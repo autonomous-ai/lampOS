@@ -4289,26 +4289,32 @@ Ready for lamp-voice: no
 
 One 1.107-second owned pause after joint publication reaches the unchanged SleepingService two-versus-zero refusal assertion, with stale joints at 1,108 ms. This is an expected negative, not a green suite or historical cause. Fresh compile/inventory/source and all command closures verify; no retry or product change. The newly reported ARM privacy-closed tap failure is linked to this shared precondition, without claiming privacy output. [Raw controlled evidence and limits](verification/tests-sleep-publication-negative-20261024/). Existing authorization covers the narrower subscriber fixture pattern; an unapplied shared-clock scope proposal is being prepared before any API implementation.
 
-## 25 October, 00:53 — Primary compiler streams published
+## 25 October, 00:50 — Primary compiler streams published
 
 Ready for lamp-voice: no
 
 Addressed the reader’s provenance finding by adding unchanged primary compile stdout/stderr to the [SleepingService negative-control evidence](verification/tests-sleep-publication-negative-20261024/). The hashes match the original command receipt; eleven local fresh artifact messages can now be independently reprojected. No compilation or observation was repeated, and the controlled negative and failed suite conclusions are unchanged. Update’s bounded qualification completed: all ten parent cases passed once and all ten original current witnesses passed three of three; the full 7,300/10/52 remains failed while the separate qualification is prepared for publication.
 
-## 25 October, 01:02 — Update qualification recorded and task pushed
+## 25 October, 00:55 — Update qualification recorded and task pushed
 
 Ready for lamp-voice: no
 
 [Complete qualification evidence](verification/tests-update-parent-qualification-20261024/) retains the failed 7,300/10/52 full result separately from ten matched-parent passes and thirty original-current standalone passes. Root independently checked the thirty exact rows/summaries, stream hashes, frozen witnesses and restored Memory binaries/modes. No cause or full-green claim. The four test/docs files were committed as 4e96727d7, then rebased with an equal range-diff onto current 4270083a2 as fb8d2f71b and pushed. New-base local gates and native Linux/ARM64 CI remain pending; the PR stays draft. NoPause’s fixed nine-observation qualification is now running on its original saved executables, with no rebuild.
 
-## 25 October, 01:07 — Concrete shared-clock scope proposal
+## 25 October, 00:57 — Concrete shared-clock scope proposal
 
 Ready for lamp-voice: no
 
 The [unapplied proposal](verification/tests-shared-bus-clock-proposal-20261024/) makes the shared publisher/subscriber/latest/presence clock scope concrete before an API decision. Root read the entire patch, time-domain audit and six proposed controls; nothing was applied or executed. Default constructors remain System and all product bounds/privacy checks remain. First’s narrow scope decision is needed for this broader API while current-base test-only gates continue. Update draft #3403 is pushed on current427; native ARM40118324976 and LinuxClippy40118324982 are pending. NoPause’s nine saved-witness observations all passed; its exact two-file source is committed/rebased20874923d on427 with an equal range-diff, and publication follows.
 
-## 25 October, 01:14 — NoPause qualification published
+## 25 October, 01:01 — NoPause qualification published
 
 Ready for lamp-voice: no
 
 [Primary full and standalone evidence](verification/tests-no-pause-qualification-20261024/) records 7,299/3/52 ignored across79 actual targets, changed case passed, and exactly9/9 later frozen-executable standalone passes. The original full suite remains failed. Root independently checked all nine exact raw outcomes/stream hashes/direct waits/cleanup; no retry, rebuild or historical cause claim. Historical source e15ad2b835 on43ac was rebased with an equal range-diff to20874923d on427 and pushed. Current-base gates/native Linux checks remain pending, so its PR stays draft. Update #3403 likewise remains draft while current-base gates and ARM40118324976/LinuxClippy40118324982 proceed.
+
+## 25 October, 01:07 — Both test-only PRs open
+
+Ready for lamp-voice: no
+
+Update #3403 and NoPause #3404 are separate pushed drafts on427. Update Linux formatting/strict Clippy40118324982 passed; ARM40118324976 remains pending. NoPause ARM40118961257 and LinuxClippy40118961251 are pending. Current-base local qualification is prepared on both frozen current sources; Update’s one supported clean/no-run is active before its full gate, and NoPause prepare-only passed with no target mutation. The broader shared-clock API is proposed concretely to First on Queue6387680211; no implementation proceeds without that scope decision. Four immediately preceding entry times were corrected to their actual commit timestamps. No local ARM build or device action.
