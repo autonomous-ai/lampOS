@@ -1,0 +1,61 @@
+{
+  "state": "FROZEN_PENDING_RELEASE_PIN_AND_ROOT_GRANT",
+  "execution_allowed": false,
+  "release_path": "/private/tmp/fourth-combined-private-callback-gates-20261024/linux/attempt1/terminal.json",
+  "release_sha256": null,
+  "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+  "controls": [
+    {
+      "name": "name",
+      "root": "/private/tmp/fourth-common-callback-name-mutant-20261024",
+      "branch": "fourth/common-callback-name-mutant-20261024",
+      "head": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+      "tree": "00b069d03bf88d098f632dd155596892a582d72b",
+      "good_tree": "be860815986f43c8a1b37a8ac50a210216977039",
+      "owned_paths": [
+        "lampOS/crates/voice/src/second_provider/worker.rs",
+        "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+        "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs"
+      ],
+      "mutant_patch_sha256": "4335ba85f77854905f3ae6f52ed662154f02a16c2e7d235039e6a41555cb99c5",
+      "delta_from_good_only": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "expected_failure_types": [
+        "denied_neutral_completion",
+        "name_payload"
+      ]
+    },
+    {
+      "name": "hits",
+      "root": "/private/tmp/fourth-common-callback-hits-mutant-20261024",
+      "branch": "fourth/common-callback-hits-mutant-20261024",
+      "head": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+      "tree": "79e236eaa933f24991158437eb99404165050d08",
+      "good_tree": "be860815986f43c8a1b37a8ac50a210216977039",
+      "owned_paths": [
+        "lampOS/crates/voice/src/second_provider/worker.rs",
+        "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+        "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs"
+      ],
+      "mutant_patch_sha256": "feb7d52879366dca54a5ccda34e71cdf2d4bc044d7f2e56c76556cfbf3e7c582",
+      "delta_from_good_only": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "expected_failure_types": [
+        "denied_neutral_completion",
+        "private_io",
+        "hits_payload"
+      ]
+    }
+  ],
+  "exact_test": "second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch",
+  "good_frozen_path": "/private/tmp/fourth-combined-private-callback-gates-20261024/frozen.json",
+  "good_frozen_sha256": "b207ba40d0e4254e0653206d88370771832a7a3395b3b1ce171e2e9f1678df4a",
+  "limits_seconds": {
+    "metadata": 300,
+    "clean": 300,
+    "compile": 1800,
+    "test": 180,
+    "export": 30,
+    "cleanup_signal_grace": 5,
+    "overall_per_control": 2400
+  },
+  "input_provenance_sha256": "16c9b72a96dccb126bc3e630b8eb3107e3887d8f17e704bf5285a1d792ea8c80"
+}

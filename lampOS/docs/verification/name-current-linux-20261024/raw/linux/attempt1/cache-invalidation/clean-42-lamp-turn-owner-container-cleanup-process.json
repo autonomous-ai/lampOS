@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-42-lamp-turn-owner"
+  ],
+  "elapsed_seconds": 0.14871835399753763,
+  "exit": 0,
+  "pid": 5930,
+  "process_group": 5930,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

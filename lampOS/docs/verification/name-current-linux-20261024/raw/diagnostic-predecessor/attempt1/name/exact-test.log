@@ -1,0 +1,36 @@
+    Finished `test` profile [unoptimized] target(s) in 1.73s
+     Running unittests src/lib.rs (/target/debug/deps/lamp_voice-a0522fe25b4499c4)
+
+running 1 test
+test second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch ... 
+thread 'second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch' (4) panicked at crates/voice/src/second_provider/worker/kept_name_callback_tests.rs:73:5:
+privacy-defaults: 
+running 1 test
+test second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch ... FAILED
+
+failures:
+
+failures:
+    second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3891 filtered out; finished in 10.03s
+
+
+lamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting
+lamp-voice second: request 1 heard 6 words, the last 0 ms after the line ended
+
+thread 'second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch' (6) panicked at crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs:971:18:
+HTTP capture finishes: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3891 filtered out; finished in 10.05s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

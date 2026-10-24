@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-combined-private-139979693f59-exact-test"
+  ],
+  "elapsed_seconds": 0.13941861099738162,
+  "exit": 0,
+  "pid": 81402,
+  "process_group": 81402,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

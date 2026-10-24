@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-06-lamp-bus"
+  ],
+  "elapsed_seconds": 0.1582827729980636,
+  "exit": 0,
+  "pid": 4766,
+  "process_group": 4766,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

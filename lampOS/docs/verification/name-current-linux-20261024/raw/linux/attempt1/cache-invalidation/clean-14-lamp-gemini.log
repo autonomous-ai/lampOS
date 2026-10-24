@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-name-current/crates/gemini#lamp-gemini@0.1.0` is ignored, cleaning all versions of `lamp-gemini` found
+warning: url qualifier in `-p path+file:///src-fourth-name-current/crates/gemini#lamp-gemini@0.1.0` ignored, cleaning all versions of `lamp-gemini` found
+     Removed 62 files, 25.1MiB total

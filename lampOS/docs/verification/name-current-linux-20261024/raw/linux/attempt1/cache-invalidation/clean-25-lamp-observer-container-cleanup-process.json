@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-25-lamp-observer"
+  ],
+  "elapsed_seconds": 0.14860196800145786,
+  "exit": 0,
+  "pid": 5508,
+  "process_group": 5508,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

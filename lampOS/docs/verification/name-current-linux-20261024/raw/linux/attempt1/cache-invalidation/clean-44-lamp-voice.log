@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-name-current/crates/voice#lamp-voice@0.1.0` is ignored, cleaning all versions of `lamp-voice` found
+warning: url qualifier in `-p path+file:///src-fourth-name-current/crates/voice#lamp-voice@0.1.0` ignored, cleaning all versions of `lamp-voice` found
+     Removed 7 files, 129.1MiB total

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clippy"
+  ],
+  "elapsed_seconds": 0.1491791740008921,
+  "exit": 0,
+  "pid": 25918,
+  "process_group": 25918,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

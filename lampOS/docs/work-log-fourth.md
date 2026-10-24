@@ -8573,3 +8573,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: native callback fixture census finding corrected
 
 #3391 original ARM run40105362608 fails at the actual cross-file scratch-template invariant;6,419passed/1failed/106skipped,4,954unrun retained. [Actual unchanged source-census red/green](verification/callback-scratch-census-20261024/README.md) is standalone0/1 before and1/0 after, without changing the census. Corrected two-file candidatea4ac gives the isolated child a parent-owned0700 TMPDIR and keeps the config helper as sole path constructor; it also adds direct name observation and Unknown/empty-face negatives. New five-stage formal gates include the exact Cargo census and await the active Name owners' release. No new full passing count or activation is claimed.
+
+## 2026-10-24: current Name Linux qualification retained
+
+[Linux-only Name84239 packet](verification/name-current-linux-20261024/README.md) verifies five stages0, Voice4186/0/24 and Update388/0/4, all five controls and fresh46/source/cleanup. It retains the predecessor diagnostic aggregate1 and its explicit non-waiving handoff. Mac Update remains active; no full two-host or new native/latency/physical/activation claim. Released Linux now checks corrected callback candidatea4ac including exact Cargo scratch census.

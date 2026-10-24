@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-21-lamp-mood"
+  ],
+  "elapsed_seconds": 0.15274620199852507,
+  "exit": 0,
+  "pid": 5329,
+  "process_group": 5329,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

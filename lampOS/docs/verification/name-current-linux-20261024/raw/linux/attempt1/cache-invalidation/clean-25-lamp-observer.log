@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-name-current/crates/observer#lamp-observer@0.1.0` is ignored, cleaning all versions of `lamp-observer` found
+warning: url qualifier in `-p path+file:///src-fourth-name-current/crates/observer#lamp-observer@0.1.0` ignored, cleaning all versions of `lamp-observer` found
+     Removed 41 files, 5.6MiB total

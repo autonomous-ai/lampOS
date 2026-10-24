@@ -1,0 +1,12 @@
+{
+  "experiment_not_ordinary_voice_gate": true,
+  "frozen_sha256": "9f20def1bd289ef5aab69277a496b08e86e4af22248dd74fa677938c628a995d",
+  "prior_owner": {
+    "exit": 1,
+    "path": "/private/tmp/fourth-combined-private-callback-mutant-controls-20261024/revision1/attempt1/name/terminal.json",
+    "prior_nonzero_not_waived": true,
+    "raw_test_exit": 101,
+    "sha256": "fd27f8af1c995e286eb6da737b7d24724c9226f5a82ab686858c59d683d9ed07"
+  },
+  "tree": "79e236eaa933f24991158437eb99404165050d08"
+}

@@ -1,0 +1,74 @@
+{
+  "artifact": {
+    "executable": "/target/debug/deps/lamp_voice-a0522fe25b4499c4",
+    "features": [],
+    "filenames": [
+      "/target/debug/deps/lamp_voice-a0522fe25b4499c4"
+    ],
+    "fresh": false,
+    "manifest_path": "/src-fourth-mutant-control/crates/voice/Cargo.toml",
+    "package_id": "path+file:///src-fourth-mutant-control/crates/voice#lamp-voice@0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "/src-fourth-mutant-control/crates/voice/src/lib.rs",
+      "test": true
+    }
+  },
+  "container_executable": "/target/debug/deps/lamp_voice-a0522fe25b4499c4",
+  "full_workspace_freshness_not_claimed": true,
+  "host_executable": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/lamp_voice-a0522fe25b4499c4",
+  "validated_artifact": {
+    "external_artifact_messages_ignored": 0,
+    "fresh_compilation_evidence": "Cargo compiler-artifact fresh:false, excluding custom-build targets, with exact validated Package ID/manifest/target/source binding",
+    "stage": "compile-control",
+    "workspace_artifacts": [
+      {
+        "custom_build": false,
+        "executable": "/target/debug/deps/lamp_voice-a0522fe25b4499c4",
+        "filenames": [
+          "/target/debug/deps/lamp_voice-a0522fe25b4499c4"
+        ],
+        "fresh": false,
+        "manifest_path": "/src-fourth-mutant-control/crates/voice/Cargo.toml",
+        "manifest_sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+        "manifest_source_path": "lampOS/crates/voice/Cargo.toml",
+        "name": "lamp-voice",
+        "package_id": "path+file:///src-fourth-mutant-control/crates/voice#lamp-voice@0.1.0",
+        "profile": {
+          "debug_assertions": true,
+          "debuginfo": 0,
+          "opt_level": "0",
+          "overflow_checks": true,
+          "test": true
+        },
+        "qualifies_fresh_compilation": true,
+        "source_git_path": "lampOS/crates/voice/src/lib.rs",
+        "source_path": "/src-fourth-mutant-control/crates/voice/src/lib.rs",
+        "source_sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+        "stage": "compile-control",
+        "target_kind": [
+          "lib"
+        ],
+        "target_name": "lamp_voice",
+        "version": "0.1.0"
+      }
+    ]
+  }
+}

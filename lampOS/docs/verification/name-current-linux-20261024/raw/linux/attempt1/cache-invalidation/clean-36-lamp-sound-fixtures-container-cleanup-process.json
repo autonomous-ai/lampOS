@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-36-lamp-sound-fixtures"
+  ],
+  "elapsed_seconds": 0.14403245099674677,
+  "exit": 0,
+  "pid": 5746,
+  "process_group": 5746,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

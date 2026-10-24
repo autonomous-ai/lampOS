@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-29-lamp-ring"
+  ],
+  "elapsed_seconds": 0.1506415920011932,
+  "exit": 0,
+  "pid": 5586,
+  "process_group": 5586,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

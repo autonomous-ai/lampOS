@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-22-lamp-msgs"
+  ],
+  "elapsed_seconds": 0.1551416699985566,
+  "exit": 0,
+  "pid": 5347,
+  "process_group": 5347,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

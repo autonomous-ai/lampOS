@@ -1,0 +1,61 @@
+{
+  "buffered_panic_display_is_not_wall_clock_chronology": true,
+  "cargo_exit": 101,
+  "child_numeric_exit": null,
+  "child_numeric_exit_note": "Captured fixture wrapper does not print numeric child status",
+  "classification": "EXPECTED_NEGATIVE_POLICY_REJECTION",
+  "disclosure_not_inferred": true,
+  "embedded_child_summary": {
+    "failed": 1,
+    "filtered": 3891,
+    "ignored": 0,
+    "measured": 0,
+    "passed": 0,
+    "status": "FAILED"
+  },
+  "failure_kind": "private_io",
+  "first_child_failure": {
+    "column": 13,
+    "line": 963,
+    "message": "assertion `left == right` failed: private I/O is checked even if final HTTP dispatch was denied: silent\n  left: 1\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\nFAILED\n\nfailures:\n\nfailures:\n    second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3891 filtered out; finished in 0.10s\n\nerror: test failed, to rerun pass `-p lamp-voice --lib`",
+    "path": "crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs"
+  },
+  "negative_case_proof": "Exact reviewed silent-first loop; first child panic at approved assertion; silent-success marker absent",
+  "no_independent_nested_test_count": true,
+  "outer_final_target_summary": {
+    "failed": 1,
+    "filtered": 3891,
+    "ignored": 0,
+    "measured": 0,
+    "passed": 0,
+    "status": "FAILED"
+  },
+  "raw_summaries": [
+    {
+      "failed": 1,
+      "filtered": 3891,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 0,
+      "status": "FAILED"
+    },
+    {
+      "failed": 1,
+      "filtered": 3891,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 0,
+      "status": "FAILED"
+    }
+  ],
+  "reason": "Exact silent-first fixture boundary; no silent completion; source/compile/binary/cleanup proof required independently",
+  "rpc_count_observed": null,
+  "running_binary": "/target/debug/deps/lamp_voice-a0522fe25b4499c4",
+  "valid_expected_negative_rejection": true,
+  "wrapper_failure": {
+    "column": 5,
+    "line": 73,
+    "message": "privacy-defaults: \nrunning 1 test\ntest second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch ... FAILED\n\nfailures:\n\nfailures:\n    second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3891 filtered out; finished in 0.08s\n\n\nlamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting\nlamp-voice second: request 1 heard 6 words, the last 0 ms after the line ended\nlamp-voice second: chat request 155 bytes, 2 messages, 0 tools; its answer began in 2 ms; the first request of this client\nlamp-voice second: chat answer: no words or call and its end 2 ms after it was asked; no usage given\nlamp-voice second: request 1 chat round 1 first event in 5 ms",
+    "path": "crates/voice/src/second_provider/worker/kept_name_callback_tests.rs"
+  }
+}

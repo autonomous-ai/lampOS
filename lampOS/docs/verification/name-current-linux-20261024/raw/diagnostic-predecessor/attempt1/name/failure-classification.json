@@ -1,0 +1,10 @@
+{
+  "buffered_panic_display_is_not_wall_clock_chronology": true,
+  "cargo_exit": 101,
+  "child_numeric_exit": null,
+  "child_numeric_exit_note": "Captured fixture wrapper does not print numeric child status",
+  "classification": "INCONCLUSIVE",
+  "no_independent_nested_test_count": true,
+  "reason": "Observed failure type is not approved for this historical-policy mutant",
+  "valid_expected_negative_rejection": false
+}

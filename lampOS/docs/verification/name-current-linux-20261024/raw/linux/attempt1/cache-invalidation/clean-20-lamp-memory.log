@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-name-current/crates/memory#lamp-memory@0.1.0` is ignored, cleaning all versions of `lamp-memory` found
+warning: url qualifier in `-p path+file:///src-fourth-name-current/crates/memory#lamp-memory@0.1.0` ignored, cleaning all versions of `lamp-memory` found
+     Removed 167 files, 60.8MiB total

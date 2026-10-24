@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-31-lamp-schedule"
+  ],
+  "elapsed_seconds": 0.14676269199844683,
+  "exit": 0,
+  "pid": 5629,
+  "process_group": 5629,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

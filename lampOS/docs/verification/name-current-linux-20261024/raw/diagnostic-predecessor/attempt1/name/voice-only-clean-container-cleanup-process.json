@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-combined-private-139979693f59-voice-only-clean"
+  ],
+  "elapsed_seconds": 0.14331976500034216,
+  "exit": 0,
+  "pid": 73841,
+  "process_group": 73841,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

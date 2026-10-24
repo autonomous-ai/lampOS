@@ -1,0 +1,73 @@
+{
+  "base": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "branch": "fourth/name-current-carry-20261024",
+  "frozen_sha256": "e41e49a05c031f36c6c8117c689d019ddc2061cb92eed0e6d170154d6783a786",
+  "helpers": {
+    "cache.py": {
+      "bytes": 10654,
+      "helper_code_not_included": true,
+      "sha256": "de6f8b4418b61605846aa230022754f045a557feb2eeae7cc3c1adb840e221e9"
+    },
+    "gate.py": {
+      "bytes": 33899,
+      "helper_code_not_included": true,
+      "sha256": "1354752278c84717ac06edc6648f5d88c81e6f0610ab591cb103e35572a35216"
+    }
+  },
+  "outside_owned_base_exact": 10449,
+  "owned_paths": {
+    "lampOS/crates/update/tests/install.rs": {
+      "bytes": 176164,
+      "git_blob": "2aedddbc60a34da0f8c8f74190f3d72db5f3e1fd",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792852329871621963,
+      "sha256": "a1a28359bc481a51d9557209735bb96ea04f0fe2584e0ab4185c8d11e9d31847"
+    },
+    "lampOS/deploy/product/lamp-voice.service": {
+      "bytes": 14572,
+      "git_blob": "66cf7d980bb3b22802649db871a7f7bb6fe0f117",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792852329872667384,
+      "sha256": "2aeece0f9d10a5ff2006e5a905eb03ab6314f0e4148a816ca921ade577a85221"
+    },
+    "lampOS/docs/second-voice.md": {
+      "bytes": 316123,
+      "git_blob": "d309475475c33dcda71e9e970634086e3e416613",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792852329873183210,
+      "sha256": "8664d1ccbcf2a24c14447a601e80dbe8bbdfe64a43ab1e6dafcb0b0080a3879b"
+    },
+    "lampOS/docs/switches.md": {
+      "bytes": 309249,
+      "git_blob": "34e1b55f7fb7b1f210f2ede7634326a7fa2e82e0",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792852329874827853,
+      "sha256": "5a95c7479a1ac8e917a7386d55a5eab5ad7cba7ff2cf8a21202745fcd146bd20"
+    },
+    "lampOS/docs/verification/known-name-product-prep-20261022/README.md": {
+      "bytes": 6375,
+      "git_blob": "3a76115ce622757d46ce2b4dba97acfcd777ae35",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792852521873711512,
+      "sha256": "0e3e196f0aa9d57cacc1dab2b9d0a561ccd4b39f491c877d5b1a06e30db29835"
+    }
+  },
+  "reconstruction": {
+    "semantic_index_sha256": "205533602ea33608ea3e4d48c7bcbaaa0162b9f121f25a3b665f244032e51f5a",
+    "source_files": 10454,
+    "tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7"
+  },
+  "source_files": 10454,
+  "source_root": "/private/tmp/fourth-name-current-carry-20261024",
+  "tested_tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7"
+}

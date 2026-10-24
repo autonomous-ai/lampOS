@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-name-current/crates/lean#lamp-lean@0.1.0` is ignored, cleaning all versions of `lamp-lean` found
+warning: url qualifier in `-p path+file:///src-fourth-name-current/crates/lean#lamp-lean@0.1.0` ignored, cleaning all versions of `lamp-lean` found
+     Removed 38 files, 3.6MiB total

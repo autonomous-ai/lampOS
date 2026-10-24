@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-fmt"
+  ],
+  "elapsed_seconds": 0.15165683699888177,
+  "exit": 0,
+  "pid": 6917,
+  "process_group": 6917,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

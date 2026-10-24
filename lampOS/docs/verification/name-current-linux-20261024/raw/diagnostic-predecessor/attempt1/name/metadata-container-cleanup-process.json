@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-combined-private-139979693f59-metadata"
+  ],
+  "elapsed_seconds": 0.14268876899950556,
+  "exit": 0,
+  "pid": 72845,
+  "process_group": 72845,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

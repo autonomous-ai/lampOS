@@ -1,0 +1,19 @@
+{
+  "at_unix": 1792854758.5958772,
+  "authorized_by": "Fourth: Name84239 exact five-stage design reviewed; mutation experiments ended with retained inconclusive name result and proved hits rejection, cleanup/source/release confirmed; exclusive Linux target granted",
+  "design_sha256": "04f1e377bc6a9fcca04400d14ae300d2eb45b0a46ca328dc1a7347823ca423eb",
+  "frozen_sha256": "e41e49a05c031f36c6c8117c689d019ddc2061cb92eed0e6d170154d6783a786",
+  "no_lamp_action": true,
+  "previous_release": {
+    "diagnostic_only": false,
+    "exit": 1,
+    "no_cache_freshness_inferred_from_handoff": true,
+    "path": "/private/tmp/fourth-combined-private-callback-mutant-controls-20261024/revision1/attempt1/terminal.json",
+    "prior_failure_not_waived": true,
+    "prior_failures": [],
+    "prior_source_stable": true,
+    "sha256": "c67b6aca03c0a4aa297e81171939b53e42723d695a8dbd19bf5b4641d153256d",
+    "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024"
+  },
+  "tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7"
+}

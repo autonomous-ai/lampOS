@@ -1,0 +1,7 @@
+{
+  "allow_sequential_after_inconclusive": true,
+  "authorized_by": "Fourth: exact two one-function source mutants, source/fresh artifact/negative-boundary/cleanup design reviewed; exclusive released Linux target granted for sequential independent controls; inconclusive outcomes remain nonzero and are not waived",
+  "prepared_design_sha256": "7bb20c67e5c5b8bce0e28e574a91e7e52d69a7d7612de831355deb1a27cfc8f3",
+  "release_path": "/private/tmp/fourth-combined-private-callback-gates-20261024/linux/attempt1/terminal.json",
+  "release_sha256": "e05a0f89bc8935e048847c1ad9776f82eb9c311dfd5ffbe1c881b5c1312fda36"
+}

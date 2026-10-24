@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-name-current/crates/ipc#lamp-ipc@0.1.0` is ignored, cleaning all versions of `lamp-ipc` found
+warning: url qualifier in `-p path+file:///src-fourth-name-current/crates/ipc#lamp-ipc@0.1.0` ignored, cleaning all versions of `lamp-ipc` found
+     Removed 78 files, 3.9MiB total

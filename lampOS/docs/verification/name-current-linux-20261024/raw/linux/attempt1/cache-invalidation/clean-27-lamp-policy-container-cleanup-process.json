@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-27-lamp-policy"
+  ],
+  "elapsed_seconds": 0.15369357699819375,
+  "exit": 0,
+  "pid": 5549,
+  "process_group": 5549,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

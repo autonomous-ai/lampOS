@@ -1,0 +1,29 @@
+{
+  "state": "ROOT_APPROVED",
+  "complete_config_design_validated": true,
+  "reviewed_by": "Fourth",
+  "source_tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7",
+  "config_sha256": "d8bc7cd4a96d44a9e343eb6a3b4f8d6385afb1e6b5478fd0974cfee7d970ad5b",
+  "frozen_sha256": "e41e49a05c031f36c6c8117c689d019ddc2061cb92eed0e6d170154d6783a786",
+  "design_sha256": "04f1e377bc6a9fcca04400d14ae300d2eb45b0a46ca328dc1a7347823ca423eb",
+  "platforms": {
+    "mac": {
+      "state": "ROOT_GRANTED",
+      "authorized_by": "Fourth: Name84239 five-file source/runtime parity, five-stage design and currentbe860 Mac release reviewed; exclusive target granted",
+      "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+      "release_receipt": "/private/tmp/fourth-combined-private-callback-gates-20261024/mac/attempt1/terminal.json",
+      "release_receipt_sha256": "17dba7e03de0fd3e7017dc9aafc88ddf030afc219f074853f8598c840e35b474",
+      "expected_release_exit": 0
+    },
+    "linux": {
+      "state": "ROOT_GRANTED",
+      "authorized_by": "Fourth: Name84239 exact five-stage design reviewed; mutation experiments ended with retained inconclusive name result and proved hits rejection, cleanup/source/release confirmed; exclusive Linux target granted",
+      "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+      "release_receipt": "/private/tmp/fourth-combined-private-callback-mutant-controls-20261024/revision1/attempt1/terminal.json",
+      "release_receipt_sha256": "c67b6aca03c0a4aa297e81171939b53e42723d695a8dbd19bf5b4641d153256d",
+      "expected_release_exit": 1,
+      "accept_prior_diagnostic_failure": true
+    }
+  },
+  "note": "Linux remains ungranted while independent mutation controls own it; no prior outcome waived."
+}

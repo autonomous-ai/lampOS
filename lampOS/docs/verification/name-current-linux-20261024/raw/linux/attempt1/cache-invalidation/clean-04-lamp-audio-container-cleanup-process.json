@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-04-lamp-audio"
+  ],
+  "elapsed_seconds": 0.15158389900170732,
+  "exit": 0,
+  "pid": 3830,
+  "process_group": 3830,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

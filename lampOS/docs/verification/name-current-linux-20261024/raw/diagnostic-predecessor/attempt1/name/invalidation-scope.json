@@ -1,0 +1,7 @@
+{
+  "all_metadata_members": 46,
+  "exact_clean_spec": "path+file:///src-fourth-mutant-control/crates/voice#lamp-voice@0.1.0",
+  "not_cleaned_other_local_members": 45,
+  "selected_packages": 1,
+  "separate_prerequisite_not_test_pass": true
+}

@@ -1,0 +1,18 @@
+{
+  "prepared_only": true,
+  "source_frozen": true,
+  "target_grant_pending": true,
+  "release_pin_pending": true,
+  "files": {
+    "host.py": "0b2a42a3e48f9ee456dcf098537e209ba27931a6de120a5269aec3a2a88f94c7",
+    "cache.py": "de6f8b4418b61605846aa230022754f045a557feb2eeae7cc3c1adb840e221e9",
+    "config.json": "6f8780cbd3ca7cb40349c49e06fe6e56623519e5ea72e179f303a0a28b06a2a5",
+    "controls.json": "0a7792b40dc1b1f31f32f001c08a1b8f0db12f6fa69a329dd150fbde14637716",
+    "name-frozen.json": "32fa3db5dc9a44dca1284d82255dea99e331e0a68090a0528d166ffcb0c535dc",
+    "hits-frozen.json": "9f20def1bd289ef5aab69277a496b08e86e4af22248dd74fa677938c628a995d",
+    "source-validation.json": "5c51c982aa899401c73f4c26c134a4ecc00fe4c75106d22b0c165630733c6f89",
+    "runner.py": "b3e0b3740ebf029fbdaa37eade8d93f0bc2bf191a414d6ed66b80429a3af62e1",
+    "evidence.py": "60bfe44c8a4679988e376d9d96218b466bb810f40bb610a7174ff8992a12e877",
+    "freeze.py": "38bbbb3201dcc590b69a23d51f3a3f14aa2e0ceb4de77ea86bc4f134287b0a47"
+  }
+}

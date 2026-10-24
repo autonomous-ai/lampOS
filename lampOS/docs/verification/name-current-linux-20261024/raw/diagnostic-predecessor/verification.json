@@ -1,0 +1,39 @@
+{
+  "aggregate_exit": 1,
+  "captured_binary_hashes_stage_time_only": true,
+  "explicit_root_accept_prior_diagnostic_failure": true,
+  "no_current_cache_read": true,
+  "no_previous_failure_waived": true,
+  "normal_voice_gate_pass": false,
+  "outcomes": [
+    {
+      "child_numeric_exit": null,
+      "description": "Cargo101, observed child HTTP capture timeout; inconclusive; no actual negative-policy assertion coverage credited",
+      "experiment_exit": 1,
+      "fresh46_not_claimed": true,
+      "name": "name",
+      "nested_copies_not_independent_tests": true,
+      "ordinary_voice_gate_pass": false,
+      "outcome": "INCONCLUSIVE",
+      "raw_cargo_test_exit": 101,
+      "raw_nested_and_outer_summaries_retained": true,
+      "source_cleanup_released": true,
+      "stage_time_binary_sha256": "eb3fb21743d2b84513b5eaf960512083631788f4dfd3e5574e707bddb177a5d6"
+    },
+    {
+      "child_numeric_exit": null,
+      "description": "Cargo101, actual silent private-I/O assertion left1/right0; expected rejection only, never normal Voice pass",
+      "experiment_exit": 0,
+      "fresh46_not_claimed": true,
+      "name": "hits",
+      "nested_copies_not_independent_tests": true,
+      "ordinary_voice_gate_pass": false,
+      "outcome": "EXPECTED_NEGATIVE_POLICY_REJECTION",
+      "raw_cargo_test_exit": 101,
+      "raw_nested_and_outer_summaries_retained": true,
+      "source_cleanup_released": true,
+      "stage_time_binary_sha256": "b7e0e6ba08717abf018e9f5d5f0ad49aedcc384444bf9209a66864f220a25668"
+    }
+  ],
+  "source_stable_cleanup_release_verified": true
+}

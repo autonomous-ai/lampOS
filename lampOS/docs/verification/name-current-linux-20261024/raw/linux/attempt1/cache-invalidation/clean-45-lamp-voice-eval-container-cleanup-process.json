@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-name-current-01ef394a3f48-clean-45-lamp-voice-eval"
+  ],
+  "elapsed_seconds": 0.13820350900277845,
+  "exit": 0,
+  "pid": 5984,
+  "process_group": 5984,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

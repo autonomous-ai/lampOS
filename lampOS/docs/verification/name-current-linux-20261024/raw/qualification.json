@@ -1,0 +1,231 @@
+{
+  "base": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "compiler_output_hashes_stage_time_only": true,
+  "current_source_index_refs_mtimes_targets_cache_not_read_or_written": true,
+  "diagnostic_predecessor_retained": [
+    {
+      "child_numeric_exit": null,
+      "description": "Cargo101, observed child HTTP capture timeout; inconclusive; no actual negative-policy assertion coverage credited",
+      "experiment_exit": 1,
+      "fresh46_not_claimed": true,
+      "name": "name",
+      "nested_copies_not_independent_tests": true,
+      "ordinary_voice_gate_pass": false,
+      "outcome": "INCONCLUSIVE",
+      "raw_cargo_test_exit": 101,
+      "raw_nested_and_outer_summaries_retained": true,
+      "source_cleanup_released": true,
+      "stage_time_binary_sha256": "eb3fb21743d2b84513b5eaf960512083631788f4dfd3e5574e707bddb177a5d6"
+    },
+    {
+      "child_numeric_exit": null,
+      "description": "Cargo101, actual silent private-I/O assertion left1/right0; expected rejection only, never normal Voice pass",
+      "experiment_exit": 0,
+      "fresh46_not_claimed": true,
+      "name": "hits",
+      "nested_copies_not_independent_tests": true,
+      "ordinary_voice_gate_pass": false,
+      "outcome": "EXPECTED_NEGATIVE_POLICY_REJECTION",
+      "raw_cargo_test_exit": 101,
+      "raw_nested_and_outer_summaries_retained": true,
+      "source_cleanup_released": true,
+      "stage_time_binary_sha256": "b7e0e6ba08717abf018e9f5d5f0ad49aedcc384444bf9209a66864f220a25668"
+    }
+  ],
+  "draft_proposal_still_hold": true,
+  "five_stages": [
+    {
+      "compiler_output_hashes_stage_time_only": true,
+      "controls": [
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "tests/install.rs",
+          "matches": [
+            {
+              "cargo_target": "tests/install.rs",
+              "name": "the_product_sees_who_speaks",
+              "status": "ok"
+            }
+          ],
+          "name": "the_product_sees_who_speaks",
+          "observed_once_passed": true
+        }
+      ],
+      "current_cache_outputs_not_read": true,
+      "freshly_compiled_local_members": 46,
+      "no_mac_qualification": true,
+      "platform": "linux",
+      "prior_aggregate_failure_not_waived": true,
+      "source_stable_and_cleanup_verified": true,
+      "stages": [
+        {
+          "bound_seconds": 300,
+          "elapsed_seconds": 12.756960687998799,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "a853a2d55baea61cf84f8c5241a70be22c690eef10c69363377ee584b22994c7",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "fmt",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 388.4768075519969,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "4d13f30405baf32282e6ff4fa41a7239593e1c4550f6af821f2aad478af88f9d",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "clippy",
+          "stdout_sha256": "4daa11a77146a795ca07853102d60d9d3fca7f08ebb158f64184c8594e63b7c1"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 222.3066878119971,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "f1a35c74f1d6205714782cb23520438b1d0d96b89b6b507e8d464f908127d517",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "workspace-build",
+          "stdout_sha256": "51e9365b10a8378cbb494e7ca8d0e30568a7d74e2db19c4da3ca56c184496dec"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 955.0427054930005,
+          "exact_control_count": 4,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4186
+          },
+          "process_sha256": "392db6a2f953a3c73f52d8579ed4b2785a2a0cdbede81a1057e72339d31d97d3",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4186
+          },
+          "stage": "full-voice",
+          "stdout_sha256": "ad72d46d0c1134ab1820a55375cd594f91ab51cb93c8939188ef11f7ebb38904"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 248.52226821800286,
+          "exact_control_count": 1,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 4,
+            "passed": 388
+          },
+          "process_sha256": "0eb604b86ae91a0f347cf0f4356ece015797c21c5034ac72bea20a7f9c62152a",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 4,
+            "passed": 388
+          },
+          "stage": "full-update",
+          "stdout_sha256": "1285903e49dce6dde4d3153536e6564279c64a75702f8c59922a78f15b453d63"
+        }
+      ],
+      "terminal_sha256": "20b462c4b15770419a834788ba3c5a33ffe6699c8d131da47c4853bdacf0a375",
+      "tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7",
+      "update_counts": {
+        "failed": 0,
+        "ignored": 4,
+        "passed": 388
+      },
+      "voice_counts": {
+        "failed": 0,
+        "ignored": 24,
+        "passed": 4186
+      }
+    }
+  ],
+  "historical_112_and_5_547_are_not_current_measurements": true,
+  "linux_gate_verified": true,
+  "mac_active_not_read_or_qualified": true,
+  "name_tested_tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7",
+  "not_claimed": [
+    "current latency measurements",
+    "physical lamp behavior",
+    "pins measured",
+    "product activation/readiness",
+    "Mac gate pass",
+    "ARM64 qualification"
+  ],
+  "root_explicit_diagnostic_handoff": true
+}

@@ -1,0 +1,13 @@
+{
+  "experiment_not_ordinary_voice_gate": true,
+  "frozen_sha256": "32fa3db5dc9a44dca1284d82255dea99e331e0a68090a0528d166ffcb0c535dc",
+  "prior_owner": {
+    "exit": 0,
+    "path": "/private/tmp/fourth-combined-private-callback-gates-20261024/linux/attempt1/terminal.json",
+    "sha256": "e05a0f89bc8935e048847c1ad9776f82eb9c311dfd5ffbe1c881b5c1312fda36",
+    "source_stable": true,
+    "target_release_permitted": true,
+    "tree": "be860815986f43c8a1b37a8ac50a210216977039"
+  },
+  "tree": "00b069d03bf88d098f632dd155596892a582d72b"
+}

@@ -1,0 +1,63 @@
+{
+  "at_unix": 1792854449.023146,
+  "exit": 1,
+  "expected_rejections": 1,
+  "experiment_outcomes": [
+    {
+      "child_numeric_exit": null,
+      "elapsed_seconds": 225.5799652249989,
+      "evidence_export_completed": true,
+      "exit": 1,
+      "full_workspace_fresh46_claim": false,
+      "name": "name",
+      "ordinary_voice_gate_pass": false,
+      "prior_owner": {
+        "exit": 0,
+        "path": "/private/tmp/fourth-combined-private-callback-gates-20261024/linux/attempt1/terminal.json",
+        "sha256": "e05a0f89bc8935e048847c1ad9776f82eb9c311dfd5ffbe1c881b5c1312fda36",
+        "source_stable": true,
+        "target_release_permitted": true,
+        "tree": "be860815986f43c8a1b37a8ac50a210216977039"
+      },
+      "raw_test_exit": 101,
+      "source_stable": true,
+      "stage_time_binary_sha256": "eb3fb21743d2b84513b5eaf960512083631788f4dfd3e5574e707bddb177a5d6",
+      "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+      "target_release_permitted": true,
+      "tree": "00b069d03bf88d098f632dd155596892a582d72b",
+      "valid_expected_negative_rejection": false
+    },
+    {
+      "child_numeric_exit": null,
+      "elapsed_seconds": 146.5449808129997,
+      "evidence_export_completed": true,
+      "exit": 0,
+      "full_workspace_fresh46_claim": false,
+      "name": "hits",
+      "ordinary_voice_gate_pass": false,
+      "prior_owner": {
+        "exit": 1,
+        "path": "/private/tmp/fourth-combined-private-callback-mutant-controls-20261024/revision1/attempt1/name/terminal.json",
+        "prior_nonzero_not_waived": true,
+        "raw_test_exit": 101,
+        "sha256": "fd27f8af1c995e286eb6da737b7d24724c9226f5a82ab686858c59d683d9ed07"
+      },
+      "raw_test_exit": 101,
+      "source_stable": true,
+      "stage_time_binary_sha256": "b7e0e6ba08717abf018e9f5d5f0ad49aedcc384444bf9209a66864f220a25668",
+      "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+      "target_release_permitted": true,
+      "tree": "79e236eaa933f24991158437eb99404165050d08",
+      "valid_expected_negative_rejection": true
+    }
+  ],
+  "full_workspace_fresh46_claim": false,
+  "ordinary_voice_gate_pass": false,
+  "raw_test_exits": [
+    101,
+    101
+  ],
+  "source_stable": true,
+  "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+  "target_release_permitted": true
+}

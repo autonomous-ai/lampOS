@@ -1,0 +1,50 @@
+warning: function `hits_note_permitted` is never used
+    --> crates/voice/src/remember.rs:4475:15
+     |
+4475 | pub(crate) fn hits_note_permitted(
+     |               ^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `lamp-voice` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 1.96s
+     Running unittests src/lib.rs (/target/debug/deps/lamp_voice-a0522fe25b4499c4)
+
+running 1 test
+test second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch ... 
+thread 'second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch' (4) panicked at crates/voice/src/second_provider/worker/kept_name_callback_tests.rs:73:5:
+privacy-defaults: 
+running 1 test
+test second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch ... FAILED
+
+failures:
+
+failures:
+    second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3891 filtered out; finished in 0.08s
+
+
+lamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting
+lamp-voice second: request 1 heard 6 words, the last 0 ms after the line ended
+lamp-voice second: chat request 155 bytes, 2 messages, 0 tools; its answer began in 2 ms; the first request of this client
+lamp-voice second: chat answer: no words or call and its end 2 ms after it was asked; no usage given
+lamp-voice second: request 1 chat round 1 first event in 5 ms
+
+thread 'second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch' (6) panicked at crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs:963:13:
+assertion `left == right` failed: private I/O is checked even if final HTTP dispatch was denied: silent
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3891 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

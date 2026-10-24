@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-name-current/crates/schedule#lamp-schedule@0.1.0` is ignored, cleaning all versions of `lamp-schedule` found
+warning: url qualifier in `-p path+file:///src-fourth-name-current/crates/schedule#lamp-schedule@0.1.0` ignored, cleaning all versions of `lamp-schedule` found
+     Removed 80 files, 44.9MiB total
