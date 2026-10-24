@@ -1,0 +1,16 @@
+{
+  "attempt": 2,
+  "conclusion": "success",
+  "event": "pull_request",
+  "headSha": "8f5c600c1562d7e2459ddd03ccb999206fdf48ad",
+  "status": "completed",
+  "run": 40077708256,
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T08:37:09.3841333Z      Summary [ 203.328s] 11199 tests run: 11199 passed (1 leaky), 92 skipped"
+  ],
+  "previously_failed_control": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T08:36:52.6231817Z         PASS [   0.006s] ( 9845/11199) lamp-voice second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy"
+  ],
+  "primary_log_sha256": "1fc0d767e4d94582221a0628221492e732c37358288bb3d4f4f469f274333694",
+  "scope": "one same-head failed-job recheck; original failure remains retained; a pass does not establish original-clock cause"
+}

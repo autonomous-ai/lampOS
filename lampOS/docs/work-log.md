@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-24 15:40 +07, Settings author gates complete
+
+#3347 `8f5c600c1` has all green author gates: Mac **48/0/3 ignored**,
+fmt/strict Clippy, identical-tree offline Linux fmt; official dedicated
+**2/0/3 filtered**, Linux Clippy, ordinary ARM64 attempt 2 **11,198 PASS +
+1 LEAK**, 92 skipped, zero failed/unrun. [Native proof](verification/settings-native-20261024/README.md)
+retains original missing-input 0/2 and original ordinary room-clock failure
+with 1,351 unrun. Retry success does not establish its cause; existing #3190
+owns the fixture-clock repair. Reviewer source/native read has no P1/P2;
+reader's own local gate and renewed final disposition remain pending.
+
+Independent #3349 `6213596a3` ordered-epoch source/focused read is READ-OK:
+**26/0**, Mac fmt/strict Clippy, exact Linux fmt, 6,991 unchanged source
+hashes. It stays stacked behind #3344; official native/base qualification
+is separate. No delayed-filesystem, camera/slide, latency or activation claim.
+
+#3327, #3334 and #3342 remain cleared and submitted to the train. #3330 stays
+draft for parent #3327 integration and final conflict carry; prepared source
+and eight-case gates/read are clear. Second owns no lamp: #2810 attended
+window and #1812 trusted key remain external blocks. Next: current Settings
+reader disposition, epoch native read and incoming findings; package final
+carry immediately after parent integration. No manual merge or base-only carry.
+
+---
+
 ## Current checkpoint: 2026-10-24 15:19 +07, Settings qualification pushed
 
 New claimed #2809 Settings slice is draft #3347, now `8f5c600c1`.
