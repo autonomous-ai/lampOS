@@ -1,3 +1,12 @@
+# Current disposition: source HOLD cleared on 031990a89
+
+The [monotonic repair and eight independent controls](monotonic-repair-031990a89/README.md)
+clear Second's reproduced clock-span source finding. Broader exact-head
+Mac/native and physical/activation qualification remain separate. The
+original failing-head evidence below is retained unchanged.
+
+---
+
 # #3355 corrected-head reader: forward-clock persistence finding
 
 Exact authored head `51925472d61d712db1d2169edd9d33892c9ac9d8`.

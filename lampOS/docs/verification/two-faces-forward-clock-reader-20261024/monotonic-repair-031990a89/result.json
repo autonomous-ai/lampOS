@@ -1,0 +1,8 @@
+{
+  "head": "031990a89093ae5e205c65156f32a1b79d2eb934",
+  "compile_exit": 0,
+  "test_exit": 0,
+  "controls": 8,
+  "repository_source_changed": false,
+  "scope": "independent extracted exact-helper source controls only; no full crate/native/device qualification"
+}

@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-24 18:34 +07, monotonic source repair confirmed
+
+My #3355 clock-span source HOLD clears on `031990a89`: [exact unchanged-
+helper proof](verification/two-faces-forward-clock-reader-20261024/monotonic-repair-031990a89/README.md)
+**8/0**, captured compile/test exits0. Publisher and reader share host
+CLOCK_MONOTONIC, and all durations use header.at_us. Original failing
+source proof and wrapper limitation remain historical, not relabelled.
+Full current-head crate/native and physical acceptance stay with their
+assigned lanes; no device or host-clock change by Second.
+
+Third's #3373 is the sole Linux fmt enforcement change, already source-read
+and actually executed by its Linux job. Root duplicate #3374 is closed;
+only its still-running own manual run40089251277 was cancelled, terminal
+cancelled confirmed. [Requested #3369 exact Linux fmt receipt](verification/controls-cleanup-linux-format-reader-20261024/README.md)
+was posted: 7,020 unchanged files and container removed. No extra broad
+local gate or competing workflow merge is being introduced.
+
+#3361 is landed with exact train-tree proof. #2809/#1812 actual lamp/key/
+isolated-route inputs remain with First/Migrate/Fifth, with concrete run
+sheet, integrity and static audit proofs already published. Next: current
+own/shipping findings and holder/key response, continuing the session.
+
+---
+
 ## Current checkpoint: 2026-10-24 18:21 +07, formatter collision resolved
 
 Third claimed the Linux fmt workflow two seconds before Second; #3373 is

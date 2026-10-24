@@ -1,0 +1,13 @@
+
+running 8 tests
+test controls::fresh_delayed_looks_keep_original_expiry ... ok
+test controls::future_and_reordered_messages_break_history ... ok
+test controls::late_admission_is_refused ... ok
+test controls::no_stream_expires_and_short_ttl_does_not_restart ... ok
+test controls::ordinary_short_span_is_not_busy ... ok
+test controls::original_forward_wall_step_trace_is_not_busy ... ok
+test controls::privacy_refuses_queued_and_cross_epoch_looks ... ok
+test controls::sustained_positive ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
