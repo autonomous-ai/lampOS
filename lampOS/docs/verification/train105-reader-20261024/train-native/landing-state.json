@@ -1,0 +1,26 @@
+{
+  "source_train_tested_landed_trees": {
+    "a6e780f86c4d5ab725ef9c9de7cc1c73726ad0a9": "c5b58fe5507007068a15d7bec0a83b6ee453ea98",
+    "b467ddd72dc88cd0a123cbc1f8169bc8f7400984": "c5b58fe5507007068a15d7bec0a83b6ee453ea98",
+    "b1214962a0881ec2c8cb063ebb4aa43393213fc3": "c5b58fe5507007068a15d7bec0a83b6ee453ea98",
+    "42f08cf038660ff60b3415f7c3a64740ce782fcc": "c5b58fe5507007068a15d7bec0a83b6ee453ea98"
+  },
+  "all_equal": true,
+  "source_state_at_final_read": {
+    "headRefOid": "a6e780f86c4d5ab725ef9c9de7cc1c73726ad0a9",
+    "isDraft": false,
+    "state": "CLOSED"
+  },
+  "merged_at": "2026-10-24T22:04:32Z",
+  "original_native_chronology": {
+    "source": {
+      "completed_at": "2026-10-24T22:02:09Z",
+      "succeeded_before_merge": true
+    },
+    "train": {
+      "completed_at": "2026-10-24T22:04:12Z",
+      "succeeded_before_merge": true
+    }
+  },
+  "scope": "Final reader snapshot and source/test/landed technical proof. The bot pre-merge executor itself was not observed; this does not demonstrate remediation of train104 revocation/HOLD handling."
+}
