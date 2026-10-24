@@ -1,0 +1,11 @@
+    Checking lamp-body v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/body)
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/camera)
+    Checking lamp-controls v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/controls)
+    Checking lamp-ring v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/ring)
+    Checking lamp-health v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/health)
+    Checking lamp-audio v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/audio)
+    Checking lamp-schedule v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/schedule)
+    Checking lamp-expression v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/expression)
+    Checking lamp-voice v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/voice)
+    Checking lamp-skills v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/skills)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.12s

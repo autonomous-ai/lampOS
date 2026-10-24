@@ -1,0 +1,42 @@
+[
+  {
+    "part": "settings",
+    "old": "8f5c600c1562d7e2459ddd03ccb999206fdf48ad",
+    "new": "0844ce154da6fb515db7cf2c8c727b14853baf75",
+    "base": "b2c9eb3dd9be0721dd5a7fa9e211275906383d27",
+    "changed_non_markdown_files_unchanged": [
+      {
+        "path": ".github/workflows/lampos-settings-pair.yml",
+        "sha256": "5e56a9b8e600bea8c513c8cbd9f5ba3cf27974d47c20a4d07b8ce7dc24934d15"
+      },
+      {
+        "path": "lampOS/crates/settings/tests/release_pair.rs",
+        "sha256": "b71d5ed2366b651a1be1e9446320b69df4f832558c1f77e921b104ad21f75b01"
+      },
+      {
+        "path": "lampOS/crates/settings/tests/release_pair/fixture.rs",
+        "sha256": "20b8d1e82d94bd15aebca9419f625d81229138e45e4c7e41a787b3800be4b112"
+      }
+    ]
+  },
+  {
+    "part": "package",
+    "old": "4f44e25b49dfec41d93454f95d5d5fc70696ebad",
+    "new": "6cba8153250ad07f71db36ca66f49099a1f4d7e8",
+    "base": "b2c9eb3dd9be0721dd5a7fa9e211275906383d27",
+    "changed_non_markdown_files_unchanged": [
+      {
+        "path": "lampOS/crates/skills/tests/release_pair.rs",
+        "sha256": "a3203635e3f3275384da2340280cdf66020269ddddb039165f894eba64cfeed2"
+      },
+      {
+        "path": "lampOS/crates/skills/tests/release_pair/fixture.rs",
+        "sha256": "33c4ffcf5642c9a6b260805f9eb4abc73caabf8127fd72f45acb2bed4535f744"
+      },
+      {
+        "path": "lampOS/crates/skills/tests/release_pair/package.rs",
+        "sha256": "93033533c5bbc26809a85463949a5e7fab72afbf0194c8a62831b395d1459920"
+      }
+    ]
+  }
+]

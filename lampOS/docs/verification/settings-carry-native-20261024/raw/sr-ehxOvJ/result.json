@@ -1,0 +1,10 @@
+{
+  "actual_released_pair": true,
+  "artifacts_unchanged": true,
+  "children_reaped": 7,
+  "groups_absent": true,
+  "hardware_or_device_acceptance": false,
+  "result": "passed",
+  "rpc_count": 34,
+  "test": "release_6498_settings_reads_6408_and_6408_reads_return"
+}
