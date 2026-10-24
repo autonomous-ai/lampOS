@@ -1,0 +1,14 @@
+{
+  "head": "b33ade24771fb8e72f56df4ca1155eb591534d45",
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "retained_original": "4654cee94fc4990091001e333d49c174766e647d",
+  "tree": "36be6093499933827764110ef03be3d94a87326a",
+  "source_files": 7023,
+  "gate_source_matches_committed_head": true,
+  "counts": {
+    "passed": 4006,
+    "failed": 0,
+    "ignored": 21
+  },
+  "original_authorship_retained": true
+}
