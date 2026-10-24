@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 08:52 — native Body gate complete; final Voice suite running
+
+- #3308 `a4a4d9e42` ARM64 is green: **7,316 passed (two Voice LEAK),
+  35 skipped**, process **12/0**; Linux Clippy passed. The CI preview is
+  the exact authored tree. The retained leak qualification is on the PR
+  and in the [receipt](verification/remember-speaker-and-body-read-20261024/README.md).
+- Requested enrollment now has **16/0** focused Voice controls, including
+  real microphone timing, privacy close/reopen during held STT, stop races,
+  and bounded evidence. Full Eyes **322/0/5 ignored** and strict Clippy pass.
+  Final whole-workspace formatting and strict Voice Clippy pass; the full
+  Voice test suite is running on `88b1ad796` before the code push.
+- Took the next eligible read, #3313, while these gates run. No lamp action.
+
 ## 2026-10-24 08:30 — enrollment repair active; Body carry read
 
 - First's face-speaker enrollment assignment was claimed at 08:09 on

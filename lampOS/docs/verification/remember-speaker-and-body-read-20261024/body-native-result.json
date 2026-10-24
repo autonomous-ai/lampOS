@@ -1,0 +1,15 @@
+{
+  "head": "a4a4d9e42974ec4846e405d52db0a54583f58bcf",
+  "arm64_run": 40049289489,
+  "clippy_run": 40049289507,
+  "conclusion": "success",
+  "preview_equals_authored_tree": true,
+  "native_log_sha256": "17ecf8ec491579f8235a1a1295991d092c4aeb8f16fd0b92f149b2b53fab445c",
+  "retained_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T01:39:50.9306586Z         LEAK [   0.436s] (5145/7316) lamp-voice same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T01:39:50.9786058Z         LEAK [   0.248s] (5152/7316) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T01:40:21.2901698Z      Summary [ 150.783s] 7316 tests run: 7316 passed (2 leaky), 35 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T01:40:35.0969624Z test result: 12 passed; 0 failed"
+  ],
+  "limits": "Two Voice LEAK results remain qualified; no device or clean child-teardown claim."
+}

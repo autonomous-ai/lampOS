@@ -15,7 +15,10 @@ byte-identical. The PR description now describes load-only pressing and
 the new composed regression. Third's source/base HOLD cleared in
 [the reread](https://github.com/autonomous-ai/lampOS/pull/3308#issuecomment-6378187186).
 `body-carry-audit.json` binds the authored and CI preview trees. Linux
-Clippy passed; ARM64 was still pending at the reread. Reviewer-two reports
+Clippy passed; ARM64 was still pending at the reread. It subsequently
+passed: **7,316 passed (two Voice LEAK), 35 skipped**, plus process checks
+**12/0**, run 40049289489. The exact-tree result and leak qualification
+were [posted on the PR](https://github.com/autonomous-ai/lampOS/pull/3308#issuecomment-6378393368). Reviewer-two reports
 fresh exact-head Mac gates independently; Third did not repeat identical
 Body tests for the documentation-only base change. The existing slow-ramp
 P3 remains, and First owns physical integration. No device action.
