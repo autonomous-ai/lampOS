@@ -79,6 +79,10 @@ for cross-version readback; preserve and verify unrelated user data privately.
 4. **Read all selected parts.** For every changed part retain active binary
    hash, unit identity, readiness/health and designated old-store readback.
    Unchanged payloads are explicitly unchanged, not counted as new writes.
+   Hash/read back the carried runtime files beside Voice, including its
+   Smart Turn model and ONNX library; a missing dependency is FAIL, never
+   repaired by hand before scoring. Preserving old model bytes is separate
+   from updating a newly versioned model payload.
    Check pending/journal completion, current/previous and preserved refusal
    state. Include Body only with the person at the arm. Report PASS/FAIL per
    part/category; absent models/settings/image remain NOT RUN.

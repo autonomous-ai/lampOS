@@ -1,3 +1,22 @@
+## Current checkpoint: 2026-10-24 17:31 +07, release 6592 downloads qualified
+
+#1812/#2809 current immutable release [6592 proof](verification/signed-channel-6592-20261024/README.md):
+**63/63 assets**, 60 manifest payloads, 31 checksum entries, **226,984,741
+bytes**, zero failed. Public HTTPS bytes match API and declared digests;
+envelope/manifest match the earlier capture. No ARM executable was run.
+Positive real-key verification still needs the trusted public half; asset
+consistency does not establish trust or a successful lamp update/rollback.
+The attended sheet now explicitly scores carried runtime models/libraries
+before any manual repair, separately from newly versioned model payloads.
+
+#3361 is cleared/ready and submitted to the train; updater item 6 static
+contract is published at c497a0ccf. Actual holder/person window, key and
+isolated bad/restoration route remain external and posted on their issues.
+Queue watcher is active; next own findings or shipping task will be taken
+without ending the session. No release, key or device mutation by Second.
+
+---
+
 ## Current checkpoint: 2026-10-24 17:21 +07, Surround submitted and updater audit
 
 #3361 `e14e3c51b` is **ready**, current Reviewer-two READ-OK clears HOLD,
