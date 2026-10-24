@@ -6,7 +6,7 @@ async fn run(
     count_only: bool,
     scoped: bool,
     privacy_change: bool,
-    room_publish: bool,
+    case: u8,
 ) -> (
     Engine,
     u64,
@@ -18,7 +18,7 @@ async fn run(
         + u64::from(count_only)
         + 2 * u64::from(!scoped)
         + 4 * u64::from(privacy_change)
-        + 8 * u64::from(room_publish);
+        + 8 * u64::from(case);
     let words = "My name is Kesh, remember my face";
     let gate = privacy_change.then(|| Arc::new(FinishGate::default()));
     let script = Arc::new(Script {
@@ -132,7 +132,7 @@ async fn run(
 
 #[tokio::test]
 async fn remember_speaker_records_an_ordinary_request_from_its_microphone_clock() {
-    let (mut engine, request, began_us, ended_us, line) = run(false, true, false, false).await;
+    let (mut engine, request, began_us, ended_us, line) = run(false, true, false, 0).await;
     let line = line.expect("the enrollment call read its line");
     let proof = line
         .enrollment
@@ -153,20 +153,20 @@ async fn remember_speaker_records_an_ordinary_request_from_its_microphone_clock(
 
 #[tokio::test]
 async fn remember_speaker_count_only_never_records_enrollment_words_or_identity() {
-    let (_, request, _, _, line) = run(true, true, false, false).await;
+    let (_, request, _, _, line) = run(true, true, false, 0).await;
     assert!(line.is_none(), "onboarding must not run an enrollment tool");
     assert!(crate::speaking_faces::line_seen(request).is_none());
 }
 
 #[tokio::test]
 async fn remember_speaker_without_a_live_request_scope_never_records_evidence() {
-    let (_, request, _, _, _) = run(false, false, false, false).await;
+    let (_, request, _, _, _) = run(false, false, false, 0).await;
     assert!(crate::speaking_faces::line_seen(request).is_none());
 }
 
 #[tokio::test]
 async fn remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enrollment() {
-    let (engine, request, _, _, line) = run(false, true, true, false).await;
+    let (engine, request, _, _, line) = run(false, true, true, 0).await;
     let line = line.expect("the tool looked for its own line");
     assert!(line.enrollment.is_none());
     let lease = engine
@@ -203,7 +203,7 @@ async fn remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enro
 
 #[tokio::test]
 async fn remember_speaker_room_publish_keeps_only_its_live_request_proof() {
-    let (mut engine, request, _, _, line) = run(false, true, false, true).await;
+    let (mut engine, request, _, _, line) = run(false, true, false, 1).await;
     let original = line.unwrap();
     let proof = original.enrollment.as_ref().unwrap();
     let lease = engine
@@ -254,4 +254,85 @@ async fn remember_speaker_room_publish_keeps_only_its_live_request_proof() {
             .is_none(),
         "late room publication cannot revive a cancelled enrollment"
     );
+}
+
+// Separate request numbers keep these workers apart in the shared line cache.
+async fn late_room_publish_after_epoch_change(privacy: bool) {
+    let (mut engine, request, _, _, line) =
+        run(false, true, false, if privacy { 3 } else { 2 }).await;
+    let mut room = line.expect("the first publication reached the enrollment tool");
+    let proof = room.enrollment.as_ref().unwrap().clone();
+    assert!(proof.is_current(lamp_ipc::monotonic_us()));
+    let lease = engine
+        .turn
+        .as_ref()
+        .unwrap()
+        .memory_scope
+        .as_ref()
+        .unwrap()
+        .lease();
+    assert!(lease.is_current());
+    assert!(
+        crate::speaking_faces::line_seen(request)
+            .unwrap()
+            .enrollment
+            .is_some()
+    );
+
+    // Model a pending room task holding its original proof across the epoch
+    // change. No sleep or delayed filesystem is needed to order the publishes.
+    if privacy {
+        engine.privacy((false, 2, true, 1));
+        engine.privacy((true, 3, true, 1));
+    } else {
+        crate::remember_speaker::forget();
+    }
+    assert!(lease.is_current(), "this is not the stopped-lease control");
+    assert!(!proof.is_current(lamp_ipc::monotonic_us()));
+    assert!(
+        crate::speaking_faces::line_seen(request)
+            .unwrap()
+            .enrollment
+            .is_none()
+    );
+    room.speakers.clear();
+    room.known = None;
+    publish_room_line(room.clone(), true, Some(&lease));
+    let after = crate::speaking_faces::line_seen(request).unwrap();
+    assert!(after.speakers.is_empty() && after.known.is_none());
+    assert!(
+        after.enrollment.is_none(),
+        "late room task revived old proof"
+    );
+
+    // Even the task's retained pre-invalidation line refuses before transport.
+    let (answer, _) = crate::known_faces::run_scoped(
+        std::path::Path::new("/missing-enrollment.sock"),
+        &lamp_gemini::ToolCall {
+            id: "late-room".into(),
+            name: crate::known_faces::REMEMBER.into(),
+            args: json!({"name":"Kesh"}),
+        },
+        crate::known_faces::FaceSwitches {
+            checked: true,
+            remember_speaker: true,
+            ..Default::default()
+        },
+        None,
+        Some(&room),
+        request,
+        Some(&lease),
+    );
+    assert_eq!(answer, json!({"error":crate::remember_speaker::NOT_SEEN}));
+    engine.stop_through(request);
+}
+
+#[tokio::test]
+async fn remember_speaker_room_publish_after_forget_cannot_revive_its_original_proof() {
+    late_room_publish_after_epoch_change(false).await;
+}
+
+#[tokio::test]
+async fn remember_speaker_room_publish_after_privacy_reopen_cannot_revive_its_original_proof() {
+    late_room_publish_after_epoch_change(true).await;
 }
