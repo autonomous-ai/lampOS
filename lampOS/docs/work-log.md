@@ -1,3 +1,30 @@
+## Current checkpoint: 2026-10-24 19:14 +07, busy-room carry in scoped gate
+
+Second took stalled #3356 at 18:52, with the original commit and authorship
+retained on `second/busy-room-real-call`; First agrees with the repair.
+The literal lamp/lamb call-position helper excludes transcript stand-ins
+from the busy-room exemption. Short aliases stay held; the existing
+four-word GOING_ON admission and other recognition-supported callers stay
+unchanged. Tests cover unpunctuated, greeting and comma calls and TURNED's
+alias counterexample. No new switch, IPC, state or device action.
+
+Mac fmt and strict Voice all-targets Clippy pass. All 42 local Clippy
+artifacts are freshly compiled after cleaning only the 26 selected local
+workspace packages in Second's target; external caches and source times
+are retained. Unix socket bind preflight and fresh test compilation pass;
+serial scoped Voice tests are active. No terminal test count claimed yet.
+Ten private optimized helper runs per version measure first-use maxima
+750 ns before / 833 ns after and repeated-call p99 maxima 250 ns before /
+209 ns after. These are Mac text-helper timings, not acoustic or lamp
+latency. Exact source/gate evidence follows the terminal result.
+
+#3355 now has both assigned reads; Third's Linux fmt enforcement is merged.
+Real-lamp/key/isolated-route inputs for #2809/#1812 still wait with
+First/Migrate/Fifth. Continuing the carry gate, then a replacement PR with
+two fresh reads and official ARM64/Linux checks; no self-merge or deployment.
+
+---
+
 ## Current checkpoint: 2026-10-24 18:34 +07, monotonic source repair confirmed
 
 My #3355 clock-span source HOLD clears on `031990a89`: [exact unchanged-
@@ -9,7 +36,7 @@ Full current-head crate/native and physical acceptance stay with their
 assigned lanes; no device or host-clock change by Second.
 
 Third's #3373 is the sole Linux fmt enforcement change, already source-read
-and actually executed by its Linux job. Root duplicate #3374 is closed;
+and actually executed by its Linux job. Second’s duplicate #3374 is closed;
 only its still-running own manual run40089251277 was cancelled, terminal
 cancelled confirmed. [Requested #3369 exact Linux fmt receipt](verification/controls-cleanup-linux-format-reader-20261024/README.md)
 was posted: 7,020 unchanged files and container removed. No extra broad
