@@ -83,7 +83,7 @@ fn a_soft_first_word_is_kept_only_with_the_switch_and_first_words() {
 #[test]
 fn a_soft_start_reaches_at_most_half_a_second_before_the_usual_one() {
     // A run of 200 blocks before the onset: talk going on all along.
-    let (begins, onset) = start(true, true, &vec![Some(0.6); 200], false);
+    let (begins, onset) = start(true, true, &[Some(0.6); 200], false);
     assert_eq!(begins, usual(onset) - SOFT_START_BLOCKS as u64);
 }
 
@@ -114,12 +114,12 @@ fn a_pause_of_a_tenth_of_a_second_ends_what_a_soft_start_reaches() {
 /// line's sound began at it, and the word was lost. It gets its 200 ms.
 #[test]
 fn a_word_begun_at_the_usual_start_gets_its_200_ms_before() {
-    let (begins, onset) = start(true, true, &vec![Some(0.5); 24], false);
+    let (begins, onset) = start(true, true, &[Some(0.5); 24], false);
     assert_eq!(usual(onset), onset - 24);
     assert_eq!(begins, onset - 24 - REACH_LEAD_BLOCKS as u64);
     // Said 200 ms or more inside the usual start already: 200 ms more all
     // the same.
-    let (begins, onset) = start(true, true, &vec![Some(0.5); 4], false);
+    let (begins, onset) = start(true, true, &[Some(0.5); 4], false);
     assert_eq!(begins, usual(onset) - SOFT_START_LEAD_BLOCKS as u64);
 }
 
@@ -136,7 +136,7 @@ fn a_soft_start_never_reaches_into_the_lamps_own_sound() {
 /// onset, and still 200 ms more than the usual 300 ms.
 #[test]
 fn every_soft_start_keeps_200_ms_more_than_the_usual() {
-    let (begins, onset) = start(true, true, &vec![Some(0.2); 40], false);
+    let (begins, onset) = start(true, true, &[Some(0.2); 40], false);
     assert_eq!(begins, usual(onset) - SOFT_START_LEAD_BLOCKS as u64);
     // And with the lamp sounding 10 blocks before the usual start, from
     // after that block.
