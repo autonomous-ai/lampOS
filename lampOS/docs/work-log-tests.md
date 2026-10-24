@@ -4330,3 +4330,9 @@ The [qualification evidence](verification/tests-update-parent-qualification-2026
 Ready for lamp-voice: no
 
 Published the exact missing nine-controller manifest (476 bytes, b180e343...) and clarified that e15 is an unpushed post-execution local snapshot, not the execution head. Historical execution binds43ac plus the recorded two-file hashes; no unavailable Git identity is used as proof. Both task branches now carry equal range-diffs on821: Update be88244fb and NoPause7c0cf8d33. Independent clone/worktree rebases preserve the frozen427 local gates. Original ARM Update is7,395 PASS+1LEAK/53skip on427; original NoPause is7,398 PASS+1LEAK/53skip and its actual3053 checkout includes821 and exactly matches the complete7c authored tree. New-head checks are pending; local Update Voice is4,017/1/21, readers active. The private Linux rollback control stopped at unsupported CAP_SYS_CHROOT before test allocation; no privileges/settings changed.
+
+## 25 October, 01:35 — Taken Cloud result-ack completion
+
+Ready for lamp-voice: no
+
+Taken Queue6387992551: the Cloud followup3 no-join result-ack test measured11.025s in ARM40118324976. Exact open/merged and related relink searches plus complete open-PR file ownership census find no competing settings.rs task. The test-only plan replaces both fixed5.5s completion sleeps with terminal worker-state observation using the same5.5s watchdog; both ACK branches and every assertion stay. The real unacknowledged5s product deadline is untouched. No new measured result or API change is claimed. Source preparation proceeds while two existing frozen427 full gates finish; no third Rust job.
