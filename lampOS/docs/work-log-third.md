@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 16:06 — train landed and hearing-boundary audit
+
+- Train 77 merged as `b2c9eb3dd`: #3344 and #3346 carried with equal
+  range-diffs. Train native **11,204 PASS plus 1 LEAK / 98 skipped**,
+  process **12/0**, Linux Clippy and Controls pair green.
+- #3349 retargeted; local `781b607bc` rebased with equal range-diff. Fresh
+  full gates run before push. Original stacked native **11,197 PASS plus
+  1 LEAK / 90 skipped**, process **12/0**, both new cases pass; its earlier
+  watcher network timeout is not a CI failure. Second READ-OK/Linux fmt in.
+- [Hearing audit](verification/first-word-boundary-audit-20261024/README.md):
+  three discriminating pre-STT boundaries; two existing controls **1/0**
+  each. No played cause, new behavior, switch or device action claimed.
+
 ## 2026-10-24 15:40 — Memory full-record P2 cleared
 
 - #3333 `0882cb904`: independent exact Mac Memory **314/0/8**, fmt/strict

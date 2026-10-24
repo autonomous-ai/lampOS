@@ -1,0 +1,23 @@
+{
+  "base": "b2c9eb3dd9be0721dd5a7fa9e211275906383d27",
+  "local_rebased_head": "781b607bc20e874bfb69a6136368176f25dda745",
+  "binary": "/private/tmp/third-remember-voice-target/debug/deps/lamp_voice-6afccc7ec26c06bc",
+  "binary_sha256": "9e0129269b55874bbdac5f66ef496483fa3916b254f0b03a985ede5269b74044",
+  "fingerprint": "/private/tmp/third-remember-voice-target/debug/.fingerprint/lamp-voice-6afccc7ec26c06bc/test-lib-lamp_voice.json",
+  "checks": [
+    {
+      "name": "coordinator::tests::turn_taking::a_follow_up_with_a_pause_loses_only_its_first_piece",
+      "exit": 0,
+      "seconds": 0.3,
+      "output": "/private/tmp/third-first-word-existing-0.txt"
+    },
+    {
+      "name": "second_provider::net::stt::tests::speech_after_a_held_quiet_sends_it_first_in_order",
+      "exit": 0,
+      "seconds": 0.413,
+      "output": "/private/tmp/third-first-word-existing-1.txt"
+    }
+  ],
+  "unchanged_binary": true,
+  "physical_or_STT_model_claim": false
+}

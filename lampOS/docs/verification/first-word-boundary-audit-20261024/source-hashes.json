@@ -1,0 +1,12 @@
+{
+  "product_base": "b2c9eb3dd9be0721dd5a7fa9e211275906383d27",
+  "files": {
+    "crates/voice/src/activity.rs": "7818cc99037149e60717d8fc9db91de02f9f31e0f6dd8a08fed04005fe16b821",
+    "crates/voice/src/coordinator.rs": "c669a641b688987c66589d1cc94718f044b50ff3e1db47a9d6d42c7984346d8e",
+    "crates/voice/src/coordinator/tests/turn_taking.rs": "47075418dac7fc54591976ca2557e3be698590b94e8cdbd49a8f4f5c379da0c8",
+    "crates/voice/src/second_provider.rs": "deab04e7b7fdddc39b3f02b23149e8112575f77ae8aadbd3640fb4982dce21d4",
+    "crates/voice/src/second_provider/net/stt.rs": "dc30ec197a23b30446e2f1b68fcdcbf2efbdccdbc84355e439a6fa002567dbe2",
+    "crates/audio/src/capture.rs": "45552421f095cdd70f5abd5a0490605140058d8e8c5a36ca715a2cd94f6f17a3",
+    "deploy/product/lamp-voice.service": "47bf48cda169d69c97536a3a569f1de44fdd7d7040b1543ca4e82480fb16983f"
+  }
+}

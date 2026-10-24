@@ -1,0 +1,6 @@
+
+running 1 test
+test second_provider::net::stt::tests::speech_after_a_held_quiet_sends_it_first_in_order ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3732 filtered out; finished in 0.11s
+
