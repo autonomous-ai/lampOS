@@ -1,0 +1,20 @@
+[
+  {
+    "file": "linux-fmt-current.json",
+    "original_sha256": "e42b7fdf09cd1ff7c642553261ebc8f78180a266f18ab3fcc5a00b42524d82ac",
+    "published_sha256": "e42b7fdf09cd1ff7c642553261ebc8f78180a266f18ab3fcc5a00b42524d82ac",
+    "private_home_redacted": false
+  },
+  {
+    "file": "linux-fmt-current-cleanup.json",
+    "original_sha256": "ca13f8309563a426329c958fd5808b7b027d98553b91c5c533115ec6c8f310d7",
+    "published_sha256": "ca13f8309563a426329c958fd5808b7b027d98553b91c5c533115ec6c8f310d7",
+    "private_home_redacted": false
+  },
+  {
+    "file": "linux-fmt-current.txt",
+    "original_sha256": "803a4875c1aac91e4694b4d3fffd78bf92940bdd5ac69ba802db45161cd000b2",
+    "published_sha256": "803a4875c1aac91e4694b4d3fffd78bf92940bdd5ac69ba802db45161cd000b2",
+    "private_home_redacted": false
+  }
+]
