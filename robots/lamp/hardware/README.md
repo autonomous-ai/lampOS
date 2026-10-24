@@ -20,3 +20,9 @@ This folder is owned by the hardware team. Upload here:
 
 Large binary CAD files are stored via **Git LFS** (see `.gitattributes`).
 File list and revision notes live in [`cad/README.md`](cad/README.md).
+
+PCB:
+
+- [`pcb/`](pcb/README.md) - Pi hat, head power, input button
+- schematic PDF, Altium, Gerbers per board
+- Altium + PDF via Git LFS
