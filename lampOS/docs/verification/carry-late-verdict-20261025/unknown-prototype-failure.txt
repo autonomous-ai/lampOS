@@ -1,0 +1,145 @@
+
+running 1 test
+second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner --- FAILED
+
+failures:
+
+---- second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner stdout ----
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 24 s after the lamp's words ended and 25 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: the conversation's voice (cosine 1.00)
+lamp-voice second: request 3: the one the lamp answered (voice 1.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 45 s after the lamp's words ended and 45 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 25 s after the lamp's words ended and 25 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: the conversation's voice (cosine 0.75)
+lamp-voice second: request 3: its voice (Some(0.7500188)) is not nearer the conversation's than the voice held as someone else's in this carry (Some(0.66141653)), by 0.1: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: no sure sign who said it (voice 0.75, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 45 s after the lamp's words ended and 45 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 24 s after the lamp's words ended and 25 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: the conversation's voice (cosine 0.50)
+lamp-voice second: request 3: no sure sign who said it (voice 0.50, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 44 s after the lamp's words ended and 45 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 24 s after the lamp's words ended and 25 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice provider: request 3: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 3: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 45 s after the lamp's words ended and 45 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 24 s after the lamp's words ended and 25 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: another voice than the conversation's (cosine 0.00): no conversation is going on for it
+lamp-voice second: request 3: someone else (voice 0.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): held, not answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: 2 lines in a row from someone else: the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: in a busy room, the line began 44 s after the lamp's words ended and 45 s after its call, past the 8 s a follow-up has (LAMP_NAME_OR_FOLLOW_UP)
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: it was last heard saying words, to their end, 60 s ago, it was last called 60 s ago, 0 lines left alone since it last spoke
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: the conversation's voice (cosine 1.00)
+lamp-voice second: request 3: the one the lamp answered (voice 1.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: it was last heard saying words, to their end, 60 s ago, it was last called 60 s ago, 0 lines left alone since it last spoke
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 3: no conversation going on: it was last heard saying words, to their end, 60 s ago, it was last called 60 s ago, 0 lines left alone since it last spoke
+lamp-voice provider: request 2: another voice than the conversation's, known after its answer (cosine 0.00): the conversation is over
+lamp-voice second: request 3: request 2's voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: the conversation's voice (cosine 0.75)
+lamp-voice second: request 3: its voice (Some(0.7500188)) is not nearer the conversation's than the voice held as someone else's in this carry (Some(0.66141653)), by 0.1: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: no sure sign who said it (voice 0.75, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+
+thread 'second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner' (250871816) panicked at crates/voice/src/second_provider/worker.rs:10452:21:
+assertion `left == right` failed: room unknown, voice 4, +25 s
+  left: true
+ right: false
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3758 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

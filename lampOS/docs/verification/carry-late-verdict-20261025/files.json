@@ -1,0 +1,62 @@
+{
+  "README.md": {
+    "bytes": 2467,
+    "sha256": "be174294ae5adba08d3ff6c51e1f240984455f6e25a4af4e54b5047b12a94939"
+  },
+  "busy-first-focused.txt": {
+    "bytes": 118,
+    "sha256": "a3c0ef781d1c3b2cd6361b74372b831de03671f7855f7066a4534cdffd2a0318"
+  },
+  "checkpoint-build.txt": {
+    "bytes": 364422,
+    "sha256": "dea0474897da0ac2164317ec6abac713af528a73ec214fdbc34581948cafc177"
+  },
+  "checkpoint-clippy.txt": {
+    "bytes": 276601,
+    "sha256": "b844bce7ffd332b2536c9509ae5aeb917cc683784c6cdb578d4427ab72ef7715"
+  },
+  "checkpoint-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "checkpoint-gates.json": {
+    "bytes": 1860,
+    "sha256": "88283469daea37f1b0515101c70207b55d90ce21647a1e48dc3a3122bad47e0b"
+  },
+  "checkpoint-source-after.json": {
+    "bytes": 1460636,
+    "sha256": "bc3db8b2b0170a5d6bee987d50d0c341fa8f8a0a999d6a153cd882e432ef2b54"
+  },
+  "checkpoint-source-before.json": {
+    "bytes": 1460636,
+    "sha256": "bc3db8b2b0170a5d6bee987d50d0c341fa8f8a0a999d6a153cd882e432ef2b54"
+  },
+  "clamped-focused.txt": {
+    "bytes": 118,
+    "sha256": "db279882e9a5a60fc4c92939094217804a531b5e731340c60af904fe833cdd86"
+  },
+  "initial-red-source.json": {
+    "bytes": 687,
+    "sha256": "858d6c720d821390460f263b5739da64127f9341285c3f69712a5cb956cb1c12"
+  },
+  "initial-red.patch": {
+    "bytes": 1985,
+    "sha256": "12726d81bda64343196b7bfc22d1db2c3810077bc279c85588566b8c4a721a98"
+  },
+  "initial-red.txt": {
+    "bytes": 2178,
+    "sha256": "1e4f5d4a63ee94fc372b202340538eec7c1d4f9556809397461ca84158d584d0"
+  },
+  "room-fixture-setup-error.txt": {
+    "bytes": 15896,
+    "sha256": "1b5ba5fdf545c8845c0fa10847e7848da9f89376a27748dd391fa6b0ba68ee79"
+  },
+  "setup-cwd-error.txt": {
+    "bytes": 694,
+    "sha256": "eb7950e497578b60b08d9e2aca6339aa979a8e8b4ffc19de2d4b4ccc04cfd62a"
+  },
+  "unknown-prototype-failure.txt": {
+    "bytes": 19902,
+    "sha256": "5a52b5c6019176e5d76d2a401f833197e31d73754e648fc2c9aac8350b86bb26"
+  }
+}

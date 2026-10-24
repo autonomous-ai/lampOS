@@ -1,0 +1,46 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 85ca4e5b45..fbef529dce 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -10389,6 +10389,41 @@ mod tests {
+         );
+     }
+ 
++    /// Synthetic sure-other bar, as the existing late-print control: the
++    /// first colleague print is learned only at the owner's +25 s verdict.
++    /// Production calibration and activation are unchanged.
++    #[test]
++    fn a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner() {
++        let _one = crate::provider_worker::tests::one_thread();
++        for (after_s, expected) in [(25, None), (45, Some(crate::attention::BUSY_UNCALLED))] {
++            let mut desk = CarryDesk::new(true);
++            desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
++            desk.answered(60);
++            let answer = desk.heeding.said_until_us.unwrap();
++            desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
++            assert_eq!(
++                desk.line_at(
++                    -1,
++                    "",
++                    "I sent the slides to the client this morning.",
++                    answer + 3_000_000
++                ),
++                None
++            );
++            desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
++            assert_eq!(
++                desk.line_at(
++                    1,
++                    "",
++                    "Will it rain in the afternoon?",
++                    answer + after_s * 1_000_000
++                ),
++                expected,
++                "+{after_s} s"
++            );
++        }
++    }
++
+     /// The owner's P1 on Queue #3126 (lamp-4ace, 23 Oct 18:51): in a busy
+     /// room, each line begun 12 s after the lamp's words, past the 8 s a
+     /// follow-up has, five turns of the owner are all answered with

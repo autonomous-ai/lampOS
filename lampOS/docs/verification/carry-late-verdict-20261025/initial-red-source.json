@@ -1,0 +1,22 @@
+{
+  "head": "f3f49646e592adf124b21e6732f8ea2b55a009b2",
+  "branch": "third/carry-late-verdict",
+  "worker_sha256": "7ad62e83ecf63bba5513d5211d8ab6033ac89ad6721ea03411aeae72b51e31c4",
+  "patch": "/private/tmp/third-carry-late-red.patch",
+  "command": [
+    "cargo",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner",
+    "--",
+    "--test-threads=1"
+  ],
+  "exit": 101,
+  "first_failed_row": "+25 s owner voice1; +45 s not reached",
+  "scope": "synthetic 1.5s sure-other threshold, production2.5 unchanged; not a current harmful admission or acoustic measurement"
+}
