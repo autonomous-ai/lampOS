@@ -1,0 +1,45 @@
+{
+  "scope": "Observed Expression compiler target selection and literal source-reference grep; not dep-info or executable attestation",
+  "expression_artifacts": [
+    {
+      "stage": "clippy",
+      "manifest_path": "/private/tmp/second-chat-kept-framing-20261024/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "/private/tmp/second-chat-kept-framing-20261024/lampOS/crates/expression/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    {
+      "stage": "test-compile",
+      "manifest_path": "/private/tmp/second-chat-kept-framing-20261024/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "/private/tmp/second-chat-kept-framing-20261024/lampOS/crates/expression/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false
+    }
+  ],
+  "literal_reference_grep": "crates/voice/src/bus_out.rs:103:    /// that acts on a quiet room (`docs/expression.md`) takes a judgement\ncrates/voice/src/coordinator.rs:5662:    // (docs/expression.md). Only if that is switched on.\ncrates/voice/src/expression_out.rs:2://! shows (`docs/expression.md`).\ncrates/voice/src/expression_out.rs:491:/// docs/expression.md, \"Held turns: the protocol First must publish\"),\n",
+  "all_matches_comments": true
+}
