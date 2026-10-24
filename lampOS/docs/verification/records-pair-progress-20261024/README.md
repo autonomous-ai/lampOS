@@ -13,3 +13,12 @@ Run [40058164064](https://github.com/autonomous-ai/lampOS/actions/runs/400581640
 Common's old Mac gate is also terminal: Voice 4,063/15/15, Eyes 327/0/5, Update 386/0/6, Skills 23/0/0. Linux Voice remains 4,131/8/18, Eyes 329/0/5, Update 388/0/4, Skills 23/0/0. Both hosts passed formatting, strict workspace Clippy and build. The corrected log parser verifies 266 required source controls once per host; it does not waive the full Voice failures. These bind the old frozen Common tree only; the new enrollment carry is still being resolved.
 
 Memory's current-base Mac/Linux checks continue, while its unchanged actual-pair driver retains the separately published 2/0 result. No lamp test, physical latency result, power-loss qualification or build-row increase is claimed.
+
+
+## Published correction and Memory PR, 10:56 +07
+
+Records is now `6f79d33d6` on #3329. Both reviewed P2 findings are folded. The corrected candidate tree `b839e645d` passed Mac Records 182/0/1 and Linux Records 193/0/5, including all six new descendant/malformed-proof controls; formatting and strict Records Clippy passed on both, and Linux workspace build passed. Source and cleanup guards verify. The preceding candidate's Linux items-after-test-module failure remains historical; the unchanged helper body was relocated before the test module. Fresh dedicated native/ARM64/Clippy runs are active, and readiness still waits on those runs and renewed reads.
+
+The [raw historical native receipts](historical-native-40058378617/manifest.json) retain the actual three passing cases and six-unit external cleanup on old `38a8d5651`, plus source identity/maps, host diagnostics and Root's audit. The run API is cancelled, and its old Rust cleanup defect is not waived by a successful normal run. The four misleading host-failure lines came from expected inactive service exit codes and remain in the raw record. The new workflow handles those statuses explicitly.
+
+Memory is published as [#3333](https://github.com/autonomous-ai/lampOS/pull/3333), `4f8e95111` on current `9ed44f88c`. Current tree `69bf9af35` passed fresh full Memory 314/0/8 on both hosts, workspace formatting, strict scoped Mac Memory Clippy and strict Linux workspace Clippy/build. All 10,315 tracked files and cleanup verified before a README-only result update. Its actual release-driver result remains 2/0 on the unchanged direct driver, with identical published Memory payloads and retained original failures. Current native ARM64/Clippy and independent reads remain required; no lamp or row increase.

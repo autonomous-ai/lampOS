@@ -1,0 +1,1145 @@
+{
+  "architecture": "aarch64",
+  "artifacts": [
+    {
+      "part": "lamp-records",
+      "path": "/home/runner/work/_temp/records-pair-artifacts/6408/lamp-records",
+      "release": 6408,
+      "sha256": "a1839349ca730d0051033bf37a43238dfc0deb2a32184e600893424724722031",
+      "size": 1393272,
+      "source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb"
+    },
+    {
+      "part": "lamp-records",
+      "path": "/home/runner/work/_temp/records-pair-artifacts/6449/lamp-records",
+      "release": 6449,
+      "sha256": "b18095bc74064e9949d9ed16c8f3c9a4c8c46e35892d3922800cf4aea8bb668f",
+      "size": 1406976,
+      "source": "be16c3327524ccef8a1908a3b8ebf40c16efba8a"
+    },
+    {
+      "part": "lamp-voice",
+      "path": "/home/runner/work/_temp/records-pair-artifacts/6408/lamp-voice",
+      "release": 6408,
+      "sha256": "af7cd0d1e384ebddcca2b58eea94176c80aba573a5f47f4cd95cc8ce1a7ad084",
+      "size": 28375944,
+      "source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb"
+    },
+    {
+      "part": "lamp-voice",
+      "path": "/home/runner/work/_temp/records-pair-artifacts/6449/lamp-voice",
+      "release": 6449,
+      "sha256": "21783ba5fd6654d96164f7426dc27f2c72f06a074ce91fe06b256feec697c6da",
+      "size": 28372464,
+      "source": "be16c3327524ccef8a1908a3b8ebf40c16efba8a"
+    }
+  ],
+  "case_number": 1,
+  "cleanup_confirmed": true,
+  "cleanup_error": null,
+  "command_log_is_bounded_prefixes": true,
+  "command_log_may_be_compacted": false,
+  "commands": [
+    {
+      "args": [
+        "-m"
+      ],
+      "elapsed_us": 5133,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10152,
+      "pid": 10152,
+      "program": "/usr/bin/uname",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "aarch64\n",
+      "stdout_bytes": 8,
+      "stdout_sha256": "5121ae59314a84da7b4d9587374398f1afa2000b243b3e54f491adefaac54f92",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--version"
+      ],
+      "elapsed_us": 5096,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10153,
+      "pid": 10153,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "systemd 249 (249.11-0ubuntu3.22)\n+PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT +GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 -IDN +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 -PWQUALITY -P11KIT -QRENCODE +BZIP2 +LZ4 +XZ +ZLIB +ZSTD -XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified\n",
+      "stdout_bytes": 310,
+      "stdout_sha256": "e5fdfc14c82c06891fca8c995dbbd2ea44294ee5acef365d086f5bf686f80366",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "is-active",
+        "--quiet",
+        "hal.service"
+      ],
+      "elapsed_us": 5089,
+      "exit": 3,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10154,
+      "pid": 10154,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "is-active",
+        "--quiet",
+        "os-server.service"
+      ],
+      "elapsed_us": 5094,
+      "exit": 3,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10155,
+      "pid": 10155,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "is-active",
+        "--quiet",
+        "led-boot.service"
+      ],
+      "elapsed_us": 5098,
+      "exit": 3,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10156,
+      "pid": 10156,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "is-active",
+        "--quiet",
+        "led-shutdown.service"
+      ],
+      "elapsed_us": 5057,
+      "exit": 3,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10157,
+      "pid": 10157,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-0.service"
+      ],
+      "elapsed_us": 5122,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10158,
+      "pid": 10158,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=\nMainPID=0\nControlPID=0\nControlGroup=\nId=lamp-records-pair-10099-shared-0.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\nJob=\nNeedDaemonReload=no\nInvocationID=\n",
+      "stdout_bytes": 181,
+      "stdout_sha256": "a67fa6fa02377671a10614ca57eb7a387b71c29ff4f178dcd658e5e303e6f4c9",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--quiet",
+        "--no-ask-password",
+        "--unit=lamp-records-pair-10099-shared-0.service",
+        "--property=Type=exec",
+        "--property=Restart=no",
+        "--property=RuntimeMaxSec=180s",
+        "--property=TimeoutStopSec=8s",
+        "--property=KillMode=control-group",
+        "--property=PrivateNetwork=yes",
+        "--property=DevicePolicy=closed",
+        "--setenv=LAMP_BUS_ROOT=/run/lamp-records-release-pair-10099-1/bus",
+        "--setenv=LAMP_SESSION_READ_GROUP=root",
+        "/run/lamp-records-release-pair-10099-1/bin/lamp-voice",
+        "serve",
+        "/run/lamp-records-release-pair-10099-1/control/provider.json",
+        "/run/lamp-records-release-pair-10099-1/voice/sessions/${INVOCATION_ID}",
+        "--controls-mute",
+        "/run/lamp-records-release-pair-10099-1/control/mute.json",
+        "--controls-bus-root",
+        "/run/lamp-records-release-pair-10099-1/bus"
+      ],
+      "elapsed_us": 20317,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10159,
+      "pid": 10159,
+      "program": "/usr/bin/systemd-run",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 9999
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-0.service"
+      ],
+      "elapsed_us": 5131,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10165,
+      "pid": 10165,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=exec\nMainPID=10160\nControlPID=0\nExecStart={ path=/run/lamp-records-release-pair-10099-1/bin/lamp-voice ; argv[]=/run/lamp-records-release-pair-10099-1/bin/lamp-voice serve /run/lamp-records-release-pair-10099-1/control/provider.json /run/lamp-records-release-pair-10099-1/voice/sessions/${INVOCATION_ID} --controls-mute /run/lamp-records-release-pair-10099-1/control/mute.json --controls-bus-root /run/lamp-records-release-pair-10099-1/bus ; ignore_errors=no ; start_time=[Sat 2026-10-24 03:29:28 UTC] ; stop_time=[n/a] ; pid=10160 ; code=(null) ; status=0/0 }\nControlGroup=/system.slice/lamp-records-pair-10099-shared-0.service\nId=lamp-records-pair-10099-shared-0.service\nLoadState=loaded\nActiveState=active\nSubState=running\nJob=\nNeedDaemonReload=no\nInvocationID=6d10b81423ff474a80cd7513df7c3c57\n",
+      "stdout_bytes": 802,
+      "stdout_sha256": "c426b986728683bf30c38a91587c88d4c64edef817a9bc6df10519d8c0632a45",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-0.service"
+      ],
+      "elapsed_us": 5111,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10169,
+      "pid": 10169,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=exec\nMainPID=10160\nControlPID=0\nExecStart={ path=/run/lamp-records-release-pair-10099-1/bin/lamp-voice ; argv[]=/run/lamp-records-release-pair-10099-1/bin/lamp-voice serve /run/lamp-records-release-pair-10099-1/control/provider.json /run/lamp-records-release-pair-10099-1/voice/sessions/${INVOCATION_ID} --controls-mute /run/lamp-records-release-pair-10099-1/control/mute.json --controls-bus-root /run/lamp-records-release-pair-10099-1/bus ; ignore_errors=no ; start_time=[Sat 2026-10-24 03:29:28 UTC] ; stop_time=[n/a] ; pid=10160 ; code=(null) ; status=0/0 }\nControlGroup=/system.slice/lamp-records-pair-10099-shared-0.service\nId=lamp-records-pair-10099-shared-0.service\nLoadState=loaded\nActiveState=active\nSubState=running\nJob=\nNeedDaemonReload=no\nInvocationID=6d10b81423ff474a80cd7513df7c3c57\n",
+      "stdout_bytes": 802,
+      "stdout_sha256": "c426b986728683bf30c38a91587c88d4c64edef817a9bc6df10519d8c0632a45",
+      "timeout_ms": 3000
+    },
+    {
+      "first_event_bytes_observed": true,
+      "first_service_sequence": 1,
+      "persisted_written_events": 0,
+      "producer_metadata_ready": true,
+      "shared_projection": true,
+      "unit": "lamp-records-pair-10099-shared-0.service"
+    },
+    {
+      "args": [
+        "--no-ask-password",
+        "stop",
+        "lamp-records-pair-10099-shared-0.service"
+      ],
+      "elapsed_us": 10197,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10170,
+      "pid": 10170,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 10000
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-0.service"
+      ],
+      "elapsed_us": 5116,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10171,
+      "pid": 10171,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=\nMainPID=0\nControlPID=0\nControlGroup=\nId=lamp-records-pair-10099-shared-0.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\nJob=\nNeedDaemonReload=no\nInvocationID=\n",
+      "stdout_bytes": 181,
+      "stdout_sha256": "a67fa6fa02377671a10614ca57eb7a387b71c29ff4f178dcd658e5e303e6f4c9",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-1.service"
+      ],
+      "elapsed_us": 5128,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10172,
+      "pid": 10172,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=\nMainPID=0\nControlPID=0\nControlGroup=\nId=lamp-records-pair-10099-shared-1.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\nJob=\nNeedDaemonReload=no\nInvocationID=\n",
+      "stdout_bytes": 181,
+      "stdout_sha256": "e6abcc41ec2a52a507809bf752a3ef828662d35142052112f8ba17baa6f5f3f0",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--quiet",
+        "--no-ask-password",
+        "--unit=lamp-records-pair-10099-shared-1.service",
+        "--property=Type=exec",
+        "--property=Restart=no",
+        "--property=RuntimeMaxSec=180s",
+        "--property=TimeoutStopSec=8s",
+        "--property=KillMode=control-group",
+        "--property=PrivateNetwork=yes",
+        "--property=DevicePolicy=closed",
+        "--setenv=LAMP_BUS_ROOT=/run/lamp-records-release-pair-10099-1/bus",
+        "--setenv=LAMP_SESSION_READ_GROUP=root",
+        "/run/lamp-records-release-pair-10099-1/bin/lamp-voice",
+        "serve",
+        "/run/lamp-records-release-pair-10099-1/control/provider.json",
+        "/run/lamp-records-release-pair-10099-1/voice/sessions/${INVOCATION_ID}",
+        "--controls-mute",
+        "/run/lamp-records-release-pair-10099-1/control/mute.json",
+        "--controls-bus-root",
+        "/run/lamp-records-release-pair-10099-1/bus"
+      ],
+      "elapsed_us": 20317,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10173,
+      "pid": 10173,
+      "program": "/usr/bin/systemd-run",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 9999
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-1.service"
+      ],
+      "elapsed_us": 5142,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10179,
+      "pid": 10179,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=exec\nMainPID=10174\nControlPID=0\nExecStart={ path=/run/lamp-records-release-pair-10099-1/bin/lamp-voice ; argv[]=/run/lamp-records-release-pair-10099-1/bin/lamp-voice serve /run/lamp-records-release-pair-10099-1/control/provider.json /run/lamp-records-release-pair-10099-1/voice/sessions/${INVOCATION_ID} --controls-mute /run/lamp-records-release-pair-10099-1/control/mute.json --controls-bus-root /run/lamp-records-release-pair-10099-1/bus ; ignore_errors=no ; start_time=[Sat 2026-10-24 03:29:30 UTC] ; stop_time=[n/a] ; pid=10174 ; code=(null) ; status=0/0 }\nControlGroup=/system.slice/lamp-records-pair-10099-shared-1.service\nId=lamp-records-pair-10099-shared-1.service\nLoadState=loaded\nActiveState=active\nSubState=running\nJob=\nNeedDaemonReload=no\nInvocationID=807732d5bda147a1a880de9ed0869f23\n",
+      "stdout_bytes": 802,
+      "stdout_sha256": "bf903e3b0a8447d8a0ece1d586d5d2773fc13736ac9bc212566bffea105eef2c",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-1.service"
+      ],
+      "elapsed_us": 5122,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10183,
+      "pid": 10183,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=exec\nMainPID=10174\nControlPID=0\nExecStart={ path=/run/lamp-records-release-pair-10099-1/bin/lamp-voice ; argv[]=/run/lamp-records-release-pair-10099-1/bin/lamp-voice serve /run/lamp-records-release-pair-10099-1/control/provider.json /run/lamp-records-release-pair-10099-1/voice/sessions/${INVOCATION_ID} --controls-mute /run/lamp-records-release-pair-10099-1/control/mute.json --controls-bus-root /run/lamp-records-release-pair-10099-1/bus ; ignore_errors=no ; start_time=[Sat 2026-10-24 03:29:30 UTC] ; stop_time=[n/a] ; pid=10174 ; code=(null) ; status=0/0 }\nControlGroup=/system.slice/lamp-records-pair-10099-shared-1.service\nId=lamp-records-pair-10099-shared-1.service\nLoadState=loaded\nActiveState=active\nSubState=running\nJob=\nNeedDaemonReload=no\nInvocationID=807732d5bda147a1a880de9ed0869f23\n",
+      "stdout_bytes": 802,
+      "stdout_sha256": "bf903e3b0a8447d8a0ece1d586d5d2773fc13736ac9bc212566bffea105eef2c",
+      "timeout_ms": 3000
+    },
+    {
+      "first_event_bytes_observed": true,
+      "first_service_sequence": 1,
+      "persisted_written_events": 0,
+      "producer_metadata_ready": true,
+      "shared_projection": true,
+      "unit": "lamp-records-pair-10099-shared-1.service"
+    },
+    {
+      "args": [
+        "check",
+        "/run/lamp-records-release-pair-10099-1/control/records.json",
+        "--apply",
+        "--report",
+        "/run/lamp-records-release-pair-10099-1/control/old-shared-refusal.json"
+      ],
+      "elapsed_us": 5109,
+      "exit": 2,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10184,
+      "pid": 10184,
+      "program": "/home/runner/work/_temp/records-pair-artifacts/6408/lamp-records",
+      "reaped": true,
+      "stderr": "lamp-records: /run/lamp-records-release-pair-10099-1/control/records.json: fields this build does not read, ignored: roots[0].session_read_group\n",
+      "stderr_bytes": 145,
+      "stderr_sha256": "4989c01b09a66209f043a31e8fb928c8dec4a374f7bba05da80cb5f8e2df5b6e",
+      "stdout": "{\"schema_version\":1,\"config_fingerprint\":\"36dc0eb430cf9bc586b35bb3581a39fc0b9b3316fc57e1bb2a7fb045e165a383\",\"at_unix_s\":1792812570,\"mode\":\"apply\",\"enabled\":true,\"roots\":[{\"root\":\"/run/lamp-records-release-pair-10099-1/voice/sessions\",\"unit\":\"lamp-records-pair-10099-shared-1.service\",\"before_bytes\":0,\"planned_bytes\":0,\"removed_bytes\":0,\"remaining_bytes\":0,\"limit_bytes\":1,\"active\":[],\"planned\":[],\"removed\":[],\"refused\":[],\"disk\":null,\"error\":\"directory must be owned, private, and on the root filesystem\"}],\"error\":null}\n",
+      "stdout_bytes": 523,
+      "stdout_sha256": "8af1b7f90a7123ec98be65aca17108348fa2081bebbaf74bcb64c6ad96857db9",
+      "timeout_ms": 60000
+    },
+    {
+      "args": [
+        "check",
+        "/run/lamp-records-release-pair-10099-1/control/records.json"
+      ],
+      "elapsed_us": 20300,
+      "exit": 1,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10185,
+      "pid": 10185,
+      "program": "/home/runner/work/_temp/records-pair-artifacts/6449/lamp-records",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "{\"schema_version\":1,\"config_fingerprint\":\"697650eb0c22ce057e4659b625519cf7e15aec6fd69003b0c648c0e4ae5039d2\",\"at_unix_s\":1792812570,\"mode\":\"dry_run\",\"enabled\":true,\"roots\":[{\"root\":\"/run/lamp-records-release-pair-10099-1/voice/sessions\",\"unit\":\"lamp-records-pair-10099-shared-1.service\",\"before_bytes\":16384,\"planned_bytes\":8192,\"removed_bytes\":0,\"remaining_bytes\":16384,\"limit_bytes\":1,\"active\":[\"807732d5bda147a1a880de9ed0869f23\"],\"planned\":[\"6d10b81423ff474a80cd7513df7c3c57\"],\"removed\":[],\"refused\":[\"fffffffffffffffffffffffffffffffd: Not a directory (os error 20)\",\"fffffffffffffffffffffffffffffffe: session must contain only its metadata directory\"],\"processes\":{\"gone\":0,\"zombie\":0,\"exiting\":0,\"kernel_threads\":208,\"examples\":[]},\"disk\":{\"total_bytes\":3344932864,\"available_bytes\":3315412992},\"error\":null}],\"error\":null}\n",
+      "stdout_bytes": 828,
+      "stdout_sha256": "1ea9f7206b00ca41648310b26713336bf5934569b4dfb493b693098b6600376c",
+      "timeout_ms": 60000
+    },
+    {
+      "args": [
+        "check",
+        "/run/lamp-records-release-pair-10099-1/control/records.json",
+        "--apply",
+        "--report",
+        "/run/lamp-records-release-pair-10099-1/control/applied.json"
+      ],
+      "elapsed_us": 20344,
+      "exit": 1,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10188,
+      "pid": 10188,
+      "program": "/home/runner/work/_temp/records-pair-artifacts/6449/lamp-records",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "{\"schema_version\":1,\"config_fingerprint\":\"697650eb0c22ce057e4659b625519cf7e15aec6fd69003b0c648c0e4ae5039d2\",\"at_unix_s\":1792812570,\"mode\":\"apply\",\"enabled\":true,\"roots\":[{\"root\":\"/run/lamp-records-release-pair-10099-1/voice/sessions\",\"unit\":\"lamp-records-pair-10099-shared-1.service\",\"before_bytes\":16384,\"planned_bytes\":8192,\"removed_bytes\":8192,\"remaining_bytes\":8192,\"limit_bytes\":1,\"active\":[\"807732d5bda147a1a880de9ed0869f23\"],\"planned\":[\"6d10b81423ff474a80cd7513df7c3c57\"],\"removed\":[\"6d10b81423ff474a80cd7513df7c3c57\"],\"refused\":[\"fffffffffffffffffffffffffffffffd: Not a directory (os error 20)\",\"fffffffffffffffffffffffffffffffe: session must contain only its metadata directory\"],\"processes\":{\"gone\":0,\"zombie\":0,\"exiting\":0,\"kernel_threads\":208,\"examples\":[]},\"disk\":{\"total_bytes\":3344932864,\"available_bytes\":3315421184},\"error\":null}],\"error\":null}\n",
+      "stdout_bytes": 862,
+      "stdout_sha256": "35b4cc64a74e6841b7da57cf9bfbd57ab53731096ed8368b97d8b830d9299a8d",
+      "timeout_ms": 60000
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-1.service"
+      ],
+      "elapsed_us": 5129,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10191,
+      "pid": 10191,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=exec\nMainPID=10174\nControlPID=0\nExecStart={ path=/run/lamp-records-release-pair-10099-1/bin/lamp-voice ; argv[]=/run/lamp-records-release-pair-10099-1/bin/lamp-voice serve /run/lamp-records-release-pair-10099-1/control/provider.json /run/lamp-records-release-pair-10099-1/voice/sessions/${INVOCATION_ID} --controls-mute /run/lamp-records-release-pair-10099-1/control/mute.json --controls-bus-root /run/lamp-records-release-pair-10099-1/bus ; ignore_errors=no ; start_time=[Sat 2026-10-24 03:29:30 UTC] ; stop_time=[n/a] ; pid=10174 ; code=(null) ; status=0/0 }\nControlGroup=/system.slice/lamp-records-pair-10099-shared-1.service\nId=lamp-records-pair-10099-shared-1.service\nLoadState=loaded\nActiveState=active\nSubState=running\nJob=\nNeedDaemonReload=no\nInvocationID=807732d5bda147a1a880de9ed0869f23\n",
+      "stdout_bytes": 802,
+      "stdout_sha256": "bf903e3b0a8447d8a0ece1d586d5d2773fc13736ac9bc212566bffea105eef2c",
+      "timeout_ms": 3000
+    },
+    {
+      "args": [
+        "--no-ask-password",
+        "stop",
+        "lamp-records-pair-10099-shared-1.service"
+      ],
+      "elapsed_us": 10179,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10193,
+      "pid": 10193,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout_ms": 10000
+    },
+    {
+      "args": [
+        "--system",
+        "--no-pager",
+        "--no-ask-password",
+        "show",
+        "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,ControlGroup,ExecStart,Type,NeedDaemonReload,Job",
+        "lamp-records-pair-10099-shared-1.service"
+      ],
+      "elapsed_us": 5124,
+      "exit": 0,
+      "group_absent": true,
+      "normal_exit": true,
+      "pgid": 10194,
+      "pid": 10194,
+      "program": "/usr/bin/systemctl",
+      "reaped": true,
+      "stderr": "",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Type=\nMainPID=0\nControlPID=0\nControlGroup=\nId=lamp-records-pair-10099-shared-1.service\nLoadState=not-found\nActiveState=inactive\nSubState=dead\nJob=\nNeedDaemonReload=no\nInvocationID=\n",
+      "stdout_bytes": 181,
+      "stdout_sha256": "e6abcc41ec2a52a507809bf752a3ef828662d35142052112f8ba17baa6f5f3f0",
+      "timeout_ms": 3000
+    }
+  ],
+  "error": null,
+  "expected_pair": [
+    6408,
+    6449
+  ],
+  "full_rotation_or_device_acceptance": false,
+  "native_root_systemd": true,
+  "no_guard_override": true,
+  "observations": [
+    {
+      "artifact": {
+        "part": "lamp-voice",
+        "path": "/home/runner/work/_temp/records-pair-artifacts/6449/lamp-voice",
+        "release": 6449,
+        "sha256": "21783ba5fd6654d96164f7426dc27f2c72f06a074ce91fe06b256feec697c6da",
+        "size": 28372464,
+        "source": "be16c3327524ccef8a1908a3b8ebf40c16efba8a"
+      },
+      "hardware_or_provider_worker": false,
+      "invocation": "6d10b81423ff474a80cd7513df7c3c57",
+      "metadata_ready": true,
+      "muted": true,
+      "producer_release": 6449,
+      "unit": "lamp-records-pair-10099-shared-0.service"
+    },
+    {
+      "artifact": {
+        "part": "lamp-voice",
+        "path": "/home/runner/work/_temp/records-pair-artifacts/6449/lamp-voice",
+        "release": 6449,
+        "sha256": "21783ba5fd6654d96164f7426dc27f2c72f06a074ce91fe06b256feec697c6da",
+        "size": 28372464,
+        "source": "be16c3327524ccef8a1908a3b8ebf40c16efba8a"
+      },
+      "hardware_or_provider_worker": false,
+      "invocation": "807732d5bda147a1a880de9ed0869f23",
+      "metadata_ready": true,
+      "muted": true,
+      "producer_release": 6449,
+      "unit": "lamp-records-pair-10099-shared-1.service"
+    },
+    {
+      "active_producer_inventory": {
+        "allocated_bytes": 8192,
+        "complete_rotation_coverage": false,
+        "files": {
+          "": {
+            "atime": [
+              1792812570,
+              874469986
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812570,
+              874469986
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1345,
+            "kind": "directory",
+            "links": 3,
+            "mode": 16872,
+            "mtime": [
+              1792812570,
+              873470021
+            ],
+            "sha256": null,
+            "size": 60,
+            "uid": 0
+          },
+          "metadata": {
+            "atime": [
+              1792812570,
+              874469986
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812570,
+              874469986
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1346,
+            "kind": "directory",
+            "links": 2,
+            "mode": 16872,
+            "mtime": [
+              1792812570,
+              873470021
+            ],
+            "sha256": null,
+            "size": 140,
+            "uid": 0
+          },
+          "metadata/events-0.jsonl": {
+            "atime": [
+              1792812570,
+              873470021
+            ],
+            "blocks": 8,
+            "ctime": [
+              1792812570,
+              874469986
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1347,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812570,
+              874469986
+            ],
+            "sha256": "47c9ed3bd1395d0323eab728a4af47a737e34555334c5783e67c35a8ddce50c1",
+            "size": 456,
+            "uid": 0
+          },
+          "metadata/events-1.jsonl": {
+            "atime": [
+              1792812570,
+              873470021
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812570,
+              874469986
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1348,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812570,
+              873470021
+            ],
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0,
+            "uid": 0
+          },
+          "metadata/events-2.jsonl": {
+            "atime": [
+              1792812570,
+              873470021
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812570,
+              874469986
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1349,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812570,
+              873470021
+            ],
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0,
+            "uid": 0
+          },
+          "metadata/events-3.jsonl": {
+            "atime": [
+              1792812570,
+              873470021
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812570,
+              874469986
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1350,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812570,
+              873470021
+            ],
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0,
+            "uid": 0
+          },
+          "metadata/health.json": {
+            "atime": [
+              1792812570,
+              873470021
+            ],
+            "blocks": 8,
+            "ctime": [
+              1792812570,
+              874469986
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1351,
+            "kind": "file",
+            "links": 1,
+            "mode": 33152,
+            "mtime": [
+              1792812570,
+              874469986
+            ],
+            "sha256": "a93ab7fee9f259049e02230f9faf8f079b00f8d6df0fccf7c81f7d32622d5c0e",
+            "size": 406,
+            "uid": 0
+          }
+        },
+        "generation": 0,
+        "nonempty_segments": 1,
+        "rotations": 0
+      },
+      "closed_producer_inventory": {
+        "allocated_bytes": 8192,
+        "complete_rotation_coverage": false,
+        "files": {
+          "": {
+            "atime": [
+              1792812568,
+              395557013
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812568,
+              395557013
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1331,
+            "kind": "directory",
+            "links": 3,
+            "mode": 16872,
+            "mtime": [
+              1792812568,
+              395557013
+            ],
+            "sha256": null,
+            "size": 60,
+            "uid": 0
+          },
+          "metadata": {
+            "atime": [
+              1792812568,
+              395557013
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812568,
+              395557013
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1332,
+            "kind": "directory",
+            "links": 2,
+            "mode": 16872,
+            "mtime": [
+              1792812568,
+              395557013
+            ],
+            "sha256": null,
+            "size": 140,
+            "uid": 0
+          },
+          "metadata/events-0.jsonl": {
+            "atime": [
+              1792812568,
+              395557013
+            ],
+            "blocks": 8,
+            "ctime": [
+              1792812568,
+              422556065
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1333,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812568,
+              422556065
+            ],
+            "sha256": "d3f936fb87ae5065d52c7ca9463153670e5d497bb806afcaa4d9a37713fbc07c",
+            "size": 542,
+            "uid": 0
+          },
+          "metadata/events-1.jsonl": {
+            "atime": [
+              1792812568,
+              395557013
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812568,
+              395557013
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1334,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812568,
+              395557013
+            ],
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0,
+            "uid": 0
+          },
+          "metadata/events-2.jsonl": {
+            "atime": [
+              1792812568,
+              395557013
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812568,
+              395557013
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1335,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812568,
+              395557013
+            ],
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0,
+            "uid": 0
+          },
+          "metadata/events-3.jsonl": {
+            "atime": [
+              1792812568,
+              395557013
+            ],
+            "blocks": 0,
+            "ctime": [
+              1792812568,
+              395557013
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1336,
+            "kind": "file",
+            "links": 1,
+            "mode": 33184,
+            "mtime": [
+              1792812568,
+              395557013
+            ],
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "size": 0,
+            "uid": 0
+          },
+          "metadata/health.json": {
+            "atime": [
+              1792812568,
+              395557013
+            ],
+            "blocks": 8,
+            "ctime": [
+              1792812568,
+              423556030
+            ],
+            "dev": 29,
+            "gid": 0,
+            "ino": 1337,
+            "kind": "file",
+            "links": 1,
+            "mode": 33152,
+            "mtime": [
+              1792812568,
+              423556030
+            ],
+            "sha256": "5d46318ee0dc25580f1199955357a71c97b603eacfc60afeb2d40d6a3df8c69b",
+            "size": 405,
+            "uid": 0
+          }
+        },
+        "generation": 0,
+        "nonempty_segments": 1,
+        "rotations": 0
+      }
+    },
+    {
+      "actual_report": {
+        "at_unix_s": 1792812570,
+        "config_fingerprint": "36dc0eb430cf9bc586b35bb3581a39fc0b9b3316fc57e1bb2a7fb045e165a383",
+        "enabled": true,
+        "error": null,
+        "mode": "apply",
+        "roots": [
+          {
+            "active": [],
+            "before_bytes": 0,
+            "disk": null,
+            "error": "directory must be owned, private, and on the root filesystem",
+            "limit_bytes": 1,
+            "planned": [],
+            "planned_bytes": 0,
+            "refused": [],
+            "remaining_bytes": 0,
+            "removed": [],
+            "removed_bytes": 0,
+            "root": "/run/lamp-records-release-pair-10099-1/voice/sessions",
+            "unit": "lamp-records-pair-10099-shared-1.service"
+          }
+        ],
+        "schema_version": 1
+      },
+      "exit": 2,
+      "label": "old-shared-refusal",
+      "reader_release": 6408,
+      "reader_sha256": "a1839349ca730d0051033bf37a43238dfc0deb2a32184e600893424724722031"
+    },
+    {
+      "actual_report": {
+        "at_unix_s": 1792812570,
+        "config_fingerprint": "697650eb0c22ce057e4659b625519cf7e15aec6fd69003b0c648c0e4ae5039d2",
+        "enabled": true,
+        "error": null,
+        "mode": "dry_run",
+        "roots": [
+          {
+            "active": [
+              "807732d5bda147a1a880de9ed0869f23"
+            ],
+            "before_bytes": 16384,
+            "disk": {
+              "available_bytes": 3315412992,
+              "total_bytes": 3344932864
+            },
+            "error": null,
+            "limit_bytes": 1,
+            "planned": [
+              "6d10b81423ff474a80cd7513df7c3c57"
+            ],
+            "planned_bytes": 8192,
+            "processes": {
+              "examples": [],
+              "exiting": 0,
+              "gone": 0,
+              "kernel_threads": 208,
+              "zombie": 0
+            },
+            "refused": [
+              "fffffffffffffffffffffffffffffffd: Not a directory (os error 20)",
+              "fffffffffffffffffffffffffffffffe: session must contain only its metadata directory"
+            ],
+            "remaining_bytes": 16384,
+            "removed": [],
+            "removed_bytes": 0,
+            "root": "/run/lamp-records-release-pair-10099-1/voice/sessions",
+            "unit": "lamp-records-pair-10099-shared-1.service"
+          }
+        ],
+        "schema_version": 1
+      },
+      "exit": 1,
+      "label": "dry",
+      "reader_release": 6449,
+      "reader_sha256": "b18095bc74064e9949d9ed16c8f3c9a4c8c46e35892d3922800cf4aea8bb668f"
+    },
+    {
+      "actual_report": {
+        "at_unix_s": 1792812570,
+        "config_fingerprint": "697650eb0c22ce057e4659b625519cf7e15aec6fd69003b0c648c0e4ae5039d2",
+        "enabled": true,
+        "error": null,
+        "mode": "apply",
+        "roots": [
+          {
+            "active": [
+              "807732d5bda147a1a880de9ed0869f23"
+            ],
+            "before_bytes": 16384,
+            "disk": {
+              "available_bytes": 3315421184,
+              "total_bytes": 3344932864
+            },
+            "error": null,
+            "limit_bytes": 1,
+            "planned": [
+              "6d10b81423ff474a80cd7513df7c3c57"
+            ],
+            "planned_bytes": 8192,
+            "processes": {
+              "examples": [],
+              "exiting": 0,
+              "gone": 0,
+              "kernel_threads": 208,
+              "zombie": 0
+            },
+            "refused": [
+              "fffffffffffffffffffffffffffffffd: Not a directory (os error 20)",
+              "fffffffffffffffffffffffffffffffe: session must contain only its metadata directory"
+            ],
+            "remaining_bytes": 8192,
+            "removed": [
+              "6d10b81423ff474a80cd7513df7c3c57"
+            ],
+            "removed_bytes": 8192,
+            "root": "/run/lamp-records-release-pair-10099-1/voice/sessions",
+            "unit": "lamp-records-pair-10099-shared-1.service"
+          }
+        ],
+        "schema_version": 1
+      },
+      "exit": 1,
+      "label": "applied",
+      "reader_release": 6449,
+      "reader_sha256": "b18095bc74064e9949d9ed16c8f3c9a4c8c46e35892d3922800cf4aea8bb668f"
+    },
+    {
+      "closed_removed": 1,
+      "live_protected": 1,
+      "no_full_rotation_or_hardware_acceptance": true,
+      "outside_unchanged": true,
+      "private_or_current_shared_cleanup": true,
+      "removed_allocated_bytes": 8192,
+      "shared_rollback_retention_supported": false,
+      "unknown_and_symlink_unchanged": true
+    }
+  ],
+  "result": "passed",
+  "signature_trust_verified": false,
+  "test": "records_6408_refuses_6449_shared_layout_and_6449_can_resume",
+  "version": 1
+}

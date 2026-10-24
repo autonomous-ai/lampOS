@@ -8431,3 +8431,9 @@ Taken per the ship-critical Queue: #2809 Memory and Records coverage. Records' a
 Ready for lamp-voice: no (#3329 native artifact execution remains pending).
 
 Published Records #3329 and folded two workflow fixes into `38a8d5651`, retaining both zero-execution failures. [Results and limitations](verification/records-pair-progress-20261024/README.md) bind Mac 182/0/1, historical Linux 187/0/5 with exact relevant-source parity, current fmt/strict Clippy/workspace build and shell/jq 52/0. The native host requirements remain intact. Memory's current-base checks continue; Common's completed old gates retain all Voice failures while its current enrollment carry is being resolved. No lamp action or row increase.
+
+## 2026-10-24 10:56 +07: both update-reader PRs published
+
+Ready for lamp-voice: no (fresh native gates and renewed reads pending).
+
+Pushed Records #3329 `6f79d33d6` with both P2 fixes, Linux 193/0/5 and Mac 182/0/1; published Memory #3333 `4f8e95111` with current Mac/Linux 314/0/8 and separately retained actual binary pair 2/0. [Evidence and raw historical native receipts](verification/records-pair-progress-20261024/README.md) preserve all failed/cancelled attempts and their limits. Both PRs directly parent current `9ed44f88c`. Common's current enrollment carry is in full Linux qualification; its independent Mac packet follows the released target. No physical or readiness hold is waived.
