@@ -1,6 +1,12 @@
 # Tests work log
 
-## 2026-10-25 03:12 — retain newer failed full epochs
+## 2026-10-25 03:10 — current f978 native primary proof
+
+Ready for lamp-voice: no
+
+Independently downloaded the four original current-head CI logs/run metadata without rerunning CI: #3403 9ce73c76a ARM40126362263 has 7,409 PASS plus one LEAK / 53 skipped, Linux40126362254 passes; #3404 ea10e4c7d ARM40126363634 has 7,399 PASS plus one LEAK / 53 skipped, Linux40126363568 passes. Every selected case is terminal, zero fail/timeout; primary indices and binary/case identities are unique and contiguous. Each actual tested preview has f978 plus the authored head as parents and the same whole tree as authored. [Complete primary proof](verification/tests-f978-native-20261025/) retains the streams, projections and full identities. Both PRs remain drafts for the separately retained failed Mac epoch qualification; no native result waives those failures. Corrected the prior log entry's display time to its actual 03:07 commit time; no outcome changed.
+
+## 2026-10-25 03:07 — retain newer failed full epochs
 
 Ready for lamp-voice: no
 
