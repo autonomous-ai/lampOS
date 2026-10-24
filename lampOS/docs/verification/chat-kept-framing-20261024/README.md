@@ -11,7 +11,8 @@ Mac fmt, strict Voice all-targets Clippy and full serial Voice pass:
 **4,005 passed / 0 failed / 21 ignored**. Both existing keep-alive cases and
 the new split-header case pass once. All tracked source hashes are unchanged.
 Exactly 26 package names were invalidated; 25 path-package identities were
-observed, with fresh workspace artifacts and explicit unchanged vendor reuse.
+observed. All 42 Clippy and 40 test-compile records have fresh=false,
+including Sonora; the cached-vendor lists are empty.
 Exact-head source-only offline Linux fmt passes: 7,023 regular file hashes
 unchanged, owned container removed. No full workspace or local ARM gate.
 
