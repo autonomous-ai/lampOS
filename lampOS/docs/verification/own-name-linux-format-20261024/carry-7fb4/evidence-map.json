@@ -1,0 +1,28 @@
+{
+  "head": "7fb4feb204ae15b747a49e619239b3c5decd2c84",
+  "copied_files": [
+    {
+      "source": "linux-fmt-current.json",
+      "file": "linux-fmt-current.json",
+      "bytes": 6931,
+      "sha256": "cb6462b81c77b19b5ab9e4c13242e56469cbc3798fcd1bcd4efdd4ad113068f3",
+      "byte_identical": true
+    },
+    {
+      "source": "linux-fmt-current.txt",
+      "file": "linux-fmt-current.txt",
+      "bytes": 277,
+      "sha256": "1f6b760f30970581f6a1e0d68be01eff01fd86b4272a82eb20063f2b65de948e",
+      "byte_identical": true
+    },
+    {
+      "source": "linux-fmt-current-cleanup.json",
+      "file": "linux-fmt-current-cleanup.json",
+      "bytes": 254,
+      "sha256": "203eef6937d02f23ae3bb85299ed78570363041eb4eeabca7f96c27a3226712d",
+      "byte_identical": true
+    }
+  ],
+  "redactions": [],
+  "scope": "Exact receipt/log copies only; no executable, source archive, Python helper or API identity-bearing metadata is included."
+}
