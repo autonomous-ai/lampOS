@@ -1,0 +1,15 @@
+{
+  "recorded_at": "2026-10-24T20:36:29.228106+00:00",
+  "source": "Parent closed-command timing report",
+  "other_native": 73052,
+  "other_scope": "eight direct baseline cases, once each, eight passed; no compilation",
+  "actual_recorded_command_start": "2026-10-24T20:34:20.196584Z",
+  "actual_recorded_command_finish": "2026-10-24T20:35:00.998579Z",
+  "other_job_terminal": true,
+  "other_compiler_jobs_used": 0,
+  "Cloud_native": 53518,
+  "Cloud_compiler_jobs": 2,
+  "amendment_sha256": "d397ea6e0337ab062845f07c861f14a9f0d1cca7a9bfaa3a7aa517a4964c2698",
+  "no_global_load_or_causal_timing_claim": true,
+  "future_qualification_compiler4_still_requires_new_amendment": true
+}

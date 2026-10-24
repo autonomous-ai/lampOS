@@ -1,0 +1,28 @@
+{
+  "command": [
+    "file",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+  "started_at": "2026-10-24T20:34:08.040213+00:00",
+  "timeout_seconds": 60,
+  "stdout": "file.stdout.txt",
+  "stderr": "file.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 61008,
+  "owned_process_group": 61008,
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "wall_seconds": 0.02218,
+  "finished_at": "2026-10-24T20:34:08.062492+00:00",
+  "stdout_sha256": "749f1b1d903998d24834e59ae32699ded4b98f54e49ea45138556d0863095501",
+  "stdout_bytes": 189,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

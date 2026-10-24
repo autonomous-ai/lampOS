@@ -1,0 +1,1225 @@
+{
+  "variant": "base-update0",
+  "head": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "profile_debug": 0,
+  "planned": 8,
+  "completed": 8,
+  "unrun": 0,
+  "observations": [
+    {
+      "case_key": "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b170eb9b2418b12bc50a521573e937ce39a3e40d93a37257502732ae864fca54",
+          "--exact",
+          "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice",
+        "started_at": "2026-10-24T20:34:20.196584+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 61576,
+        "owned_process_group": 61576,
+        "validated_child_session": {
+          "pid": 61576,
+          "sid": 61576,
+          "pgid": 61576,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 61576,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 1.937954,
+        "finished_at": "2026-10-24T20:34:22.135299+00:00",
+        "stdout_sha256": "fc3d2107c8b38a640722ebde8e9b96d1ce4b3f301931bdd9bb210243c382b93d",
+        "stdout_bytes": 208,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/01",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-45a1046acddcb43e",
+        "sha256": "b170eb9b2418b12bc50a521573e937ce39a3e40d93a37257502732ae864fca54",
+        "bytes": 94435436,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice#lamp-voice@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-45a1046acddcb43e"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-45a1046acddcb43e",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b170eb9b2418b12bc50a521573e937ce39a3e40d93a37257502732ae864fca54",
+      "compiled_child_bindings": [],
+      "scope": {
+        "key": "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]",
+        "profile_debug": 0,
+        "compiled_programs": [],
+        "system_programs": [],
+        "parent_environment_absent": [],
+        "inner_new_PG": false,
+        "scope": "In-process RingLight/Actions; no child"
+      }
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]",
+      "name": "physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/e801d2fca1d5053e6ce5c4e1c72f6803ec978754ac8db34a1b3ded3eac1c57b2",
+          "--exact",
+          "physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+        "started_at": "2026-10-24T20:34:25.750941+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 62036,
+        "owned_process_group": 62036,
+        "validated_child_session": {
+          "pid": 62036,
+          "sid": 62036,
+          "pgid": 62036,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 62036,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 1.043871,
+        "finished_at": "2026-10-24T20:34:26.794909+00:00",
+        "stdout_sha256": "d834bb4ad24304def071b77344e12aeb67533fda81e4ed19e07aabfbd376afa2",
+        "stdout_bytes": 248,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/02",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/lamp_voice_eval-950f5ab79bd5b913",
+        "sha256": "e801d2fca1d5053e6ce5c4e1c72f6803ec978754ac8db34a1b3ded3eac1c57b2",
+        "bytes": 24536068,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_voice_eval",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/lamp_voice_eval-950f5ab79bd5b913"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/lamp_voice_eval-950f5ab79bd5b913",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/e801d2fca1d5053e6ce5c4e1c72f6803ec978754ac8db34a1b3ded3eac1c57b2",
+      "compiled_child_bindings": [],
+      "scope": {
+        "key": "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]",
+        "profile_debug": 0,
+        "compiled_programs": [],
+        "system_programs": [
+          {
+            "path": "/usr/bin/true",
+            "sha256": "875c7eea9c66c826091ede3cc44599311dc6818caf17f9e53d97c54c288842b2",
+            "bytes": 84032,
+            "mode": 493
+          }
+        ],
+        "parent_environment_absent": [],
+        "inner_new_PG": false,
+        "scope": "/usr/bin/true already waited; in-process backend"
+      }
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]",
+      "name": "physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+          "--exact",
+          "physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+        "started_at": "2026-10-24T20:34:30.251559+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 62480,
+        "owned_process_group": 62480,
+        "validated_child_session": {
+          "pid": 62480,
+          "sid": 62480,
+          "pgid": 62480,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 62480,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 2.989742,
+        "finished_at": "2026-10-24T20:34:33.241371+00:00",
+        "stdout_sha256": "73959563f975b3417c1e9c5def7dc0a8396fa024f538aa68754d1202db02ae54",
+        "stdout_bytes": 213,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/03",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+        "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+        "bytes": 15954472,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+      "compiled_child_bindings": [
+        {
+          "binding": {
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "bytes": 28924864,
+            "compiler_artifact": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+              "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+              "target": {
+                "kind": [
+                  "bin"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "lamp-voice-eval",
+                "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/main.rs",
+                "edition": "2024",
+                "doc": true,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "0",
+                "debuginfo": 0,
+                "debug_assertions": true,
+                "overflow_checks": true,
+                "test": false
+              },
+              "features": [],
+              "filenames": [
+                "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+              ],
+              "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+              "fresh": false
+            },
+            "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+          },
+          "original_mode_proof": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "bytes": 28924864,
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "mode": 493
+          },
+          "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+          "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+        }
+      ],
+      "scope": {
+        "key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]",
+        "profile_debug": 0,
+        "compiled_programs": [
+          "lamp-voice-eval"
+        ],
+        "system_programs": [],
+        "parent_environment_absent": [],
+        "inner_new_PG": true,
+        "scope": "Same canonical evaluator BIN: fake-clock-session -> fake-clock-lamp-voice; process_group(0), Cleanup kill+wait; no Voice/Body CLI"
+      }
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]",
+      "name": "physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+          "--exact",
+          "physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+        "started_at": "2026-10-24T20:34:36.906642+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 62639,
+        "owned_process_group": 62639,
+        "validated_child_session": {
+          "pid": 62639,
+          "sid": 62639,
+          "pgid": 62639,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 62639,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 1.689666,
+        "finished_at": "2026-10-24T20:34:38.596405+00:00",
+        "stdout_sha256": "046fa7d3584549d99cfa6709d4071c87cc16bbd6e7462b32267eca90e840d7b2",
+        "stdout_bytes": 219,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/04",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+        "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+        "bytes": 15954472,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+      "compiled_child_bindings": [
+        {
+          "binding": {
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "bytes": 28924864,
+            "compiler_artifact": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+              "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+              "target": {
+                "kind": [
+                  "bin"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "lamp-voice-eval",
+                "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/main.rs",
+                "edition": "2024",
+                "doc": true,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "0",
+                "debuginfo": 0,
+                "debug_assertions": true,
+                "overflow_checks": true,
+                "test": false
+              },
+              "features": [],
+              "filenames": [
+                "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+              ],
+              "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+              "fresh": false
+            },
+            "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+          },
+          "original_mode_proof": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "bytes": 28924864,
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "mode": 493
+          },
+          "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+          "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+        }
+      ],
+      "scope": {
+        "key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]",
+        "profile_debug": 0,
+        "compiled_programs": [
+          "lamp-voice-eval"
+        ],
+        "system_programs": [],
+        "parent_environment_absent": [],
+        "inner_new_PG": true,
+        "scope": "Same canonical evaluator BIN: fake-clock-session -> fake-clock-lamp-voice; process_group(0), Cleanup kill+wait; no Voice/Body CLI"
+      }
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]",
+      "name": "physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+          "--exact",
+          "physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+        "started_at": "2026-10-24T20:34:42.541467+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 62814,
+        "owned_process_group": 62814,
+        "validated_child_session": {
+          "pid": 62814,
+          "sid": 62814,
+          "pgid": 62814,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 62814,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 1.547914,
+        "finished_at": "2026-10-24T20:34:44.089484+00:00",
+        "stdout_sha256": "8ba2c450ad1934af0180c3277a60785df6f1f1698b5c9d375d7c5fc0d4f8623b",
+        "stdout_bytes": 219,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/05",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+        "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+        "bytes": 15954472,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+      "compiled_child_bindings": [
+        {
+          "binding": {
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "bytes": 28924864,
+            "compiler_artifact": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+              "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+              "target": {
+                "kind": [
+                  "bin"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "lamp-voice-eval",
+                "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/main.rs",
+                "edition": "2024",
+                "doc": true,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "0",
+                "debuginfo": 0,
+                "debug_assertions": true,
+                "overflow_checks": true,
+                "test": false
+              },
+              "features": [],
+              "filenames": [
+                "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+              ],
+              "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+              "fresh": false
+            },
+            "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+          },
+          "original_mode_proof": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "bytes": 28924864,
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "mode": 493
+          },
+          "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+          "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+        }
+      ],
+      "scope": {
+        "key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]",
+        "profile_debug": 0,
+        "compiled_programs": [
+          "lamp-voice-eval"
+        ],
+        "system_programs": [],
+        "parent_environment_absent": [],
+        "inner_new_PG": true,
+        "scope": "Same canonical evaluator BIN: fake-clock-session -> fake-clock-lamp-voice; process_group(0), Cleanup kill+wait; no Voice/Body CLI"
+      }
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]",
+      "name": "physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+          "--exact",
+          "physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+        "started_at": "2026-10-24T20:34:48.059750+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 62946,
+        "owned_process_group": 62946,
+        "validated_child_session": {
+          "pid": 62946,
+          "sid": 62946,
+          "pgid": 62946,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 62946,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 1.665862,
+        "finished_at": "2026-10-24T20:34:49.725710+00:00",
+        "stdout_sha256": "94d87bbeb6928c13a748e26ee9a3dafd3a72f386fe5b44b67fa311faf2a557bd",
+        "stdout_bytes": 211,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/06",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+        "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+        "bytes": 15954472,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+      "compiled_child_bindings": [
+        {
+          "binding": {
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "bytes": 28924864,
+            "compiler_artifact": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+              "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+              "target": {
+                "kind": [
+                  "bin"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "lamp-voice-eval",
+                "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/main.rs",
+                "edition": "2024",
+                "doc": true,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "0",
+                "debuginfo": 0,
+                "debug_assertions": true,
+                "overflow_checks": true,
+                "test": false
+              },
+              "features": [],
+              "filenames": [
+                "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+              ],
+              "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+              "fresh": false
+            },
+            "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+          },
+          "original_mode_proof": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "bytes": 28924864,
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "mode": 493
+          },
+          "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+          "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+        }
+      ],
+      "scope": {
+        "key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]",
+        "profile_debug": 0,
+        "compiled_programs": [
+          "lamp-voice-eval"
+        ],
+        "system_programs": [],
+        "parent_environment_absent": [],
+        "inner_new_PG": true,
+        "scope": "Same canonical evaluator BIN: fake-clock-session -> fake-clock-lamp-voice; process_group(0), Cleanup kill+wait; no Voice/Body CLI"
+      }
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]",
+      "name": "physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+          "--exact",
+          "physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+        "started_at": "2026-10-24T20:34:53.785460+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 63674,
+        "owned_process_group": 63674,
+        "validated_child_session": {
+          "pid": 63674,
+          "sid": 63674,
+          "pgid": 63674,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 63674,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 1.768142,
+        "finished_at": "2026-10-24T20:34:55.553738+00:00",
+        "stdout_sha256": "47064837c8838456f7489bfd66d745348283a994a7e3f42ae2c0ad33fcb93c4b",
+        "stdout_bytes": 204,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/07",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+        "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+        "bytes": 15954472,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+      "compiled_child_bindings": [
+        {
+          "binding": {
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "bytes": 28924864,
+            "compiler_artifact": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+              "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+              "target": {
+                "kind": [
+                  "bin"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "lamp-voice-eval",
+                "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/main.rs",
+                "edition": "2024",
+                "doc": true,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "0",
+                "debuginfo": 0,
+                "debug_assertions": true,
+                "overflow_checks": true,
+                "test": false
+              },
+              "features": [],
+              "filenames": [
+                "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+              ],
+              "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+              "fresh": false
+            },
+            "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+          },
+          "original_mode_proof": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "bytes": 28924864,
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "mode": 493
+          },
+          "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+          "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+        }
+      ],
+      "scope": {
+        "key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]",
+        "profile_debug": 0,
+        "compiled_programs": [
+          "lamp-voice-eval"
+        ],
+        "system_programs": [],
+        "parent_environment_absent": [],
+        "inner_new_PG": true,
+        "scope": "Same canonical evaluator BIN: fake-clock-session -> fake-clock-lamp-voice; process_group(0), Cleanup kill+wait; no Voice/Body CLI"
+      }
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]",
+      "name": "physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason",
+      "outcome": "ok",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+          "--exact",
+          "physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+        "started_at": "2026-10-24T20:34:59.363515+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 63793,
+        "owned_process_group": 63793,
+        "validated_child_session": {
+          "pid": 63793,
+          "sid": 63793,
+          "pgid": 63793,
+          "start_new_session": true
+        },
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "owned_session_cleanup": {
+          "sid": 63793,
+          "censuses": [
+            {
+              "label": "before outer cleanup",
+              "members": []
+            },
+            {
+              "label": "after outer cleanup / empty recheck",
+              "members": []
+            }
+          ],
+          "signals": [],
+          "errors": [],
+          "absent": true
+        },
+        "wall_seconds": 1.63497,
+        "finished_at": "2026-10-24T20:35:00.998579+00:00",
+        "stdout_sha256": "28a81b86968223da2a4d4456322c14ba5bb47530a1a436f581d9d5cc805c2fa2",
+        "stdout_bytes": 221,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/baseline-observations/08",
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+        "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+        "bytes": 15954472,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "actual_test_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+      "compiled_child_bindings": [
+        {
+          "binding": {
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "bytes": 28924864,
+            "compiler_artifact": {
+              "reason": "compiler-artifact",
+              "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+              "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+              "target": {
+                "kind": [
+                  "bin"
+                ],
+                "crate_types": [
+                  "bin"
+                ],
+                "name": "lamp-voice-eval",
+                "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/main.rs",
+                "edition": "2024",
+                "doc": true,
+                "doctest": false,
+                "test": true
+              },
+              "profile": {
+                "opt_level": "0",
+                "debuginfo": 0,
+                "debug_assertions": true,
+                "overflow_checks": true,
+                "test": false
+              },
+              "features": [],
+              "filenames": [
+                "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+              ],
+              "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+              "fresh": false
+            },
+            "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+          },
+          "original_mode_proof": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+            "bytes": 28924864,
+            "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+            "mode": 493
+          },
+          "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+          "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+        }
+      ],
+      "scope": {
+        "key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]",
+        "profile_debug": 0,
+        "compiled_programs": [
+          "lamp-voice-eval"
+        ],
+        "system_programs": [],
+        "parent_environment_absent": [],
+        "inner_new_PG": true,
+        "scope": "Same canonical evaluator BIN: fake-clock-session -> fake-clock-lamp-voice; process_group(0), Cleanup kill+wait; no Voice/Body CLI"
+      }
+    }
+  ],
+  "all_cases_once": true,
+  "last_case_command": {
+    "command": [
+      "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+      "--exact",
+      "physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval",
+    "started_at": "2026-10-24T20:34:59.363515+00:00",
+    "timeout_seconds": 600,
+    "stdout": "exact.stdout.txt",
+    "stderr": "exact.stderr.txt",
+    "timeout_cleanup": [],
+    "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+    "owned_pid": 63793,
+    "owned_process_group": 63793,
+    "validated_child_session": {
+      "pid": 63793,
+      "sid": 63793,
+      "pgid": 63793,
+      "start_new_session": true
+    },
+    "timed_out": false,
+    "exit_code": 0,
+    "unexpected_residual_group_after_normal_exit": false,
+    "direct_status_before_cleanup": 0,
+    "owned_group_present_before_cleanup": false,
+    "direct_wait_status": 0,
+    "owned_group_absent_after_cleanup": true,
+    "owned_session_cleanup": {
+      "sid": 63793,
+      "censuses": [
+        {
+          "label": "before outer cleanup",
+          "members": []
+        },
+        {
+          "label": "after outer cleanup / empty recheck",
+          "members": []
+        }
+      ],
+      "signals": [],
+      "errors": [],
+      "absent": true
+    },
+    "wall_seconds": 1.63497,
+    "finished_at": "2026-10-24T20:35:00.998579+00:00",
+    "stdout_sha256": "28a81b86968223da2a4d4456322c14ba5bb47530a1a436f581d9d5cc805c2fa2",
+    "stdout_bytes": 221,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "complete": true,
+  "all_owned_sessions_absent": true
+}

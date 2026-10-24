@@ -1,0 +1,716 @@
+[
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/closed-run-review.json",
+    "relative": "actual/closed-run-review.json",
+    "sha256": "1e132dfd058141fc6ab31f3660dac8ffe33fffcdcdbfc36b10edf470ea3a83ea",
+    "bytes": 7523
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/root-grant.raw.json",
+    "relative": "actual/root-grant.raw.json",
+    "sha256": "f6b413011611500a64e72f3110922ea22bf47aa5552162849f1262de946d49db",
+    "bytes": 2547
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/results.json",
+    "relative": "actual/results.json",
+    "sha256": "d933283f89bb1df808579dadc201c0ef5d9befd0716683e923dcf45c8b7f6aef",
+    "bytes": 106192
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/root-reported-direct-baseline-closed.json",
+    "relative": "actual/root-reported-direct-baseline-closed.json",
+    "sha256": "3b850a968e0674608bd3ed70a89f19d1e1bc5b1bd8e4dcabb521e7cf1474bf1b",
+    "bytes": 680
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/CPU-target-release.json",
+    "relative": "actual/CPU-target-release.json",
+    "sha256": "5baf1ee1c4dd58bfd97dd2225a43728529049849dd0becf1ce8c8e2adeae841c",
+    "bytes": 465
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/root-direct-baseline-overlap-amendment.raw.json",
+    "relative": "actual/root-direct-baseline-overlap-amendment.raw.json",
+    "sha256": "d397ea6e0337ab062845f07c861f14a9f0d1cca7a9bfaa3a7aa517a4964c2698",
+    "bytes": 754
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/root-no-pause-compile-overlap-authorization.raw.json",
+    "relative": "actual/root-no-pause-compile-overlap-authorization.raw.json",
+    "sha256": "e1f39ce7c40ab6d2353514a7fc04523e693adff848e19c0fb5b0701cdc8d300b",
+    "bytes": 665
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/post-close-compile-authorization-context.json",
+    "relative": "actual/post-close-compile-authorization-context.json",
+    "sha256": "c6f4f31d098c8a14d127a85b65fa8d0baf5817e44597a59765893c0d69f9bc7a",
+    "bytes": 574
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/environment.json",
+    "relative": "actual/environment.json",
+    "sha256": "39c0af544bf20690c159a7153b6f49cc2101c5e6776a6b0a3eebc367dcd80ba5",
+    "bytes": 5184
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-workspace-build/before-stage.storage.json",
+    "relative": "actual/clean-before-workspace-build/before-stage.storage.json",
+    "sha256": "a6dccfbf923fcf80f25b7cb694c8dbef82c7635b3991e2740b84727510b3ef4e",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-workspace-build/clean-before-workspace-build.stdout.txt",
+    "relative": "actual/clean-before-workspace-build/clean-before-workspace-build.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-workspace-build/clean-before-workspace-build.json",
+    "relative": "actual/clean-before-workspace-build/clean-before-workspace-build.json",
+    "sha256": "9fcf1cd2fe1cbd78091acb99ecd9207a5bda4e63fb06f081f8c8f48006d8b8e6",
+    "bytes": 2641
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-workspace-build/clean-before-workspace-build.guards.json",
+    "relative": "actual/clean-before-workspace-build/clean-before-workspace-build.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-workspace-build/clean-before-workspace-build.stderr.txt",
+    "relative": "actual/clean-before-workspace-build/clean-before-workspace-build.stderr.txt",
+    "sha256": "7a2aaa704dee20eea3920162493af41153ab172356bb3146a49c450f1c9dade2",
+    "bytes": 38
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/fmt/before-stage.storage.json",
+    "relative": "actual/fmt/before-stage.storage.json",
+    "sha256": "aeb4265c05ef3082cb2f4650b827c41bf3e7f5b0980a8a366900e8f6ba088843",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/fmt/fmt.json",
+    "relative": "actual/fmt/fmt.json",
+    "sha256": "019421182df0a0613706013526bec9edb0afd622ebe01f432c085f5089d9cf0c",
+    "bytes": 1166
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/fmt/fmt.stderr.txt",
+    "relative": "actual/fmt/fmt.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/fmt/fmt.guards.json",
+    "relative": "actual/fmt/fmt.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/fmt/fmt.stdout.txt",
+    "relative": "actual/fmt/fmt.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/before-witness-c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253.storage.json",
+    "relative": "actual/tests/before-witness-c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253.storage.json",
+    "sha256": "f20f1ef5fef40504ed929b20b4ecc7de185d1bcfe0c8bbd2f7f6349400e18cbc",
+    "bytes": 219
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executable-bindings.json",
+    "relative": "actual/tests/frozen-executable-bindings.json",
+    "sha256": "4ab399360f5e68f6a0c0aac3eacf4d4d021cd5df26f944b040920071467115b8",
+    "bytes": 11824
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/executed-summaries.json",
+    "relative": "actual/tests/executed-summaries.json",
+    "sha256": "e0ca703862a5b981a1d80924c512ef856eed1d2037d945f0e02476d1d84e6592",
+    "bytes": 1666
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/tests.guards.json",
+    "relative": "actual/tests/tests.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compilation-outcome.json",
+    "relative": "actual/tests/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/before-witness-copies.storage.json",
+    "relative": "actual/tests/before-witness-copies.storage.json",
+    "sha256": "7c32d9978110fd59dec841248d4ba4dd66b96d1d5a4d943f6893bd6c3e641b1c",
+    "bytes": 219
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/tests.json",
+    "relative": "actual/tests/tests.json",
+    "sha256": "615755704098db028cc33ed3a908fad42aa90dccd8883fe83e11da0ff42d0f7f",
+    "bytes": 1264
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/before-witness-c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374.storage.json",
+    "relative": "actual/tests/before-witness-c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374.storage.json",
+    "sha256": "813e26b2e6e43b3ecdbbd768a252e1d9c69a4d433a5227e40034f0e68079f07a",
+    "bytes": 219
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/before-stage.storage.json",
+    "relative": "actual/tests/before-stage.storage.json",
+    "sha256": "8811cfa3ebaea01d4e863b22650c4b8004a3e24b698219a1ba48a23a045c6834",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/affected-case-outcomes.json",
+    "relative": "actual/tests/affected-case-outcomes.json",
+    "sha256": "3ffc18063afeed44b4334e6eef8d8d81a705866f1552b04779a782f623511e0d",
+    "bytes": 546
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census.json",
+    "relative": "actual/tests/compiled-census.json",
+    "sha256": "2f6afcb70e69cbc0be22f8c614e96a3a25e1ab9f3207dfebe5290e86cef27689",
+    "bytes": 19459
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/target-outcomes.json",
+    "relative": "actual/tests/target-outcomes.json",
+    "sha256": "62f8cc8e9d52a85551b8bfbc5bd155b6085db0908431f7899e33c7df23308813",
+    "bytes": 53188
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/tests.stdout.txt",
+    "relative": "actual/tests/tests.stdout.txt",
+    "sha256": "1c2602adec381afc24dbe2b29890773fe5553541c23701e56c92691b0bc84ca5",
+    "bytes": 258888
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/local-library-lineage.json",
+    "relative": "actual/tests/local-library-lineage.json",
+    "sha256": "b8c2ac9d971ef8df8f73f37cdb031508db4121b0362df85057102202aa28eafb",
+    "bytes": 74943
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/before-witness-f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e.storage.json",
+    "relative": "actual/tests/before-witness-f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e.storage.json",
+    "sha256": "568a66e9eb46c1b0fa7f2a389c6062eaa36f0e39587313d92fa62c7a1482d28f",
+    "bytes": 219
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-artifacts.json",
+    "relative": "actual/tests/compiled-artifacts.json",
+    "sha256": "39169cdaf0b7483ff9e8780ddf97735fd5d44eff1253c278e7cb03a6f901a1fe",
+    "bytes": 8979
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/before-witness-9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b.storage.json",
+    "relative": "actual/tests/before-witness-9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b.storage.json",
+    "sha256": "f2f0b60f492a452ccb2e32a5af6cc607e448b211363e962ab03f459e02c19b48",
+    "bytes": 218
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/tests.stderr.txt",
+    "relative": "actual/tests/tests.stderr.txt",
+    "sha256": "1f038b82990db4ddb6ece93c12ce8bab7d8d5e53c57d56495f01213602887d1c",
+    "bytes": 5210
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/before-witness-bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c.storage.json",
+    "relative": "actual/tests/before-witness-bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c.storage.json",
+    "sha256": "2cad036d2fd4b34987b3a0b726f5feb3f5820978cfcc44176cd780f15596cb29",
+    "bytes": 218
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/diff-check/before-stage.storage.json",
+    "relative": "actual/diff-check/before-stage.storage.json",
+    "sha256": "5880a8001713b793860f39f5cb11918fd4b6d1e8c249a78c80f75e98de5d9a11",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/diff-check/diff-check.stderr.txt",
+    "relative": "actual/diff-check/diff-check.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/diff-check/diff-check.guards.json",
+    "relative": "actual/diff-check/diff-check.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/diff-check/diff-check.stdout.txt",
+    "relative": "actual/diff-check/diff-check.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/diff-check/diff-check.json",
+    "relative": "actual/diff-check/diff-check.json",
+    "sha256": "cd827284da416e72dcd2f9777537942c2527183d8e1275f64c5dfd074148b6d4",
+    "bytes": 1117
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clippy/clippy.guards.json",
+    "relative": "actual/clippy/clippy.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clippy/clippy.stderr.txt",
+    "relative": "actual/clippy/clippy.stderr.txt",
+    "sha256": "050eca199b1c5ce66f9542be96ea48bcfd2dad7c6853461401f542ab48658e81",
+    "bytes": 4425
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clippy/compilation-outcome.json",
+    "relative": "actual/clippy/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clippy/before-stage.storage.json",
+    "relative": "actual/clippy/before-stage.storage.json",
+    "sha256": "e7f77264f218dca9956cb347ff56578dd0cd8c94704ce9cb45d34b54185bb6ea",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clippy/clippy.json",
+    "relative": "actual/clippy/clippy.json",
+    "sha256": "a53d7e5d720a6166c61e27435e603a939939f517df052ebf24004d159cf8e796",
+    "bytes": 1303
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clippy/local-library-lineage.json",
+    "relative": "actual/clippy/local-library-lineage.json",
+    "sha256": "87b0f9ca7c4a515dc9304b1e301a23ff43b0c3ad9ee962b7b088850ed287e6d6",
+    "bytes": 60904
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clippy/clippy.stdout.txt",
+    "relative": "actual/clippy/clippy.stdout.txt",
+    "sha256": "e6e7540c8078723c675608036a709105e46aa385fcebe52bfa25973f67553540",
+    "bytes": 212817
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-clippy/before-stage.storage.json",
+    "relative": "actual/clean-before-clippy/before-stage.storage.json",
+    "sha256": "5f76ac372402137ca9835b57e8da3d77af7c280f91d0e017c6bcdabf5fa8522b",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-clippy/clean-before-clippy.stdout.txt",
+    "relative": "actual/clean-before-clippy/clean-before-clippy.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-clippy/clean-before-clippy.stderr.txt",
+    "relative": "actual/clean-before-clippy/clean-before-clippy.stderr.txt",
+    "sha256": "39b9423fb518bae1c9fc32579642a657551699117c8b94f9c090a88c1bec6928",
+    "bytes": 39
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-clippy/clean-before-clippy.json",
+    "relative": "actual/clean-before-clippy/clean-before-clippy.json",
+    "sha256": "0687dd59baff3234efaa092ba7a33e29ee2cd2183ab2e6c1bc8aa8a98ea0e05c",
+    "bytes": 2623
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-clippy/clean-before-clippy.guards.json",
+    "relative": "actual/clean-before-clippy/clean-before-clippy.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/workspace-build/compilation-outcome.json",
+    "relative": "actual/workspace-build/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/workspace-build/before-stage.storage.json",
+    "relative": "actual/workspace-build/before-stage.storage.json",
+    "sha256": "4a82bda9660492df58aa7e71d9804a8013965a3f87d610a140a36203200e31d9",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/workspace-build/workspace-build.stdout.txt",
+    "relative": "actual/workspace-build/workspace-build.stdout.txt",
+    "sha256": "3ee3eaeade0f3fb07ad008d0321ead785e092335d40f6a27cb2b2c1efd05ab6c",
+    "bytes": 449895
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/workspace-build/workspace-build.guards.json",
+    "relative": "actual/workspace-build/workspace-build.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/workspace-build/local-library-lineage.json",
+    "relative": "actual/workspace-build/local-library-lineage.json",
+    "sha256": "003d6aaad98f17edcb9bbce20efe690782b0655269fd4f6ea538f12e8a8ddd9d",
+    "bytes": 209630
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/workspace-build/workspace-build.json",
+    "relative": "actual/workspace-build/workspace-build.json",
+    "sha256": "cce82151092e451311ba3041d9e457fe5a2d98be649966755092113e6ac9767f",
+    "bytes": 1274
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/workspace-build/workspace-build.stderr.txt",
+    "relative": "actual/workspace-build/workspace-build.stderr.txt",
+    "sha256": "7845ba565a059bf24cfaa6196c6953c494d4b3e23d4c5106961ef615c8bc2262",
+    "bytes": 8109
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-tests/before-stage.storage.json",
+    "relative": "actual/clean-before-tests/before-stage.storage.json",
+    "sha256": "f1e6a4f6bb04d7c1c606f62e9cbd11e7664371cb504e1e1b697417523439a4ef",
+    "bytes": 212
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-tests/clean-before-tests.json",
+    "relative": "actual/clean-before-tests/clean-before-tests.json",
+    "sha256": "3c3d1ec19dcc2620ea210e4d62701ef9629eccf6ad7ff80681342bfce75c82fd",
+    "bytes": 2621
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-tests/clean-before-tests.stdout.txt",
+    "relative": "actual/clean-before-tests/clean-before-tests.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-tests/clean-before-tests.guards.json",
+    "relative": "actual/clean-before-tests/clean-before-tests.guards.json",
+    "sha256": "0b18bfa5830cc3ea3125c9217a777e9c2e1cd330afa650942160c367c69db195",
+    "bytes": 279
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/clean-before-tests/clean-before-tests.stderr.txt",
+    "relative": "actual/clean-before-tests/clean-before-tests.stderr.txt",
+    "sha256": "223aec06ef0914eaf59d65a3c6f9ec0d6a9aa5ff76236f56aff33fb2c9b51fb2",
+    "bytes": 39
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/all.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/ignored.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/file.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/file.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/file.json",
+    "sha256": "89ea3ff3d323983aa49e09a867147c3e8a11fdd53de6fa4cb05203fd3eb842cc",
+    "bytes": 1228
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/all.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/all.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/census.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/census.json",
+    "sha256": "9e4bd22929884980ce8d34d5d3915936197364b25e271d0c419d5ed44e02284f",
+    "bytes": 823
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/ignored.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/ignored.json",
+    "sha256": "5721cb7b065a0c22627a46a0ce3a90f5a761882a0fe09448e34b7b05becdf6b0",
+    "bytes": 1281
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/ignored.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/ignored.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/file.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/file.stdout.txt",
+    "sha256": "749f1b1d903998d24834e59ae32699ded4b98f54e49ea45138556d0863095501",
+    "bytes": 189
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/all.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/all.json",
+    "sha256": "765fd0ad73dd607f225db973b75a223e2a627e039f992a9dc325f8b5d41401d3",
+    "bytes": 1256
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/all.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/ignored.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/file.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/file.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/file.json",
+    "sha256": "c8d29b4b2d6296e3fa519bd5906a059eedb993c636a2e07f1ae6022d7125a285",
+    "bytes": 1229
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/all.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/all.stdout.txt",
+    "sha256": "65a1af78f7f5a5f4fae11cb562ec4172cb0283c09005f24b8c238aa3caaca0eb",
+    "bytes": 12562
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/census.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/census.json",
+    "sha256": "789a52e53b11f00799d0a15793a6447c0acf6edc1ff36f2f331db7a8eac73789",
+    "bytes": 13651
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/ignored.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/ignored.json",
+    "sha256": "a7b8abeee58ee60768cf5e577def851c45e7608e7b319b6910798001609eed60",
+    "bytes": 1282
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/ignored.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/ignored.stdout.txt",
+    "sha256": "c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21",
+    "bytes": 92
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/file.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/file.stdout.txt",
+    "sha256": "1226a214373630f0c439184b7abea539a66090c56140d7372de6df9ef659026e",
+    "bytes": 189
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/all.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/all.json",
+    "sha256": "c6c2ee78f57ca1322275ede22b3be1ee726e690ef300de78818b7cc61dbc3f60",
+    "bytes": 1260
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/all.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/ignored.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/file.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/file.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/file.json",
+    "sha256": "8cd95b5638bee5ec06698374680a300e5499b3c6d2486f0269bed45d345e0859",
+    "bytes": 1231
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/all.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/all.stdout.txt",
+    "sha256": "07c46bff77ea130bea2bada7b01d0efaa7b0ee4d8bfc9cb31c2c1ce62f539a46",
+    "bytes": 152
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/census.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/census.json",
+    "sha256": "e2e5f4db46cb7a7866966d415eb7c46739ed86e1c35e66367cd65addd5c5fd53",
+    "bytes": 1151
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/ignored.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/ignored.json",
+    "sha256": "67bd61fec0c06362381f345162f6f28e82eda765027d40b2ec2b9c3def06e347",
+    "bytes": 1285
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/ignored.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/ignored.stdout.txt",
+    "sha256": "07c46bff77ea130bea2bada7b01d0efaa7b0ee4d8bfc9cb31c2c1ce62f539a46",
+    "bytes": 152
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/file.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/file.stdout.txt",
+    "sha256": "d1eec5d5d090c4b06ef84fd40804ed1c5e5f863d41e80edc9d388491cefe3c4a",
+    "bytes": 191
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/all.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-release_pair-bc9e625090/all.json",
+    "sha256": "8fb6d1c29a803933e30449b713f5a0bd65a557db2692728bab029730afd959cf",
+    "bytes": 1260
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/all.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/ignored.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/file.stderr.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/file.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/file.json",
+    "sha256": "ef6a4c1cf855435c3a8b8abef3d229fff054dceb33928a8021dd9be0449ccb71",
+    "bytes": 1221
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/all.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/all.stdout.txt",
+    "sha256": "fc341fc3b369cb62574795fb53824c4c9a475b11373aabd723a6689e13762b3a",
+    "bytes": 2362
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/census.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/census.json",
+    "sha256": "748032191cb3c01fa671438ec7134bd8f192a0b48f774169b235ca4b86e824f9",
+    "bytes": 3209
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/ignored.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/ignored.json",
+    "sha256": "1b84909faeaebe1d780da4834c8389fca03fdbf83bf6ee3596de8adcd9a329a8",
+    "bytes": 1273
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/ignored.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/ignored.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/file.stdout.txt",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/file.stdout.txt",
+    "sha256": "d74ab15991ca0a644bf8a4b0629d3dc8455cf59ef1e02b4f00182c66fe1cf1d5",
+    "bytes": 181
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/compiled-census/lamp-cloud-it-c39b76d586/all.json",
+    "relative": "actual/tests/compiled-census/lamp-cloud-it-c39b76d586/all.json",
+    "sha256": "525aab8ee046b84011ae1a27a5f4e6d7cfa87803d6a878b1ec208198ef7a401a",
+    "bytes": 1251
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/root-direct-baseline-overlap-amendment.json",
+    "relative": "plan-and-inputs/root-direct-baseline-overlap-amendment.json",
+    "sha256": "d397ea6e0337ab062845f07c861f14a9f0d1cca7a9bfaa3a7aa517a4964c2698",
+    "bytes": 754
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/plan.json",
+    "relative": "plan-and-inputs/plan.json",
+    "sha256": "e93befd031aec85a0090f04216dcf6b9bbffa975807f5524a19327b7092a41c6",
+    "bytes": 16451
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/metadata-original-command-receipt.json",
+    "relative": "plan-and-inputs/metadata-original-command-receipt.json",
+    "sha256": "c2351016e78b15390a46ffd863dff085868426cfeeca488b000db4151d4f7409",
+    "bytes": 1217
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/reverse-closure.json",
+    "relative": "plan-and-inputs/reverse-closure.json",
+    "sha256": "c2092b713bfe7a59187c7a0d4b304d549370ceb64f31aff269be9108275c71ab",
+    "bytes": 1318
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/prior-actual-graph-proof.json",
+    "relative": "plan-and-inputs/prior-actual-graph-proof.json",
+    "sha256": "8a1a4b71f8985d19bc8f9cb1d14f09f31291dab76eaab4002f3742f37569f4a2",
+    "bytes": 311
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/execution-consumed.json",
+    "relative": "plan-and-inputs/execution-consumed.json",
+    "sha256": "be3e704d3f7b9be33354c79811fddabbe066ff79bdf624e1c1be440446292c92",
+    "bytes": 674
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/canonical-source-map.json",
+    "relative": "plan-and-inputs/canonical-source-map.json",
+    "sha256": "ae98053fd573bdf3d3c71cbd984587af692d1982229122e6c183e3d49d29a890",
+    "bytes": 2832306
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/root-execution-grant.json",
+    "relative": "plan-and-inputs/root-execution-grant.json",
+    "sha256": "f6b413011611500a64e72f3110922ea22bf47aa5552162849f1262de946d49db",
+    "bytes": 2547
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/root-no-pause-compile-overlap-amendment.json",
+    "relative": "plan-and-inputs/root-no-pause-compile-overlap-amendment.json",
+    "sha256": "e1f39ce7c40ab6d2353514a7fc04523e693adff848e19c0fb5b0701cdc8d300b",
+    "bytes": 665
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/frozen-actual-cloud-metadata.stdout.txt",
+    "relative": "plan-and-inputs/frozen-actual-cloud-metadata.stdout.txt",
+    "sha256": "a028aca64b389125d59dff5c7e5cab44c4751747b5c8daebfd689974cda2827a",
+    "bytes": 2365064
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/metadata-source-comparison.json",
+    "relative": "plan-and-inputs/metadata-source-comparison.json",
+    "sha256": "deb82bac7fdb1a2c308654442da0a2daee59cc9a4246e7cb0c9e49b9d2bc0f5a",
+    "bytes": 64271
+  },
+  {
+    "source": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/SHA256SUMS",
+    "relative": "plan-and-inputs/SHA256SUMS",
+    "sha256": "94997f782567114710e15a7e2488df5c8e02945b435f99508ac3b4cbab8cc270",
+    "bytes": 886
+  }
+]

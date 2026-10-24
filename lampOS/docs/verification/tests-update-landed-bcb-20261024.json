@@ -1,0 +1,33 @@
+{
+  "PR": 3403,
+  "landed_via": 3382,
+  "train": 3409,
+  "landed_head": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "files": [
+    {
+      "path": "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+      "authored_blob": "357756e28b0fe397a2c46310eded0bc3e27b8566",
+      "landed_blob": "357756e28b0fe397a2c46310eded0bc3e27b8566",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/runnable_events.rs",
+      "authored_blob": "8f1d99ba24dc7f2aa807c018e519909351944139",
+      "landed_blob": "8f1d99ba24dc7f2aa807c018e519909351944139",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+      "authored_blob": "876279be733d86116c59be4cfb1f13c2bf144792",
+      "landed_blob": "876279be733d86116c59be4cfb1f13c2bf144792",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "authored_blob": "a22792661011bbc3ebd395686810a23d5fba3c49",
+      "landed_blob": "a22792661011bbc3ebd395686810a23d5fba3c49",
+      "equal": true
+    }
+  ],
+  "scope": "All four owned inputs landed through the qualified consumer. Duplicate PR closure does not alter or waive the separately retained historical failed epochs."
+}

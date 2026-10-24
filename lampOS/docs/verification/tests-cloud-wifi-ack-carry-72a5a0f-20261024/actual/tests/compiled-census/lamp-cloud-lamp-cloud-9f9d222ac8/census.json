@@ -1,0 +1,25 @@
+{
+  "package": "lamp-cloud",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-cloud",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+  "sha256": "9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b",
+  "compiled_cases": [],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 0,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

@@ -1,0 +1,252 @@
+{
+  "native_session": 53518,
+  "terminal_exit_code": 0,
+  "current_head": "72a5a0f67c1a9d12d257e38d85cff7bfaf268999",
+  "current_parent": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "all8canonical_stages_completed": true,
+  "all_gates_passed": true,
+  "full_Cloud_counts": {
+    "passed": 196,
+    "failed": 0,
+    "ignored": 4,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_targets": 5,
+  "affected_case": [
+    {
+      "package": "lamp-cloud",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+      "status": "ok"
+    }
+  ],
+  "lineage": {
+    "clippy": {
+      "records": 32,
+      "fresh_false": 32,
+      "same_command_exact_reuse": 0,
+      "unresolved": 0
+    },
+    "tests": {
+      "records": 32,
+      "fresh_false": 32,
+      "same_command_exact_reuse": 0,
+      "unresolved": 0
+    },
+    "workspace-build": {
+      "records": 96,
+      "fresh_false": 96,
+      "same_command_exact_reuse": 0,
+      "unresolved": 0
+    }
+  },
+  "source_before": {
+    "canonical": "8044e1268ae43ad74cb8e8022a968a2b7c20783693972d5ab9659f984d63b202"
+  },
+  "source_after": {
+    "canonical": "8044e1268ae43ad74cb8e8022a968a2b7c20783693972d5ab9659f984d63b202"
+  },
+  "owned_commands_verified": [
+    {
+      "record": "clean-before-workspace-build/clean-before-workspace-build.json",
+      "pid": 61483,
+      "pgid": 61483,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "9fcf1cd2fe1cbd78091acb99ecd9207a5bda4e63fb06f081f8c8f48006d8b8e6"
+    },
+    {
+      "record": "fmt/fmt.json",
+      "pid": 51185,
+      "pgid": 51185,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "019421182df0a0613706013526bec9edb0afd622ebe01f432c085f5089d9cf0c"
+    },
+    {
+      "record": "tests/tests.json",
+      "pid": 56135,
+      "pgid": 56135,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "615755704098db028cc33ed3a908fad42aa90dccd8883fe83e11da0ff42d0f7f"
+    },
+    {
+      "record": "diff-check/diff-check.json",
+      "pid": 75834,
+      "pgid": 75834,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "cd827284da416e72dcd2f9777537942c2527183d8e1275f64c5dfd074148b6d4"
+    },
+    {
+      "record": "clippy/clippy.json",
+      "pid": 52832,
+      "pgid": 52832,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "a53d7e5d720a6166c61e27435e603a939939f517df052ebf24004d159cf8e796"
+    },
+    {
+      "record": "clean-before-clippy/clean-before-clippy.json",
+      "pid": 51760,
+      "pgid": 51760,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "0687dd59baff3234efaa092ba7a33e29ee2cd2183ab2e6c1bc8aa8a98ea0e05c"
+    },
+    {
+      "record": "workspace-build/workspace-build.json",
+      "pid": 62484,
+      "pgid": 62484,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "cce82151092e451311ba3041d9e457fe5a2d98be649966755092113e6ac9767f"
+    },
+    {
+      "record": "clean-before-tests/clean-before-tests.json",
+      "pid": 55976,
+      "pgid": 55976,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "3c3d1ec19dcc2620ea210e4d62701ef9629eccf6ad7ff80681342bfce75c82fd"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/file.json",
+      "pid": 61008,
+      "pgid": 61008,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "89ea3ff3d323983aa49e09a867147c3e8a11fdd53de6fa4cb05203fd3eb842cc"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/ignored.json",
+      "pid": 61015,
+      "pgid": 61015,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "5721cb7b065a0c22627a46a0ce3a90f5a761882a0fe09448e34b7b05becdf6b0"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp-cloud-9f9d222ac8/all.json",
+      "pid": 61014,
+      "pgid": 61014,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "765fd0ad73dd607f225db973b75a223e2a627e039f992a9dc325f8b5d41401d3"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/file.json",
+      "pid": 61051,
+      "pgid": 61051,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "c8d29b4b2d6296e3fa519bd5906a059eedb993c636a2e07f1ae6022d7125a285"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/ignored.json",
+      "pid": 61053,
+      "pgid": 61053,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "a7b8abeee58ee60768cf5e577def851c45e7608e7b319b6910798001609eed60"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp_cloud-f2de7eed3d/all.json",
+      "pid": 61052,
+      "pgid": 61052,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "c6c2ee78f57ca1322275ede22b3be1ee726e690ef300de78818b7cc61dbc3f60"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-release_pair-bc9e625090/file.json",
+      "pid": 60998,
+      "pgid": 60998,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "8cd95b5638bee5ec06698374680a300e5499b3c6d2486f0269bed45d345e0859"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-release_pair-bc9e625090/ignored.json",
+      "pid": 61004,
+      "pgid": 61004,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "67bd61fec0c06362381f345162f6f28e82eda765027d40b2ec2b9c3def06e347"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-release_pair-bc9e625090/all.json",
+      "pid": 60999,
+      "pgid": 60999,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "8fb6d1c29a803933e30449b713f5a0bd65a557db2692728bab029730afd959cf"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-it-c39b76d586/file.json",
+      "pid": 61028,
+      "pgid": 61028,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "ef6a4c1cf855435c3a8b8abef3d229fff054dceb33928a8021dd9be0449ccb71"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-it-c39b76d586/ignored.json",
+      "pid": 61048,
+      "pgid": 61048,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "1b84909faeaebe1d780da4834c8389fca03fdbf83bf6ee3596de8adcd9a329a8"
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-it-c39b76d586/all.json",
+      "pid": 61039,
+      "pgid": 61039,
+      "exit": 0,
+      "direct_wait": 0,
+      "group_absent": true,
+      "sha256": "525aab8ee046b84011ae1a27a5f4e6d7cfa87803d6a878b1ec208198ef7a401a"
+    }
+  ],
+  "saved_witness_count": 5,
+  "saved_witness_hashes_fullmodes_verified": true,
+  "controls_repeated": false,
+  "new_metadata_query_executed": false,
+  "source_mutation": false,
+  "global_isolation_or_performance_claim": false,
+  "results_sha256": "d933283f89bb1df808579dadc201c0ef5d9befd0716683e923dcf45c8b7f6aef"
+}

@@ -1,0 +1,12 @@
+{
+  "Cloud_native": 53518,
+  "Cloud_controller_terminal": "2026-10-24T20:38:34.163720+00:00",
+  "Cloud_last_actual_command_finish": "2026-10-24T20:38:26.954838+00:00",
+  "new_authorization_recorded_at": "2026-10-24T20:39:05.976258+00:00",
+  "new_authorization_sha256": "e1f39ce7c40ab6d2353514a7fc04523e693adff848e19c0fb5b0701cdc8d300b",
+  "new_authorization_is_AFTER_Cloud_closed": true,
+  "actual_compile_overlap_with_Cloud": false,
+  "future_sibling_launch_not_inferred": true,
+  "direct8actualoverlap_preserved_separately": true,
+  "no_isolation_or_timing_claim": true
+}

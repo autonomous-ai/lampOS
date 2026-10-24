@@ -1,0 +1,14 @@
+{
+  "native_session": 53518,
+  "terminal_exit_code": 0,
+  "owned_jobs_outstanding": 0,
+  "owned_groups_reaped_absent": 20,
+  "frozen_witnesses_verified": 5,
+  "source_guard": {
+    "canonical": "8044e1268ae43ad74cb8e8022a968a2b7c20783693972d5ab9659f984d63b202"
+  },
+  "source_mutation": false,
+  "controls_repeated": false,
+  "further_target_or_test_execution_granted": false,
+  "review_sha256": "1e132dfd058141fc6ab31f3660dac8ffe33fffcdcdbfc36b10edf470ea3a83ea"
+}

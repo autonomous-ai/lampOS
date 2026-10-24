@@ -1,0 +1,2887 @@
+{
+  "started_at": "2026-10-24T20:30:09.245661+00:00",
+  "source_before": {
+    "canonical": "8044e1268ae43ad74cb8e8022a968a2b7c20783693972d5ab9659f984d63b202"
+  },
+  "steps": [
+    {
+      "id": "fmt",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/fmt.json",
+        "sha256": "be0fb8627f1f58fdf041283522c09508efd5ecfa2b5e37bd341c0a24e3d323dc",
+        "mode": "0o600",
+        "bytes": 738
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:30:11.360279+00:00",
+        "available_bytes": 25055797248,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T20:30:13.429530+00:00",
+        "timeout_seconds": 300,
+        "stdout": "fmt.stdout.txt",
+        "stderr": "fmt.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 25046290432,
+        "owned_pid": 51185,
+        "owned_process_group": 51185,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 11.973849,
+        "finished_at": "2026-10-24T20:30:25.403259+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "id": "clean-before-clippy",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/clean-before-clippy.json",
+        "sha256": "9db6e85b87febe5914e4abb4d430ee792b915822196044003e59299ab4dffd0c",
+        "mode": "0o600",
+        "bytes": 2371
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:30:32.142589+00:00",
+        "available_bytes": 24878538752,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clean",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-actions",
+          "-p",
+          "lamp-addons",
+          "-p",
+          "lamp-air",
+          "-p",
+          "lamp-audio",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-bus",
+          "-p",
+          "lamp-camera",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-ears",
+          "-p",
+          "lamp-environment",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-eyes",
+          "-p",
+          "lamp-gemini",
+          "-p",
+          "lamp-health",
+          "-p",
+          "lamp-ipc",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-local-time",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-mood",
+          "-p",
+          "lamp-msgs",
+          "-p",
+          "lamp-name",
+          "-p",
+          "lamp-near-call",
+          "-p",
+          "lamp-observer",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-policy",
+          "-p",
+          "lamp-records",
+          "-p",
+          "lamp-ring",
+          "-p",
+          "lamp-same-voice",
+          "-p",
+          "lamp-schedule",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-settings",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-sound-fixtures",
+          "-p",
+          "lamp-station",
+          "-p",
+          "lamp-surround",
+          "-p",
+          "lamp-tasks",
+          "-p",
+          "lamp-turn-end",
+          "-p",
+          "lamp-turn-end-wire",
+          "-p",
+          "lamp-turn-owner",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "-p",
+          "lamp-voice-processes",
+          "-p",
+          "sonora",
+          "-p",
+          "tough"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T20:30:34.386645+00:00",
+        "timeout_seconds": 300,
+        "stdout": "clean-before-clippy.stdout.txt",
+        "stderr": "clean-before-clippy.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 24863793152,
+        "owned_pid": 51760,
+        "owned_process_group": 51760,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 8.957001,
+        "finished_at": "2026-10-24T20:30:43.343573+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "39b9423fb518bae1c9fc32579642a657551699117c8b94f9c090a88c1bec6928",
+        "stderr_bytes": 39
+      }
+    },
+    {
+      "id": "clippy",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/clippy.json",
+        "sha256": "f8c497aa6998c85b098641a70c83b280eea759b170b0355b73dfe9f24f4dda27",
+        "mode": "0o600",
+        "bytes": 878
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:30:50.083479+00:00",
+        "available_bytes": 28840054784,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-cloud",
+          "--all-targets",
+          "--message-format=json",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T20:30:52.247824+00:00",
+        "timeout_seconds": 3600,
+        "stdout": "clippy.stdout.txt",
+        "stderr": "clippy.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 28794441728,
+        "owned_pid": 52832,
+        "owned_process_group": 52832,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 48.423721,
+        "finished_at": "2026-10-24T20:31:40.737623+00:00",
+        "stdout_sha256": "e6e7540c8078723c675608036a709105e46aa385fcebe52bfa25973f67553540",
+        "stdout_bytes": 212817,
+        "stderr_sha256": "050eca199b1c5ce66f9542be96ea48bcfd2dad7c6853461401f542ab48658e81",
+        "stderr_bytes": 4425
+      },
+      "compilation": {
+        "build_finished_messages": [
+          {
+            "reason": "build-finished",
+            "success": true
+          }
+        ],
+        "compiler_error_messages": [],
+        "successful": true
+      },
+      "local_library_lineage": {
+        "records": 32,
+        "fresh_false": 32,
+        "same_command_exact_reuse": 0,
+        "unresolved": 0
+      }
+    },
+    {
+      "id": "clean-before-tests",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/clean-before-tests.json",
+        "sha256": "493f41a6e61d5c28f884ba5d99a88ba58f3bc59749a0bd46b789e8e432566ee6",
+        "mode": "0o600",
+        "bytes": 2370
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:31:47.482171+00:00",
+        "available_bytes": 27622559744,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clean",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-actions",
+          "-p",
+          "lamp-addons",
+          "-p",
+          "lamp-air",
+          "-p",
+          "lamp-audio",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-bus",
+          "-p",
+          "lamp-camera",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-ears",
+          "-p",
+          "lamp-environment",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-eyes",
+          "-p",
+          "lamp-gemini",
+          "-p",
+          "lamp-health",
+          "-p",
+          "lamp-ipc",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-local-time",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-mood",
+          "-p",
+          "lamp-msgs",
+          "-p",
+          "lamp-name",
+          "-p",
+          "lamp-near-call",
+          "-p",
+          "lamp-observer",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-policy",
+          "-p",
+          "lamp-records",
+          "-p",
+          "lamp-ring",
+          "-p",
+          "lamp-same-voice",
+          "-p",
+          "lamp-schedule",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-settings",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-sound-fixtures",
+          "-p",
+          "lamp-station",
+          "-p",
+          "lamp-surround",
+          "-p",
+          "lamp-tasks",
+          "-p",
+          "lamp-turn-end",
+          "-p",
+          "lamp-turn-end-wire",
+          "-p",
+          "lamp-turn-owner",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "-p",
+          "lamp-voice-processes",
+          "-p",
+          "sonora",
+          "-p",
+          "tough"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T20:31:49.732062+00:00",
+        "timeout_seconds": 300,
+        "stdout": "clean-before-tests.stdout.txt",
+        "stderr": "clean-before-tests.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 27626614784,
+        "owned_pid": 55976,
+        "owned_process_group": 55976,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.531117,
+        "finished_at": "2026-10-24T20:31:50.263293+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "223aec06ef0914eaf59d65a3c6f9ec0d6a9aa5ff76236f56aff33fb2c9b51fb2",
+        "stderr_bytes": 39
+      }
+    },
+    {
+      "id": "tests",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/tests.json",
+        "sha256": "a8ee44d1ec72d49bcc8accf661c41500b68a993107c1c47dda4ba518baf59d9b",
+        "mode": "0o600",
+        "bytes": 834
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:31:56.865200+00:00",
+        "available_bytes": 28090777600,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-cloud",
+          "--no-fail-fast",
+          "--message-format=json"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T20:31:59.039273+00:00",
+        "timeout_seconds": 7200,
+        "stdout": "tests.stdout.txt",
+        "stderr": "tests.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 28070891520,
+        "owned_pid": 56135,
+        "owned_process_group": 56135,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 124.38936,
+        "finished_at": "2026-10-24T20:34:03.426437+00:00",
+        "stdout_sha256": "1c2602adec381afc24dbe2b29890773fe5553541c23701e56c92691b0bc84ca5",
+        "stdout_bytes": 258888,
+        "stderr_sha256": "1f038b82990db4ddb6ece93c12ce8bab7d8d5e53c57d56495f01213602887d1c",
+        "stderr_bytes": 5210
+      },
+      "compilation": {
+        "build_finished_messages": [
+          {
+            "reason": "build-finished",
+            "success": true
+          }
+        ],
+        "compiler_error_messages": [],
+        "successful": true
+      },
+      "local_library_lineage": {
+        "records": 32,
+        "fresh_false": 32,
+        "same_command_exact_reuse": 0,
+        "unresolved": 0
+      },
+      "execution": {
+        "source": "actual test result lines only, including any harness-compatible summaries",
+        "command_exit_code": 0,
+        "command_timed_out": false,
+        "rows": [
+          {
+            "raw": "test result: ok. 166 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 11.66s",
+            "status": "ok",
+            "passed": 166,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.91s",
+            "status": "ok",
+            "passed": 30,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 2,
+            "measured": 0,
+            "filtered_out": 0
+          },
+          {
+            "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "status": "ok",
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 0
+          }
+        ],
+        "totals": {
+          "passed": 196,
+          "failed": 0,
+          "ignored": 4,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        "qualification": "Nonzero or timeout is still a failed/incomplete gate regardless of parsed counts; compiled inventory is not execution."
+      },
+      "frozen_executables": [
+        {
+          "original": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4",
+            "sha256": "bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c",
+            "mode": "0o755",
+            "bytes": 3096920
+          },
+          "saved": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c-release_pair-03031a8d457564d4",
+            "sha256": "bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c",
+            "mode": "0o555",
+            "bytes": 3096920
+          },
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+            "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+            "target": {
+              "kind": [
+                "test"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "release_pair",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/release_pair.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 2,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4"
+            ],
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4",
+            "fresh": false
+          },
+          "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+        },
+        {
+          "original": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud",
+            "sha256": "c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374",
+            "mode": "0o755",
+            "bytes": 29544720
+          },
+          "saved": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374-lamp-cloud",
+            "sha256": "c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374",
+            "mode": "0o555",
+            "bytes": 29544720
+          },
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+            "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+            "target": {
+              "kind": [
+                "bin"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "lamp-cloud",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 2,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": false
+            },
+            "features": [],
+            "filenames": [
+              "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud"
+            ],
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud",
+            "fresh": false
+          },
+          "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+        },
+        {
+          "original": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+            "sha256": "9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b",
+            "mode": "0o755",
+            "bytes": 1019888
+          },
+          "saved": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b-lamp_cloud-41eb706784ccd943",
+            "sha256": "9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b",
+            "mode": "0o555",
+            "bytes": 1019888
+          },
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+            "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+            "target": {
+              "kind": [
+                "bin"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "lamp-cloud",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 2,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943"
+            ],
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+            "fresh": false
+          },
+          "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+        },
+        {
+          "original": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1",
+            "sha256": "c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253",
+            "mode": "0o755",
+            "bytes": 19646536
+          },
+          "saved": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253-it-f97da77857dd66f1",
+            "sha256": "c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253",
+            "mode": "0o555",
+            "bytes": 19646536
+          },
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+            "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+            "target": {
+              "kind": [
+                "test"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "it",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/it/main.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 2,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1"
+            ],
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1",
+            "fresh": false
+          },
+          "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+        },
+        {
+          "original": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58",
+            "sha256": "f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e",
+            "mode": "0o755",
+            "bytes": 36721888
+          },
+          "saved": {
+            "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e-lamp_cloud-181eacc6d66b1b58",
+            "sha256": "f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e",
+            "mode": "0o555",
+            "bytes": 36721888
+          },
+          "compiler_artifact": {
+            "reason": "compiler-artifact",
+            "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+            "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+            "target": {
+              "kind": [
+                "lib"
+              ],
+              "crate_types": [
+                "lib"
+              ],
+              "name": "lamp_cloud",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": true,
+              "test": true
+            },
+            "profile": {
+              "opt_level": "0",
+              "debuginfo": 2,
+              "debug_assertions": true,
+              "overflow_checks": true,
+              "test": true
+            },
+            "features": [],
+            "filenames": [
+              "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58"
+            ],
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58",
+            "fresh": false
+          },
+          "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+        }
+      ],
+      "target_outcomes": {
+        "targets": [
+          {
+            "kind": "executable",
+            "package": "lamp-cloud",
+            "target": {
+              "kind": [
+                "lib"
+              ],
+              "crate_types": [
+                "lib"
+              ],
+              "name": "lamp_cloud",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": true,
+              "test": true
+            },
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58",
+            "sha256": "f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e",
+            "name": "lamp-cloud:lib:lamp_cloud",
+            "result": "ok",
+            "counts": {
+              "passed": 166,
+              "failed": 0,
+              "ignored": 2,
+              "measured": 0,
+              "filtered_out": 0
+            },
+            "raw_test_rows": [
+              [
+                "account::tests::write_a_rotated_fixture",
+                "ignored, writes a fixture"
+              ],
+              [
+                "account::tests::a_ping_reply_rotates_only_what_it_changes",
+                "ok"
+              ],
+              [
+                "answer::tests::a_volume_out_of_range_is_refused_before_anything_is_asked",
+                "ok"
+              ],
+              [
+                "answer::tests::unmuting_from_the_app_and_what_this_lamp_lacks_are_refused_plainly",
+                "ok"
+              ],
+              [
+                "account::tests::a_kept_account_is_complete_and_its_secret_is_never_printed",
+                "ok"
+              ],
+              [
+                "answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts",
+                "ok"
+              ],
+              [
+                "chat::tests::a_chat_send_is_its_message_and_v1s_session_and_speak",
+                "ok"
+              ],
+              [
+                "answer::tests::the_light_row_reads_sets_and_previews_the_persons_light",
+                "ok"
+              ],
+              [
+                "chat::tests::a_run_nothing_answers_ends_as_a_fault_after_a_minute",
+                "ok"
+              ],
+              [
+                "chat::tests::a_fault_and_task_news_go_as_v1s_events_and_news_has_no_run",
+                "ok"
+              ],
+              [
+                "chat::tests::a_summary_is_the_first_two_hundred_characters",
+                "ok"
+              ],
+              [
+                "chat::tests::each_run_has_its_own_name",
+                "ok"
+              ],
+              [
+                "account::tests::each_kept_rotated_login_reads_as_it_was_kept",
+                "ok"
+              ],
+              [
+                "chat::tests::words_are_gathered_for_a_quarter_second_and_the_whole_reply_ends_the_run",
+                "ok"
+              ],
+              [
+                "account::tests::a_rotated_account_from_a_later_build_still_reads",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_names_one_and_says_how_the_forget_went",
+                "ok"
+              ],
+              [
+                "faces::tests::entirely_is_true_unless_said_false_and_a_flag_only",
+                "ok"
+              ],
+              [
+                "answer::tests::system_info_says_each_switchs_kinds_only_while_it_is_on",
+                "ok"
+              ],
+              [
+                "faces::tests::it_is_off_unless_switched_on_with_the_eyes_socket",
+                "ok"
+              ],
+              [
+                "faces::tests::memory_is_asked_for_the_persons_own_id_and_their_rules",
+                "ok"
+              ],
+              [
+                "account::tests::a_rotated_account_is_kept_for_this_user_alone",
+                "ok"
+              ],
+              [
+                "faces::tests::memory_is_said_forgotten_only_when_every_forget_was_done",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_of_the_face_only_never_asks_memory",
+                "ok"
+              ],
+              [
+                "faces::tests::the_list_is_names_and_whether_each_waits_for_a_yes",
+                "ok"
+              ],
+              [
+                "beat::tests::the_ping_says_the_lamp_and_takes_a_new_broker_from_its_reply",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_takes_the_person_off_the_eyes_and_memory",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_build_and_the_default_route_are_read_as_written",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_never_takes_the_memory_of_someone_renamed_from_the_name",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_entirely_forgets_the_person_in_memory_too",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_entirely_after_the_face_is_gone_still_forgets_the_memory",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_with_the_eyes_on_and_the_voice_off_leaves_nothing_half_removed",
+                "ok"
+              ],
+              [
+                "light::tests::a_choice_is_checked_as_v1_checks_it_and_off_keeps_the_colour",
+                "ok"
+              ],
+              [
+                "lamp::tests::a_child_still_there_after_the_kill_is_handed_back_not_waited_for",
+                "ok"
+              ],
+              [
+                "faces::tests::the_eyes_are_asked_over_their_socket",
+                "ok"
+              ],
+              [
+                "light::tests::a_colour_is_the_nearest_tint_at_the_level_its_brightest_channel_reaches",
+                "ok"
+              ],
+              [
+                "light::tests::the_snapshot_is_v1s_shape_with_the_light_by_its_own_names",
+                "ok"
+              ],
+              [
+                "light::tests::each_of_the_fifty_lights_comes_back_from_its_own_colour",
+                "ok"
+              ],
+              [
+                "answer::tests::the_skills_are_listed_for_the_app_only_with_their_switch",
+                "ok"
+              ],
+              [
+                "make_skill::tests::the_switch_and_the_socket_are_lamp_voices",
+                "ok"
+              ],
+              [
+                "make_skill::tests::a_make_is_handed_to_the_voice_and_its_answer_told",
+                "ok"
+              ],
+              [
+                "guard::tests::guard_from_the_app_is_handed_to_lamp_skills_call_socket",
+                "ok"
+              ],
+              [
+                "make_skill::tests::the_played_command_tells_the_same_answers_in_plain_words",
+                "ok"
+              ],
+              [
+                "make_skill::tests::made_is_told_with_may_use_as_the_skills_page_says_it",
+                "ok"
+              ],
+              [
+                "online::tests::a_result_lost_before_its_ack_is_handed_back",
+                "ok"
+              ],
+              [
+                "online::tests::a_preview_done_is_not_answered_and_one_that_fails_is",
+                "ok"
+              ],
+              [
+                "online::tests::a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text",
+                "ok"
+              ],
+              [
+                "online::tests::a_dropped_connection_is_made_again_and_subscribed_again",
+                "ok"
+              ],
+              [
+                "answer::tests::reports_are_read_and_set_from_the_app_only_with_their_switch",
+                "ok"
+              ],
+              [
+                "online::tests::a_change_is_acked_starting_and_its_result_follows_on_the_channel",
+                "ok"
+              ],
+              [
+                "lamp::tests::recovery_is_read_from_setups_file",
+                "ok"
+              ],
+              [
+                "online::tests::only_the_lamps_own_account_channel_commands_it",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_reset_is_read_from_the_controls_pins",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_volume_is_asked_of_lamp_actions_and_the_host_read_from_proc",
+                "ok"
+              ],
+              [
+                "online::tests::a_text_is_acked_with_its_run_and_its_answer_goes_out_as_chat_events",
+                "ok"
+              ],
+              [
+                "online::tests::the_lamp_comes_online_as_v1_and_answers_on_its_channel",
+                "ok"
+              ],
+              [
+                "online::tests::the_time_is_rfc3339_in_utc",
+                "ok"
+              ],
+              [
+                "online::tests::with_its_switch_the_broker_is_left_a_will_that_says_offline",
+                "ok"
+              ],
+              [
+                "online::tests::with_its_switch_the_broker_is_reached_over_tls",
+                "ok"
+              ],
+              [
+                "online::tests::a_skills_line_lost_with_the_connection_goes_again_unchanged",
+                "ok"
+              ],
+              [
+                "online::tests::an_own_key_is_acked_at_once_and_is_in_no_reply",
+                "ok"
+              ],
+              [
+                "photos::tests::it_is_off_unless_switched_on_with_both_places",
+                "ok"
+              ],
+              [
+                "photos::tests::the_eyes_reasons_are_said_plainly",
+                "ok"
+              ],
+              [
+                "online::tests::a_refused_login_backs_off_and_is_said_once",
+                "ok"
+              ],
+              [
+                "ping::tests::the_payload_is_v1s_and_a_reply_may_move_the_broker_or_the_id",
+                "ok"
+              ],
+              [
+                "ping::tests::the_ping_goes_above_the_v1_base_and_asks_for_a_broker_while_none_is_kept",
+                "ok"
+              ],
+              [
+                "ping::tests::the_wait_doubles_to_a_minute_and_starts_again_once_connected",
+                "ok"
+              ],
+              [
+                "photos::tests::the_photo_goes_to_the_eyes_and_is_never_kept",
+                "ok"
+              ],
+              [
+                "online::tests::reports_go_below_the_channel_and_leave_the_queue_on_the_ack",
+                "ok"
+              ],
+              [
+                "photos::tests::the_apps_photo_is_a_name_and_a_jpeg_checked",
+                "ok"
+              ],
+              [
+                "online::tests::a_slow_connack_is_waited_for_while_texts_are_taken",
+                "ok"
+              ],
+              [
+                "online::tests::a_command_with_the_largest_photo_is_read_and_answered",
+                "ok"
+              ],
+              [
+                "online::tests::only_a_command_on_the_lamps_own_account_channel_is_done_and_answered",
+                "ok"
+              ],
+              [
+                "online::tests::without_the_switch_no_skills_line_goes_up",
+                "ok"
+              ],
+              [
+                "reports::tests::a_health_report_carries_numbers_enums_and_listed_names_only",
+                "ok"
+              ],
+              [
+                "reports::tests::a_crash_report_is_systemds_numbers_by_the_lists",
+                "ok"
+              ],
+              [
+                "lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for",
+                "ok"
+              ],
+              [
+                "online::tests::a_wifi_result_ready_while_offline_is_said_once_back_online",
+                "ok"
+              ],
+              [
+                "reports::tests::a_local_template_exit_note_cannot_grant_consent_to_send",
+                "ok"
+              ],
+              [
+                "reports::tests::an_error_held_a_minute_sends_at_once_and_once_an_hour",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_on_the_bus_reaches_lamp_cloud",
+                "ok"
+              ],
+              [
+                "reports::tests::a_report_sent_again_is_the_same_message_with_infos_id",
+                "ok"
+              ],
+              [
+                "online::tests::a_named_text_behind_an_unacknowledged_publish_goes_unnamed",
+                "ok"
+              ],
+              [
+                "reports::tests::failed_units_are_current_allowlisted_and_unambiguous",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute",
+                "ok"
+              ],
+              [
+                "reports::tests::a_choice_is_kept_with_who_made_it_whether_held_and_when",
+                "ok"
+              ],
+              [
+                "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_given_offline_goes_when_connected_and_once_more_on_the_next",
+                "ok"
+              ],
+              [
+                "reports::tests::a_report_over_four_kib_is_cut_or_counted",
+                "ok"
+              ],
+              [
+                "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+                "ok"
+              ],
+              [
+                "reports::tests::only_nonempty_instances_of_listed_templates_are_exit_notes",
+                "ok"
+              ],
+              [
+                "reports::tests::a_newer_builds_choice_reads_off_and_is_kept",
+                "ok"
+              ],
+              [
+                "reports::tests::an_exit_note_it_cant_read_is_skipped_once_and_left_whole",
+                "ok"
+              ],
+              [
+                "reports::tests::each_kept_reports_record_reads_as_it_was_kept",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back",
+                "ok"
+              ],
+              [
+                "reports::tests::the_exit_note_drop_in_runs_this_binary_for_the_unit_stopped",
+                "ok"
+              ],
+              [
+                "reports::tests::handed_reports_go_on_the_ack_and_again_after_a_drop_with_the_same_seq",
+                "ok"
+              ],
+              [
+                "reports::tests::no_value_from_a_file_reaches_the_journal",
+                "ok"
+              ],
+              [
+                "reports::tests::the_lists_are_the_products",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_deletes_what_waits_and_nothing_but_stopped_goes_after",
+                "ok"
+              ],
+              [
+                "reports::tests::times_read_back_as_written",
+                "ok"
+              ],
+              [
+                "reports::tests::only_the_newest_health_waits",
+                "ok"
+              ],
+              [
+                "reports::tests::write_a_reports_fixture",
+                "ignored, writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set"
+              ],
+              [
+                "settings::tests::a_broker_on_an_address_with_colons_is_bracketed",
+                "ok"
+              ],
+              [
+                "settings::tests::a_failure_with_no_join_is_said_on_the_link_there_is",
+                "ok"
+              ],
+              [
+                "reports::tests::no_secret_planted_in_any_input_reaches_any_report",
+                "ok"
+              ],
+              [
+                "settings::tests::a_change_is_acked_at_once_and_its_result_follows",
+                "ok"
+              ],
+              [
+                "settings::tests::each_kind_becomes_one_line_for_the_helper",
+                "ok"
+              ],
+              [
+                "settings::tests::a_refusal_a_helper_not_running_and_one_that_never_answers_are_failures",
+                "ok"
+              ],
+              [
+                "reports::tests::a_choice_it_cant_read_is_off_kept_whole_and_said",
+                "ok"
+              ],
+              [
+                "settings::tests::every_keys_request_gets_a_coded_result_with_its_id",
+                "ok"
+              ],
+              [
+                "settings::tests::a_wifi_change_is_one_at_a_time_and_its_result_carries_the_request_id",
+                "ok"
+              ],
+              [
+                "reports::tests::queued_reports_read_one_release_forward",
+                "ok"
+              ],
+              [
+                "settings::tests::off_each_kind_is_refused_as_one_this_lamp_lacks",
+                "ok"
+              ],
+              [
+                "settings::tests::off_the_wifi_is_refused_as_a_kind_this_lamp_lacks",
+                "ok"
+              ],
+              [
+                "settings::tests::own_keys_need_their_switch_and_their_lines_hold_only_what_the_helper_reads",
+                "ok"
+              ],
+              [
+                "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+                "ok"
+              ],
+              [
+                "reports::tests::the_bus_can_only_turn_reports_off",
+                "ok"
+              ],
+              [
+                "settings::tests::the_lamps_name_in_the_app_is_read_from_the_helpers_file",
+                "ok"
+              ],
+              [
+                "settings::tests::the_switch_needs_both_words",
+                "ok"
+              ],
+              [
+                "settings::tests::the_wifi_line_carries_the_broker_and_no_error_holds_a_value",
+                "ok"
+              ],
+              [
+                "settings::tests::the_wifi_needs_its_own_switch_beside_the_names",
+                "ok"
+              ],
+              [
+                "reports::tests::exit_notes_are_systemds_variables_and_success_writes_nothing",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_3_a_joined_never_acked_is_dropped_once_its_wait_ended",
+                "ok"
+              ],
+              [
+                "skills::tests::a_core_skill_can_never_be_removed_and_an_installed_one_can",
+                "ok"
+              ],
+              [
+                "reports::tests::the_queues_state_reads_forward_and_is_set_aside_when_it_cant",
+                "ok"
+              ],
+              [
+                "skills::tests::a_core_skill_is_never_removed",
+                "ok"
+              ],
+              [
+                "skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole",
+                "ok"
+              ],
+              [
+                "skills::tests::a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off",
+                "ok"
+              ],
+              [
+                "settings::tests::a_confirm_with_a_request_id_is_taken_for_a_change_without_one",
+                "ok"
+              ],
+              [
+                "reports::tests::the_voices_no_on_the_bus_sends_stopped_and_ends_the_health",
+                "ok"
+              ],
+              [
+                "skills::tests::a_link_named_as_a_skill_is_left_as_it_is",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_given_while_a_newer_yes_reads_off_is_kept_and_does_all_a_no_does",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skills_folder_that_cannot_be_read_is_said_plainly",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_that_does_not_load_is_listed_with_why_and_what_it_says_of_itself",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed",
+                "ok"
+              ],
+              [
+                "reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery",
+                "ok"
+              ],
+              [
+                "skills::tests::an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_2_lamp_clouds_online_deadline_ends_before_the_helpers",
+                "ok"
+              ],
+              [
+                "skills::tests::each_kept_off_file_reads_the_same_skills_off",
+                "ok"
+              ],
+              [
+                "skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_5_a_confirm_for_another_request_id_is_refused",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused",
+                "ok"
+              ],
+              [
+                "skills::tests::the_store_is_on_only_with_its_own_switch_and_the_pages",
+                "ok"
+              ],
+              [
+                "skills::tests::the_switch_is_on_only_with_the_cloud",
+                "ok"
+              ],
+              [
+                "skills::tests::what_a_skill_may_use_is_said_in_plain_words_with_the_privacy_switch",
+                "ok"
+              ],
+              [
+                "skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed",
+                "ok"
+              ],
+              [
+                "unasked::tests::at_most_six_are_taken_in_any_hour",
+                "ok"
+              ],
+              [
+                "unasked::tests::a_named_text_goes_named_only_at_once_and_is_held_unnamed",
+                "ok"
+              ],
+              [
+                "unasked::tests::only_lamp_skills_lines_are_taken_and_another_publisher_is_named_once",
+                "ok"
+              ],
+              [
+                "skills::tests::the_reply_lists_each_skill_with_its_group_and_what_it_may_use",
+                "ok"
+              ],
+              [
+                "skills::tests::an_installed_skill_is_removed",
+                "ok"
+              ],
+              [
+                "unasked::tests::pieces_keep_their_order_and_one_heard_again_is_dropped",
+                "ok"
+              ],
+              [
+                "unasked::tests::the_journals_lines_name_the_skill_and_never_the_text",
+                "ok"
+              ],
+              [
+                "unasked::tests::while_offline_the_newest_few_wait_in_order_and_owed_go_first",
+                "ok"
+              ],
+              [
+                "skills::tests::only_a_skill_that_loads_can_be_turned_off",
+                "ok"
+              ],
+              [
+                "skills::tests::an_installed_skill_that_does_not_load_is_removed_too",
+                "ok"
+              ],
+              [
+                "skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched",
+                "ok"
+              ],
+              [
+                "wire::tests::commands_are_read_as_v1_sends_them",
+                "ok"
+              ],
+              [
+                "wire::tests::replies_carry_v1s_identity_fields",
+                "ok"
+              ],
+              [
+                "settings::tests::p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only",
+                "ok"
+              ],
+              [
+                "skills::tests::without_the_manage_helper_nothing_is_removed",
+                "ok"
+              ],
+              [
+                "reports::tests::nothing_goes_without_each_of_the_three_gates",
+                "ok"
+              ],
+              [
+                "reports::tests::template_exit_notes_keep_only_the_fixed_name_in_files_and_reports",
+                "ok"
+              ],
+              [
+                "skills::tests::the_reply_is_bounded",
+                "ok"
+              ],
+              [
+                "settings::tests::p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+                "ok"
+              ],
+              [
+                "reports::tests::the_queue_keeps_its_bounds_and_the_rate_its_limits",
+                "ok"
+              ]
+            ],
+            "test_rows": [
+              [
+                "account::tests::write_a_rotated_fixture",
+                "ignored, writes a fixture"
+              ],
+              [
+                "account::tests::a_ping_reply_rotates_only_what_it_changes",
+                "ok"
+              ],
+              [
+                "answer::tests::a_volume_out_of_range_is_refused_before_anything_is_asked",
+                "ok"
+              ],
+              [
+                "answer::tests::unmuting_from_the_app_and_what_this_lamp_lacks_are_refused_plainly",
+                "ok"
+              ],
+              [
+                "account::tests::a_kept_account_is_complete_and_its_secret_is_never_printed",
+                "ok"
+              ],
+              [
+                "answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts",
+                "ok"
+              ],
+              [
+                "chat::tests::a_chat_send_is_its_message_and_v1s_session_and_speak",
+                "ok"
+              ],
+              [
+                "answer::tests::the_light_row_reads_sets_and_previews_the_persons_light",
+                "ok"
+              ],
+              [
+                "chat::tests::a_run_nothing_answers_ends_as_a_fault_after_a_minute",
+                "ok"
+              ],
+              [
+                "chat::tests::a_fault_and_task_news_go_as_v1s_events_and_news_has_no_run",
+                "ok"
+              ],
+              [
+                "chat::tests::a_summary_is_the_first_two_hundred_characters",
+                "ok"
+              ],
+              [
+                "chat::tests::each_run_has_its_own_name",
+                "ok"
+              ],
+              [
+                "account::tests::each_kept_rotated_login_reads_as_it_was_kept",
+                "ok"
+              ],
+              [
+                "chat::tests::words_are_gathered_for_a_quarter_second_and_the_whole_reply_ends_the_run",
+                "ok"
+              ],
+              [
+                "account::tests::a_rotated_account_from_a_later_build_still_reads",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_names_one_and_says_how_the_forget_went",
+                "ok"
+              ],
+              [
+                "faces::tests::entirely_is_true_unless_said_false_and_a_flag_only",
+                "ok"
+              ],
+              [
+                "answer::tests::system_info_says_each_switchs_kinds_only_while_it_is_on",
+                "ok"
+              ],
+              [
+                "faces::tests::it_is_off_unless_switched_on_with_the_eyes_socket",
+                "ok"
+              ],
+              [
+                "faces::tests::memory_is_asked_for_the_persons_own_id_and_their_rules",
+                "ok"
+              ],
+              [
+                "account::tests::a_rotated_account_is_kept_for_this_user_alone",
+                "ok"
+              ],
+              [
+                "faces::tests::memory_is_said_forgotten_only_when_every_forget_was_done",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_of_the_face_only_never_asks_memory",
+                "ok"
+              ],
+              [
+                "faces::tests::the_list_is_names_and_whether_each_waits_for_a_yes",
+                "ok"
+              ],
+              [
+                "beat::tests::the_ping_says_the_lamp_and_takes_a_new_broker_from_its_reply",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_takes_the_person_off_the_eyes_and_memory",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_build_and_the_default_route_are_read_as_written",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_never_takes_the_memory_of_someone_renamed_from_the_name",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_entirely_forgets_the_person_in_memory_too",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_entirely_after_the_face_is_gone_still_forgets_the_memory",
+                "ok"
+              ],
+              [
+                "faces::tests::a_remove_with_the_eyes_on_and_the_voice_off_leaves_nothing_half_removed",
+                "ok"
+              ],
+              [
+                "light::tests::a_choice_is_checked_as_v1_checks_it_and_off_keeps_the_colour",
+                "ok"
+              ],
+              [
+                "lamp::tests::a_child_still_there_after_the_kill_is_handed_back_not_waited_for",
+                "ok"
+              ],
+              [
+                "faces::tests::the_eyes_are_asked_over_their_socket",
+                "ok"
+              ],
+              [
+                "light::tests::a_colour_is_the_nearest_tint_at_the_level_its_brightest_channel_reaches",
+                "ok"
+              ],
+              [
+                "light::tests::the_snapshot_is_v1s_shape_with_the_light_by_its_own_names",
+                "ok"
+              ],
+              [
+                "light::tests::each_of_the_fifty_lights_comes_back_from_its_own_colour",
+                "ok"
+              ],
+              [
+                "answer::tests::the_skills_are_listed_for_the_app_only_with_their_switch",
+                "ok"
+              ],
+              [
+                "make_skill::tests::the_switch_and_the_socket_are_lamp_voices",
+                "ok"
+              ],
+              [
+                "make_skill::tests::a_make_is_handed_to_the_voice_and_its_answer_told",
+                "ok"
+              ],
+              [
+                "guard::tests::guard_from_the_app_is_handed_to_lamp_skills_call_socket",
+                "ok"
+              ],
+              [
+                "make_skill::tests::the_played_command_tells_the_same_answers_in_plain_words",
+                "ok"
+              ],
+              [
+                "make_skill::tests::made_is_told_with_may_use_as_the_skills_page_says_it",
+                "ok"
+              ],
+              [
+                "online::tests::a_result_lost_before_its_ack_is_handed_back",
+                "ok"
+              ],
+              [
+                "online::tests::a_preview_done_is_not_answered_and_one_that_fails_is",
+                "ok"
+              ],
+              [
+                "online::tests::a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text",
+                "ok"
+              ],
+              [
+                "online::tests::a_dropped_connection_is_made_again_and_subscribed_again",
+                "ok"
+              ],
+              [
+                "answer::tests::reports_are_read_and_set_from_the_app_only_with_their_switch",
+                "ok"
+              ],
+              [
+                "online::tests::a_change_is_acked_starting_and_its_result_follows_on_the_channel",
+                "ok"
+              ],
+              [
+                "lamp::tests::recovery_is_read_from_setups_file",
+                "ok"
+              ],
+              [
+                "online::tests::only_the_lamps_own_account_channel_commands_it",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_reset_is_read_from_the_controls_pins",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_volume_is_asked_of_lamp_actions_and_the_host_read_from_proc",
+                "ok"
+              ],
+              [
+                "online::tests::a_text_is_acked_with_its_run_and_its_answer_goes_out_as_chat_events",
+                "ok"
+              ],
+              [
+                "online::tests::the_lamp_comes_online_as_v1_and_answers_on_its_channel",
+                "ok"
+              ],
+              [
+                "online::tests::the_time_is_rfc3339_in_utc",
+                "ok"
+              ],
+              [
+                "online::tests::with_its_switch_the_broker_is_left_a_will_that_says_offline",
+                "ok"
+              ],
+              [
+                "online::tests::with_its_switch_the_broker_is_reached_over_tls",
+                "ok"
+              ],
+              [
+                "online::tests::a_skills_line_lost_with_the_connection_goes_again_unchanged",
+                "ok"
+              ],
+              [
+                "online::tests::an_own_key_is_acked_at_once_and_is_in_no_reply",
+                "ok"
+              ],
+              [
+                "photos::tests::it_is_off_unless_switched_on_with_both_places",
+                "ok"
+              ],
+              [
+                "photos::tests::the_eyes_reasons_are_said_plainly",
+                "ok"
+              ],
+              [
+                "online::tests::a_refused_login_backs_off_and_is_said_once",
+                "ok"
+              ],
+              [
+                "ping::tests::the_payload_is_v1s_and_a_reply_may_move_the_broker_or_the_id",
+                "ok"
+              ],
+              [
+                "ping::tests::the_ping_goes_above_the_v1_base_and_asks_for_a_broker_while_none_is_kept",
+                "ok"
+              ],
+              [
+                "ping::tests::the_wait_doubles_to_a_minute_and_starts_again_once_connected",
+                "ok"
+              ],
+              [
+                "photos::tests::the_photo_goes_to_the_eyes_and_is_never_kept",
+                "ok"
+              ],
+              [
+                "online::tests::reports_go_below_the_channel_and_leave_the_queue_on_the_ack",
+                "ok"
+              ],
+              [
+                "photos::tests::the_apps_photo_is_a_name_and_a_jpeg_checked",
+                "ok"
+              ],
+              [
+                "online::tests::a_slow_connack_is_waited_for_while_texts_are_taken",
+                "ok"
+              ],
+              [
+                "online::tests::a_command_with_the_largest_photo_is_read_and_answered",
+                "ok"
+              ],
+              [
+                "online::tests::only_a_command_on_the_lamps_own_account_channel_is_done_and_answered",
+                "ok"
+              ],
+              [
+                "online::tests::without_the_switch_no_skills_line_goes_up",
+                "ok"
+              ],
+              [
+                "reports::tests::a_health_report_carries_numbers_enums_and_listed_names_only",
+                "ok"
+              ],
+              [
+                "reports::tests::a_crash_report_is_systemds_numbers_by_the_lists",
+                "ok"
+              ],
+              [
+                "lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for",
+                "ok"
+              ],
+              [
+                "online::tests::a_wifi_result_ready_while_offline_is_said_once_back_online",
+                "ok"
+              ],
+              [
+                "reports::tests::a_local_template_exit_note_cannot_grant_consent_to_send",
+                "ok"
+              ],
+              [
+                "reports::tests::an_error_held_a_minute_sends_at_once_and_once_an_hour",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_on_the_bus_reaches_lamp_cloud",
+                "ok"
+              ],
+              [
+                "reports::tests::a_report_sent_again_is_the_same_message_with_infos_id",
+                "ok"
+              ],
+              [
+                "online::tests::a_named_text_behind_an_unacknowledged_publish_goes_unnamed",
+                "ok"
+              ],
+              [
+                "reports::tests::failed_units_are_current_allowlisted_and_unambiguous",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute",
+                "ok"
+              ],
+              [
+                "reports::tests::a_choice_is_kept_with_who_made_it_whether_held_and_when",
+                "ok"
+              ],
+              [
+                "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_given_offline_goes_when_connected_and_once_more_on_the_next",
+                "ok"
+              ],
+              [
+                "reports::tests::a_report_over_four_kib_is_cut_or_counted",
+                "ok"
+              ],
+              [
+                "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+                "ok"
+              ],
+              [
+                "reports::tests::only_nonempty_instances_of_listed_templates_are_exit_notes",
+                "ok"
+              ],
+              [
+                "reports::tests::a_newer_builds_choice_reads_off_and_is_kept",
+                "ok"
+              ],
+              [
+                "reports::tests::an_exit_note_it_cant_read_is_skipped_once_and_left_whole",
+                "ok"
+              ],
+              [
+                "reports::tests::each_kept_reports_record_reads_as_it_was_kept",
+                "ok"
+              ],
+              [
+                "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back",
+                "ok"
+              ],
+              [
+                "reports::tests::the_exit_note_drop_in_runs_this_binary_for_the_unit_stopped",
+                "ok"
+              ],
+              [
+                "reports::tests::handed_reports_go_on_the_ack_and_again_after_a_drop_with_the_same_seq",
+                "ok"
+              ],
+              [
+                "reports::tests::no_value_from_a_file_reaches_the_journal",
+                "ok"
+              ],
+              [
+                "reports::tests::the_lists_are_the_products",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_deletes_what_waits_and_nothing_but_stopped_goes_after",
+                "ok"
+              ],
+              [
+                "reports::tests::times_read_back_as_written",
+                "ok"
+              ],
+              [
+                "reports::tests::only_the_newest_health_waits",
+                "ok"
+              ],
+              [
+                "reports::tests::write_a_reports_fixture",
+                "ignored, writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set"
+              ],
+              [
+                "settings::tests::a_broker_on_an_address_with_colons_is_bracketed",
+                "ok"
+              ],
+              [
+                "settings::tests::a_failure_with_no_join_is_said_on_the_link_there_is",
+                "ok"
+              ],
+              [
+                "reports::tests::no_secret_planted_in_any_input_reaches_any_report",
+                "ok"
+              ],
+              [
+                "settings::tests::a_change_is_acked_at_once_and_its_result_follows",
+                "ok"
+              ],
+              [
+                "settings::tests::each_kind_becomes_one_line_for_the_helper",
+                "ok"
+              ],
+              [
+                "settings::tests::a_refusal_a_helper_not_running_and_one_that_never_answers_are_failures",
+                "ok"
+              ],
+              [
+                "reports::tests::a_choice_it_cant_read_is_off_kept_whole_and_said",
+                "ok"
+              ],
+              [
+                "settings::tests::every_keys_request_gets_a_coded_result_with_its_id",
+                "ok"
+              ],
+              [
+                "settings::tests::a_wifi_change_is_one_at_a_time_and_its_result_carries_the_request_id",
+                "ok"
+              ],
+              [
+                "reports::tests::queued_reports_read_one_release_forward",
+                "ok"
+              ],
+              [
+                "settings::tests::off_each_kind_is_refused_as_one_this_lamp_lacks",
+                "ok"
+              ],
+              [
+                "settings::tests::off_the_wifi_is_refused_as_a_kind_this_lamp_lacks",
+                "ok"
+              ],
+              [
+                "settings::tests::own_keys_need_their_switch_and_their_lines_hold_only_what_the_helper_reads",
+                "ok"
+              ],
+              [
+                "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+                "ok"
+              ],
+              [
+                "reports::tests::the_bus_can_only_turn_reports_off",
+                "ok"
+              ],
+              [
+                "settings::tests::the_lamps_name_in_the_app_is_read_from_the_helpers_file",
+                "ok"
+              ],
+              [
+                "settings::tests::the_switch_needs_both_words",
+                "ok"
+              ],
+              [
+                "settings::tests::the_wifi_line_carries_the_broker_and_no_error_holds_a_value",
+                "ok"
+              ],
+              [
+                "settings::tests::the_wifi_needs_its_own_switch_beside_the_names",
+                "ok"
+              ],
+              [
+                "reports::tests::exit_notes_are_systemds_variables_and_success_writes_nothing",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_3_a_joined_never_acked_is_dropped_once_its_wait_ended",
+                "ok"
+              ],
+              [
+                "skills::tests::a_core_skill_can_never_be_removed_and_an_installed_one_can",
+                "ok"
+              ],
+              [
+                "reports::tests::the_queues_state_reads_forward_and_is_set_aside_when_it_cant",
+                "ok"
+              ],
+              [
+                "skills::tests::a_core_skill_is_never_removed",
+                "ok"
+              ],
+              [
+                "skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole",
+                "ok"
+              ],
+              [
+                "skills::tests::a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off",
+                "ok"
+              ],
+              [
+                "settings::tests::a_confirm_with_a_request_id_is_taken_for_a_change_without_one",
+                "ok"
+              ],
+              [
+                "reports::tests::the_voices_no_on_the_bus_sends_stopped_and_ends_the_health",
+                "ok"
+              ],
+              [
+                "skills::tests::a_link_named_as_a_skill_is_left_as_it_is",
+                "ok"
+              ],
+              [
+                "reports::tests::a_no_given_while_a_newer_yes_reads_off_is_kept_and_does_all_a_no_does",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skills_folder_that_cannot_be_read_is_said_plainly",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_that_does_not_load_is_listed_with_why_and_what_it_says_of_itself",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed",
+                "ok"
+              ],
+              [
+                "reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery",
+                "ok"
+              ],
+              [
+                "skills::tests::an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_2_lamp_clouds_online_deadline_ends_before_the_helpers",
+                "ok"
+              ],
+              [
+                "skills::tests::each_kept_off_file_reads_the_same_skills_off",
+                "ok"
+              ],
+              [
+                "skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_5_a_confirm_for_another_request_id_is_refused",
+                "ok"
+              ],
+              [
+                "skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused",
+                "ok"
+              ],
+              [
+                "skills::tests::the_store_is_on_only_with_its_own_switch_and_the_pages",
+                "ok"
+              ],
+              [
+                "skills::tests::the_switch_is_on_only_with_the_cloud",
+                "ok"
+              ],
+              [
+                "skills::tests::what_a_skill_may_use_is_said_in_plain_words_with_the_privacy_switch",
+                "ok"
+              ],
+              [
+                "skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed",
+                "ok"
+              ],
+              [
+                "unasked::tests::at_most_six_are_taken_in_any_hour",
+                "ok"
+              ],
+              [
+                "unasked::tests::a_named_text_goes_named_only_at_once_and_is_held_unnamed",
+                "ok"
+              ],
+              [
+                "unasked::tests::only_lamp_skills_lines_are_taken_and_another_publisher_is_named_once",
+                "ok"
+              ],
+              [
+                "skills::tests::the_reply_lists_each_skill_with_its_group_and_what_it_may_use",
+                "ok"
+              ],
+              [
+                "skills::tests::an_installed_skill_is_removed",
+                "ok"
+              ],
+              [
+                "unasked::tests::pieces_keep_their_order_and_one_heard_again_is_dropped",
+                "ok"
+              ],
+              [
+                "unasked::tests::the_journals_lines_name_the_skill_and_never_the_text",
+                "ok"
+              ],
+              [
+                "unasked::tests::while_offline_the_newest_few_wait_in_order_and_owed_go_first",
+                "ok"
+              ],
+              [
+                "skills::tests::only_a_skill_that_loads_can_be_turned_off",
+                "ok"
+              ],
+              [
+                "skills::tests::an_installed_skill_that_does_not_load_is_removed_too",
+                "ok"
+              ],
+              [
+                "skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched",
+                "ok"
+              ],
+              [
+                "wire::tests::commands_are_read_as_v1_sends_them",
+                "ok"
+              ],
+              [
+                "wire::tests::replies_carry_v1s_identity_fields",
+                "ok"
+              ],
+              [
+                "settings::tests::p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only",
+                "ok"
+              ],
+              [
+                "skills::tests::without_the_manage_helper_nothing_is_removed",
+                "ok"
+              ],
+              [
+                "reports::tests::nothing_goes_without_each_of_the_three_gates",
+                "ok"
+              ],
+              [
+                "reports::tests::template_exit_notes_keep_only_the_fixed_name_in_files_and_reports",
+                "ok"
+              ],
+              [
+                "skills::tests::the_reply_is_bounded",
+                "ok"
+              ],
+              [
+                "settings::tests::p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only",
+                "ok"
+              ],
+              [
+                "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+                "ok"
+              ],
+              [
+                "reports::tests::the_queue_keeps_its_bounds_and_the_rate_its_limits",
+                "ok"
+              ]
+            ],
+            "display_annotation_mapping": [],
+            "stdout_interleaving_mapping": []
+          },
+          {
+            "kind": "executable",
+            "package": "lamp-cloud",
+            "target": {
+              "kind": [
+                "bin"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "lamp-cloud",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+              "edition": "2024",
+              "doc": true,
+              "doctest": false,
+              "test": true
+            },
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+            "sha256": "9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b",
+            "name": "lamp-cloud:bin:lamp-cloud",
+            "result": "ok",
+            "counts": {
+              "passed": 0,
+              "failed": 0,
+              "ignored": 0,
+              "measured": 0,
+              "filtered_out": 0
+            },
+            "raw_test_rows": [],
+            "test_rows": [],
+            "display_annotation_mapping": [],
+            "stdout_interleaving_mapping": []
+          },
+          {
+            "kind": "executable",
+            "package": "lamp-cloud",
+            "target": {
+              "kind": [
+                "test"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "it",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/it/main.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": true
+            },
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1",
+            "sha256": "c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253",
+            "name": "lamp-cloud:test:it",
+            "result": "ok",
+            "counts": {
+              "passed": 30,
+              "failed": 0,
+              "ignored": 0,
+              "measured": 0,
+              "filtered_out": 0
+            },
+            "raw_test_rows": [
+              [
+                "setup::the_generation_on_every_reply_is_the_one_setups_status_says",
+                "ok"
+              ],
+              [
+                "setup::the_unit_reads_the_account_where_the_products_setup_writes_it",
+                "ok"
+              ],
+              [
+                "switch::lamp_4aces_cloud_on_writes_the_units_whole_drop_in",
+                "ok"
+              ],
+              [
+                "switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot",
+                "ok"
+              ],
+              [
+                "switch::the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts",
+                "ok"
+              ],
+              [
+                "switch::the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it",
+                "ok"
+              ],
+              [
+                "switch::the_unit_may_reach_lamp_voices_app_make_socket",
+                "ok"
+              ],
+              [
+                "skills_contract::the_skills_page_reads_the_agreed_reply_and_its_refusal",
+                "ok"
+              ],
+              [
+                "setup::what_setup_writes_from_the_apps_request_reads_as_a_complete_account",
+                "ok"
+              ],
+              [
+                "report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit",
+                "ok"
+              ],
+              [
+                "report_contract::every_report_carries_the_agreed_fields_and_sent_at_is_set_once",
+                "ok"
+              ],
+              [
+                "texts::a_line_from_another_publisher_on_messages_out_is_not_sent",
+                "ok"
+              ],
+              [
+                "report_contract::the_apps_switch_reads_the_agreed_reply_and_its_refusal",
+                "ok"
+              ],
+              [
+                "app_contract::the_faces_page_reads_names_and_removes_one",
+                "ok"
+              ],
+              [
+                "app_contract::schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without",
+                "ok"
+              ],
+              [
+                "app_contract::a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update",
+                "ok"
+              ],
+              [
+                "report_contract::a_lamp_with_the_armed_way_back_or_the_switch_off_says_nothing_waits",
+                "ok"
+              ],
+              [
+                "texts::with_nothing_listening_a_text_is_refused_at_once_and_off_it_is_not_here",
+                "ok"
+              ],
+              [
+                "app_contract::the_software_update_is_answered_from_lamp_updates_status",
+                "ok"
+              ],
+              [
+                "texts::task_news_comes_out_with_no_text_asked_first",
+                "ok"
+              ],
+              [
+                "texts::a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events",
+                "ok"
+              ],
+              [
+                "texts::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news",
+                "ok"
+              ],
+              [
+                "app_contract::each_field_the_apps_page_reads_is_there_with_the_type_it_takes",
+                "ok"
+              ],
+              [
+                "texts::a_named_text_goes_named_only_while_its_yes_stands_as_it_goes",
+                "ok"
+              ],
+              [
+                "ring::a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_given_way",
+                "ok"
+              ],
+              [
+                "skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope",
+                "ok"
+              ],
+              [
+                "skills_contract::a_skill_from_a_package_is_listed_with_its_sha256_and_version",
+                "ok"
+              ],
+              [
+                "switch::with_the_switch_on_it_connects_to_the_accounts_broker",
+                "ok"
+              ],
+              [
+                "report_contract::a_lamp_without_the_armed_way_back_says_lamp_update_waits",
+                "ok"
+              ],
+              [
+                "switch::without_the_switch_it_says_so_and_connects_nowhere",
+                "ok"
+              ]
+            ],
+            "test_rows": [
+              [
+                "setup::the_generation_on_every_reply_is_the_one_setups_status_says",
+                "ok"
+              ],
+              [
+                "setup::the_unit_reads_the_account_where_the_products_setup_writes_it",
+                "ok"
+              ],
+              [
+                "switch::lamp_4aces_cloud_on_writes_the_units_whole_drop_in",
+                "ok"
+              ],
+              [
+                "switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot",
+                "ok"
+              ],
+              [
+                "switch::the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts",
+                "ok"
+              ],
+              [
+                "switch::the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it",
+                "ok"
+              ],
+              [
+                "switch::the_unit_may_reach_lamp_voices_app_make_socket",
+                "ok"
+              ],
+              [
+                "skills_contract::the_skills_page_reads_the_agreed_reply_and_its_refusal",
+                "ok"
+              ],
+              [
+                "setup::what_setup_writes_from_the_apps_request_reads_as_a_complete_account",
+                "ok"
+              ],
+              [
+                "report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit",
+                "ok"
+              ],
+              [
+                "report_contract::every_report_carries_the_agreed_fields_and_sent_at_is_set_once",
+                "ok"
+              ],
+              [
+                "texts::a_line_from_another_publisher_on_messages_out_is_not_sent",
+                "ok"
+              ],
+              [
+                "report_contract::the_apps_switch_reads_the_agreed_reply_and_its_refusal",
+                "ok"
+              ],
+              [
+                "app_contract::the_faces_page_reads_names_and_removes_one",
+                "ok"
+              ],
+              [
+                "app_contract::schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without",
+                "ok"
+              ],
+              [
+                "app_contract::a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update",
+                "ok"
+              ],
+              [
+                "report_contract::a_lamp_with_the_armed_way_back_or_the_switch_off_says_nothing_waits",
+                "ok"
+              ],
+              [
+                "texts::with_nothing_listening_a_text_is_refused_at_once_and_off_it_is_not_here",
+                "ok"
+              ],
+              [
+                "app_contract::the_software_update_is_answered_from_lamp_updates_status",
+                "ok"
+              ],
+              [
+                "texts::task_news_comes_out_with_no_text_asked_first",
+                "ok"
+              ],
+              [
+                "texts::a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events",
+                "ok"
+              ],
+              [
+                "texts::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news",
+                "ok"
+              ],
+              [
+                "app_contract::each_field_the_apps_page_reads_is_there_with_the_type_it_takes",
+                "ok"
+              ],
+              [
+                "texts::a_named_text_goes_named_only_while_its_yes_stands_as_it_goes",
+                "ok"
+              ],
+              [
+                "ring::a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_given_way",
+                "ok"
+              ],
+              [
+                "skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope",
+                "ok"
+              ],
+              [
+                "skills_contract::a_skill_from_a_package_is_listed_with_its_sha256_and_version",
+                "ok"
+              ],
+              [
+                "switch::with_the_switch_on_it_connects_to_the_accounts_broker",
+                "ok"
+              ],
+              [
+                "report_contract::a_lamp_without_the_armed_way_back_says_lamp_update_waits",
+                "ok"
+              ],
+              [
+                "switch::without_the_switch_it_says_so_and_connects_nowhere",
+                "ok"
+              ]
+            ],
+            "display_annotation_mapping": [],
+            "stdout_interleaving_mapping": []
+          },
+          {
+            "kind": "executable",
+            "package": "lamp-cloud",
+            "target": {
+              "kind": [
+                "test"
+              ],
+              "crate_types": [
+                "bin"
+              ],
+              "name": "release_pair",
+              "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/release_pair.rs",
+              "edition": "2024",
+              "doc": false,
+              "doctest": false,
+              "test": true
+            },
+            "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4",
+            "sha256": "bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c",
+            "name": "lamp-cloud:test:release_pair",
+            "result": "ok",
+            "counts": {
+              "passed": 0,
+              "failed": 0,
+              "ignored": 2,
+              "measured": 0,
+              "filtered_out": 0
+            },
+            "raw_test_rows": [
+              [
+                "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement",
+                "ignored, requires pinned releases in a fresh isolated native ARM64 container"
+              ],
+              [
+                "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement",
+                "ignored, requires pinned releases in a fresh isolated native ARM64 container"
+              ]
+            ],
+            "test_rows": [
+              [
+                "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement",
+                "ignored, requires pinned releases in a fresh isolated native ARM64 container"
+              ],
+              [
+                "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement",
+                "ignored, requires pinned releases in a fresh isolated native ARM64 container"
+              ]
+            ],
+            "display_annotation_mapping": [],
+            "stdout_interleaving_mapping": []
+          },
+          {
+            "kind": "doctests",
+            "package": "lamp-cloud",
+            "name": "lamp-cloud:doctests",
+            "result": "ok",
+            "counts": {
+              "passed": 0,
+              "failed": 0,
+              "ignored": 0,
+              "measured": 0,
+              "filtered_out": 0
+            },
+            "raw_test_rows": [],
+            "test_rows": [],
+            "display_annotation_mapping": [],
+            "stdout_interleaving_mapping": []
+          }
+        ],
+        "completed_targets": [
+          "lamp-cloud:lib:lamp_cloud",
+          "lamp-cloud:bin:lamp-cloud",
+          "lamp-cloud:test:it",
+          "lamp-cloud:test:release_pair",
+          "lamp-cloud:doctests"
+        ],
+        "passed_targets": [
+          "lamp-cloud:lib:lamp_cloud",
+          "lamp-cloud:bin:lamp-cloud",
+          "lamp-cloud:test:it",
+          "lamp-cloud:test:release_pair",
+          "lamp-cloud:doctests"
+        ],
+        "failed_targets": [],
+        "unrun_targets": [],
+        "incomplete_targets": [],
+        "binding_errors": [],
+        "compiler_census_is_execution": false,
+        "complete_binding": true
+      },
+      "affected_case": [
+        {
+          "package": "lamp-cloud",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_cloud",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "name": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "id": "clean-before-workspace-build",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/clean-before-workspace-build.json",
+        "sha256": "55e716afa17493fc0c10f161d2dc9a2091dd4eba4a5906f03be4871ad97d521e",
+        "mode": "0o600",
+        "bytes": 2380
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:34:13.422885+00:00",
+        "available_bytes": 25523302400,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clean",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-actions",
+          "-p",
+          "lamp-addons",
+          "-p",
+          "lamp-air",
+          "-p",
+          "lamp-audio",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-bus",
+          "-p",
+          "lamp-camera",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-ears",
+          "-p",
+          "lamp-environment",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-eyes",
+          "-p",
+          "lamp-gemini",
+          "-p",
+          "lamp-health",
+          "-p",
+          "lamp-ipc",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-local-time",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-mood",
+          "-p",
+          "lamp-msgs",
+          "-p",
+          "lamp-name",
+          "-p",
+          "lamp-near-call",
+          "-p",
+          "lamp-observer",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-policy",
+          "-p",
+          "lamp-records",
+          "-p",
+          "lamp-ring",
+          "-p",
+          "lamp-same-voice",
+          "-p",
+          "lamp-schedule",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-settings",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-sound-fixtures",
+          "-p",
+          "lamp-station",
+          "-p",
+          "lamp-surround",
+          "-p",
+          "lamp-tasks",
+          "-p",
+          "lamp-turn-end",
+          "-p",
+          "lamp-turn-end-wire",
+          "-p",
+          "lamp-turn-owner",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "-p",
+          "lamp-voice-processes",
+          "-p",
+          "sonora",
+          "-p",
+          "tough"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T20:34:15.731987+00:00",
+        "timeout_seconds": 300,
+        "stdout": "clean-before-workspace-build.stdout.txt",
+        "stderr": "clean-before-workspace-build.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 25672818688,
+        "owned_pid": 61483,
+        "owned_process_group": 61483,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 4.533549,
+        "finished_at": "2026-10-24T20:34:20.265603+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "7a2aaa704dee20eea3920162493af41153ab172356bb3146a49c450f1c9dade2",
+        "stderr_bytes": 38
+      }
+    },
+    {
+      "id": "workspace-build",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/workspace-build.json",
+        "sha256": "79844ccdb73d3e42a924de8404deba37eedb87d7d518f07546244b96e4c3ef9c",
+        "mode": "0o600",
+        "bytes": 829
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:34:27.808086+00:00",
+        "available_bytes": 28113633280,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "build",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--message-format=json-render-diagnostics"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T20:34:30.306378+00:00",
+        "timeout_seconds": 3600,
+        "stdout": "workspace-build.stdout.txt",
+        "stderr": "workspace-build.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 28197498880,
+        "owned_pid": 62484,
+        "owned_process_group": 62484,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 218.891107,
+        "finished_at": "2026-10-24T20:38:09.193557+00:00",
+        "stdout_sha256": "3ee3eaeade0f3fb07ad008d0321ead785e092335d40f6a27cb2b2c1efd05ab6c",
+        "stdout_bytes": 449895,
+        "stderr_sha256": "7845ba565a059bf24cfaa6196c6953c494d4b3e23d4c5106961ef615c8bc2262",
+        "stderr_bytes": 8109
+      },
+      "compilation": {
+        "build_finished_messages": [
+          {
+            "reason": "build-finished",
+            "success": true
+          }
+        ],
+        "compiler_error_messages": [],
+        "successful": true
+      },
+      "local_library_lineage": {
+        "records": 96,
+        "fresh_false": 96,
+        "same_command_exact_reuse": 0,
+        "unresolved": 0
+      }
+    },
+    {
+      "id": "diff-check",
+      "state": "passed",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/consumed-stages/diff-check.json",
+        "sha256": "fd200cb4de7a749eedd06b90a3d25b2cab0b6c66d12528b78249ea87564b9102",
+        "mode": "0o600",
+        "bytes": 730
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T20:38:24.105384+00:00",
+        "available_bytes": 23932690432,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "git",
+          "diff",
+          "--check",
+          "HEAD",
+          "--"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events",
+        "started_at": "2026-10-24T20:38:26.900197+00:00",
+        "timeout_seconds": 60,
+        "stdout": "diff-check.stdout.txt",
+        "stderr": "diff-check.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 75834,
+        "owned_process_group": 75834,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.054498,
+        "finished_at": "2026-10-24T20:38:26.954838+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    }
+  ],
+  "unrun_steps": [],
+  "status": "all planned local gates passed",
+  "execution_consumed": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/execution-consumed.json",
+    "sha256": "be3e704d3f7b9be33354c79811fddabbe066ff79bdf624e1c1be440446292c92",
+    "mode": "0o600",
+    "bytes": 674
+  },
+  "terminal": true,
+  "all_gates_passed": true,
+  "historical_cause_claim": false,
+  "diagnostic_control_executable_used": false,
+  "concurrency_context": {
+    "mode": "root-authorized overlap on distinct exclusive targets",
+    "other_active_native_session": null,
+    "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Current owned Cloud compilerjobs2 and no other active Cargo handle/jobs. Later qualification compiler4 permitted only by explicit root resource amendment on the distinct reserved target, with actual launch receipt retained. Reservation is not actual overlap. No global-isolation or timing claim.",
+    "other_active_compiler_jobs": 0,
+    "total_bounded_compile_jobs": 2,
+    "this_gate_compiler_jobs": 2,
+    "later_other_compile_job_limit": 4,
+    "maximum_later_total_compile_jobs": 6,
+    "other_target_role": "Reserved future qualification target only; no active sibling Cargo job at grant/start"
+  },
+  "isolated_load_or_timing_claim": false,
+  "source_after": {
+    "canonical": "8044e1268ae43ad74cb8e8022a968a2b7c20783693972d5ab9659f984d63b202"
+  },
+  "finished_at": "2026-10-24T20:38:34.163720+00:00",
+  "runner_exit_code": 0
+}

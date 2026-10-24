@@ -1,0 +1,306 @@
+{
+  "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-45a1046acddcb43e",
+    "sha256": "b170eb9b2418b12bc50a521573e937ce39a3e40d93a37257502732ae864fca54",
+    "bytes": 94435436,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-45a1046acddcb43e"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-45a1046acddcb43e",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  },
+  "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/lamp_voice_eval-950f5ab79bd5b913",
+    "sha256": "e801d2fca1d5053e6ce5c4e1c72f6803ec978754ac8db34a1b3ded3eac1c57b2",
+    "bytes": 24536068,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/lamp_voice_eval-950f5ab79bd5b913"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/lamp_voice_eval-950f5ab79bd5b913",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  },
+  "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+    "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+    "bytes": 15954472,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  },
+  "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+    "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+    "bytes": 15954472,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  },
+  "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+    "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+    "bytes": 15954472,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  },
+  "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+    "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+    "bytes": 15954472,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  },
+  "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+    "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+    "bytes": 15954472,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  },
+  "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]": {
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+    "sha256": "b0d794df94b4670f8be9584b6ca2d97dd6d141e1cd40e348f3abbbca56fa9f7f",
+    "bytes": 15954472,
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/deps/it-917370f90cac6422",
+      "fresh": false
+    },
+    "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+  }
+}

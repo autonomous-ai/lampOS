@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-10-24T20:39:05.976258+00:00",
+  "authorization_before_launch": true,
+  "cloud_native_session": 53518,
+  "cloud_compiler_jobs": 2,
+  "future_other_native_session": null,
+  "other_compiler_jobs_authorized": 4,
+  "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2",
+  "cloud_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+  "total_bounded_owned_compiler_jobs": 6,
+  "actual_sibling_launch_receipt_pending": true,
+  "global_isolation_or_timing_claim": false
+}

@@ -1,0 +1,10 @@
+[
+  {
+    "status": "PASS",
+    "seconds": 5.028,
+    "index": 312,
+    "total": 1206,
+    "binary": "lamp-cloud",
+    "case": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks"
+  }
+]

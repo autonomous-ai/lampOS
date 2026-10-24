@@ -1,0 +1,267 @@
+{
+  "cases": [
+    {
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "package": "lamp-voice",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+        "target": "lamp-voice:test:it",
+        "stage": "voice-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-ac9b9993d410d428",
+        "actual_binary_sha256": "50dbe275eb6eefdd36adf31eada8e5ce49aa7f618ce70cd7a2e1653e75a2ff1a",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "raw_stream_sha256": "fec688a18766e57b4acbe342b71c7681e77e9763577f3037f7354efe28e13cc8",
+        "byte_offset": 715617,
+        "bytes": 1209,
+        "sha256": "e5d4d9f4bbdafe2655637c0731c0fb5eb49714c666e4634d509ec301b61d9de1",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [3.613018ms, 4.137906ms, 4.67154ms, 4.865509ms, 8.068469ms, 22.616366ms, 22.694821ms, 38.489991ms, 40.303295ms, 41.364281ms, 55.821597ms, 57.562432ms, 58.608335ms, 59.79053ms, 60.913805ms, 61.546635ms, 75.891872ms, 80.671151ms, 80.67941ms, 115.234026ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (5849363) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[3.613018ms, 4.137906ms, 4.67154ms, 4.865509ms, 8.068469ms, 22.616366ms, 22.694821ms, 38.489991ms, 40.303295ms, 41.364281ms, 55.821597ms, 57.562432ms, 58.608335ms, 59.79053ms, 60.913805ms, 61.546635ms, 75.891872ms, 80.671151ms, 80.67941ms, 115.234026ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice/tests/it/light_call.rs:90:5"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    },
+    {
+      "name": "physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times",
+      "package": "lamp-voice-eval",
+      "target_kind": "lib",
+      "target_name": "lamp_voice_eval",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times",
+        "target": "lamp-voice-eval:lib:lamp_voice_eval",
+        "stage": "readers-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice_eval-dbe254449ccce883",
+        "actual_binary_sha256": "1809a0a0968bca169246540aba3850bc0baff57bbfe0f62f1ca65939cb8900a8",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_stream_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4",
+        "byte_offset": 739074,
+        "bytes": 983,
+        "sha256": "66b2aba01186a3bb4b689080f5e8ee5ba7cd4fb93c59d7f7118572e2af647895",
+        "utf8": "---- physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times stdout ----\n\nthread 'physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times' (6145967) panicked at crates/voice-eval/src/physical/mac.rs:4541:9:\nassertion failed: matches!(published[0].kind, EventKind::InputAvailability { available: true })\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic\n   3: lamp_voice_eval::physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\n   4: lamp_voice_eval::physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice-eval/src/physical/mac.rs:4541:9"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    },
+    {
+      "name": "physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored",
+      "package": "lamp-voice-eval",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored",
+        "target": "lamp-voice-eval:test:it",
+        "stage": "readers-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-f337388f4e72a80e",
+        "actual_binary_sha256": "dbe75f54cd9772225fcf7b6955a64a750beb32b81cccacbfcbc53fdd23b9a34e",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_stream_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4",
+        "byte_offset": 766890,
+        "bytes": 992,
+        "sha256": "9a2b0ddcd0ba7646ef5d4bfac8c2c2e000cede80181e50ac07f33c9ad98190a5",
+        "utf8": "---- physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored stdout ----\n\nthread 'physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored' (6187477) panicked at crates/voice-eval/tests/it/physical_loopback.rs:176:5:\nassertion `left == right` failed: Null\n  left: Aborted { reason: \"session close failed: fixture control read frame: host watchdog expired (fixture control read frame: host watchdog expired)\" }\n right: Completed\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: it::physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\n   5: it::physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice-eval/tests/it/physical_loopback.rs:176:5"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    },
+    {
+      "name": "physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields",
+      "package": "lamp-voice-eval",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields",
+        "target": "lamp-voice-eval:test:it",
+        "stage": "readers-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-f337388f4e72a80e",
+        "actual_binary_sha256": "dbe75f54cd9772225fcf7b6955a64a750beb32b81cccacbfcbc53fdd23b9a34e",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_stream_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4",
+        "byte_offset": 767883,
+        "bytes": 1070,
+        "sha256": "e3e121cf5c643bde8f5369e6bdcafc056f99b54168dfa81e711a731fd4e4bcf8",
+        "utf8": "---- physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields stdout ----\n\nthread 'physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields' (6187643) panicked at crates/voice-eval/tests/it/physical_loopback.rs:304:5:\nassertion `left == right` failed: Null\n  left: Aborted { reason: \"session close failed: fixture control read frame: host watchdog expired (fixture control read frame: host watchdog expired)\" }\n right: Completed\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: it::physical_loopback::assert_directed_receipts\n   5: it::physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\n   6: it::physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice-eval/tests/it/physical_loopback.rs:304:5"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    },
+    {
+      "name": "physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn",
+      "package": "lamp-voice-eval",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn",
+        "target": "lamp-voice-eval:test:it",
+        "stage": "readers-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-f337388f4e72a80e",
+        "actual_binary_sha256": "dbe75f54cd9772225fcf7b6955a64a750beb32b81cccacbfcbc53fdd23b9a34e",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_stream_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4",
+        "byte_offset": 768954,
+        "bytes": 1070,
+        "sha256": "7a49da7252599004712578e454ca7a834a9a06de53a24cba2f7e59865a9e4599",
+        "utf8": "---- physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn stdout ----\n\nthread 'physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn' (6187488) panicked at crates/voice-eval/tests/it/physical_loopback.rs:304:5:\nassertion `left == right` failed: Null\n  left: Aborted { reason: \"session close failed: fixture control read frame: host watchdog expired (fixture control read frame: host watchdog expired)\" }\n right: Completed\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: it::physical_loopback::assert_directed_receipts\n   5: it::physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\n   6: it::physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice-eval/tests/it/physical_loopback.rs:304:5"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    },
+    {
+      "name": "physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup",
+      "package": "lamp-voice-eval",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup",
+        "target": "lamp-voice-eval:test:it",
+        "stage": "readers-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-f337388f4e72a80e",
+        "actual_binary_sha256": "dbe75f54cd9772225fcf7b6955a64a750beb32b81cccacbfcbc53fdd23b9a34e",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_stream_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4",
+        "byte_offset": 770025,
+        "bytes": 1038,
+        "sha256": "bccc07d16c5fd6ee6b18bab6aaca007737a402caf3eae2d99c2e6e19ee0ff5e0",
+        "utf8": "---- physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup stdout ----\n\nthread 'physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup' (6187981) panicked at crates/voice-eval/tests/it/physical_loopback.rs:304:5:\nassertion `left == right` failed: Null\n  left: Aborted { reason: \"session close failed: fixture control read frame: host watchdog expired (fixture control read frame: host watchdog expired)\" }\n right: Completed\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: it::physical_loopback::assert_directed_receipts\n   5: it::physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\n   6: it::physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice-eval/tests/it/physical_loopback.rs:304:5"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    },
+    {
+      "name": "physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues",
+      "package": "lamp-voice-eval",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues",
+        "target": "lamp-voice-eval:test:it",
+        "stage": "readers-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-f337388f4e72a80e",
+        "actual_binary_sha256": "dbe75f54cd9772225fcf7b6955a64a750beb32b81cccacbfcbc53fdd23b9a34e",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_stream_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4",
+        "byte_offset": 771064,
+        "bytes": 1010,
+        "sha256": "676bb8b1691bcf346db631526860b8ab273f5d60b851210eea5539e5b8ddc3c1",
+        "utf8": "---- physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues stdout ----\n\nthread 'physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues' (6189042) panicked at crates/voice-eval/tests/it/physical_loopback.rs:304:5:\nassertion `left == right` failed: Null\n  left: Aborted { reason: \"session close failed: fixture control read frame: host watchdog expired (fixture control read frame: host watchdog expired)\" }\n right: Completed\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: it::physical_loopback::assert_directed_receipts\n   5: it::physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\n   6: it::physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice-eval/tests/it/physical_loopback.rs:304:5"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    },
+    {
+      "name": "physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason",
+      "package": "lamp-voice-eval",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "name": "physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason",
+        "target": "lamp-voice-eval:test:it",
+        "stage": "readers-default-parallel",
+        "actual_status": "FAILED",
+        "actual_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-f337388f4e72a80e",
+        "actual_binary_sha256": "dbe75f54cd9772225fcf7b6955a64a750beb32b81cccacbfcbc53fdd23b9a34e",
+        "raw_stream": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/new-base-fb8-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "raw_stream_sha256": "efbe5e154c1ded83f3e26743d9b64fc61e6ec3d610e2b4e4cc81eca853b4b7e4",
+        "byte_offset": 772075,
+        "bytes": 1047,
+        "sha256": "f1c8507cdbce9a28b5957b1235b1fb7d8815f01062b877e6c6f33c9839513945",
+        "utf8": "---- physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason stdout ----\n\nthread 'physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason' (6187856) panicked at crates/voice-eval/tests/it/physical_loopback.rs:304:5:\nassertion `left == right` failed: Null\n  left: Aborted { reason: \"session close failed: fixture runtime exit and final relay output exceeded its host watchdog\" }\n right: Completed\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: it::physical_loopback::assert_directed_receipts\n   5: it::physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\n   6: it::physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n",
+        "assertion_locations": [
+          "crates/voice-eval/tests/it/physical_loopback.rs:304:5"
+        ],
+        "classification": "Unmatched pending PR-head3/3 or separately granted actual matched-base review; no inherited artifact waiver."
+      }
+    }
+  ],
+  "original_source": "fb8/427",
+  "actual_totals": {
+    "passed": 7316,
+    "failed": 8,
+    "ignored": 52
+  },
+  "frozen_only_after_whole_gate_closed": true
+}

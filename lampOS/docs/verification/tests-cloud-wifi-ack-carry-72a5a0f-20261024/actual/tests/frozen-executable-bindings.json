@@ -1,0 +1,237 @@
+[
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4",
+      "sha256": "bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c",
+      "mode": "0o755",
+      "bytes": 3096920
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c-release_pair-03031a8d457564d4",
+      "sha256": "bc9e6250902e3a0d4490005692af78a52ca08e66938cbff4333d1dd320b55b7c",
+      "mode": "0o555",
+      "bytes": 3096920
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud",
+      "sha256": "c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374",
+      "mode": "0o755",
+      "bytes": 29544720
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374-lamp-cloud",
+      "sha256": "c471c13c0b3bc349562486b169f2b69a1f4a8b57f46bc6dfb90c400db41cd374",
+      "mode": "0o555",
+      "bytes": 29544720
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+      "sha256": "9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b",
+      "mode": "0o755",
+      "bytes": 1019888
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b-lamp_cloud-41eb706784ccd943",
+      "sha256": "9f9d222ac8675baa569ea0a7fca627550be533bc8d64fae6d8bf52d7a2c5a47b",
+      "mode": "0o555",
+      "bytes": 1019888
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1",
+      "sha256": "c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253",
+      "mode": "0o755",
+      "bytes": 19646536
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253-it-f97da77857dd66f1",
+      "sha256": "c39b76d5864f19c9822f7c5eb030b94e2c22e5bbb1bc157971de4da2ea166253",
+      "mode": "0o555",
+      "bytes": 19646536
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58",
+      "sha256": "f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e",
+      "mode": "0o755",
+      "bytes": 36721888
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run-2026-10-24T203009.245309+0000/tests/frozen-executables/f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e-lamp_cloud-181eacc6d66b1b58",
+      "sha256": "f2de7eed3d3af5ab98730eff745e7eca25fd1ef30219dd8a26925bfe8f463d6e",
+      "mode": "0o555",
+      "bytes": 36721888
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  }
+]

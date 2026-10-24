@@ -1,0 +1,26 @@
+{
+  "scratch_source_bodies_omitted": true,
+  "scripts": [
+    {
+      "private_original": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/run.py",
+      "file_name": "run.py",
+      "sha256": "93d4308225e54c9cd89e75c21cb60ef90168feb4da30ba8671934d2c92895cbe",
+      "bytes": 19150,
+      "body_omitted": true
+    },
+    {
+      "private_original": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/support.py",
+      "file_name": "support.py",
+      "sha256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+      "bytes": 5896,
+      "body_omitted": true
+    },
+    {
+      "private_original": "lampOS/target/tests-recovery/evidence/cloud-ack-carry-72a5a0f-canonical-prep/census.py",
+      "file_name": "census.py",
+      "sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+      "bytes": 14714,
+      "body_omitted": true
+    }
+  ]
+}

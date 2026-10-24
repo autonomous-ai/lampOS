@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-10-24T20:35:08.818268+00:00",
+  "cloud_native_session": 53518,
+  "cloud_compiler_jobs": 2,
+  "other_reported_launched_native_session": 73052,
+  "other_scope": "Eight prescribed direct executable baseline observations, one named case at a time, frozen f978/debug0; no Cargo compile",
+  "other_compiler_jobs": 0,
+  "total_owned_compiler_jobs": 2,
+  "distinct_target": "pr-head-qualification-cargo-target/debug0",
+  "baseline_approval_sha256": "4c7f30075b96d2eebbab81f3f027003d8b1e05a0f8595cbf3dd58b8ba9ee7d6f",
+  "start_evidence_scope": "Auditor reported actual native handle; native launch itself not instrumented here. Actual per-case command starts remain in its primary records.",
+  "global_isolation_or_timing_claim": false
+}

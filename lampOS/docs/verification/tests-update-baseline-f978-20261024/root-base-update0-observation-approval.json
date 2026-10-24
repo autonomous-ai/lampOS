@@ -1,0 +1,18 @@
+{
+  "phase": "baseline-observations",
+  "root_reviewed": true,
+  "controller_sha256": "ca88791f89379f831b561d7b5d43f54aed718f2cf6e9b90722669e22a612ef0b",
+  "observation_plan_sha256": "cc1888b96d9e219ecc6bb1f23db2524f3ba769f25094374dfad495a8f52f564e",
+  "prep_plan_sha256": "2e1e7c747e669b7269a76cb92477dcc9c528f82646e90fcf90afeb7cdd088349",
+  "owned_session_cleanup_reviewed": true,
+  "at": "2026-10-24T20:33:37.769076+00:00",
+  "scope": "Exactly eight prescribed baseline observations, once each, on frozen f978/debug0. No current-head observation, retry, Cargo, source change or target replacement. Both 0/101 outcomes retained; any cleanup/infrastructure error stops before next case. Historical baseline identity is explicit after bcb landing.",
+  "concurrency": {
+    "cloud_canonical_native_session": 53518,
+    "cloud_compile_jobs": 2,
+    "this_run_direct_cases": 1,
+    "this_run_compiler_jobs": 0,
+    "exclusive_qualification_target": true,
+    "global_isolation_or_timing_claim": false
+  }
+}

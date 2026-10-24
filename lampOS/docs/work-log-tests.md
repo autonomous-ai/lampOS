@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-25 03:44 — latest Cloud carry and baseline observations
+
+Ready for lamp-voice: no
+
+Cloud #3410 is pushed as 72a5a0f67 on live bcb with an equal range-diff. [Fresh canonical proof](verification/tests-cloud-wifi-ack-carry-72a5a0f-20261024/) records all eight gates passing, full Cloud 196/0/4 over five targets, fresh local compiler bindings and clean unchanged source. No A/B control was repeated. Original 5b/f978 [native proof](verification/tests-cloud-wifi-native-5b-20261024/) separately has 1,206 selected PASS / eight skipped, changed case 5.028 s, strict Linux pass and actual authored/preview whole-tree equality. Current72 native40130844249/40130844271 and the reader's carry disposition remain pending; original timing/proof reads are closed with no new findings.
+
+#3403 is closed as duplicate after all four owned blobs landed through qualified #3382/train102 at bcb; [exact blob proof](verification/tests-update-landed-bcb-20261024.json). Its eight historical full-run failures remain open for classification. [One frozen f978 baseline observation per case](verification/tests-update-baseline-f978-20261024/) passed8/8 with no cleanup errors. Therefore every case still needs the prescribed three at actual latest helper source; no waiver or cause claim. NoPause's separate debug2 baseline compile11250 is active before its49 observations; current403/bcb carry remains unpushed pending qualification. All original failed full epochs and frozen sources remain intact. No product/API, workflow, device or local ARM build.
+
 ## 2026-10-25 03:19 — Wi-Fi acknowledgment event wait pushed
 
 Ready for lamp-voice: no
