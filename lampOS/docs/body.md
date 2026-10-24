@@ -554,13 +554,17 @@ base also does not come all the way back: it rests where it is once it is
 within 20 counts of where it is wanted, as every joint does, so after an
 exchange it can sit up to two degrees from where it began.
 
-**The pose's speed is what lets a nod show** (24 Oct): every offset Expression asks of the head moves at
-`--speed`, and at 120 counts a second a 0.035 rad nod of 360 ms is over before the head has gone half way. lamp-4ace's
-joints, read off `body/joint_states` ten times a second through one spoken answer each: at `--speed 120`, two head
-swings of 2 degrees or more, its posture moving and nothing else; at 300, six, of 3 to 7 degrees, the nods. No false
-cut-in was heard in either, nothing retreated, and the head's and base's loads peaked at 251 and 184. The product runs
-300, the cap. Downward the head still reaches 15 counts from home (`--reach`), so a nod dips from wherever the
-speaking posture holds the head.
+**The pose's speed is what lets a nod show** (24 Oct): the offsets Expression asks of the head, the mood
+poses and gaze moves go through the pose filter at `--speed`, with a software acceleration of six times it (720 counts
+a second squared at 120, 1,800 at 300). Leans keep their 1.5 s and the arm's stand and fold `--stand-seconds`.
+lamp-4ace's joints, read off `body/joint_states` ten times a second through one spoken answer each: at `--speed 120`,
+two head swings of 2 degrees or more, its posture moving and nothing else; at 300, six, of 3 to 7 degrees, the nods. No
+false cut-in was heard in either. Body's exit reports over 17.6 minutes at 300 and 43 at 120 that evening: the head
+pitch's highest single 20 ms step read 328 and 281, roll 32 at both, the base 196 and 200, and the arm's shoulder and
+elbow 376 and 488 against 396 and 488. Single steps over the pitch's 240 come at both speeds; the strain bounds act on
+six steps in a row (pitch, roll and yaw 240, 150 and 220; the arm 560 under `--force-limit 600`), and at 300 nothing
+was eased and nothing retreated. The product runs 300, `Tuning::SPEED_CAP`. Downward the head still reaches 15 counts
+from home (`--reach`), so a nod dips from wherever the speaking posture holds the head.
 
 A joint that has arrived rests, in any mood: once the commanded pose has
 been within 6 counts of the wanted one and slower than 15 counts a second
