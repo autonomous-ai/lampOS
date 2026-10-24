@@ -301,7 +301,7 @@ impl Drop for Running {
 }
 
 #[test]
-fn sigterm_finishes_recording_and_releases_the_actual_serve_owner() {
+fn sigterm_reports_bounded_recording_and_releases_the_actual_serve_owner() {
     let root = Root::new();
     let bus = Bus::new(root.0.join("bus")).unwrap();
     let mut reports = bus
@@ -355,15 +355,23 @@ fn sigterm_finishes_recording_and_releases_the_actual_serve_owner() {
     assert_eq!(summary["physical_stop_verified"], false);
     assert!(summary["counts"]["reader_errors"].as_u64().unwrap() > 0);
     assert_eq!(summary["recording"]["failed"], false);
-    assert_eq!(summary["recording"]["finished"], true);
+    let finished = summary["recording"]["finished"]
+        .as_bool()
+        .expect("the optional writer must report completion truthfully");
     assert_eq!(summary["recording"]["dropped"], 0);
-    let records = replay::read(fs::File::open(record).unwrap()).unwrap();
-    assert!(!records.is_empty());
-    assert!(
-        records
-            .iter()
-            .all(|row| row.observation.is_none() && row.fault == Some(ControlFault::Missing))
-    );
+    // Product shutdown waits only 100 ms for the optional disk writer.
+    // A truthful incomplete report is allowed; a parseable prefix is not
+    // evidence of a fully drained/synced recording. Complete replay has its
+    // separate five-second, test-only roundtrip control in runtime.rs.
+    if finished {
+        let records = replay::read(fs::File::open(record).unwrap()).unwrap();
+        assert!(!records.is_empty());
+        assert!(
+            records
+                .iter()
+                .all(|row| row.observation.is_none() && row.fault == Some(ControlFault::Missing))
+        );
+    }
     let mut restarted = Service::new(&bus, Config::default(), MissingPins, CLOCK).unwrap();
     let after = restarted.step(lamp_ipc::monotonic_us);
     assert_ne!(after.state.session_id, before.session_id);
