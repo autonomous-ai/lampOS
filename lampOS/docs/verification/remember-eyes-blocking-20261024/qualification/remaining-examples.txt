@@ -1,0 +1,24 @@
+   Compiling lamp-voice v0.1.0 (/private/tmp/second-remember-eyes-blocking-20261024/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.68s
+     Running unittests examples/render_line_second.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/render_line_second-64bf83bb8828a9bd)
+
+running 4 tests
+test tests::silence_is_cut_at_either_end_with_50_ms_kept ... ok
+test tests::the_arguments_are_checked_as_render_lines_are ... ok
+test tests::the_manifest_names_the_configured_voice_and_model ... ok
+test tests::the_wav_is_mono_16_bit_at_the_routes_rate ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/stop_words_stt_replay.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/stop_words_stt_replay-b4b5bc69dcd2f200)
+
+running 6 tests
+test tests::blocks_are_dated_and_scored_as_the_lamp_read_them ... ok
+test tests::only_cut_lines_are_stop_lines_in_a_mixed_plays_file ... ok
+test tests::only_the_lamps_sounding_is_sent_and_raw_is_asked_on_the_cadence ... ok
+test tests::options_are_read ... ok
+test tests::the_lamps_own_words_stop_nothing ... ok
+test tests::the_voices_stop_words_are_counted_against_the_played_lines ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+

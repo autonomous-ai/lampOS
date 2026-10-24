@@ -1,0 +1,20 @@
+{
+  "head": "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3",
+  "command": [
+    "<private-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--example",
+    "render_line_second",
+    "--example",
+    "stop_words_stt_replay",
+    "--",
+    "--test-threads=1"
+  ],
+  "exit": 0,
+  "scope": "Two test=true example targets also skipped by the original failed library invocation; separate execution on equal rebased whole tree."
+}

@@ -1,0 +1,7 @@
+{
+  "only_code_delta": "three inserted lines in cfg(test) own_name_exchange, including one mode-setting call",
+  "all_original_source_bytes_preserved_in_order": true,
+  "all_original_assertions_timeouts_locks_unchanged": true,
+  "production_prefix_byte_identical": true,
+  "after_sha256": "884d6b7cd69c066b15802234f87d57380561f0620050a72f41aae44430871bc2"
+}

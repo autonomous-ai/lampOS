@@ -1,0 +1,9 @@
+{
+  "executed_head": "1f78ef3b8a62c69c0affff3f4bd89870d5ea5339",
+  "current_head": "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3",
+  "base": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "executed_and_current_whole_tree": "8d8c615acf16f1dd865f64e957012220b0bb13c8",
+  "whole_trees_equal": true,
+  "no_source_change": true,
+  "full_library_result": "FAILED 3742/1/15 retained; isolated case 3/3 separate; remaining targets separate"
+}

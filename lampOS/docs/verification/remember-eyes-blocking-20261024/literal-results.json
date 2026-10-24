@@ -1,0 +1,29 @@
+{
+  "test.txt": [
+    "test result: FAILED. 3742 passed; 1 failed; 15 ignored; 0 measured; 0 filtered out; finished in 539.43s"
+  ],
+  "remember-speaker.txt": [
+    "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 3742 filtered out; finished in 0.15s"
+  ],
+  "qualification/isolated-2.txt": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3757 filtered out; finished in 2.42s"
+  ],
+  "qualification/isolated-3.txt": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3757 filtered out; finished in 2.42s"
+  ],
+  "qualification/isolated-1.txt": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3757 filtered out; finished in 2.42s"
+  ],
+  "qualification/doc-tests.txt": [
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "qualification/remaining-targets.txt": [
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 278 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.30s",
+    "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "qualification/remaining-examples.txt": [
+    "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "scope": "Post-terminal hashes only; compiler artifact freshness is asserted only in captured compilation streams. No inferred per-invocation compiler profile.",
+  "bindings": [
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c75c87452d24a363",
+      "post_run_sha256": "63a1cb8f0a013d205a7c29230cae3f66a8236eb6abd564321791efd05278074b",
+      "bytes": 102281120
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+      "post_run_sha256": "8e62e5cae0971aac4e00185b91d2745a8409b6eb7d1fa4e4a892fccb01af1d7f",
+      "bytes": 141213384
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-3ab8ef644bb4cec9",
+      "post_run_sha256": "894dd87c290e3f8447929461d7a45f4c783b6a91f7d3ae2da2142c9bf4466296",
+      "bytes": 1158168
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-92b41c10fde060fb",
+      "post_run_sha256": "c785d8d808be8cea427ba9b5a87c2b1a0b934e1767613c6d898e330df7c06cc5",
+      "bytes": 6114592
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/render_line_second-64bf83bb8828a9bd",
+      "post_run_sha256": "b225833624a0eafd6dc67ced879023be8d8b9d14ce3c3b599d6034210ae0d9c2",
+      "bytes": 1588384
+    },
+    {
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/stop_words_stt_replay-b4b5bc69dcd2f200",
+      "post_run_sha256": "9af3294aad9cc29903f810657eef809e44d5b8afad655d375b63f52e3b64fa3b",
+      "bytes": 3401448
+    }
+  ]
+}

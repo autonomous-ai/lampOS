@@ -1,0 +1,9 @@
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:190:    fn own_name_exchange(
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:266:                own_name_exchange(words, name, false, true, json!({"remembered": name}));
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:322:                own_name_exchange(words, "Kess", true, true, json!({"remembered": "Kess"}));
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:383:                own_name_exchange(words, name, true, true, json!({"remembered": name}));
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:405:                own_name_exchange(words, name, false, true, json!({"remembered": name}));
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:418:            let (answer, requests) = own_name_exchange(
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:429:        let (answer, requests) = own_name_exchange(
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:444:        let (answer, requests) = own_name_exchange(
+<temporary>/second-remember-eyes-blocking-20261024/lampOS/crates/voice/src/remember_speaker.rs:466:        let (answer, requests) = own_name_exchange(

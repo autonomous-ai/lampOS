@@ -1,0 +1,22 @@
+{
+  "compile_command": [
+    "<private-home>/.cargo/bin/rustc",
+    "+1.96.0",
+    "--edition=2024",
+    "-L",
+    "dependency=<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps",
+    "--extern",
+    "rustix=<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/librustix-7424dd734b3552f1.rlib",
+    "/private/tmp/second-remember-speaker-socket-audit-20261024/accepted_socket_probe.rs",
+    "-o",
+    "/private/tmp/second-remember-speaker-socket-audit-20261024/accepted-socket-probe"
+  ],
+  "compile_exit": 0,
+  "run_exit": 0,
+  "source_sha256": "3a14d9343e6b165f5449e47e684c7fb67336e8682de015df248645f0dae903b0",
+  "binary_sha256": "5b9876e47bb4513486dd46d29de625082ddac80abbdf6da6a00ddb75787d7514",
+  "rustix_dependency_sha256": "89e80df4123eb140a17b8bf668c8e6c2f8a739aa745a702e5d4a9b029bbc0a29",
+  "scope": "Controlled owned local macOS AF_UNIX condition, not a historical failure-cause assignment or Linux/device observation",
+  "local_linux_arm_build_or_test": false,
+  "compiler_scope": "Standalone host rustc command with a recorded cached Rustix rlib, not a Cargo gate or fresh dependency/profile claim"
+}

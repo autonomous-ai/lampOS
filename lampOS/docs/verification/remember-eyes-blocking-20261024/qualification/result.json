@@ -1,0 +1,99 @@
+{
+  "head": "1f78ef3b8a62c69c0affff3f4bd89870d5ea5339",
+  "stages": [
+    {
+      "tag": "isolated-1",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--",
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 2.625
+    },
+    {
+      "tag": "isolated-2",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--",
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 2.637
+    },
+    {
+      "tag": "isolated-3",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--",
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 2.645
+    },
+    {
+      "tag": "remaining-targets",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--bins",
+        "--test",
+        "it",
+        "--test",
+        "release_pair",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 27.056
+    },
+    {
+      "tag": "doc-tests",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--doc"
+      ],
+      "exit": 0,
+      "seconds": 1.389
+    }
+  ],
+  "source_unchanged": true
+}
