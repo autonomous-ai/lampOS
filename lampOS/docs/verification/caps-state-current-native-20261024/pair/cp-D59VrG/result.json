@@ -1,0 +1,24 @@
+{
+  "artifacts": [
+    {
+      "bytes": 4517592,
+      "original_and_copy_unchanged": true,
+      "release": 6408,
+      "sha256": "b5359557611b4fa3aa09709b659c7243f77c9ae945c326937f55adbc928903d6",
+      "source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb"
+    },
+    {
+      "bytes": 4517592,
+      "original_and_copy_unchanged": true,
+      "release": 6498,
+      "sha256": "b5359557611b4fa3aa09709b659c7243f77c9ae945c326937f55adbc928903d6",
+      "source": "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+    }
+  ],
+  "case_deadline_seconds": 90,
+  "children_reaped": 3,
+  "hardware_confirmed": false,
+  "identical_release_binaries": true,
+  "result": "passed",
+  "test": "release_6408_keeps_6498_caps_and_6498_reads_its_changes"
+}
