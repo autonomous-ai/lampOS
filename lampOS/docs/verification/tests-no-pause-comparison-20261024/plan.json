@@ -1,0 +1,138 @@
+{
+  "identity": "no-pause-owned-setup-comparison-43ac-v1",
+  "execution_authorized": false,
+  "require_explicit_root_grant_and_auditor_target_release": true,
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+  "cargo_toolchain": "1.96.0",
+  "variants": [
+    {
+      "name": "baseline",
+      "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-base",
+      "branch": "tests/1569-no-pause-diagnostic-base",
+      "head": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+      "owned_paths": [
+        "lampOS/crates/expression/tests/runtime.rs"
+      ],
+      "source_map": "baseline-source-map.json",
+      "source_map_sha256": "4c9fcd2a3b230aa3267813eaa48c0003f235460a68a91c3acc7a0398082db9b1",
+      "tracked_paths": 10442
+    },
+    {
+      "name": "candidate",
+      "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-candidate",
+      "branch": "tests/1569-no-pause-diagnostic-candidate",
+      "head": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+      "owned_paths": [
+        "lampOS/crates/expression/tests/runtime.rs",
+        "lampOS/docs/realtime-tests.md"
+      ],
+      "source_map": "candidate-source-map.json",
+      "source_map_sha256": "937e28d5b24f69352ee2b6f6990f4e0a8c1b27bbf20f8ed05d435965f525b555",
+      "tracked_paths": 10442
+    }
+  ],
+  "packages_to_invalidate_each_variant": [
+    "lamp-actions",
+    "lamp-audio",
+    "lamp-body",
+    "lamp-bus",
+    "lamp-camera",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-gemini",
+    "lamp-health",
+    "lamp-ipc",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-local-time",
+    "lamp-msgs",
+    "lamp-near-call",
+    "lamp-policy",
+    "lamp-ring",
+    "lamp-schedule",
+    "lamp-skills",
+    "lamp-tasks",
+    "lamp-turn-end-wire",
+    "lamp-turn-owner",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-processes",
+    "sonora",
+    "tough"
+  ],
+  "clean_method": "Invalidate all26conservative localworkspace dependencies plus2workspace localvendor patches (sonora,tough), preserving registry/git external artifacts. Each actually observed path package must fresh=false and its manifest/src inside matching worktree, else INVALID/stop; no timestamps refreshed.",
+  "case": "without_a_pause_said_expression_asks_exactly_as_before",
+  "compile_argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-expression",
+    "--test",
+    "runtime",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "observations": [
+    {
+      "variant": "baseline",
+      "mode": "control",
+      "expected": "pass"
+    },
+    {
+      "variant": "baseline",
+      "mode": "before-service-1100ms",
+      "expected": "fail"
+    },
+    {
+      "variant": "candidate",
+      "mode": "control",
+      "expected": "pass"
+    },
+    {
+      "variant": "candidate",
+      "mode": "before-service-1100ms",
+      "expected": "pass"
+    }
+  ],
+  "mode_key": "LAMP_TEST_NO_PAUSE_SETUP_GATE",
+  "outer_timeouts_seconds": {
+    "clean": 300,
+    "compile": 3600,
+    "list": 60,
+    "observation": 120
+  },
+  "minimum_free_bytes": 5368709120,
+  "source_helper_sha256": "f6a4da3823c5ab9155605927e6f9b979d145cb8b9af5229cf0c5614a2001830b",
+  "test_child_scope": "Selectedcase uses Root processid naming, Bus sockets/keepers and Service; no subprocess invocation. Only diagnostic helper spawns one owned std thread, cancels/joins before Service construction. Other runtime tests including journal children are listed but never executed. Clock callback None unchanged.",
+  "classification": "Preserve all4 original outcomes even if ordinary test outcome differs prediction; missing/duplicate/unknown rows, timeout/group/source/storage/hash/compile issues invalid\u2192stop. No retry. Historical cause not established.",
+  "source_only_preparation": true,
+  "metadata_proof": "Source guard binds exact tracked bytes, symlink target bytes, original indexblob and Git executable bit (owner execute) only. Full POSIX permission modes, mtimes, ctimes and ownership are NOT frozen or claimed preserved. Frozen compiled executable receipts separately bind its actual full mode/hash/bytes before/after commands.",
+  "permanent_execution_consumption": "execution-consumed.json O_EXCL+fsync before shared-target access/commands; never deleted even after abort. consumed-observations/<variant>-<mode>.json O_EXCL+fsync prelaunch; aborts cannot be retried with new timestamp folder. New plan identity/root review needed for any new execution.",
+  "root_grant_schema": {
+    "plan_identity": "no-pause-owned-setup-comparison-43ac-v1",
+    "plan_sha256": "ACTUAL_FINAL_PLAN_SHA256",
+    "controller_sha256": "ACTUAL_FINAL_RUN_PY_SHA256",
+    "source_map_sha256": {
+      "baseline": "4c9fcd2a3b230aa3267813eaa48c0003f235460a68a91c3acc7a0398082db9b1",
+      "candidate": "937e28d5b24f69352ee2b6f6990f4e0a8c1b27bbf20f8ed05d435965f525b555"
+    },
+    "source_guards": "actual aggregates emitted by source-only prepare mode, exact mapping",
+    "source_heads": {
+      "baseline": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+      "candidate": "43ac6c843ea91dfc051a9d25e165c9d93f895942"
+    },
+    "execution_authorized": true,
+    "grant_scope": "one-compile-list-control-and-pause-per-variant",
+    "exclusive_target_grant": {
+      "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+      "previous_owner_released": true,
+      "cpu_exclusive": true
+    },
+    "grant_id": "NONEMPTY_ROOT_GRANTED_UNIQUE_ID"
+  },
+  "invalid_census_preservation": "Append consumed observation before launch; save raw terminal command record before parsing; parser/setup/timeout failures retain actual stdout/stderr/raw_command and mark invalid/incomplete, no retry."
+}

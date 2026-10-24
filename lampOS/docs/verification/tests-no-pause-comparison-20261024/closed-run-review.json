@@ -1,0 +1,223 @@
+{
+  "finished_native_session": 66681,
+  "native_terminal_exit": 0,
+  "raw_result_sha256": "422bc77834a59c750fb5ae49ee2e48748d9d2fa39eb422e71429cd9df4810b09",
+  "commands": [
+    {
+      "variant": "baseline",
+      "label": "clean-local-packages",
+      "exit": 0,
+      "pid": 77621,
+      "pgid": 77621,
+      "group_absent": true,
+      "record_sha256": "08c51ac6917a17c10d219a1e15f26a26de8bcac21b7f5169dd23eb91a1649ce7",
+      "seconds": 0.528461
+    },
+    {
+      "variant": "baseline",
+      "label": "compile-runtime",
+      "exit": 0,
+      "pid": 78058,
+      "pgid": 78058,
+      "group_absent": true,
+      "record_sha256": "574647b99e8301006d5fde2a623f34bd03ed8c235bf93cec85ac54ec7e2ab65f",
+      "seconds": 46.882946
+    },
+    {
+      "variant": "baseline",
+      "label": "runtime-inventory",
+      "exit": 0,
+      "pid": 81022,
+      "pgid": 81022,
+      "group_absent": true,
+      "record_sha256": "84ee3c2b258a1e75a0e4a16030cabe635037ea9b40c0eede126c3ff7f8e08bc9",
+      "seconds": 0.685005
+    },
+    {
+      "variant": "baseline",
+      "label": "observation-control",
+      "exit": 101,
+      "pid": 83234,
+      "pgid": 83234,
+      "group_absent": true,
+      "record_sha256": "ba84b1e05098e79f71a5ba56aa56160cc5d576275b361288917e65e5f49c9c47",
+      "seconds": 3.597127
+    },
+    {
+      "variant": "baseline",
+      "label": "observation-before-service-1100ms",
+      "exit": 101,
+      "pid": 84309,
+      "pgid": 84309,
+      "group_absent": true,
+      "record_sha256": "c4c3215a343c136e23a446131d4a512f74ba8db3b7532f02dfafb6f2d885a4d9",
+      "seconds": 2.377222
+    },
+    {
+      "variant": "candidate",
+      "label": "clean-local-packages",
+      "exit": 0,
+      "pid": 84738,
+      "pgid": 84738,
+      "group_absent": true,
+      "record_sha256": "095e6a544c1687275307a41cf9aff3b1e5844cf266cab06be2948d7d2a62596c",
+      "seconds": 0.953318
+    },
+    {
+      "variant": "candidate",
+      "label": "compile-runtime",
+      "exit": 0,
+      "pid": 84932,
+      "pgid": 84932,
+      "group_absent": true,
+      "record_sha256": "ede00f1c2edf70bc8a68f2be9deaf9cb75dffbecddf6b524442a21a4347d0f1f",
+      "seconds": 19.684184
+    },
+    {
+      "variant": "candidate",
+      "label": "runtime-inventory",
+      "exit": 0,
+      "pid": 87212,
+      "pgid": 87212,
+      "group_absent": true,
+      "record_sha256": "1cb90f968265de51a8583c6c9db3fbdbef4bacee957697c3adf5195e4e7a0174",
+      "seconds": 5.358988
+    },
+    {
+      "variant": "candidate",
+      "label": "observation-control",
+      "exit": 0,
+      "pid": 91941,
+      "pgid": 91941,
+      "group_absent": true,
+      "record_sha256": "c9b9f15ab809f35b0b9b8e2d8733fa7f949173237b5411a2b066a3e7d6ab3d8e",
+      "seconds": 0.103736
+    },
+    {
+      "variant": "candidate",
+      "label": "observation-before-service-1100ms",
+      "exit": 0,
+      "pid": 93706,
+      "pgid": 93706,
+      "group_absent": true,
+      "record_sha256": "30056705e7733c6cdeee71a021f3b14c5490a92b183bcc8a0af49c2fa19de084",
+      "seconds": 1.312641
+    }
+  ],
+  "observations": [
+    {
+      "variant": "baseline",
+      "mode": "control",
+      "actual": "fail",
+      "exit_code": 101,
+      "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 3.50s",
+      "original_body_or_light_expectation_diagnostic": true,
+      "intervention": null,
+      "matches_prediction": false
+    },
+    {
+      "variant": "baseline",
+      "mode": "before-service-1100ms",
+      "actual": "fail",
+      "exit_code": 101,
+      "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 2.28s",
+      "original_body_or_light_expectation_diagnostic": true,
+      "intervention": {
+        "held_us": 1107600,
+        "elapsed_us": 1107789,
+        "before_wall_ms": 1792855920792,
+        "after_wall_ms": 1792855921900
+      },
+      "matches_prediction": true
+    },
+    {
+      "variant": "candidate",
+      "mode": "control",
+      "actual": "pass",
+      "exit_code": 0,
+      "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.06s",
+      "original_body_or_light_expectation_diagnostic": false,
+      "intervention": null,
+      "matches_prediction": true
+    },
+    {
+      "variant": "candidate",
+      "mode": "before-service-1100ms",
+      "actual": "pass",
+      "exit_code": 0,
+      "summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 1.27s",
+      "original_body_or_light_expectation_diagnostic": false,
+      "intervention": {
+        "held_us": 1108601,
+        "elapsed_us": 1108698,
+        "before_wall_ms": 1792856021795,
+        "after_wall_ms": 1792856022904
+      },
+      "matches_prediction": true
+    }
+  ],
+  "frozen_witnesses": [
+    {
+      "variant": "baseline",
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/baseline/frozen-runtime-executable",
+      "sha256": "3107297c47bcc6dbd4d8739b72d7baf4a82cbdf881046ef4afa04fb0c31126b1",
+      "mode": "0o555",
+      "bytes": 8225048
+    },
+    {
+      "variant": "candidate",
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/candidate/frozen-runtime-executable",
+      "sha256": "aaed7451764a99b7fbe6c9e434604965c2f68f21aac3cd49c2381f1bb34760da",
+      "mode": "0o555",
+      "bytes": 8228600
+    }
+  ],
+  "local_library_lineage": [
+    {
+      "variant": "baseline",
+      "actual_local_records": 11,
+      "all_fresh_false": true,
+      "actual_output_bindings": 20,
+      "sha256": "85246f91ecdc2acce35512254ea169edf5d46e4ade34a2ad139135f936fe2cee"
+    },
+    {
+      "variant": "candidate",
+      "actual_local_records": 11,
+      "all_fresh_false": true,
+      "actual_output_bindings": 20,
+      "sha256": "65fa1feb180141f0a94cad65dc26b27bb4ec98f71d6252aee2351df16cd0d28b"
+    }
+  ],
+  "actual_profile_features": {
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": []
+  },
+  "source_before_equals_after": true,
+  "counts": {
+    "compile_commands": 2,
+    "inventories": 2,
+    "case_observations": 4,
+    "case_passed": 2,
+    "case_failed": 2,
+    "unrun": 0,
+    "retries": 0
+  },
+  "classification": "Original ordering failed both without and with the1100ms setup intervention at the original a body request expectation. Candidate ordering passed both predefined observations, including1100ms intervention. Baseline control failure prevents attributing failure specifically to the injected pause. No historical cause or whole-suite/native qualification claimed.",
+  "original_failures_retained": true,
+  "all_planned_predictions_matched": false,
+  "metadata_limit": "Tracked sourcebytes/symlinkbytes and Git owner-executablebit only; no fullPOSIXsource-modes/mtime/ctime/ownership preservation claim. Witness full modes/hashes separately verified.",
+  "root_grant_sha256": "383e6b51f6e01516be6d9fa12c90cafafb5c814490caef7272297b0cda6eb9ef",
+  "execution_consumed_sha256": "6c491831bc3f1ea583c122ee736a7cde5e370bf89cc1187368a4fa3139c5fadd",
+  "observation_consumption_receipts": {
+    "baseline-before-service-1100ms.json": "37f6451f55dd1146ec7c81db18bc0376500cc59476335cfa8b4050448992c07d",
+    "baseline-control.json": "8c083e65c287575dc4f32edb4d901ac01c0883e5ad37206f05c1b2bf573c822d",
+    "candidate-before-service-1100ms.json": "498ad571c98f102f04b074380b2d5292f48bc9a0e469ebc8ab212e7a06b4f9e0",
+    "candidate-control.json": "53f1aa1251ca70d79bb8538a15dcbf78ed5a3a8c5f81e7483eb599ef5d45e5e3"
+  }
+}

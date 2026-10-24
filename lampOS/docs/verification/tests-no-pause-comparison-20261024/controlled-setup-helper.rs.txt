@@ -1,0 +1,69 @@
+// Uncommitted diagnostic only: the exact no-pause case calls this gate.
+fn controlled_no_pause_setup_once() {
+    match std::env::var("LAMP_TEST_NO_PAUSE_SETUP_GATE").as_deref() {
+        Err(std::env::VarError::NotPresent) | Ok("control") => return,
+        Ok("before-service-1100ms") => {}
+        other => panic!("invalid no-pause setup gate mode: {other:?}"),
+    }
+    static REACHED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if REACHED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    enum Command {
+        Reached,
+        Cancel,
+    }
+    struct OwnedGate {
+        command: std::sync::mpsc::Sender<Command>,
+        controller: Option<std::thread::JoinHandle<()>>,
+    }
+    impl Drop for OwnedGate {
+        fn drop(&mut self) {
+            let _ = self.command.send(Command::Cancel);
+            let joined = self.controller.take().expect("owned setup gate").join();
+            eprintln!("no-pause-setup-gate controller joined: {}", joined.is_ok());
+            if !std::thread::panicking() {
+                joined.expect("setup gate controller completed");
+            }
+        }
+    }
+    let (command, commands) = std::sync::mpsc::channel();
+    let (release, released) = std::sync::mpsc::channel();
+    let controller = std::thread::spawn(move || {
+        match commands.recv_timeout(std::time::Duration::from_secs(5)) {
+            Ok(Command::Reached) => {}
+            Ok(Command::Cancel) => return,
+            Err(error) => panic!("setup gate never reached: {error}"),
+        }
+        let began = std::time::Instant::now();
+        match commands.recv_timeout(std::time::Duration::from_millis(1_100)) {
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                let held = began.elapsed();
+                assert!(held >= std::time::Duration::from_millis(1_100));
+                release.send(Some(held)).expect("setup gate waiter remains owned");
+            }
+            Ok(Command::Cancel)
+            | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                let _ = release.send(None);
+            }
+            Ok(Command::Reached) => panic!("setup gate reached twice"),
+        }
+    });
+    let gate = OwnedGate { command, controller: Some(controller) };
+    let before_wall = runtime::unix_ms();
+    let began = std::time::Instant::now();
+    eprintln!("no-pause-setup-gate reached before service: wall_ms={before_wall}");
+    gate.command.send(Command::Reached).unwrap();
+    let held = released.recv_timeout(std::time::Duration::from_secs(5))
+        .expect("setup gate released within bound")
+        .expect("setup gate was not cancelled");
+    let elapsed = began.elapsed();
+    assert!(elapsed >= std::time::Duration::from_millis(1_100));
+    eprintln!(
+        "no-pause-setup-gate released: held_us={} elapsed_us={} before_wall_ms={} after_wall_ms={}",
+        held.as_micros(), elapsed.as_micros(), before_wall, runtime::unix_ms()
+    );
+    // The gate has finished its intervention. Completion is the original test's assertions.
+    drop(gate);
+}
+

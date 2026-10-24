@@ -4258,3 +4258,9 @@ All ten planned event-helper controls passed once, with zero unrun observations 
 Ready for lamp-voice: no
 
 The single planned old-loop witness caught the original timeout at 2.000353195 seconds, before its scheduled 2.2-second output release, with pending child, no writes and complete gate/child cleanup. Its Rust PASS validates that expected timeout; it is not a historical-cause finding. The candidate passed the same startup intervention earlier. All four candidate files are restored byte-for-byte with modes checked, and fresh compilation is underway before full gates. [Old-loop and restoration receipts](verification/tests-update-old-loop-20261024/). The no-pause two-file fix and four-observation comparison are source-prepared on current43ac.
+
+## 24 October, 22:35 — No-pause four-observation comparison complete
+
+Ready for lamp-voice: no
+
+Original setup ordering failed at the original body-request assertion with and without the controlled pause. Moving only publication after setup passed both observations. All four predefined outcomes are retained without retry; the unpaused baseline was predicted to pass, so the experiment does not show pause-specific causation. Root verified source/compiled witnesses, raw outcomes, matching profiles, eleven fresh local artifact messages per version, both 27-case inventories and complete owned cleanup. Canonical gates and native checks remain pending. [Raw comparison and exact final patch](verification/tests-no-pause-comparison-20261024/). Update's restored full twelve-package gate now owns the independent qualification target and CPU.

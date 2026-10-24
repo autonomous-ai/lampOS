@@ -1,0 +1,66 @@
+[
+  {
+    "file": "CPU-target-release.json",
+    "sha256": "a3a3356399dbbe880fe25e80470dccee44738783b30c61a1d0e3d49b52edb608"
+  },
+  {
+    "file": "README.md",
+    "sha256": "e5b139c7bdb2802ff2446be78a2e1c89cc80ba9766ae95a422dabdcae1f1bb23"
+  },
+  {
+    "file": "baseline-compile-runtime.json",
+    "sha256": "574647b99e8301006d5fde2a623f34bd03ed8c235bf93cec85ac54ec7e2ab65f"
+  },
+  {
+    "file": "baseline-frozen-executable.json",
+    "sha256": "936c46235ea28e979832986cdf9e0ef01cba9b4dbf9223f318d85d93f1c4f604"
+  },
+  {
+    "file": "baseline-inventory.json",
+    "sha256": "231e59221e85c0bea71aab087ea9891fd70b55b9b41329b5ba6d7037ea2095f3"
+  },
+  {
+    "file": "baseline-local-library-lineage.json",
+    "sha256": "85246f91ecdc2acce35512254ea169edf5d46e4ade34a2ad139135f936fe2cee"
+  },
+  {
+    "file": "candidate-compile-runtime.json",
+    "sha256": "ede00f1c2edf70bc8a68f2be9deaf9cb75dffbecddf6b524442a21a4347d0f1f"
+  },
+  {
+    "file": "candidate-frozen-executable.json",
+    "sha256": "c3d9172c0c26bb7924d1d05f9d47db5f8a5650bf70e336f2a44438fc2ebae728"
+  },
+  {
+    "file": "candidate-inventory.json",
+    "sha256": "231e59221e85c0bea71aab087ea9891fd70b55b9b41329b5ba6d7037ea2095f3"
+  },
+  {
+    "file": "candidate-local-library-lineage.json",
+    "sha256": "65fa1feb180141f0a94cad65dc26b27bb4ec98f71d6252aee2351df16cd0d28b"
+  },
+  {
+    "file": "candidate.patch",
+    "sha256": "c9eace763863a08c47a8de05de28f06f54a1bf82a966403468055e25b07a3bc2"
+  },
+  {
+    "file": "closed-run-review.json",
+    "sha256": "7e953f28d500f3124eee8ebf68a25172f56bf90b262566ebe299431dc02bf822"
+  },
+  {
+    "file": "controlled-setup-helper.rs.txt",
+    "sha256": "f6a4da3823c5ab9155605927e6f9b979d145cb8b9af5229cf0c5614a2001830b"
+  },
+  {
+    "file": "plan.json",
+    "sha256": "28bad2d1e762060aabed81e8f822ab71ac4487c26dd7aa3e0695d2a5d7e5b8a3"
+  },
+  {
+    "file": "raw-observation-streams.json",
+    "sha256": "b6596c96dfeb3444004bdeb12c4335cdaff52e2c582900c3af7bcda35d6fa8b9"
+  },
+  {
+    "file": "result.json",
+    "sha256": "422bc77834a59c750fb5ae49ee2e48748d9d2fa39eb422e71429cd9df4810b09"
+  }
+]

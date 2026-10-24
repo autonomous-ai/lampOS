@@ -1,0 +1,39 @@
+{
+  "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/candidate/frozen-runtime-executable",
+  "sha256": "aaed7451764a99b7fbe6c9e434604965c2f68f21aac3cd49c2381f1bb34760da",
+  "mode": "0o555",
+  "bytes": 8228600,
+  "compiler_artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-candidate/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-candidate/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "runtime",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-candidate/lampOS/crates/expression/tests/runtime.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-4128ad189403a8f0"
+    ],
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-4128ad189403a8f0",
+    "fresh": false
+  },
+  "child_scope": "Selectedcase uses Root processid naming, Bus sockets/keepers and Service; no subprocess invocation. Only diagnostic helper spawns one owned std thread, cancels/joins before Service construction. Other runtime tests including journal children are listed but never executed. Clock callback None unchanged."
+}

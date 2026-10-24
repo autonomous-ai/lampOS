@@ -1,0 +1,158 @@
+[
+  {
+    "variant": "baseline",
+    "mode": "control",
+    "command": {
+      "command": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/baseline/frozen-runtime-executable",
+        "--exact",
+        "without_a_pause_said_expression_asks_exactly_as_before",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-base/lampOS",
+      "started_at": "2026-10-24T15:31:40.741484+00:00",
+      "timeout_seconds": 120,
+      "stdout": "observation-control.stdout.txt",
+      "stderr": "observation-control.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "owned_pid": 83234,
+      "owned_process_group": 83234,
+      "timed_out": false,
+      "exit_code": 101,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 101,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 101,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 3.597127,
+      "finished_at": "2026-10-24T15:31:44.338692+00:00",
+      "stdout_sha256": "2eb09b32f33cbb091519cdc9d93fbbbc3cee9760190a486b6abbb79bdeb151dc",
+      "stdout_bytes": 269,
+      "stderr_sha256": "00050d3532dc839838ad45b59b88e712bec4c6c6150cf12623f91ced21643752",
+      "stderr_bytes": 224
+    },
+    "streams": {
+      "stdout": "\nrunning 1 test\ntest without_a_pause_said_expression_asks_exactly_as_before ... FAILED\n\nfailures:\n\nfailures:\n    without_a_pause_said_expression_asks_exactly_as_before\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 3.50s\n\n",
+      "stderr": "\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (4270152) panicked at crates/expression/tests/runtime.rs:1079:57:\na body request\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    }
+  },
+  {
+    "variant": "baseline",
+    "mode": "before-service-1100ms",
+    "command": {
+      "command": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/baseline/frozen-runtime-executable",
+        "--exact",
+        "without_a_pause_said_expression_asks_exactly_as_before",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-base/lampOS",
+      "started_at": "2026-10-24T15:32:00.600023+00:00",
+      "timeout_seconds": 120,
+      "stdout": "observation-before-service-1100ms.stdout.txt",
+      "stderr": "observation-before-service-1100ms.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "owned_pid": 84309,
+      "owned_process_group": 84309,
+      "timed_out": false,
+      "exit_code": 101,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 101,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 101,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 2.377222,
+      "finished_at": "2026-10-24T15:32:02.977419+00:00",
+      "stdout_sha256": "13cc494d0552c18e15c0a0f473dea4098131732db3489c343602b2af9331717d",
+      "stdout_bytes": 269,
+      "stderr_sha256": "67c2bbe2646ef11c904e08a3a7aff13419d459fba62c9a86808b0c82e2e9241a",
+      "stderr_bytes": 456
+    },
+    "streams": {
+      "stdout": "\nrunning 1 test\ntest without_a_pause_said_expression_asks_exactly_as_before ... FAILED\n\nfailures:\n\nfailures:\n    without_a_pause_said_expression_asks_exactly_as_before\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 2.28s\n\n",
+      "stderr": "no-pause-setup-gate reached before service: wall_ms=1792855920792\nno-pause-setup-gate released: held_us=1107600 elapsed_us=1107789 before_wall_ms=1792855920792 after_wall_ms=1792855921900\nno-pause-setup-gate controller joined: true\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (4272699) panicked at crates/expression/tests/runtime.rs:1079:57:\na body request\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    }
+  },
+  {
+    "variant": "candidate",
+    "mode": "control",
+    "command": {
+      "command": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/candidate/frozen-runtime-executable",
+        "--exact",
+        "without_a_pause_said_expression_asks_exactly_as_before",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-candidate/lampOS",
+      "started_at": "2026-10-24T15:33:24.490311+00:00",
+      "timeout_seconds": 120,
+      "stdout": "observation-control.stdout.txt",
+      "stderr": "observation-control.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "owned_pid": 91941,
+      "owned_process_group": 91941,
+      "timed_out": false,
+      "exit_code": 0,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 0,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 0,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 0.103736,
+      "finished_at": "2026-10-24T15:33:24.594194+00:00",
+      "stdout_sha256": "9a92250b34deecd9471f26fb4cb875f9a0afefe92a4f3d70e73cbd4718001027",
+      "stdout_bytes": 180,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    "streams": {
+      "stdout": "\nrunning 1 test\ntest without_a_pause_said_expression_asks_exactly_as_before ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.06s\n\n",
+      "stderr": ""
+    }
+  },
+  {
+    "variant": "candidate",
+    "mode": "before-service-1100ms",
+    "command": {
+      "command": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/candidate/frozen-runtime-executable",
+        "--exact",
+        "without_a_pause_said_expression_asks_exactly_as_before",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause-diagnostic-candidate/lampOS",
+      "started_at": "2026-10-24T15:33:41.772928+00:00",
+      "timeout_seconds": 120,
+      "stdout": "observation-before-service-1100ms.stdout.txt",
+      "stderr": "observation-before-service-1100ms.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "owned_pid": 93706,
+      "owned_process_group": 93706,
+      "timed_out": false,
+      "exit_code": 0,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 0,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 0,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 1.312641,
+      "finished_at": "2026-10-24T15:33:43.085712+00:00",
+      "stdout_sha256": "0a08f463039b93453536d026eb60e60a1e4a1d912da914c64bf9826d52d66bc3",
+      "stdout_bytes": 180,
+      "stderr_sha256": "717470ba9268fbd914c79c0ee5d42d3c87909c6f9e583e75d57c4a5242e4471e",
+      "stderr_bytes": 232
+    },
+    "streams": {
+      "stdout": "\nrunning 1 test\ntest without_a_pause_said_expression_asks_exactly_as_before ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 1.27s\n\n",
+      "stderr": "no-pause-setup-gate reached before service: wall_ms=1792856021795\nno-pause-setup-gate released: held_us=1108601 elapsed_us=1108698 before_wall_ms=1792856021795 after_wall_ms=1792856022904\nno-pause-setup-gate controller joined: true\n"
+    }
+  }
+]
