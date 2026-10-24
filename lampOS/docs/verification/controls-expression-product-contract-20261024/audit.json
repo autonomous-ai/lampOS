@@ -1,0 +1,114 @@
+{
+  "release": "lampos-lamp-voice-6610",
+  "release_source": "83da28dc7f1ea5d6a3d0ab5b599e6b023520c636",
+  "current_source": "9bd23ebf0d0fc7c8a1a19b0cd40c35501c329246",
+  "samples": [
+    {
+      "path": "lampOS/deploy/product/lamp-controls.service",
+      "release_sha256": "1a01dd19b140621fa29079823eb66241bf9dcfcf528e295afb83d4c30455ecc9",
+      "current_sha256": "1a01dd19b140621fa29079823eb66241bf9dcfcf528e295afb83d4c30455ecc9",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-expression.service",
+      "release_sha256": "e7b74d8b2754a3fcdffceb6358849c73d12f3fe48e0d4fb0ede0f9cdc911de85",
+      "current_sha256": "e7b74d8b2754a3fcdffceb6358849c73d12f3fe48e0d4fb0ede0f9cdc911de85",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/settings/controls.json",
+      "release_sha256": "66925264c8217cc8ce7a94afe3e7929d0665315f87eb2eb03d31c49324c632cd",
+      "current_sha256": "66925264c8217cc8ce7a94afe3e7929d0665315f87eb2eb03d31c49324c632cd",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/settings/controls-pins.json",
+      "release_sha256": "6e9bf8fc1b6d192df8b832d8202a7fc152befeab5c6f83e1ba5eef0cff64987a",
+      "current_sha256": "6e9bf8fc1b6d192df8b832d8202a7fc152befeab5c6f83e1ba5eef0cff64987a",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/settings/expression.json",
+      "release_sha256": "6c0fedae232f217a85d1687b47286d56b06c645ae24f1e95671edf264d74c1ae",
+      "current_sha256": "6c0fedae232f217a85d1687b47286d56b06c645ae24f1e95671edf264d74c1ae",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/README.md",
+      "release_sha256": "84f32440bd9c5d50cc40e2367acf8ca03cd0045f53d41888e92a8a7f01318a1b",
+      "current_sha256": "84f32440bd9c5d50cc40e2367acf8ca03cd0045f53d41888e92a8a7f01318a1b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/package-binaries.json",
+      "release_sha256": "ee509e10c9182021aaabd9033c1f902dcd834f551ca4b808fcf0595196f665fb",
+      "current_sha256": "ee509e10c9182021aaabd9033c1f902dcd834f551ca4b808fcf0595196f665fb",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/src/install.rs",
+      "release_sha256": "af713c6d89eaf59cb272ac7d82cdef529da553a1724efd8da675609ca3e3b47e",
+      "current_sha256": "af713c6d89eaf59cb272ac7d82cdef529da553a1724efd8da675609ca3e3b47e",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/controls/tests/it/touch_pins.rs",
+      "release_sha256": "2d8702ed6b96da30ede82a5d70d96baf2d78ca751c28874df98c3a8ec0325211",
+      "current_sha256": "2d8702ed6b96da30ede82a5d70d96baf2d78ca751c28874df98c3a8ec0325211",
+      "equal": true
+    }
+  ],
+  "downloaded_text_assets": [
+    {
+      "name": "lamp-4ace.lamp-controls.service",
+      "bytes": 1862,
+      "sha256": "a3286a3fe0b20781de2f215701c4d028cfe8afc45ed5c07bce96a74364cec94c",
+      "public_digest_match": true,
+      "source_path": "lampOS/deploy/lamp-4ace/lamp-controls.service",
+      "source_equal": true
+    },
+    {
+      "name": "lamp-4ace.lamp-expression.service",
+      "bytes": 1232,
+      "sha256": "7d0843ed63ea2d59d9b907893547f5e184da81957edd60ad048f56d6656ed45d",
+      "public_digest_match": true,
+      "source_path": "lampOS/deploy/lamp-4ace/lamp-expression.service",
+      "source_equal": true
+    },
+    {
+      "name": "lamp-52e6.lamp-controls.service",
+      "bytes": 905,
+      "sha256": "0888edee20d538eec7cd32d6adaa2581d2aeb61305200f233b7c34915e3cf382",
+      "public_digest_match": true,
+      "source_path": "lampOS/deploy/lamp-52e6/lamp-controls.service",
+      "source_equal": true
+    },
+    {
+      "name": "lamp-52e6.lamp-expression.service",
+      "bytes": 1002,
+      "sha256": "784ac5b5628717c7753c2ac7c04b08d8f74abd1485604883f84646ccc60617df",
+      "public_digest_match": true,
+      "source_path": "lampOS/deploy/lamp-52e6/lamp-expression.service",
+      "source_equal": true
+    },
+    {
+      "name": "lampos-manifest.json",
+      "bytes": 13563,
+      "sha256": "f5ca10c54cebcd0847459a5c2b718a14abdc2156b7bdea28ee6b8564a2dcb704",
+      "public_digest_match": true
+    },
+    {
+      "name": "manifest.json",
+      "bytes": 10042,
+      "sha256": "71fa598f6a90df026d11160372cf9a211ad4c27fa398b711ae5854b67c28d4d9",
+      "public_digest_match": true
+    },
+    {
+      "name": "SHA256SUMS",
+      "bytes": 2428,
+      "sha256": "0b30b2e016d95914f601abb5696fc4314e187635ac429deb5858b69a4ec4cb80",
+      "public_digest_match": true
+    }
+  ],
+  "device_or_binary_execution": false
+}
