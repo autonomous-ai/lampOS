@@ -1,0 +1,217 @@
+name: lampOS published Controls compatibility
+
+# Actual released replay/calibration writers and readers qualify only this
+# file-format pair. Normal build/download network remains available; no device,
+# GPIO/I2C, provider, broker, service or hardware acceptance participates.
+on:
+  pull_request:
+    branches: ['lamp-voice']
+    paths:
+      - 'lampOS/crates/controls/tests/release_pair*'
+      - 'lampOS/crates/controls/tests/release_pair/**'
+      - '.github/workflows/lampos-controls-pair.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lampos-controls-pair-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  published-pair:
+    name: published 6408 and 6498 Controls replay readers on ARM64
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 30
+    container: rust:1.96.0-bookworm
+    env:
+      CARGO_HOME: /github/home/.cargo
+      PAIR_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: require native ARM64 before source work
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -m 700 /tmp/controls-pair-output /tmp/controls-pair-artifacts
+          uname -sm > /tmp/controls-pair-output/platform
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: record the exact checkout and source before fixture work
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD 'HEAD^{tree}' \
+            > /tmp/controls-pair-output/source-revision
+          printf '%s\n' "run_id=$GITHUB_RUN_ID" "run_attempt=$GITHUB_RUN_ATTEMPT" \
+            "pr_head=$PAIR_PR_HEAD" "event=$GITHUB_EVENT_NAME" \
+            > /tmp/controls-pair-output/run-provenance.txt
+          # Compare the checked-out tracked paths, including merge previews.
+          # Hash regular contents separately from exact symlink text: readlink
+          # -z preserves trailing newlines without command substitution loss.
+          cat > /tmp/controls-pair-source-guard.sh <<'GUARD'
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          phase=$1
+          prefix="/tmp/controls-pair-output/source-$phase"
+          git -c safe.directory="$GITHUB_WORKSPACE" ls-files -z | sort -z > "$prefix.paths"
+          : > "$prefix.sha256"
+          : > "$prefix.symlinks"
+          while IFS= read -r -d '' path; do
+            if test -L "$path"; then
+              printf '%s\0' "$path" >> "$prefix.symlinks"
+              readlink -z -- "$path" >> "$prefix.symlinks"
+            elif test -f "$path"; then
+              sha256sum --zero -- "$path" >> "$prefix.sha256"
+            else
+              printf 'missing or nonregular tracked path: %q\n' "$path" >&2
+              exit 1
+            fi
+          done < "$prefix.paths"
+          GUARD
+          bash /tmp/controls-pair-source-guard.sh before
+      - name: fixture build dependencies
+        run: |
+          set -eu
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl jq pkg-config
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            /github/home/.cargo/registry
+            /github/home/.cargo/git
+            lampOS/target
+          key: lampos-controls-pair-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
+      - name: fetch and verify the exact published Controls artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir /tmp/controls-pair-artifacts/{6408,6498}
+          rustc --version --verbose > /tmp/controls-pair-output/rustc-version
+          expected=fc3f73157e21c6b3f662ee469f5febeeaa56bbc84091e0b781157192a3961555
+          for release in 6408 6498; do
+            artifact="/tmp/controls-pair-artifacts/$release/lamp-controls"
+            case "$release" in 6408) asset_id=668607702 ;; 6498) asset_id=670759835 ;; esac
+            url="https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-$release/lamp-controls"
+            curl --fail --location --proto '=https' --proto-redir '=https' \
+              --retry 3 --connect-timeout 20 --max-time 180 "$url" --output "$artifact"
+            test "$(stat -c '%s' "$artifact")" = 2463440
+            printf '%s  %s\n' "$expected" "$artifact" | sha256sum --check --strict
+            test "$(od -An -tx1 -N6 "$artifact" | tr -d ' \n')" = 7f454c460201
+            test "$(od -An -tx1 -j18 -N2 "$artifact" | tr -d ' \n')" = b700
+            chmod 0555 "$artifact"
+            printf 'release=%s asset_id=%s url=%s bytes=2463440 sha256=%s ELF=64-bit-little-endian-AArch64\n' \
+              "$release" "$asset_id" "$url" "$expected" >> /tmp/controls-pair-output/verified-artifacts.txt
+          done
+          # Published payloads are identical; hashes bind bytes, not signatures.
+          find /tmp/controls-pair-artifacts -type f -print0 | sort -z | xargs -0 sha256sum \
+            > /tmp/controls-pair-output/downloaded.sha256
+          chmod 0555 /tmp/controls-pair-artifacts/{6408,6498} /tmp/controls-pair-artifacts
+      - name: execute exactly two released Controls pair cases
+        working-directory: lampOS
+        shell: bash
+        env:
+          LAMP_COMPAT_OUTPUT: /tmp/controls-pair-output
+          LAMP_COMPAT_CONTROLS_6408: /tmp/controls-pair-artifacts/6408/lamp-controls
+          LAMP_COMPAT_CONTROLS_6498: /tmp/controls-pair-artifacts/6498/lamp-controls
+        run: |
+          set -euo pipefail
+          set +e
+          cargo test --locked --release -p lamp-controls --test release_pair \
+            -- --ignored --nocapture --test-threads=1 \
+            2>&1 | tee /tmp/controls-pair-output/controls-tests.log
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf '%s\n' "${statuses[0]}" > /tmp/controls-pair-output/controls-exit
+          printf '%s\n' "${statuses[1]}" > /tmp/controls-pair-output/tee-exit
+          validate_execution() {
+            grep -Eq '^test result: ok\. 2 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in [0-9.]+s$' \
+              /tmp/controls-pair-output/controls-tests.log || return
+            shopt -s nullglob
+            local results=(/tmp/controls-pair-output/controls-pair-*/result.json)
+            test "${#results[@]}" -eq 2 || return
+            for receipt in "${results[@]}"; do
+              test -f "$receipt" && test ! -L "$receipt" || return 1
+            done
+            jq --exit-status --slurp '
+              length == 2 and
+              all(.[]; .result == "passed" and .actual_released_pair == true and
+                .commands_reaped == 18 and .commands_count == 18 and
+                .groups_absent == true and .hardware_or_device_acceptance == false) and
+              ([.[].test] | sort) == [
+                "release_6408_reads_6498_calibration_and_6498_reads_returned_pins",
+                "release_6498_reads_6408_calibration_and_6408_reads_returned_pins"
+              ]
+            ' "${results[@]}"
+          }
+          validation_status=0
+          validate_execution > /tmp/controls-pair-output/execution-validation.txt 2>&1 \
+            || validation_status=$?
+          printf '%s\n' "$validation_status" > /tmp/controls-pair-output/execution-validation-exit
+          result=0
+          if [ "${statuses[0]}" -ne 0 ] || [ "${statuses[1]}" -ne 0 ] \
+            || [ "$validation_status" -ne 0 ]; then result=1; fi
+          printf '%s\n' "$result" > /tmp/controls-pair-output/test-exit
+          exit "$result"
+      - name: retain cleanup and readonly-copy outcomes even after a failed test
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/controls-pair-output
+          validate_cleanup() {
+            shopt -s nullglob
+            local results=(/tmp/controls-pair-output/controls-pair-*/result.json)
+            test "${#results[@]}" -eq 2 || return
+            jq --exit-status --slurp 'length == 2 and all(.[];
+              .commands_reaped == 18 and .commands_count == 18 and .groups_absent == true)' \
+              "${results[@]}" || return
+            local writable
+            writable=$(find /tmp/controls-pair-artifacts /tmp/controls-pair-output -type f \
+              \( -name lamp-controls -o -name lamp-controls-6408 -o -name lamp-controls-6498 \) \
+              -perm /222 -print -quit) || return
+            test -z "$writable"
+          }
+          result=0
+          validate_cleanup > /tmp/controls-pair-output/cleanup-validation.txt 2>&1 || result=$?
+          printf '%s\n' "$result" > /tmp/controls-pair-output/cleanup-validation-exit
+          exit "$result"
+      - name: verify source unchanged even after a failed fixture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/controls-pair-output
+          result=0
+          bash /tmp/controls-pair-source-guard.sh after \
+            > /tmp/controls-pair-output/source-capture.txt 2>&1 || result=$?
+          for map in paths sha256 symlinks; do
+            cmp "/tmp/controls-pair-output/source-before.$map" "/tmp/controls-pair-output/source-after.$map" \
+              >> /tmp/controls-pair-output/source-compare.txt 2>&1 || result=1
+          done
+          printf '%s\n' "$result" > /tmp/controls-pair-output/source-compare-exit
+          exit "$result"
+      - name: collect only regular evidence without executable copies
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/controls-pair-output
+          cd /tmp/controls-pair-output
+          # Never open sockets/FIFOs or upload the released executable copies.
+          find . -type f ! -name lamp-controls-6408 ! -name lamp-controls-6498 \
+            ! -name lamp-controls ! -perm /111 -print0 | sort -z \
+            | tar --null -T - -czf /tmp/lampos-controls-pair-evidence.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lampos-controls-pair-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: /tmp/lampos-controls-pair-evidence.tar.gz
+          if-no-files-found: error
+          retention-days: 7
