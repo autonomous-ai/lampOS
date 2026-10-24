@@ -1,0 +1,33 @@
+{
+  "head": "27b3695f0235bc7a721dfb216cd21203c249491d",
+  "archive_sha256": "e2125484e492fcf8ef895dd5b0c97f2569b077430ea4227354e96fbb17083195",
+  "source_revision": [
+    "76ad068a719790768ddca08b602a475b38e47786",
+    "fd35b6257b7d03b3d0161f7c1ac8a7397c8b16e8"
+  ],
+  "source_paths": 10347,
+  "regular_evidence_files": 195,
+  "cases": [
+    {
+      "test": "release_6408_reads_6498_calibration_and_6498_reads_returned_pins",
+      "commands": 18,
+      "expected_successes": 12,
+      "expected_refusals": 6,
+      "byte_equal_47_frame_replays": 9,
+      "three_written_pins_equal": true
+    },
+    {
+      "test": "release_6498_reads_6408_calibration_and_6408_reads_returned_pins",
+      "commands": 18,
+      "expected_successes": 12,
+      "expected_refusals": 6,
+      "byte_equal_47_frame_replays": 9,
+      "three_written_pins_equal": true
+    }
+  ],
+  "ordinary_summaries": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:58:36.6464084Z      Summary [ 200.490s] 11197 tests run: 11197 passed (1 leaky), 92 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:58:49.9943202Z test result: 12 passed; 0 failed"
+  ],
+  "preview_tree_matches_authored": true
+}

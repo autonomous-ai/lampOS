@@ -21,3 +21,21 @@ checks and actual ARM64 executables were not run here. The fixture audit
 found no P1/P2; failed-command provenance was strengthened, while output
 size remains checked after each bounded command rather than a live quota.
 No lamp, hardware, acoustic or real touch-latency acceptance.
+
+## Native result on 27b3695f0
+
+Dedicated 40075828326 is **2/0/0 ignored/1 filtered**. Independently verified
+195 regular evidence files: 36 command starts/reaps, 24 successes and
+12 expected refusals; nine byte-equal 47-frame replays and three equal full
+written pins files per case. Source maps stay unchanged over 10,347 paths;
+preview 76ad068a7 has the authored tree. Native ordinary 40075828246 is
+**11,196 PASS plus one LEAK, 92 skipped**, process 12/0; Linux Clippy
+40075828298 passes. Terminal metadata, all command receipts and the full
+artifact inventory/hashes are retained here. Raw artifact is on that run;
+NUL-delimited maps and executable copies are not committed.
+
+Second's independent READ-OK/Linux fmt and Lead's READ-OK are on the PR.
+Documentation-only d3a291bf8 now states single-implementation replay and
+historical native status explicitly; all Rust/Cargo/workflow bytes match.
+Current-head CI/read carry remain separate. No hanging-child cleanup
+negative control or live output quota is claimed. No hardware qualification.

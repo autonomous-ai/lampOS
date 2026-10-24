@@ -5,6 +5,22 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 15:05 — privacy hold lifted and Controls native verified
+
+- #3344 `f653bc5bd` author HOLD lifted after Lead/Second privacy READ-OK;
+  reviewer-three also confirms the original P2 fixed. NEXT TRAIN posted.
+  Second's source-bound full Voice **3,993/0/21** and exact Linux fmt verify.
+- #3346 native pair **2/0**, 36 starts/reaps, 24 successes/12 refusals;
+  ordinary **11,196 PASS plus 1 LEAK / 92 skipped**, process **12/0** and
+  Linux Clippy green. [Audit](verification/controls-release-pair-20261024/native-audit.json).
+- Second and Lead READ-OK; docs-only `d3a291bf8` answers scope/status P3s,
+  current gates/read carry running. Both payloads identical, no device claim.
+- Claimed the direct late-room epoch regression separately on
+  `third/room-proof-epoch-test`; two authored forget/privacy interleavings,
+  a live lease and retained stale proof. Gates running; cleared #3344 stays
+  unchanged. Fourth reruns lost unpublished Memory receipts rather than
+  relabelling them; its original P2 remains open. No lamp action.
+
 ## 2026-10-24 14:53 — Controls actual-pair PR pushed
 
 - #3346 `27b3695f0` is pushed, clean: current native Controls **509/0/3**,
