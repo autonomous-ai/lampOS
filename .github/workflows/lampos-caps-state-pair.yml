@@ -1,0 +1,164 @@
+name: lampOS published Actions caps state compatibility
+
+# Actual released writers/readers run here. The ordinary ARM64 and strict
+# Clippy jobs remain separate gates; synthetic peers do not qualify hardware.
+on:
+  pull_request:
+    branches: ['lamp-voice']
+    paths:
+      - 'lampOS/crates/actions/tests/release_pair*'
+      - 'lampOS/crates/actions/tests/release_pair/**'
+      - '.github/workflows/lampos-caps-state-pair.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lampos-caps-state-pair-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  published-pair:
+    name: published 6408 and 6498 Actions caps readers on ARM64
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 35
+    # A fresh /run contains no host timesync marker. No mixer, device, provider,
+    # signing key, systemd service or physical reboot participates.
+    container: rust:1.96.0-bookworm
+    env:
+      CARGO_HOME: /github/home/.cargo
+      PAIR_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: record the exact checkout and source before any fixture work
+        working-directory: lampOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test ! -e /run/systemd/timesync/synchronized
+          mkdir -p /tmp/pair-output
+          git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD 'HEAD^{tree}' \
+            > /tmp/pair-output/source-revision
+          printf '%s\n' "run_id=$GITHUB_RUN_ID" "run_attempt=$GITHUB_RUN_ATTEMPT" \
+            "pr_head=$PAIR_PR_HEAD" "event=$GITHUB_EVENT_NAME" \
+            > /tmp/pair-output/run-provenance.txt
+          uname -sm > /tmp/pair-output/platform
+          git -c safe.directory="$GITHUB_WORKSPACE" ls-files -z \
+            | sort -z | xargs -0 sha256sum > /tmp/pair-output/source-before.sha256
+      - name: fixture build dependencies
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl jq pkg-config
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            /github/home/.cargo/registry
+            /github/home/.cargo/git
+            lampOS/target
+          key: lampos-caps-state-pair-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
+      - name: fetch and verify the exact published artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pair-artifacts/{6408,6498}
+          rustc --version --verbose > /tmp/pair-output/rustc-version
+          expected=b5359557611b4fa3aa09709b659c7243f77c9ae945c326937f55adbc928903d6
+          for release in 6408 6498; do
+            artifact="/tmp/pair-artifacts/$release/lamp-actions"
+            curl --fail --location --proto '=https' --proto-redir '=https' \
+              --retry 3 --connect-timeout 20 --max-time 180 \
+              "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-$release/lamp-actions" \
+              --output "$artifact"
+            test "$(stat -c '%s' "$artifact")" = 4517592
+            printf '%s  %s\n' "$expected" "$artifact" | sha256sum --check --strict
+            test "$(od -An -tx1 -N6 "$artifact" | tr -d ' \n')" = 7f454c460201
+            test "$(od -An -tx1 -j18 -N2 "$artifact" | tr -d ' \n')" = b700
+            printf 'release=%s bytes=4517592 sha256=%s ELF=64-bit-little-endian-AArch64\n' \
+              "$release" "$expected" >> /tmp/pair-output/verified-artifacts.txt
+          done
+          # Both published payloads are byte-identical. This qualifies the pair
+          # actually shipped, not a claimed code difference between releases.
+          find /tmp/pair-artifacts -type f -print0 | sort -z | xargs -0 sha256sum \
+            > /tmp/pair-output/downloaded.sha256
+      - name: execute the published writers and opposite readers
+        working-directory: lampOS
+        shell: bash
+        env:
+          LAMP_COMPAT_OUTPUT: /tmp/pair-output
+          LAMP_COMPAT_ACTIONS_6408: /tmp/pair-artifacts/6408/lamp-actions
+          LAMP_COMPAT_ACTIONS_6498: /tmp/pair-artifacts/6498/lamp-actions
+        run: |
+          set -euo pipefail
+          set +e
+          cargo test --locked --release -p lamp-actions --test release_pair \
+            -- --ignored --nocapture --test-threads=1 \
+            2>&1 | tee /tmp/pair-output/actions-tests.log
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf '%s\n' "${statuses[0]}" > /tmp/pair-output/actions-exit
+          printf '%s\n' "${statuses[1]}" > /tmp/pair-output/tee-exit
+          validate_execution() {
+            grep -Eq '^test result: ok\. 2 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in [0-9.]+s$' \
+              /tmp/pair-output/actions-tests.log || return
+            shopt -s nullglob
+            local results=(/tmp/pair-output/cp-*/result.json)
+            test "${#results[@]}" -eq 2 || return
+            jq --exit-status --slurp '
+              length == 2 and
+              all(.[]; .result == "passed" and .children_reaped == 3) and
+              ([.[].test] | sort) == [
+                "release_6408_keeps_6498_caps_and_6498_reads_its_changes",
+                "release_6498_keeps_6408_caps_and_6408_reads_its_changes"
+              ]
+            ' "${results[@]}"
+          }
+          validation_status=0
+          validate_execution > /tmp/pair-output/execution-validation.txt 2>&1 \
+            || validation_status=$?
+          printf '%s\n' "$validation_status" > /tmp/pair-output/execution-validation-exit
+          result=0
+          if [ "${statuses[0]}" -ne 0 ] || [ "${statuses[1]}" -ne 0 ] \
+            || [ "$validation_status" -ne 0 ]; then result=1; fi
+          printf '%s\n' "$result" > /tmp/pair-output/test-exit
+          exit "$result"
+      - name: verify source stayed unchanged even after a failed test
+        if: always()
+        working-directory: lampOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pair-output
+          git -c safe.directory="$GITHUB_WORKSPACE" ls-files -z \
+            | sort -z | xargs -0 sha256sum > /tmp/pair-output/source-after.sha256
+          result=0
+          cmp /tmp/pair-output/source-before.sha256 /tmp/pair-output/source-after.sha256 \
+            > /tmp/pair-output/source-compare.txt 2>&1 || result=$?
+          printf '%s\n' "$result" > /tmp/pair-output/source-compare-exit
+          exit "$result"
+      - name: collect regular evidence without sockets or FIFOs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/pair-output
+          cd /tmp/pair-output
+          # Keep stopped state and logs, never open a FIFO or socket, and omit
+          # fixture-owned executable copies. The downloaded payloads live outside.
+          find . -type f \
+            ! -name lamp-actions-6408 ! -name lamp-actions-6498 -print0 \
+            | sort -z | tar --null -T - -czf /tmp/lampos-caps-state-pair-evidence.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lampos-caps-state-pair-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/lampos-caps-state-pair-evidence.tar.gz
+          if-no-files-found: error
+          retention-days: 7
