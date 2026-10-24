@@ -1,0 +1,5 @@
+{
+  "formatting_setup_error": "initial unpublished test function omitted fn; formatter rejected the module; corrected before tests, no test result",
+  "invalid_filter_invocation": "cargo rejected a second positional filter; raw retained; corrected by passing multiple filters to libtest after --",
+  "scope": "setup errors, not runtime test executions"
+}

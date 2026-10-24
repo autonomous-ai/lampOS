@@ -5,6 +5,24 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 03:41 — corrected native green; current carry and held-print gates
+
+Ready for lamp-voice: no (current-base carry is qualifying).
+
+- #3408 1d838 has both fresh source reads and original ARM64 **11,257 PASS
+  plus one LEAK / 106 skipped**, process **12/0**, actual Linux fmt/strict
+  Clippy green; complete authored/tested trees equal.
+  [Native receipt](verification/carry-late-verdict-20261025/active-thread/corrected-native/README.md).
+- Latest bcb carry and always-second-lookup prose correction are qualifying
+  in a separate worktree and exclusive newly empty target. Prior results
+  are not transferred; no new head has been pushed early.
+- Held-print follow-up retains the original and Unknown-room prototype
+  reds; current worker **225/0** passes lifecycle/fresh-caller controls.
+  Its full frozen gate includes a new capacity/face control and is active.
+  [Scope and comparison timing](verification/held-colleague-constraints-20261025/README.md).
+- Both pieces remain off unless set; no device, calibration, personal-scope
+  or activation change. Continuing both gates and fresh comments.
+
 ## 2026-10-25 03:16 — active-thread correction qualified locally
 
 Ready for lamp-voice: no (#3408 remains draft for fresh native gates/reads).

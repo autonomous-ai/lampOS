@@ -1,0 +1,46 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 9500a92eb7..2f5921cd8f 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -10080,6 +10080,7 @@ mod tests {
+                 // A colleague's voice reading 0.75 against the owner's.
+                 4 => vec![0.75, 0.661_4],
+                 -1 => vec![0.0, 1.0],
++                -2 => vec![-1.0, 0.0],
+                 _ => return true,
+             };
+             self.prints.push_back((request, Ok(print)));
+@@ -10774,6 +10775,33 @@ mod tests {
+         }
+     }
+ 
++    /// A newer visitor's print cannot erase an earlier held visitor's
++    /// constraint when that earlier visitor returns without a visible face.
++    #[test]
++    fn two_held_colleagues_keep_the_older_voice_constraint() {
++        let _one = crate::provider_worker::tests::one_thread();
++        let mut desk = CarryDesk::new(true);
++        desk.answered(12);
++        assert!(
++            desk.line(4, "f2", "The client liked the second draft.")
++                .is_some()
++        );
++        assert_eq!(desk.line(1, "", "Will it rain in the afternoon?"), None);
++        desk.answered(12);
++        assert!(
++            desk.line(-2, "f3", "I sent the slides to the client.")
++                .is_some()
++        );
++        assert_eq!(desk.line(1, "", "Should I take an umbrella then?"), None);
++        desk.answered(12);
++        assert!(
++            desk.line(4, "", "The client approved the slides this morning.")
++                .is_some(),
++            "the older colleague off camera is still held after another visitor"
++        );
++        assert_eq!(desk.line(1, "f1", "What time does the sun set?"), None);
++    }
++
+     /// The first builder at 09:34 on #3296: a colleague who calls the lamp
+     /// by its name while the owner's carry stands is answered, and is the
+     /// caller from then on: their own next line goes on by their face, and

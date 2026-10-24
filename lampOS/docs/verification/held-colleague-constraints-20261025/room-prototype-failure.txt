@@ -1,0 +1,67 @@
+
+running 1 test
+second_provider::worker::tests::two_held_colleagues_keep_the_older_voice_constraint --- FAILED
+
+failures:
+
+---- second_provider::worker::tests::two_held_colleagues_keep_the_older_voice_constraint stdout ----
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: the conversation's voice (cosine 0.75)
+lamp-voice second: request 2: someone else (voice 0.75, from 1500 ms of speech; faces seen speaking ["b/f2"], turned to the lamp ["b/f2"], the caller's ["b/f1"]): held, not answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: one line from someone else: the conversation's carry stands, and the line makes the room neither busy nor talked past (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: the conversation's voice (cosine 1.00)
+lamp-voice second: request 3: the one the lamp answered (voice 1.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: another voice than the conversation's (cosine -1.00): no conversation is going on for it
+lamp-voice second: request 4: someone else (voice -1.00, from 1500 ms of speech; faces seen speaking ["b/f3"], turned to the lamp ["b/f3"], the caller's ["b/f1"]): held, not answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: one line from someone else: the conversation's carry stands, and the line makes the room neither busy nor talked past (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 5: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 5: the conversation's voice (cosine 1.00)
+lamp-voice second: request 5: the one the lamp answered (voice 1.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 6: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 6: the conversation's voice (cosine 0.75)
+lamp-voice second: request 6: its voice (Some(0.7500188)) is not nearer the conversation's than every held colleague's known print, by 0.1, or a held print is missing or the bound exhausted: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 6: no sure sign who said it (voice 0.75, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 7: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 7: the conversation's voice (cosine 1.00)
+lamp-voice second: request 7: the one the lamp answered (voice 1.00, from 1500 ms of speech; faces seen speaking ["b/f1"], turned to the lamp ["b/f1"], the caller's ["b/f1"]): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 7: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: the conversation's voice (cosine 0.75)
+lamp-voice second: request 2: someone else (voice 0.75, from 1500 ms of speech; faces seen speaking ["b/f2"], turned to the lamp ["b/f2"], the caller's ["b/f1"]): held, not answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 2: one line from someone else: the conversation's carry stands, and the line makes the room neither busy nor talked past (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: the conversation's voice (cosine 1.00)
+lamp-voice second: request 3: the one the lamp answered (voice 1.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: another voice than the conversation's (cosine -1.00): no conversation is going on for it
+lamp-voice second: request 4: someone else (voice -1.00, from 1500 ms of speech; faces seen speaking ["b/f3"], turned to the lamp ["b/f3"], the caller's ["b/f1"]): held, not answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: one line from someone else: the conversation's carry stands, and the line makes the room neither busy nor talked past (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 5: in a busy room, begun 12000 ms after the lamp's words ended and judged 12000 ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary 20 s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 5: the conversation's voice (cosine 1.00)
+lamp-voice second: request 5: the one the lamp answered (voice 1.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 5: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 6: the conversation's voice (cosine 0.75)
+lamp-voice second: request 6: its voice (Some(0.7500188)) is not nearer the conversation's than every held colleague's known print, by 0.1, or a held print is missing or the bound exhausted: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 6: no sure sign who said it (voice 0.75, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 6: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+
+thread 'second_provider::worker::tests::two_held_colleagues_keep_the_older_voice_constraint' (252196278) panicked at crates/voice/src/second_provider/worker.rs:10801:13:
+the older colleague off camera is still held after another visitor: unknown
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::worker::tests::two_held_colleagues_keep_the_older_voice_constraint
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3765 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

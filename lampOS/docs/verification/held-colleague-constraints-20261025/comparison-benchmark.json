@@ -1,0 +1,60 @@
+{
+  "argv": [
+    "rustc",
+    "+1.96.0",
+    "--edition=2024",
+    "-O",
+    "/private/tmp/third-held-constraints-benchmark.rs",
+    "-o",
+    "/private/tmp/third-held-constraints-benchmark"
+  ],
+  "compiler": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+  "files_before_after": {
+    "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/src/second_provider/worker.rs": "3d5ca6c0434559357f604a8811a0e239c2c18bfd8a6a6cc3ff0d7e6b3a9a3ef0",
+    "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs": "e0217f3ec20493c0e89fc91afa23872589ee2af787adfbf427647899d52ab645",
+    "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/src/same_voice.rs": "7d68cc331f2e1818a224cebdd7c3bcd36389fae65e8c06e53307511bdf7a7301",
+    "/private/tmp/third-held-constraints-benchmark.rs": "36ac47666e18c06bbb77d61ee507cba91d66ea042d96a0c785ae982f9a001c7c"
+  },
+  "exit": 0,
+  "cases": [
+    {
+      "first_ns": 3254,
+      "p50_ns": 548,
+      "p95_ns": 561,
+      "p99_ns": 589,
+      "max_ns": 30649,
+      "case": "parent_one_known"
+    },
+    {
+      "first_ns": 1013,
+      "p50_ns": 452,
+      "p95_ns": 466,
+      "p99_ns": 496,
+      "max_ns": 20434,
+      "case": "candidate_one_known"
+    },
+    {
+      "first_ns": 3424,
+      "p50_ns": 2775,
+      "p95_ns": 2801,
+      "p99_ns": 2862,
+      "max_ns": 47211,
+      "case": "candidate_eight_known"
+    },
+    {
+      "first_ns": 553,
+      "p50_ns": 133,
+      "p95_ns": 136,
+      "p99_ns": 140,
+      "max_ns": 2471,
+      "case": "candidate_eight_missing"
+    }
+  ],
+  "dimension": 192,
+  "samples_per_case": 10000,
+  "boundary": "entry/return of extracted original positive nearness method versus actual candidate private comparison helper with already-cached stand-in prints; no inference/poll thread/logging/worker/device/audio path claim",
+  "scope": "single controlled invocation; synthetic 192-element vectors; optimized host rustc; uncontrolled host load; missing candidate only has no comparable old logging boundary",
+  "target": "first and p99 cached comparison under 1 ms on this Mac",
+  "target_met": true,
+  "maximum_missing_cache_lookups": 9
+}
