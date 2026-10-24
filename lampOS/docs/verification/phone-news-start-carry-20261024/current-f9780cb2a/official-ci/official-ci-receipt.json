@@ -1,0 +1,898 @@
+{
+  "head": "fa07f53015a17984c058f50a39f9e83b75d10a78",
+  "base": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "actual_preview": "5710d0f894e42be93a8ce322a3cbb2024adf6b9d",
+  "complete_trees": {
+    "fa07f53015a17984c058f50a39f9e83b75d10a78": "b69e2a850c7f7474c05e101cd3d609cbde0d7edb",
+    "5710d0f894e42be93a8ce322a3cbb2024adf6b9d": "b69e2a850c7f7474c05e101cd3d609cbde0d7edb"
+  },
+  "complete_trees_equal": true,
+  "arm64_run": 40126238187,
+  "linux_run": 40126238179,
+  "arm64_census": {
+    "PASS": 7409,
+    "LEAK": 1,
+    "selected_terminal": 7410,
+    "primary_terminal_lines": 7444,
+    "identical_echoed_lines": 34,
+    "selected_unrun": 0,
+    "failed": 0,
+    "skipped": 53
+  },
+  "required_local_case_count": 142,
+  "required_cases": {
+    "activity::tests::a_filler_ended_line_is_held_and_joined_with_what_follows": {
+      "status": "PASS",
+      "index": 2709,
+      "total": 7410,
+      "test": "lamp-voice activity::tests::a_filler_ended_line_is_held_and_joined_with_what_follows"
+    },
+    "activity::tests::linear_gated_keeps_the_lamps_own_voice_out_and_a_stop_over_it_in": {
+      "status": "PASS",
+      "index": 2717,
+      "total": 7410,
+      "test": "lamp-voice activity::tests::linear_gated_keeps_the_lamps_own_voice_out_and_a_stop_over_it_in"
+    },
+    "activity::tests::linear_gated_reads_the_linear_output_only_where_speech_would_be_a_person": {
+      "status": "PASS",
+      "index": 2711,
+      "total": 7410,
+      "test": "lamp-voice activity::tests::linear_gated_reads_the_linear_output_only_where_speech_would_be_a_person"
+    },
+    "activity::tests::the_detector_hears_the_linear_output_only_with_the_switch": {
+      "status": "PASS",
+      "index": 2713,
+      "total": 7410,
+      "test": "lamp-voice activity::tests::the_detector_hears_the_linear_output_only_with_the_switch"
+    },
+    "activity::tests::the_night_dials_take_only_their_ranges_and_set_two_fields": {
+      "status": "PASS",
+      "index": 2714,
+      "total": 7410,
+      "test": "lamp-voice activity::tests::the_night_dials_take_only_their_ranges_and_set_two_fields"
+    },
+    "coordinator::tests::duplex::a_brief_acknowledgment_costs_a_pause_and_none_of_the_reply": {
+      "status": "PASS",
+      "index": 3217,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_brief_acknowledgment_costs_a_pause_and_none_of_the_reply"
+    },
+    "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back": {
+      "status": "PASS",
+      "index": 3218,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back"
+    },
+    "coordinator::tests::duplex::a_person_over_the_lamp_stops_the_speaker_then_interrupts_with_their_opening_words": {
+      "status": "PASS",
+      "index": 3219,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_person_over_the_lamp_stops_the_speaker_then_interrupts_with_their_opening_words"
+    },
+    "coordinator::tests::duplex::a_person_who_pauses_longer_than_the_endpoint_wait_and_goes_on_still_interrupts": {
+      "status": "PASS",
+      "index": 3220,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_person_who_pauses_longer_than_the_endpoint_wait_and_goes_on_still_interrupts"
+    },
+    "coordinator::tests::duplex::a_person_who_speaks_once_the_lamp_is_silent_is_an_ordinary_turn": {
+      "status": "PASS",
+      "index": 3221,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_person_who_speaks_once_the_lamp_is_silent_is_an_ordinary_turn"
+    },
+    "coordinator::tests::duplex::a_reply_that_twice_yields_to_nothing_masks_like_the_baseline_until_it_ends": {
+      "status": "PASS",
+      "index": 3222,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_reply_that_twice_yields_to_nothing_masks_like_the_baseline_until_it_ends"
+    },
+    "coordinator::tests::duplex::a_short_word_heard_plainly_stops_the_reply_though_nothing_follows_it": {
+      "status": "PASS",
+      "index": 3223,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_short_word_heard_plainly_stops_the_reply_though_nothing_follows_it"
+    },
+    "coordinator::tests::duplex::a_start_reaches_past_the_reply_only_as_the_lamps_sound_ends": {
+      "status": "PASS",
+      "index": 3224,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_start_reaches_past_the_reply_only_as_the_lamps_sound_ends"
+    },
+    "coordinator::tests::duplex::a_stop_heard_by_the_listener_ends_the_reply_though_only_quiet_follows": {
+      "status": "PASS",
+      "index": 3228,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_stop_heard_by_the_listener_ends_the_reply_though_only_quiet_follows"
+    },
+    "coordinator::tests::duplex::a_stop_word_heard_in_a_yield_commits_it_and_other_words_resume_it": {
+      "status": "PASS",
+      "index": 3226,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_stop_word_heard_in_a_yield_commits_it_and_other_words_resume_it"
+    },
+    "coordinator::tests::duplex::a_yield_that_is_never_settled_is_given_up_at_its_deadline": {
+      "status": "PASS",
+      "index": 3227,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::a_yield_that_is_never_settled_is_given_up_at_its_deadline"
+    },
+    "coordinator::tests::duplex::cancellation_closes_only_one_interval_without_resuming_the_old_reply": {
+      "status": "PASS",
+      "index": 3229,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::cancellation_closes_only_one_interval_without_resuming_the_old_reply"
+    },
+    "coordinator::tests::duplex::clearing_observation_storage_does_not_erase_the_open_yield_identity": {
+      "status": "PASS",
+      "index": 3230,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::clearing_observation_storage_does_not_erase_the_open_yield_identity"
+    },
+    "coordinator::tests::duplex::complete_evidence_keeps_one_contiguous_opening_within_the_same_budget": {
+      "status": "PASS",
+      "index": 3231,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::complete_evidence_keeps_one_contiguous_opening_within_the_same_budget"
+    },
+    "coordinator::tests::duplex::evicted_fallback_prefix_rejects_within_the_original_duplex_deadline": {
+      "status": "PASS",
+      "index": 3232,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::evicted_fallback_prefix_rejects_within_the_original_duplex_deadline"
+    },
+    "coordinator::tests::duplex::expired_fallback_prefix_rejects_only_the_candidate_and_preserves_the_reply": {
+      "status": "PASS",
+      "index": 3233,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::expired_fallback_prefix_rejects_only_the_candidate_and_preserves_the_reply"
+    },
+    "coordinator::tests::duplex::first_words_older_than_the_provider_takes_are_dropped_before_the_commit": {
+      "status": "PASS",
+      "index": 3234,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::first_words_older_than_the_provider_takes_are_dropped_before_the_commit"
+    },
+    "coordinator::tests::duplex::invalid_capture_ingress_cannot_take_the_history_loss_recovery_path": {
+      "status": "PASS",
+      "index": 3235,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::invalid_capture_ingress_cannot_take_the_history_loss_recovery_path"
+    },
+    "coordinator::tests::duplex::lineage_reset_closes_a_yield_and_does_not_lend_it_to_new_capture": {
+      "status": "PASS",
+      "index": 3236,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::lineage_reset_closes_a_yield_and_does_not_lend_it_to_new_capture"
+    },
+    "coordinator::tests::duplex::missing_evidence_closes_the_yield_without_reclassifying_raw_gaps": {
+      "status": "PASS",
+      "index": 3237,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::missing_evidence_closes_the_yield_without_reclassifying_raw_gaps"
+    },
+    "coordinator::tests::duplex::provider_pcm_threshold_keeps_exactly_one_terminal_allowance_in_both_modes": {
+      "status": "PASS",
+      "index": 3238,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::provider_pcm_threshold_keeps_exactly_one_terminal_allowance_in_both_modes"
+    },
+    "coordinator::tests::duplex::regressing_hearing_time_is_not_a_successful_resume": {
+      "status": "PASS",
+      "index": 3239,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::regressing_hearing_time_is_not_a_successful_resume"
+    },
+    "coordinator::tests::duplex::resume_and_commit_decisions_close_intervals_but_only_admission_replaces_ownership": {
+      "status": "PASS",
+      "index": 3240,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::resume_and_commit_decisions_close_intervals_but_only_admission_replaces_ownership"
+    },
+    "coordinator::tests::duplex::stale_hearing_closes_observation_without_granting_new_input": {
+      "status": "PASS",
+      "index": 3241,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::stale_hearing_closes_observation_without_granting_new_input"
+    },
+    "coordinator::tests::duplex::talk_over_the_lamps_own_line_in_a_busy_room_leaves_no_playback_gap": {
+      "status": "PASS",
+      "index": 3243,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::talk_over_the_lamps_own_line_in_a_busy_room_leaves_no_playback_gap"
+    },
+    "coordinator::tests::duplex::the_lamps_own_first_word_does_not_stop_it_or_become_a_turn": {
+      "status": "PASS",
+      "index": 3242,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::the_lamps_own_first_word_does_not_stop_it_or_become_a_turn"
+    },
+    "coordinator::tests::duplex::the_lamps_own_voice_through_a_whole_reply_neither_yields_nor_becomes_a_turn": {
+      "status": "PASS",
+      "index": 3244,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::the_lamps_own_voice_through_a_whole_reply_neither_yields_nor_becomes_a_turn"
+    },
+    "coordinator::tests::duplex::the_lamps_voice_is_heard_only_from_a_reply_with_sound": {
+      "status": "PASS",
+      "index": 3245,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::the_lamps_voice_is_heard_only_from_a_reply_with_sound"
+    },
+    "coordinator::tests::duplex::the_standard_hold_cannot_keep_a_candidate_through_a_yield": {
+      "status": "PASS",
+      "index": 3246,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::the_standard_hold_cannot_keep_a_candidate_through_a_yield"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_backchannel_resumes_the_reply_on_either_rule": {
+      "status": "PASS",
+      "index": 3248,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_backchannel_resumes_the_reply_on_either_rule"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_backchannel_whose_words_come_late_still_resumes": {
+      "status": "PASS",
+      "index": 3247,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_backchannel_whose_words_come_late_still_resumes"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_half_second_backchannel_resumes_heard_or_heard_always": {
+      "status": "PASS",
+      "index": 3251,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_half_second_backchannel_resumes_heard_or_heard_always"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_half_second_wordless_yield_resumes": {
+      "status": "PASS",
+      "index": 3249,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_half_second_wordless_yield_resumes"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_question_after_a_pause_commits_though_its_first_word_came_back_empty": {
+      "status": "PASS",
+      "index": 3250,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_question_after_a_pause_commits_though_its_first_word_came_back_empty"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_stop_always_cuts_in": {
+      "status": "PASS",
+      "index": 3254,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_stop_always_cuts_in"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_wordless_yield_resumes_the_reply": {
+      "status": "PASS",
+      "index": 3252,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_wordless_yield_resumes_the_reply"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_yield_that_ends_before_its_words_resumes_the_reply": {
+      "status": "PASS",
+      "index": 3253,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_yield_that_ends_before_its_words_resumes_the_reply"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_a_yields_real_words_still_commit_a_turn": {
+      "status": "PASS",
+      "index": 3255,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_a_yields_real_words_still_commit_a_turn"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_an_answer_to_the_lamps_question_commits": {
+      "status": "PASS",
+      "index": 3256,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_an_answer_to_the_lamps_question_commits"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_and_heard_always_a_backchannel_resumes_the_reply": {
+      "status": "PASS",
+      "index": 3258,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_and_heard_always_a_backchannel_resumes_the_reply"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_and_heard_always_a_request_still_cuts_in": {
+      "status": "PASS",
+      "index": 3257,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_and_heard_always_a_request_still_cuts_in"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_and_heard_always_only_the_yields_own_final_words_decide_it": {
+      "status": "PASS",
+      "index": 3259,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_and_heard_always_only_the_yields_own_final_words_decide_it"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_and_heard_always_speech_after_the_first_flush_commits": {
+      "status": "PASS",
+      "index": 3260,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_and_heard_always_speech_after_the_first_flush_commits"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_anything_else_commits": {
+      "status": "PASS",
+      "index": 3261,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_anything_else_commits"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_empty_words_resume_the_reply": {
+      "status": "PASS",
+      "index": 3262,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_empty_words_resume_the_reply"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_openers_and_stops_still_commit": {
+      "status": "PASS",
+      "index": 3266,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_openers_and_stops_still_commit"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_speech_after_a_backchannels_words_commits": {
+      "status": "PASS",
+      "index": 3263,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_speech_after_a_backchannels_words_commits"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_speech_after_a_backchannels_words_were_asked_for_commits": {
+      "status": "PASS",
+      "index": 3264,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_speech_after_a_backchannels_words_were_asked_for_commits"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_the_five_from_lamp_52e6_resume_even_with_a_face_turned": {
+      "status": "PASS",
+      "index": 3265,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_the_five_from_lamp_52e6_resume_even_with_a_face_turned"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_the_speech_to_texts_spellings_resume": {
+      "status": "PASS",
+      "index": 3267,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_the_speech_to_texts_spellings_resume"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_two_backchannels_leave_the_reply_yielding": {
+      "status": "PASS",
+      "index": 3269,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_two_backchannels_leave_the_reply_yielding"
+    },
+    "coordinator::tests::duplex::with_backchannel_holds_words_after_a_wordless_resume_start_nothing": {
+      "status": "PASS",
+      "index": 3268,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_backchannel_holds_words_after_a_wordless_resume_start_nothing"
+    },
+    "coordinator::tests::duplex::with_counts_real_a_sound_that_is_never_a_line_stops_pausing_after_three": {
+      "status": "PASS",
+      "index": 3270,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_counts_real_a_sound_that_is_never_a_line_stops_pausing_after_three"
+    },
+    "coordinator::tests::duplex::with_counts_real_the_lamps_own_voice_twice_still_falls_back": {
+      "status": "PASS",
+      "index": 3271,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_counts_real_the_lamps_own_voice_twice_still_falls_back"
+    },
+    "coordinator::tests::duplex::with_counts_real_two_plain_asides_leave_a_third_line_heard": {
+      "status": "PASS",
+      "index": 3274,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_counts_real_two_plain_asides_leave_a_third_line_heard"
+    },
+    "coordinator::tests::duplex::with_counts_real_unknown_alone_is_not_the_lamps_own_voice": {
+      "status": "PASS",
+      "index": 3272,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_counts_real_unknown_alone_is_not_the_lamps_own_voice"
+    },
+    "coordinator::tests::duplex::with_first_words_kept_a_yields_request_begins_at_the_words_said_under_the_lamp": {
+      "status": "PASS",
+      "index": 3273,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_first_words_kept_a_yields_request_begins_at_the_words_said_under_the_lamp"
+    },
+    "coordinator::tests::duplex::with_keeps_listening_a_third_line_soon_after_two_asides_stops_the_story": {
+      "status": "PASS",
+      "index": 3284,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_keeps_listening_a_third_line_soon_after_two_asides_stops_the_story"
+    },
+    "coordinator::tests::duplex::with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more": {
+      "status": "PASS",
+      "index": 3276,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_keeps_listening_a_voice_that_is_never_a_line_pauses_the_story_twice_more"
+    },
+    "coordinator::tests::duplex::with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in": {
+      "status": "PASS",
+      "index": 3283,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_keeps_listening_the_lamps_own_voice_is_never_a_cut_in"
+    },
+    "coordinator::tests::duplex::with_soft_starts_a_line_after_the_lamps_answer_keeps_its_200_ms": {
+      "status": "PASS",
+      "index": 3277,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_soft_starts_a_line_after_the_lamps_answer_keeps_its_200_ms"
+    },
+    "coordinator::tests::duplex::with_soft_starts_a_line_under_a_quiet_unretired_reply_starts_as_before": {
+      "status": "PASS",
+      "index": 3278,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_soft_starts_a_line_under_a_quiet_unretired_reply_starts_as_before"
+    },
+    "coordinator::tests::duplex::with_the_reply_end_reach_a_line_begun_under_the_lamps_last_words_keeps_its_name": {
+      "status": "PASS",
+      "index": 3279,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_the_reply_end_reach_a_line_begun_under_the_lamps_last_words_keeps_its_name"
+    },
+    "coordinator::tests::duplex::with_the_reply_end_reach_a_line_long_after_the_lamps_sound_starts_as_before": {
+      "status": "PASS",
+      "index": 3280,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_the_reply_end_reach_a_line_long_after_the_lamps_sound_starts_as_before"
+    },
+    "coordinator::tests::duplex::with_the_reply_end_reach_the_lamps_words_before_a_pause_are_not_taken": {
+      "status": "PASS",
+      "index": 3281,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::with_the_reply_end_reach_the_lamps_words_before_a_pause_are_not_taken"
+    },
+    "coordinator::tests::duplex::without_echo_evidence_duplex_decides_as_the_conservative_baseline_does": {
+      "status": "PASS",
+      "index": 3282,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::without_echo_evidence_duplex_decides_as_the_conservative_baseline_does"
+    },
+    "coordinator::tests::duplex::without_keeps_listening_a_third_line_within_twenty_seconds_is_not_heard": {
+      "status": "PASS",
+      "index": 3287,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::duplex::without_keeps_listening_a_third_line_within_twenty_seconds_is_not_heard"
+    },
+    "coordinator::tests::early_end::speech_resumed_at_three_tenths_under_the_lamps_duplex_policy": {
+      "status": "PASS",
+      "index": 3302,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::early_end::speech_resumed_at_three_tenths_under_the_lamps_duplex_policy"
+    },
+    "coordinator::tests::endpoint_session::duplex_complete_verdict_ends_at_one_second_and_its_answer_plays": {
+      "status": "PASS",
+      "index": 3322,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::endpoint_session::duplex_complete_verdict_ends_at_one_second_and_its_answer_plays"
+    },
+    "coordinator::tests::endpoint_session::duplex_missing_model_session_ends_on_the_unchanged_silence_fallback": {
+      "status": "PASS",
+      "index": 3325,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::endpoint_session::duplex_missing_model_session_ends_on_the_unchanged_silence_fallback"
+    },
+    "coordinator::tests::pilot_faults::duplex_control_answers_once": {
+      "status": "PASS",
+      "index": 3453,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::pilot_faults::duplex_control_answers_once"
+    },
+    "coordinator::tests::pilot_faults::duplex_stalled_speaker_is_bounded": {
+      "status": "PASS",
+      "index": 3454,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::pilot_faults::duplex_stalled_speaker_is_bounded"
+    },
+    "coordinator::tests::provider_pair::duplex_through_the_worker::a_person_speaking_over_the_lamp_reaches_the_service_as_one_question_with_their_opening_words": {
+      "status": "PASS",
+      "index": 3526,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::provider_pair::duplex_through_the_worker::a_person_speaking_over_the_lamp_reaches_the_service_as_one_question_with_their_opening_words"
+    },
+    "coordinator::tests::second_route::talk_over_a_say_in_a_busy_room_waits_for_the_name_then_is_let_go_under_duplex": {
+      "status": "PASS",
+      "index": 3654,
+      "total": 7410,
+      "test": "lamp-voice coordinator::tests::second_route::talk_over_a_say_in_a_busy_room_waits_for_the_name_then_is_let_go_under_duplex"
+    },
+    "messages::tests::a_text_never_waits_on_the_news_for_the_phone": {
+      "status": "PASS",
+      "index": 4158,
+      "total": 7410,
+      "test": "lamp-voice messages::tests::a_text_never_waits_on_the_news_for_the_phone"
+    },
+    "options::tests::duplex_and_the_capture_clocked_reference_are_explicit_and_separate": {
+      "status": "PASS",
+      "index": 4192,
+      "total": 7410,
+      "test": "lamp-voice options::tests::duplex_and_the_capture_clocked_reference_are_explicit_and_separate"
+    },
+    "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types": {
+      "status": "PASS",
+      "index": 4294,
+      "total": 7410,
+      "test": "lamp-voice process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types"
+    },
+    "process::switch_census_tests::a_helper_left_out_loses_its_switches": {
+      "status": "PASS",
+      "index": 4304,
+      "total": 7410,
+      "test": "lamp-voice process::switch_census_tests::a_helper_left_out_loses_its_switches"
+    },
+    "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not": {
+      "status": "PASS",
+      "index": 4298,
+      "total": 7410,
+      "test": "lamp-voice process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not"
+    },
+    "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments": {
+      "status": "PASS",
+      "index": 4297,
+      "total": 7410,
+      "test": "lamp-voice process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments"
+    },
+    "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker": {
+      "status": "PASS",
+      "index": 4299,
+      "total": 7410,
+      "test": "lamp-voice process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker"
+    },
+    "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches": {
+      "status": "PASS",
+      "index": 4308,
+      "total": 7410,
+      "test": "lamp-voice process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches"
+    },
+    "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files": {
+      "status": "PASS",
+      "index": 4300,
+      "total": 7410,
+      "test": "lamp-voice process::switch_census_tests::the_coordinators_functions_are_still_in_their_files"
+    },
+    "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate": {
+      "status": "PASS",
+      "index": 2673,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate"
+    },
+    "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart": {
+      "status": "PASS",
+      "index": 2674,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart"
+    },
+    "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back": {
+      "status": "PASS",
+      "index": 2676,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+    },
+    "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round": {
+      "status": "PASS",
+      "index": 2675,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round"
+    },
+    "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart": {
+      "status": "PASS",
+      "index": 2679,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart"
+    },
+    "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog": {
+      "status": "PASS",
+      "index": 2707,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog"
+    },
+    "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog": {
+      "status": "PASS",
+      "index": 2680,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog"
+    },
+    "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned": {
+      "status": "PASS",
+      "index": 2678,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned"
+    },
+    "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete": {
+      "status": "PASS",
+      "index": 2681,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete"
+    },
+    "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog": {
+      "status": "PASS",
+      "index": 2682,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog"
+    },
+    "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog": {
+      "status": "PASS",
+      "index": 2688,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog"
+    },
+    "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline": {
+      "status": "PASS",
+      "index": 2690,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline"
+    },
+    "self_cuts::runnable_events::controls::no_output_is_not_readiness": {
+      "status": "PASS",
+      "index": 2683,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::no_output_is_not_readiness"
+    },
+    "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly": {
+      "status": "PASS",
+      "index": 2684,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly"
+    },
+    "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture": {
+      "status": "PASS",
+      "index": 2685,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture"
+    },
+    "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written": {
+      "status": "PASS",
+      "index": 2686,
+      "total": 7410,
+      "test": "lamp-update::round self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written"
+    },
+    "soft_start::a_pause_of_a_tenth_of_a_second_ends_what_a_soft_start_reaches": {
+      "status": "PASS",
+      "index": 6742,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::a_pause_of_a_tenth_of_a_second_ends_what_a_soft_start_reaches"
+    },
+    "soft_start::a_soft_first_word_is_kept_only_with_the_switch_and_first_words": {
+      "status": "PASS",
+      "index": 6743,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::a_soft_first_word_is_kept_only_with_the_switch_and_first_words"
+    },
+    "soft_start::a_soft_start_never_reaches_into_the_lamps_own_sound": {
+      "status": "PASS",
+      "index": 6744,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::a_soft_start_never_reaches_into_the_lamps_own_sound"
+    },
+    "soft_start::a_soft_start_reaches_at_most_half_a_second_before_the_usual_one": {
+      "status": "PASS",
+      "index": 6745,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::a_soft_start_reaches_at_most_half_a_second_before_the_usual_one"
+    },
+    "soft_start::a_start_heard_all_under_the_lamps_reply_begins_as_usual": {
+      "status": "PASS",
+      "index": 6746,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::a_start_heard_all_under_the_lamps_reply_begins_as_usual"
+    },
+    "soft_start::a_word_begun_at_the_usual_start_gets_its_200_ms_before": {
+      "status": "PASS",
+      "index": 6747,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::a_word_begun_at_the_usual_start_gets_its_200_ms_before"
+    },
+    "soft_start::a_yields_start_is_not_a_soft_start": {
+      "status": "PASS",
+      "index": 6748,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::a_yields_start_is_not_a_soft_start"
+    },
+    "soft_start::every_soft_start_keeps_200_ms_more_than_the_usual": {
+      "status": "PASS",
+      "index": 6749,
+      "total": 7410,
+      "test": "lamp-voice::it soft_start::every_soft_start_keeps_200_ms_more_than_the_usual"
+    },
+    "turn_taking::tests::a_candidate_over_the_lamp_is_dropped_when_nobody_goes_on": {
+      "status": "PASS",
+      "index": 6390,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_candidate_over_the_lamp_is_dropped_when_nobody_goes_on"
+    },
+    "turn_taking::tests::a_candidate_that_began_over_the_lamp_waits_and_passes_when_the_person_goes_on": {
+      "status": "PASS",
+      "index": 6392,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_candidate_that_began_over_the_lamp_waits_and_passes_when_the_person_goes_on"
+    },
+    "turn_taking::tests::a_fruitless_yield_is_forgiven_after_twenty_seconds_with_no_yield": {
+      "status": "PASS",
+      "index": 6393,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_fruitless_yield_is_forgiven_after_twenty_seconds_with_no_yield"
+    },
+    "turn_taking::tests::a_gap_in_capture_forgets_what_was_heard_and_any_yield": {
+      "status": "PASS",
+      "index": 6394,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_gap_in_capture_forgets_what_was_heard_and_any_yield"
+    },
+    "turn_taking::tests::a_person_over_a_sound_that_is_no_reply_is_an_ordinary_candidate": {
+      "status": "PASS",
+      "index": 6395,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_person_over_a_sound_that_is_no_reply_is_an_ordinary_candidate"
+    },
+    "turn_taking::tests::a_reply_that_closes_during_a_yield_leaves_its_candidate_to_be_settled": {
+      "status": "PASS",
+      "index": 6396,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_reply_that_closes_during_a_yield_leaves_its_candidate_to_be_settled"
+    },
+    "turn_taking::tests::a_reply_that_twice_yields_to_nothing_stops_yielding_until_it_closes": {
+      "status": "PASS",
+      "index": 6397,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_reply_that_twice_yields_to_nothing_stops_yielding_until_it_closes"
+    },
+    "turn_taking::tests::a_second_into_a_reply_the_shorter_run_stops_it_and_the_detector_starts_on_the_yield": {
+      "status": "PASS",
+      "index": 6398,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_second_into_a_reply_the_shorter_run_stops_it_and_the_detector_starts_on_the_yield"
+    },
+    "turn_taking::tests::a_short_word_heard_plainly_passes_though_nobody_goes_on": {
+      "status": "PASS",
+      "index": 6399,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_short_word_heard_plainly_passes_though_nobody_goes_on"
+    },
+    "turn_taking::tests::a_yield_whose_hearing_has_stopped_withholds_nothing": {
+      "status": "PASS",
+      "index": 6400,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_yield_whose_hearing_has_stopped_withholds_nothing"
+    },
+    "turn_taking::tests::a_yield_window_tie_or_a_clear_block_is_not_the_lamps_own_voice": {
+      "status": "PASS",
+      "index": 6401,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::a_yield_window_tie_or_a_clear_block_is_not_the_lamps_own_voice"
+    },
+    "turn_taking::tests::another_capture_stream_forgets_what_was_heard_and_any_yield": {
+      "status": "PASS",
+      "index": 6402,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::another_capture_stream_forgets_what_was_heard_and_any_yield"
+    },
+    "turn_taking::tests::arbitrary_or_future_reset_cannot_authorize_new_epoch": {
+      "status": "PASS",
+      "index": 6403,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::arbitrary_or_future_reset_cannot_authorize_new_epoch"
+    },
+    "turn_taking::tests::cache_retirement_does_not_label_unknown_or_new_lineage_reads_as_expired": {
+      "status": "PASS",
+      "index": 6404,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::cache_retirement_does_not_label_unknown_or_new_lineage_reads_as_expired"
+    },
+    "turn_taking::tests::delayed_retirement_uses_source_time_and_preserves_closed_history": {
+      "status": "PASS",
+      "index": 6405,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::delayed_retirement_uses_source_time_and_preserves_closed_history"
+    },
+    "turn_taking::tests::explicit_reset_allows_only_exact_next_epoch_and_keeps_pending_rejection": {
+      "status": "PASS",
+      "index": 6406,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::explicit_reset_allows_only_exact_next_epoch_and_keeps_pending_rejection"
+    },
+    "turn_taking::tests::heard_evidence_cannot_hide_a_cached_retained_timestamp_mismatch": {
+      "status": "PASS",
+      "index": 6407,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::heard_evidence_cannot_hide_a_cached_retained_timestamp_mismatch"
+    },
+    "turn_taking::tests::invalid_receipts_do_not_certify_mask_or_acceptance": {
+      "status": "PASS",
+      "index": 6408,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::invalid_receipts_do_not_certify_mask_or_acceptance"
+    },
+    "turn_taking::tests::late_original_write_settles_without_borrowing_successor_identity": {
+      "status": "PASS",
+      "index": 6409,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::late_original_write_settles_without_borrowing_successor_identity"
+    },
+    "turn_taking::tests::late_rejection_cannot_erase_the_original_dispatch_deadline": {
+      "status": "PASS",
+      "index": 6410,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::late_rejection_cannot_erase_the_original_dispatch_deadline"
+    },
+    "turn_taking::tests::nothing_is_a_person_over_the_lamp_until_its_own_sound_has_been_found_in_this_reply": {
+      "status": "PASS",
+      "index": 6411,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::nothing_is_a_person_over_the_lamp_until_its_own_sound_has_been_found_in_this_reply"
+    },
+    "turn_taking::tests::only_internally_aged_matching_retained_reads_have_the_expiry_type": {
+      "status": "PASS",
+      "index": 6412,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::only_internally_aged_matching_retained_reads_have_the_expiry_type"
+    },
+    "turn_taking::tests::original_read_start_is_preserved_and_clock_regression_is_rejected": {
+      "status": "PASS",
+      "index": 6413,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::original_read_start_is_preserved_and_clock_regression_is_rejected"
+    },
+    "turn_taking::tests::overlapping_read_intervals_and_sequence_overflow_are_invalid": {
+      "status": "PASS",
+      "index": 6414,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::overlapping_read_intervals_and_sequence_overflow_are_invalid"
+    },
+    "turn_taking::tests::partial_writes_and_nonfinal_gap_preserve_exact_cursors_and_tail": {
+      "status": "PASS",
+      "index": 6415,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::partial_writes_and_nonfinal_gap_preserve_exact_cursors_and_tail"
+    },
+    "turn_taking::tests::retained_prefix_requires_matching_unexpired_original_read_evidence": {
+      "status": "PASS",
+      "index": 6416,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::retained_prefix_requires_matching_unexpired_original_read_evidence"
+    },
+    "turn_taking::tests::speech_in_a_listening_gap_yields_only_with_the_switch": {
+      "status": "PASS",
+      "index": 6417,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::speech_in_a_listening_gap_yields_only_with_the_switch"
+    },
+    "turn_taking::tests::the_detector_hears_a_person_over_a_reply_so_that_its_start_ends_on_the_yield": {
+      "status": "PASS",
+      "index": 6418,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::the_detector_hears_a_person_over_a_reply_so_that_its_start_ends_on_the_yield"
+    },
+    "turn_taking::tests::the_duplex_mask_scores_the_lamp_as_silence_and_a_person_as_speech": {
+      "status": "PASS",
+      "index": 6419,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::the_duplex_mask_scores_the_lamp_as_silence_and_a_person_as_speech"
+    },
+    "turn_taking::tests::without_evidence_the_duplex_mask_is_the_conservative_mask": {
+      "status": "PASS",
+      "index": 6420,
+      "total": 7410,
+      "test": "lamp-voice turn_taking::tests::without_evidence_the_duplex_mask_is_the_conservative_mask"
+    }
+  },
+  "leaky_tests": [
+    {
+      "status": "LEAK",
+      "index": 5208,
+      "total": 7410,
+      "test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "primary_logs": {
+    "arm64": {
+      "sha256": "e5714a453b3b870ac26e86400e5c9d47490fe58ec974491bd74b21d76a3d2982",
+      "bytes": 1834344,
+      "publication": "bounded selected lines; complete original available from linked public GitHub run"
+    },
+    "linux": {
+      "sha256": "e43d9ade51ce0c9c5af85b555dfd15626b980d1037b846170901fc52636f47cd",
+      "bytes": 73079,
+      "publication": "bounded selected lines; complete original available from linked public GitHub run"
+    }
+  },
+  "historical_update_scope": "Original 2/3 remains immutable; current head contains the qualified fixture repair and actual current native gates pass. Final reader disposition remains separate."
+}

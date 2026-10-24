@@ -1,0 +1,22 @@
+{
+  "official-ci-receipt.json": {
+    "original_sha256": "fc3623cff81d88245edbbc3277ccfb8245ae401a674ddc80569df6326f062831",
+    "published_sha256": "fc3623cff81d88245edbbc3277ccfb8245ae401a674ddc80569df6326f062831"
+  },
+  "arm64-official.json": {
+    "original_sha256": "38215ba9c249a3e0b22841bfa301d1f7b606ea3ae051b9d2a9388e44b7e47fa4",
+    "published_sha256": "38215ba9c249a3e0b22841bfa301d1f7b606ea3ae051b9d2a9388e44b7e47fa4"
+  },
+  "linux-official.json": {
+    "original_sha256": "ae7f40adb6104bb25bd75c310cfbf75f5a2b1fc62365f7fdbe4bfde7cade53a4",
+    "published_sha256": "ae7f40adb6104bb25bd75c310cfbf75f5a2b1fc62365f7fdbe4bfde7cade53a4"
+  },
+  "arm64-selected.txt": {
+    "original_sha256": "a1cf4be7139a70c5e8e94672519c17281ec1477cb59a3ceaeb805c327b963d3b",
+    "published_sha256": "a1cf4be7139a70c5e8e94672519c17281ec1477cb59a3ceaeb805c327b963d3b"
+  },
+  "linux-selected.txt": {
+    "original_sha256": "5d18c91c6f8e7b6ec76f4b7f15cddbf7b1c2939126355d5699a282ca043d7af9",
+    "published_sha256": "5d18c91c6f8e7b6ec76f4b7f15cddbf7b1c2939126355d5699a282ca043d7af9"
+  }
+}

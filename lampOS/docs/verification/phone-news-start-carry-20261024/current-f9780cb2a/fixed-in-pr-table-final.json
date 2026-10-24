@@ -1,0 +1,179 @@
+{
+  "rule_comment": 6370483473,
+  "resulting_head": "fa07f53015a17984c058f50a39f9e83b75d10a78",
+  "current_base_at_freeze": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "route": "fixed in PR",
+  "original_table": {
+    "commit": "6b41c238f1ad269f1b2b276f68b536725e0db593",
+    "path": "lampOS/docs/verification/tests-phone-e63a86d0-20261024/qualification-table.json",
+    "historical_rule_satisfied": false,
+    "full_counts": {
+      "passed": 7250,
+      "failed": 2,
+      "ignored": 34
+    },
+    "rows": [
+      {
+        "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+        "current_full": "FAILED",
+        "review": "Same strict index10<25ms predicate and unchanged source failed on frozen4a84base; exact source/phase review retained separately.",
+        "category": "matched prior base failure, not a historical-cause claim"
+      },
+      {
+        "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+        "original_failure_retained": true,
+        "current_full": "ok",
+        "standalone_outcomes": [
+          "ok",
+          "ok",
+          "ok"
+        ],
+        "category": "three prescribed standalone passes; accepted timing category only, not historical cause"
+      },
+      {
+        "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "original_failure_retained": true,
+        "current_full": "ok",
+        "standalone_outcomes": [
+          "ok",
+          "ok",
+          "ok"
+        ],
+        "category": "three prescribed standalone passes; accepted timing category only, not historical cause"
+      },
+      {
+        "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+        "current_full": "FAILED",
+        "standalone_outcomes": [
+          "FAILED",
+          "ok",
+          "ok"
+        ],
+        "category": "UNRESOLVED: two of three passed; standalone failure retained. No qualification waiver."
+      }
+    ]
+  },
+  "fixed_case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+  "fix_source": "qualified #3403 be88244fbd68c4cc08d7d1043635b3de416e2174 consumed in resulting head; exact patch and author/date/message preserved",
+  "fixture_behavior": {
+    "startup_first_byte_watchdog_seconds": 5,
+    "absolute_exit_and_eof_watchdog_after_first_byte_seconds": 2,
+    "later_bytes_renew_deadline": false,
+    "script_bytes_modes_output_recovery_assertions_retained": true,
+    "product_deadlines_changed": false
+  },
+  "local_result": {
+    "full_changed_crate_head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+    "full_voice": [
+      4032,
+      0,
+      21
+    ],
+    "full_update": [
+      395,
+      0,
+      6
+    ],
+    "current_head_scoped": {
+      "voice": [
+        1,
+        0,
+        0
+      ],
+      "update": [
+        11,
+        0,
+        0
+      ]
+    },
+    "current_source_unchanged": true,
+    "current_source_count": 7027,
+    "comparison": "Only non-consumed docs/duplex-listening.md differs from the full-run head; all other tracked source files identical, whole trees not equal.",
+    "comparison_record": "input-comparison.json",
+    "full_source_ref": "second/phone-fixed-update-mac-20261024",
+    "qualified_helper_in_current_head": true
+  },
+  "native_result": {
+    "head": "fa07f53015a17984c058f50a39f9e83b75d10a78",
+    "arm64_run": 40126238187,
+    "linux_run": 40126238179,
+    "arm64_census": {
+      "PASS": 7409,
+      "LEAK": 1,
+      "selected_terminal": 7410,
+      "primary_terminal_lines": 7444,
+      "identical_echoed_lines": 34,
+      "selected_unrun": 0,
+      "failed": 0,
+      "skipped": 53
+    },
+    "all_142_required_cases_pass": true,
+    "actual_tested_preview": "5710d0f894e42be93a8ce322a3cbb2024adf6b9d",
+    "authored_tested_complete_trees_equal": true,
+    "actual_linux_fmt_and_strict_clippy": "success",
+    "prior_a9_results_keep_a9_scope": true
+  },
+  "rule_satisfied": true,
+  "reader_disposition": "Producer table conditions satisfied; Reviewer-two owns independent final review and lifting the HOLD. Original historical table remains false/2-of-3.",
+  "original_frozen_executable_rerun": false,
+  "historical_cause": "not established",
+  "historical_three_of_three": "not claimed",
+  "resulting_rows": [
+    {
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "historical_row_retained": true,
+      "historical_category_retained": "matched prior base failure, not a historical-cause claim",
+      "full_local_observation": {
+        "head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+        "outcome": "ok"
+      },
+      "current_focused_local_observation": "Not selected in focused fa run; earlier full a9 observation retained with explicit head.",
+      "current_native_observation": "PASS"
+    },
+    {
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "historical_row_retained": true,
+      "historical_category_retained": "three prescribed standalone passes; accepted timing category only, not historical cause",
+      "full_local_observation": {
+        "head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+        "outcome": "ok"
+      },
+      "current_focused_local_observation": "Not selected in focused fa run; earlier full a9 observation retained with explicit head.",
+      "current_native_observation": "PASS"
+    },
+    {
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "historical_row_retained": true,
+      "historical_category_retained": "three prescribed standalone passes; accepted timing category only, not historical cause",
+      "full_local_observation": {
+        "head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+        "outcome": "ok"
+      },
+      "current_focused_local_observation": "Not selected in focused fa run; earlier full a9 observation retained with explicit head.",
+      "current_native_observation": "PASS"
+    },
+    {
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "historical_row_retained": true,
+      "category": "fixed in PR",
+      "fix": "qualified nonblocking output/exit/EOF fixture consumed in resulting head",
+      "historical_standalone_outcomes_unchanged": [
+        "FAILED",
+        "ok",
+        "ok"
+      ],
+      "current_head_observations_do_not_replace_historical": true,
+      "full_local_observation": {
+        "head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+        "outcome": "ok"
+      },
+      "current_focused_local_observation": {
+        "head": "fa07f53015a17984c058f50a39f9e83b75d10a78",
+        "outcome": "ok",
+        "executions": 1
+      },
+      "current_native_observation": "PASS"
+    }
+  ],
+  "current_latest_base_gate_satisfied": true
+}
