@@ -1,0 +1,74 @@
+kind = "core"
+version = "1.0.0"
+enabled = true
+
+[permissions]
+topics = ["fixture/pair", "voice/state"]
+body = true
+
+[[trigger]]
+name = "night_stale"
+topic = "fixture/pair"
+field = "phase"
+equals = "night_stale"
+rearm = "ends"
+during = { from = "23:00", to = "00:00" }
+once_per_day = true
+
+[[trigger]]
+name = "night_unmatched"
+topic = "fixture/pair"
+field = "phase"
+equals = "night_unmatched"
+rearm = "ends"
+during = { from = "23:00", to = "00:00" }
+once_per_day = true
+
+[[trigger]]
+name = "night"
+topic = "fixture/pair"
+field = "phase"
+equals = "night"
+rearm = "ends"
+during = { from = "23:00", to = "00:00" }
+once_per_day = true
+
+[[trigger]]
+name = "morning"
+topic = "fixture/pair"
+field = "phase"
+equals = "morning"
+rearm = "ends"
+during = { from = "00:00", to = "01:00" }
+once_per_day = true
+
+[[trigger]]
+name = "probe"
+topic = "fixture/pair"
+field = "phase"
+equals = "probe"
+rearm = "ends"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+on = "night_stale"
+rest = { op = "rest", during = { from = "23:00", to = "01:00" } }
+
+[[do]]
+on = "night_unmatched"
+rest = { op = "rest", during = { from = "23:00", to = "01:00" } }
+
+[[do]]
+on = "night"
+rest = { op = "rest", during = { from = "23:00", to = "01:00" } }
+
+[[do]]
+on = "morning"
+rest = { op = "wake" }
+
+[[do]]
+on = "probe"
+rest = { op = "cancel" }
+

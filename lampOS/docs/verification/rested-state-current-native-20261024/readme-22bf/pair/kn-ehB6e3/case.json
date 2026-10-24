@@ -1,0 +1,38 @@
+{
+  "boundary": "actual released rested/daily readers and writers; synthetic Expression and Body receipts",
+  "clock_id": "rested-release-pair-host",
+  "excluded": [
+    "physical output",
+    "provider",
+    "updater install",
+    "clock synchronization",
+    "power-loss durability"
+  ],
+  "kind": "rested-night",
+  "morning_day": 20750,
+  "morning_trigger_window": {
+    "from": "00:00",
+    "to": "01:00"
+  },
+  "morning_utc_offset_minutes": -185,
+  "night_day": 20749,
+  "night_trigger_window": {
+    "from": "23:00",
+    "to": "00:00"
+  },
+  "night_utc_offset_minutes": -245,
+  "reader": 6408,
+  "reader_bytes": 8807104,
+  "reader_sha256": "2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5",
+  "reader_source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb",
+  "rest_window": {
+    "from": "23:00",
+    "to": "01:00"
+  },
+  "return_reader": 6498,
+  "sampled_unix_ms": 1792812906998,
+  "writer": 6498,
+  "writer_bytes": 8786048,
+  "writer_sha256": "87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984",
+  "writer_source": "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+}

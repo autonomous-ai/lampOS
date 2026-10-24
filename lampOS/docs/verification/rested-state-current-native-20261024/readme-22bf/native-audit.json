@@ -1,0 +1,431 @@
+{
+  "run_id": 40058643215,
+  "authored_head": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+  "native_platform": "Linux aarch64",
+  "suite": "6 passed, 0 failed, 0 ignored, 0 filtered",
+  "seconds": 9.0,
+  "total_spawn_count": 28,
+  "total_owned_reaps": 28,
+  "total_snapshots": 26,
+  "cases": [
+    {
+      "case": "kn-0A7V4P",
+      "direction": [
+        6408,
+        6498,
+        6408
+      ],
+      "spawn_count": 3,
+      "pid_reaps": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10114,
+          "signal": 9,
+          "stage": "a"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10120,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10125,
+          "signal": 9,
+          "stage": "a-return"
+        }
+      ],
+      "snapshots": 5,
+      "artifacts_unchanged": true,
+      "negative_admissions": 2,
+      "same_episode_renewal_delta_us": 1000870,
+      "daily_claims": {
+        "after-a": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ]
+        },
+        "after-b": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        },
+        "after-a-return": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        }
+      },
+      "private_stretches": 1,
+      "synthetic_over_after_datagram_before_done": true,
+      "no_requests_from_replacement_or_return": true,
+      "spent_morning_refused": true,
+      "state_preserved_on_reads": true
+    },
+    {
+      "case": "kn-ehB6e3",
+      "direction": [
+        6498,
+        6408,
+        6498
+      ],
+      "spawn_count": 3,
+      "pid_reaps": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10068,
+          "signal": 9,
+          "stage": "a"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10074,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10079,
+          "signal": 9,
+          "stage": "a-return"
+        }
+      ],
+      "snapshots": 5,
+      "artifacts_unchanged": true,
+      "negative_admissions": 2,
+      "same_episode_renewal_delta_us": 1001210,
+      "daily_claims": {
+        "after-a": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ]
+        },
+        "after-b": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        },
+        "after-a-return": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        }
+      },
+      "private_stretches": 1,
+      "synthetic_over_after_datagram_before_done": true,
+      "no_requests_from_replacement_or_return": true,
+      "spent_morning_refused": true,
+      "state_preserved_on_reads": true
+    },
+    {
+      "case": "kr-ARqLe5",
+      "direction": [
+        6408,
+        6408,
+        6498,
+        6498,
+        6498,
+        6408,
+        6408,
+        6408
+      ],
+      "spawn_count": 8,
+      "pid_reaps": [
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10095,
+          "signal": null,
+          "stage": "a-on"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10097,
+          "signal": null,
+          "stage": "a-off"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10099,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10102,
+          "signal": null,
+          "stage": "b-off"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10104,
+          "signal": null,
+          "stage": "b-on"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10106,
+          "signal": 9,
+          "stage": "c"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10109,
+          "signal": null,
+          "stage": "c-on"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10111,
+          "signal": null,
+          "stage": "c-off"
+        }
+      ],
+      "snapshots": 5,
+      "artifacts_unchanged": true
+    },
+    {
+      "case": "kr-FxGhWM",
+      "direction": [
+        6498,
+        6498,
+        6408,
+        6408,
+        6408,
+        6498,
+        6498,
+        6498
+      ],
+      "spawn_count": 8,
+      "pid_reaps": [
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10049,
+          "signal": null,
+          "stage": "a-on"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10051,
+          "signal": null,
+          "stage": "a-off"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10053,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10056,
+          "signal": null,
+          "stage": "b-off"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10058,
+          "signal": null,
+          "stage": "b-on"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10060,
+          "signal": 9,
+          "stage": "c"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10063,
+          "signal": null,
+          "stage": "c-on"
+        },
+        {
+          "code": 0,
+          "event": "reaped",
+          "pid": 10065,
+          "signal": null,
+          "stage": "c-off"
+        }
+      ],
+      "snapshots": 5,
+      "artifacts_unchanged": true
+    },
+    {
+      "case": "kr-JjJcz8",
+      "direction": [
+        6408,
+        6498,
+        6408
+      ],
+      "spawn_count": 3,
+      "pid_reaps": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10085,
+          "signal": 9,
+          "stage": "a"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10088,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10091,
+          "signal": 9,
+          "stage": "c"
+        }
+      ],
+      "snapshots": 3,
+      "artifacts_unchanged": true
+    },
+    {
+      "case": "kr-K3ivui",
+      "direction": [
+        6498,
+        6408,
+        6498
+      ],
+      "spawn_count": 3,
+      "pid_reaps": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10039,
+          "signal": 9,
+          "stage": "a"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10042,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10045,
+          "signal": 9,
+          "stage": "c"
+        }
+      ],
+      "snapshots": 3,
+      "artifacts_unchanged": true
+    }
+  ],
+  "event_counts": {
+    "manifest_frozen": 4,
+    "environment": 28,
+    "spawn": 28,
+    "input_barrier": 76,
+    "input": 66,
+    "skills_event": 126,
+    "expression_request": 12,
+    "expression_reply_selected": 8,
+    "synthetic_expression_evidence": 28,
+    "admitted_night_before_cut": 2,
+    "reaped": 28,
+    "snapshot": 26,
+    "probe_owner_freshness": 6,
+    "private_body_datagram": 2,
+    "synthetic_body_over": 2,
+    "morning_claim_refused_on_return": 2,
+    "case_complete": 6,
+    "asked": 12,
+    "drained_before_clock_barrier": 88,
+    "persisted_state_refused_trigger": 6
+  },
+  "source_binding": {
+    "authored_head": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+    "file_count": 6974,
+    "unique_blob_count": 5863,
+    "source_before_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+    "source_after_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+    "authored_manifest_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+    "all_paths_and_hashes_match": true,
+    "missing": [],
+    "extra": [],
+    "changed": [],
+    "method": "Every authored lampOS Git blob read through offline git cat-file --batch; complete paths and SHA-256s compared to both native manifests.",
+    "changes_from_8bc821736": [
+      "lampOS/docs/verification/rested-state-release-pair-20261024/README.md"
+    ]
+  },
+  "qualification": "Actual pinned published Skills A-to-B-to-A daily/on-off/rested persistence. Synthetic Expression/Body and controlled local-day offsets; acknowledged-boundary SIGKILL/reap, not physical output or power-loss durability."
+}

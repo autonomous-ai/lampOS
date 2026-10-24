@@ -1,0 +1,97 @@
+{
+  "head": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+  "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "tested_merge_from_checkout_logs": "4870711bf6decf78712b6d94ffabaf05a52d97de",
+  "runs": {
+    "pair": {
+      "conclusion": "success",
+      "databaseId": 40058643215,
+      "headSha": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+      "status": "completed",
+      "raw_log_sha256": "31e52cf857917b364b939bf89f7b17d32706d22326fe12ac9007bbdf7f1adebf",
+      "tests": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0,
+        "seconds": 9.0
+      }
+    },
+    "arm": {
+      "conclusion": "success",
+      "databaseId": 40058643232,
+      "headSha": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+      "status": "completed",
+      "raw_log_sha256": "07a379596f7e387337c51e0bacb72327e64bec83e6d92695395f2c7fe278da44",
+      "nextest": {
+        "passed": 11164,
+        "clean_pass_rows": 11163,
+        "leaky_passes": 1,
+        "failed": 0,
+        "skipped": 77,
+        "seconds": 199.241,
+        "numbered_rows": {
+          "PASS": 11163,
+          "LEAK": 1
+        },
+        "leak_marked_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "skipped_names": "Not emitted."
+      },
+      "separate_process_harness": {
+        "passed": 12,
+        "failed": 0
+      },
+      "packaged": {
+        "current_binaries": 47,
+        "selected_examples": 2,
+        "ordinary_payload_downloaded": false
+      }
+    },
+    "clippy": {
+      "conclusion": "success",
+      "databaseId": 40058643199,
+      "headSha": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+      "status": "completed",
+      "raw_log_sha256": "e6011cddc76bab7f2f0c51082fb57fd4d2f4175ccb1c82cac138f2a195aeacf6",
+      "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+      "rust_warning_error_diagnostics": 0
+    }
+  },
+  "archive": {
+    "file": "lampos-routine-state-pair-evidence.tar.gz",
+    "sha256": "6a9d49f98d337610e141a30bb82d8b3b6cd831b60af774b7a3e015016a17dd1a",
+    "note": "Downloaded retained tar; API ZIP metadata not separately requested."
+  },
+  "source_binding": {
+    "authored_head": "22bf27d34156bb18eb3232dcd53cb8d5931fbe06",
+    "file_count": 6974,
+    "unique_blob_count": 5863,
+    "source_before_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+    "source_after_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+    "authored_manifest_sha256": "9e3561d0c94ca99801032da5075b3098d4b48e4741f30bfd39ca4bf0a9cfd717",
+    "all_paths_and_hashes_match": true,
+    "missing": [],
+    "extra": [],
+    "changed": [],
+    "method": "Every authored lampOS Git blob read through offline git cat-file --batch; complete paths and SHA-256s compared to both native manifests.",
+    "changes_from_8bc821736": [
+      "lampOS/docs/verification/rested-state-release-pair-20261024/README.md"
+    ]
+  },
+  "retention": {
+    "mapped_files": 282,
+    "excluded_case_files": 102,
+    "raw_ci_logs": "Audited outside publication; hashes and derived results retained. No identity-bearing API objects copied."
+  },
+  "warnings": [
+    "One nextest LEAK-marked pass remains inside the pass total.",
+    "Node action deprecation, certificate rehash notice, Cargo example filename collisions remain."
+  ],
+  "limits": [
+    "Synthetic Expression/Body and fixed consecutive-day offsets, not physical output, elapsed night or clock synchronization.",
+    "Acknowledged-boundary SIGKILL/reap, not mid-write or power-loss durability.",
+    "Owned-process receipts only; no global process inventory.",
+    "Published artifact consistency pins, not independently trusted signed release verification.",
+    "No local gates were rerun or relabelled for this README-only head."
+  ]
+}
