@@ -11409,7 +11409,7 @@ async fn requested_music_through_the_installed_runner_keeps_its_offer_private() 
             asked[1].last(),
             Some(&Message::tool(
                 "music-original",
-                json!({"next":"Say one short confirmation."}).to_string()
+                json!({"next":"Say one short confirmation. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."}).to_string()
             ))
         );
         let model = serde_json::to_string(&*asked).unwrap();

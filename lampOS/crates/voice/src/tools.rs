@@ -1691,7 +1691,16 @@ fn take_requested_audio(
     let private = told.as_object_mut()?.remove("requested_audio")?;
     let expected = context?;
     let offer: lamp_msgs::RequestedAudioOffer = serde_json::from_value(private).ok()?;
-    (offer.check().is_ok() && &offer.context == expected).then_some(offer)
+    if offer.check().is_err() || &offer.context != expected {
+        return None;
+    }
+    // An offer is not the coordinator's acceptance or an audible handoff.
+    // Both voice routes receive the same truthful preparation boundary.
+    let note = told["next"].as_str().unwrap_or_default();
+    told["next"] = json!(format!(
+        "{note} The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."
+    ));
+    Some(offer)
 }
 
 /// Only the new Schedule tools use this exchange. A lost or malformed reply
@@ -2940,7 +2949,13 @@ mod tests {
                     assert!(answer.requested_audio.is_none());
                     assert!(!lease.is_current());
                 } else {
-                    assert_eq!(answer.told, json!({"next":"Say one short confirmation."}));
+                    let note = answer.told["next"].as_str().unwrap();
+                    assert!(note.starts_with("Say one short confirmation."));
+                    assert!(note.contains("playback has not started and may still be refused"));
+                    assert!(note.contains("Confirm only that you will try to play it."));
+                    assert!(note.contains("Do not say it is playing, has started, or is ready."));
+                    assert_eq!(answer.told.as_object().unwrap().len(), 1);
+                    assert!(!note.contains("relaxing.wav"));
                     assert_eq!(answer.requested_audio, Some(offer));
                     assert!(lease.is_current());
                 }
@@ -3095,7 +3110,13 @@ mod tests {
             let server = audio_socket(&dir, json!(&offer));
             let answer = answer_spoken(&settings, &call, &context);
             assert_eq!(answer.requested_audio, Some(offer));
-            assert_eq!(answer.told, json!({"next":"Say one short confirmation."}));
+            let note = answer.told["next"].as_str().unwrap();
+            assert!(note.starts_with("Say one short confirmation."));
+            assert!(note.contains("playback has not started and may still be refused"));
+            assert!(note.contains("Confirm only that you will try to play it."));
+            assert!(note.contains("Do not say it is playing, has started, or is ready."));
+            assert_eq!(answer.told.as_object().unwrap().len(), 1);
+            assert!(!note.contains("relaxing.wav"));
             assert_eq!(
                 server.join().unwrap(),
                 json!({"op":"call","name":"play_relaxing_music",
