@@ -1,0 +1,22 @@
+{
+  "memory-verified.json": {
+    "bytes": 6294,
+    "sha256": "6f8f4a4782611edbc67390ee4cd6b2d3fdd423f25a035b869ca612a6c634cc08"
+  },
+  "memory-export.json": {
+    "bytes": 2008,
+    "sha256": "aea06151bf0c48034595e4a0d2cae9b3e4a703ed78eb2cae750a501584dff17e"
+  },
+  "memory-manual.txt": {
+    "bytes": 717,
+    "sha256": "2bece8e7c5a1e785614702297c1c441d13b6ad8a0c4fe10afe5a9ea9e9028255"
+  },
+  "memory-timings.json": {
+    "bytes": 3124,
+    "sha256": "56812a8713c462b273a4440a14ce7c6e615d0e858342575047ca5aed3c1ea344"
+  },
+  "common-failures.md": {
+    "bytes": 12051,
+    "sha256": "ba4552830f024071e2b2d329ec83417a8e3f0b27385b97198db9705c393ab3b6"
+  }
+}

@@ -8417,3 +8417,11 @@ fourth/records-release-pair-20261024, after open and merged PR searches and Queu
 6378347221. Native systemd, genuine muted Voice sessions and unchanged production
 guards are required. Common’s full host gates continue independently; Photo and
 Name carry audits remain prepared. No lamp result or row increase is claimed.
+
+## 2026-10-24 09:39 +07: actual Memory pair passes; shipping update rows
+
+Ready for lamp-voice: no (remaining workspace/current-head/native gates pending).
+
+The corrected actual 6408↔6449 Memory pair passes 2/0/0, ordinary Memory 314/0/8, strict Memory Clippy and formatting; both releases contain identical Memory payloads. [Evidence and retained failures](verification/release-pair-progress-20261024/README.md) records the original startup and fixture-ID failures, verified export/cleanup, exact source and socket timing boundaries. Full Common Voice failures remain 4,063/15/15 Mac and 4,131/8/18 Linux; source parity establishes no cause or waiver. Linux Update 388/0/4 and Skills 23/0/0 pass; Mac Update continues.
+
+Taken per the ship-critical Queue: #2809 Memory and Records coverage. Records' actual systemd fixture and native lane are being finished; no Python helper will be committed, following Fourth's role. No lamp result or build-row increase.

@@ -1,0 +1,85 @@
+{
+  "source_head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "source_tree": "db30c396c9ad1ebb88b84714265809cd1c22054f",
+  "archive_sha256": "1494336ed748cd7faeeebce5d066519be894195b1bfce4f099a9142bb0fb5c58",
+  "total_rpc_count": 60,
+  "cases": [
+    {
+      "writer": "6408",
+      "opposite_reader": "6449",
+      "return_reader": "6408",
+      "rpc_count": 30,
+      "phases": {
+        "write": {
+          "rpc_count": 11,
+          "first_status_rpc_us": 14377,
+          "later_mixed_rpc_count": 10,
+          "later_mixed_min_us": 3271,
+          "later_mixed_median_us": 4900.5,
+          "later_mixed_p95_nearest_rank_us": 24392,
+          "later_mixed_max_us": 24392
+        },
+        "opposite": {
+          "rpc_count": 10,
+          "first_status_rpc_us": 22047,
+          "later_mixed_rpc_count": 9,
+          "later_mixed_min_us": 3043,
+          "later_mixed_median_us": 6960,
+          "later_mixed_p95_nearest_rank_us": 37469,
+          "later_mixed_max_us": 37469
+        },
+        "return": {
+          "rpc_count": 9,
+          "first_status_rpc_us": 21185,
+          "later_mixed_rpc_count": 8,
+          "later_mixed_min_us": 3140,
+          "later_mixed_median_us": 6607.0,
+          "later_mixed_p95_nearest_rank_us": 26101,
+          "later_mixed_max_us": 26101
+        }
+      }
+    },
+    {
+      "writer": "6449",
+      "opposite_reader": "6408",
+      "return_reader": "6449",
+      "rpc_count": 30,
+      "phases": {
+        "write": {
+          "rpc_count": 11,
+          "first_status_rpc_us": 13958,
+          "later_mixed_rpc_count": 10,
+          "later_mixed_min_us": 3393,
+          "later_mixed_median_us": 5165.5,
+          "later_mixed_p95_nearest_rank_us": 25047,
+          "later_mixed_max_us": 25047
+        },
+        "opposite": {
+          "rpc_count": 10,
+          "first_status_rpc_us": 18375,
+          "later_mixed_rpc_count": 9,
+          "later_mixed_min_us": 1961,
+          "later_mixed_median_us": 5394,
+          "later_mixed_p95_nearest_rank_us": 28833,
+          "later_mixed_max_us": 28833
+        },
+        "return": {
+          "rpc_count": 9,
+          "first_status_rpc_us": 17187,
+          "later_mixed_rpc_count": 8,
+          "later_mixed_min_us": 2565,
+          "later_mixed_median_us": 4621.5,
+          "later_mixed_p95_nearest_rank_us": 18463,
+          "later_mixed_max_us": 18463
+        }
+      }
+    }
+  ],
+  "boundary": "Fixture.ask Instant before UnixStream.connect through request write, complete bounded reply and JSON parse; captured before evidence-log open/write. First status occurs after ready-file/socket readiness; startup-to-ready is not timed.",
+  "environment": "Linux AMD64 container, actual AArch646408/6449 executables through existing binfmt, synthetic fixed corpus, native tmpfs",
+  "limits": [
+    "Counts and microseconds only; no source words, person IDs or response payloads included.",
+    "Later calls are a heterogeneous fixed test mix, not repeated identical queries or independent UX trials.",
+    "No device/acoustic/network/model/startup latency acceptance or before-after product improvement claimed."
+  ]
+}

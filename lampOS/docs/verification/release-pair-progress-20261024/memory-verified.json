@@ -1,0 +1,235 @@
+{
+  "head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "tree": "db30c396c9ad1ebb88b84714265809cd1c22054f",
+  "source_files": 10311,
+  "terminal_exit": 0,
+  "target_released": true,
+  "source_bytes_modes_mtimes_semantic_index_unchanged": true,
+  "all_five_containers_removed": true,
+  "manual_pair": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "named_results": {
+      "current_reads_release_6408_days_and_forget_survives_release_6408_reopen": 1,
+      "release_6408_reads_current_days_and_forget_survives_current_reopen": 1
+    },
+    "rpc_records_each": 30,
+    "case_terminal_receipts": [
+      {
+        "identical_release_payloads": true,
+        "opposite_reader": "6449",
+        "physical_or_signature_acceptance": false,
+        "processes_reaped": 3,
+        "release_6408_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "release_6449_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "result": "passed",
+        "return_reader": "6408",
+        "writer": "6408"
+      },
+      {
+        "identical_release_payloads": true,
+        "opposite_reader": "6408",
+        "physical_or_signature_acceptance": false,
+        "processes_reaped": 3,
+        "release_6408_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "release_6449_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "result": "passed",
+        "return_reader": "6449",
+        "writer": "6449"
+      }
+    ],
+    "artifact_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+    "artifact_bytes": 4738136,
+    "identical_memory_payloads": true,
+    "execution": "Actual AArch64 release executables under existing binfmt in Linux AMD64 container; no native-ARM-host claim"
+  },
+  "export": {
+    "archive_bytes": 276480,
+    "archive_sha256": "1494336ed748cd7faeeebce5d066519be894195b1bfce4f099a9142bb0fb5c58",
+    "regular_file_count": 14,
+    "case_count": 2,
+    "test.exit": 0,
+    "export.exit": 0
+  },
+  "full_memory": {
+    "passed": 314,
+    "failed": 0,
+    "ignored": 8,
+    "targets": [
+      {
+        "target": "unittests src/lib.rs",
+        "status": "ok",
+        "passed": 96,
+        "failed": 0,
+        "ignored": 1
+      },
+      {
+        "target": "unittests src/main.rs",
+        "status": "ok",
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "unittests src/bin/lamp-memory-eval.rs",
+        "status": "ok",
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/forget_person.rs",
+        "status": "ok",
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/forget_shared_exchange.rs",
+        "status": "ok",
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/forgot.rs",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/health_control.rs",
+        "status": "ok",
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/it/main.rs",
+        "status": "ok",
+        "passed": 154,
+        "failed": 0,
+        "ignored": 5
+      },
+      {
+        "target": "tests/paraphrase_fixture.rs",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/release_pair.rs",
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 2
+      },
+      {
+        "target": "tests/voice_early_words.rs",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/voice_follows_face.rs",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/voice_forget.rs",
+        "status": "ok",
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/voice_forget_about.rs",
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/voice_forget_named.rs",
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/voice_link_used.rs",
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/voice_observe.rs",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/voice_since_until.rs",
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "Doc-tests lamp_memory",
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    ],
+    "manual_cases_ignored_in_this_package_run": 2
+  },
+  "stages": [
+    {
+      "stage": "compile",
+      "exit": 0,
+      "elapsed_seconds": 5.618873510044068,
+      "cleanup_confirmed": true
+    },
+    {
+      "stage": "manual-pair",
+      "exit": 0,
+      "elapsed_seconds": 4.2061216295696795,
+      "cleanup_confirmed": true
+    },
+    {
+      "stage": "full-memory",
+      "exit": 0,
+      "elapsed_seconds": 81.99779364001006,
+      "cleanup_confirmed": true
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "elapsed_seconds": 358.83796314010397,
+      "cleanup_confirmed": true
+    },
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "elapsed_seconds": 20.500869079027325,
+      "cleanup_confirmed": true
+    }
+  ],
+  "prior_attempts": "Source9d: first manual0/2beforeRPC; native-runtime manual0/2badfixtureIDs, incompleteexport. No source-specific failure erased or relabelled.",
+  "limits": [
+    "No production/dependency/API changes or relaxed assertions/deadlines.",
+    "Only strict Memory all-target Clippy and fmt here; remaining Mac/workspace/current-head gates and fresh PR native acceptance are Root-owned.",
+    "Release-signature verification, Records/Voice pair, attended lamp/power-cut acceptance remain separate.",
+    "No commit or push."
+  ]
+}
