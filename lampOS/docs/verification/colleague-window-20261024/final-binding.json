@@ -1,0 +1,14 @@
+{
+  "head": "f3f49646e592adf124b21e6732f8ea2b55a009b2",
+  "tree": "cbb506a509bbfa2fae28a337fdde7611c2d1d835",
+  "base": "43ac6c843",
+  "qualified_carried_parent": "b186688ac",
+  "qualification": "four frozen-source Mac stages, 7315 passed/0 failed/52 ignored,79 summaries",
+  "source_count": 7024,
+  "frozen_sources_verified_before_commit": true,
+  "own_commit_one_line": "lampOS: bound carry from one held colleague line",
+  "worktree_clean": true,
+  "linux_fmt_clippy_and_arm64": "pending new PR native gates; Docker unavailable; no ARM64 link or device access on Mac",
+  "all_committed_blob_bytes_match_qualified_source": true,
+  "committed_source_count": 7024
+}
