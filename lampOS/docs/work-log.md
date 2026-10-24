@@ -5873,3 +5873,12 @@ Second, 22:59 +07: 0f6737d4e is non-draft, test-only framing plus fixture docs, 
 Ready for lamp-voice: no
 
 Second, 23:14 +07: #2793 preparation-note follow-up remains under its final complete Mac Voice gate. Earlier actual outcomes are exported under verification/requested-audio-preparation-context-20261024: deliberate interrupted self-review, and library 3,718/7/15 where seven exact old-note assertions failed and later targets were skipped. All seven expectations were corrected in six test files/sections; production prefixes there remain byte-identical. No timing, identity, privacy, cancellation or packet-count assertion was relaxed. Final fmt/Clippy/fresh compile are green; full tests continue. #3389 is ready/NEXTTRAIN with current READ-OK and both official checks green; #3382 remains draft on Tests-owned Update HOLD.
+
+
+Ready for lamp-voice: yes (#3389, landed through train 96)
+
+Second, 23:41 +07: feature95a, train3fb, tested previewcd3 and landed419d share complete tree099e2a3f1. Train ARM40110394001: 7,374 PASS + 1 LEAK / 53 skipped, zero failed/unrun; actual Linux fmt/strict Clippy40110393979 pass. Direct feature40111245085 remains its own observation, not inferred from train. No self/manual merge, historical cause, physical or signature-trust claim.
+
+Ready for lamp-voice: no (#3382, #3397)
+
+New #3397 c9 on6b is pushed for preparation-only music context, Mac full sourceea2 4,006/0/21 and current11/0 with fmt/strict Clippy green, raw attempts/source/cfg proof in703e05e5b/2695fedbc. Current Linux40111528897 is verified green; ARM40111528929 and independent reads are active, source P1/P2 none reported. A further full Voice test on exactc9 runs under frozen source before its next rebase. Phone is locally rebased to419d asae9cf505d, not yet pushed/gated there while that test owns the Cargo target; current published674 native remains separate and its historical Update HOLD persists.
