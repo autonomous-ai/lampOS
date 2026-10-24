@@ -1,0 +1,220 @@
+{
+  "run_id": 40056359883,
+  "pr": 3327,
+  "failed_head": "b76fe12ae98c1ac2bd284dae347ab42bb3816776",
+  "archive_name": "lampos-routine-state-pair-evidence.tar.gz",
+  "archive_sha256": "fe933182f541f355c2b878334c9c0e088552d1b81ab4187812155032841f74ec",
+  "copied_files": [
+    {
+      "archive_member": "./skills-tests.log",
+      "file": "skills-tests.txt",
+      "bytes": 16872,
+      "sha256": "11d7f923ce6d82b6c704f4cec3e4fcf59473f11cb030dab0a3192e141f17a255",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/a.exit.json",
+      "file": "kn-6iFfa5/a.exit.json",
+      "bytes": 86,
+      "sha256": "5d48f2ed936299c6d76d26d19f7d8a831b03597c8eee73bbde121f684aa85502",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/a.stderr",
+      "file": "kn-6iFfa5/a-stderr.txt",
+      "bytes": 1779,
+      "sha256": "471764be996feef5fe4cc630ad03b6abb4369b345ba3ada48db8f29f674af266",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/a.stdout",
+      "file": "kn-6iFfa5/a-stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/case.json",
+      "file": "kn-6iFfa5/case.json",
+      "bytes": 1096,
+      "sha256": "0ccd7ae9548589de381d5c1ee97bcd25279d98bf9c8b3174099532b78c55c861",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/transcript.jsonl",
+      "file": "kn-6iFfa5/transcript.txt",
+      "bytes": 13412,
+      "sha256": "fe7abccb45afcc4b45fde0de4b31854ab2b2ef96c9a65737d066346b974c3710",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/after-a/daily.json",
+      "file": "kn-6iFfa5/after-a/daily.json",
+      "bytes": 22118,
+      "sha256": "db695c636fe0b55d60fc44771f2cc9e5b0082134ccc05610149284f881b3a1aa",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/after-a/rested",
+      "file": "kn-6iFfa5/after-a/rested.txt",
+      "bytes": 19,
+      "sha256": "ca9a8a44196f47452fad3060f0aaa14c2528d0c7c0262bc963e2c80b36b26aef",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/after-a/files.json",
+      "file": "kn-6iFfa5/after-a/files.json",
+      "bytes": 706,
+      "sha256": "55bfc54cc1595bbdc794f674a14b5807ecd97f5f9a9fc73a3ee6a2732b0e3cf3",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/after-a/skill.toml",
+      "file": "kn-6iFfa5/after-a/skill.toml",
+      "bytes": 1288,
+      "sha256": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/after-a/SKILL.md",
+      "file": "kn-6iFfa5/after-a/SKILL.md",
+      "bytes": 75,
+      "sha256": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/skills/rested-check/skill.toml",
+      "file": "kn-6iFfa5/skills/rested-check/skill.toml",
+      "bytes": 1288,
+      "sha256": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-6iFfa5/skills/rested-check/SKILL.md",
+      "file": "kn-6iFfa5/skills/rested-check/SKILL.md",
+      "bytes": 75,
+      "sha256": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/a.exit.json",
+      "file": "kn-cJ2RNS/a.exit.json",
+      "bytes": 86,
+      "sha256": "2ea87f8e8b1cf607ab116ca30d2457202dbca2569b0d5d54084d543366333946",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/a.stderr",
+      "file": "kn-cJ2RNS/a-stderr.txt",
+      "bytes": 1779,
+      "sha256": "471764be996feef5fe4cc630ad03b6abb4369b345ba3ada48db8f29f674af266",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/a.stdout",
+      "file": "kn-cJ2RNS/a-stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/case.json",
+      "file": "kn-cJ2RNS/case.json",
+      "bytes": 1096,
+      "sha256": "e6ebca76e3d3e20d1cfb88e0a1e612c40831cc5a93bde17eb53e796ae8f18088",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/transcript.jsonl",
+      "file": "kn-cJ2RNS/transcript.txt",
+      "bytes": 13412,
+      "sha256": "e8e26c44c9796d9c0c966db845453901189a2389bf1988cfd121e472a43bd895",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/after-a/daily.json",
+      "file": "kn-cJ2RNS/after-a/daily.json",
+      "bytes": 22118,
+      "sha256": "db695c636fe0b55d60fc44771f2cc9e5b0082134ccc05610149284f881b3a1aa",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/after-a/rested",
+      "file": "kn-cJ2RNS/after-a/rested.txt",
+      "bytes": 19,
+      "sha256": "ca9a8a44196f47452fad3060f0aaa14c2528d0c7c0262bc963e2c80b36b26aef",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/after-a/files.json",
+      "file": "kn-cJ2RNS/after-a/files.json",
+      "bytes": 706,
+      "sha256": "55bfc54cc1595bbdc794f674a14b5807ecd97f5f9a9fc73a3ee6a2732b0e3cf3",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/after-a/skill.toml",
+      "file": "kn-cJ2RNS/after-a/skill.toml",
+      "bytes": 1288,
+      "sha256": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/after-a/SKILL.md",
+      "file": "kn-cJ2RNS/after-a/SKILL.md",
+      "bytes": 75,
+      "sha256": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/skills/rested-check/skill.toml",
+      "file": "kn-cJ2RNS/skills/rested-check/skill.toml",
+      "bytes": 1288,
+      "sha256": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+      "byte_identical": true
+    },
+    {
+      "archive_member": "./kn-cJ2RNS/skills/rested-check/SKILL.md",
+      "file": "kn-cJ2RNS/skills/rested-check/SKILL.md",
+      "bytes": 75,
+      "sha256": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+      "byte_identical": true
+    }
+  ],
+  "derived_files": [
+    {
+      "file": "bus-directory-inventory.txt",
+      "derivation": "Selected ./kn-*/b/ member names from tar -tzf of retained source archive; no bus bytes copied.",
+      "bytes": 1404,
+      "sha256": "ea9dd64512bd5d1213ca1bb84fa28c7fade0841590b07270d263e86cee95816a"
+    }
+  ],
+  "lifecycle_boundaries": [
+    {
+      "case": "kn-6iFfa5",
+      "writer": 6498,
+      "spawned_stages": [
+        "a"
+      ],
+      "owned_a_pid": 10068,
+      "owned_a_reaped": true,
+      "owned_a_signal": 9,
+      "b_spawned": false,
+      "scope": "Owned A child receipt and transcript boundary only, not a global process inventory."
+    },
+    {
+      "case": "kn-cJ2RNS",
+      "writer": 6408,
+      "spawned_stages": [
+        "a"
+      ],
+      "owned_a_pid": 10104,
+      "owned_a_reaped": true,
+      "owned_a_signal": 9,
+      "b_spawned": false,
+      "scope": "Owned A child receipt and transcript boundary only, not a global process inventory."
+    }
+  ],
+  "redactions": [],
+  "renames": "Log, stdout/stderr, transcript and rested text use .txt filenames. All copied files are byte-identical; no lines were omitted or rewritten."
+}
