@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 03:18: Common failed Mac gate preserved, Name Linux complete
+
+- [Selected Common host receipt](verification/common-rebased-selected-20261025/README.md) preserves Mac full Voice 4127/12/21 and gate 101; the other seven stages pass. Linux all eight stages pass, Voice 4200/0/24. Required controls, fresh 46 and source/cleanup verify separately, with no failure waived. Raw evidence remains private.
+- Next is one clean 427 full Voice comparison and the first three fixed isolated observations for extra cases. The executable capture is post-terminal/pre-clean; its initial failed-execution hash remains unobserved. No current-head native or privacy qualification is claimed.
+- Provisional Name 853 Linux all five stages pass: Voice 4200/0/24, Update 388/0/4, six controls/fresh 46/source/cleanup verified. Mac and final parent binding remain open. Callback 261 read remains scoped to its prior parent; Photo origin/interval holds remain. No lamp action.
+
 ## 2026-10-25 02:08: Photo skill removal decision and explicit acceptance holds
 
 - Refreshed already-claimed #2949 while Common qualification runs; [source decision](verification/photo-skill-removal-plan-20261025/README.md) reuses durable off intent and the tools-file handoff after #2856, with no extra model function or generic grant change. Removal must remain effective across updates; no renewed permission question.

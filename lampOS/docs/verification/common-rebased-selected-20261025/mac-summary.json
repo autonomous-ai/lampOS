@@ -1,0 +1,60 @@
+{
+  "cause_assigned": false,
+  "cleanup_proved": true,
+  "counts": {
+    "full-eyes": {
+      "failed": 0,
+      "ignored": 5,
+      "passed": 357
+    },
+    "full-memory": {
+      "failed": 0,
+      "ignored": 8,
+      "passed": 324
+    },
+    "full-skills": {
+      "failed": 0,
+      "ignored": 9,
+      "passed": 516
+    },
+    "full-update": {
+      "failed": 0,
+      "ignored": 6,
+      "passed": 386
+    },
+    "full-voice": {
+      "failed": 12,
+      "ignored": 21,
+      "passed": 4127
+    }
+  },
+  "failed_results_waived": false,
+  "formal_read_ok_issued": false,
+  "format": "common-failed-mac-count-sourcehash-bool-review/1",
+  "fresh_local_members": 46,
+  "full_gate_pass": false,
+  "gate_exit": 101,
+  "once_passed_controls": 5,
+  "owned_source_files": 36,
+  "physical_or_readiness_or_activation_claim": false,
+  "public_raw_upload_authorized": false,
+  "required_controls": 5,
+  "retry_performed": false,
+  "scope_base": "4270083a2e32af70397be5c705ec42af046f7a33",
+  "semantic_index_sha256": "c415fe55378ff08f5d2eb5637345f8d5b833f03a0dd9df35e76fac1da8fad36f",
+  "source_files": 10454,
+  "source_map_sha256": "9a81df3aff68d4894628e07d9300262b4636220ec7498b505a5afab6ca8dab59",
+  "source_stable": true,
+  "stage_exits": [
+    0,
+    0,
+    0,
+    0,
+    101,
+    0,
+    0,
+    0
+  ],
+  "tested_head": "f5d92567ef89f7a7aeebee1d591038bb586c7b20",
+  "tested_tree": "d454da643e6b9809a36c1cfc87ea5c8b03df110f"
+}

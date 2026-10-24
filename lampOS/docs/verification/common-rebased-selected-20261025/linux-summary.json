@@ -1,0 +1,51 @@
+{
+  "both_hosts_qualified": false,
+  "cleanup_proved": true,
+  "counts": {
+    "full-eyes": {
+      "failed": 0,
+      "ignored": 5,
+      "passed": 360
+    },
+    "full-memory": {
+      "failed": 0,
+      "ignored": 8,
+      "passed": 324
+    },
+    "full-skills": {
+      "failed": 0,
+      "ignored": 9,
+      "passed": 519
+    },
+    "full-update": {
+      "failed": 0,
+      "ignored": 4,
+      "passed": 388
+    },
+    "full-voice": {
+      "failed": 0,
+      "ignored": 24,
+      "passed": 4200
+    }
+  },
+  "current_native_acceptance": false,
+  "formal_read_ok_issued": false,
+  "format": "common-rebased-linux-count-sourcehash-bool-review/1",
+  "fresh_local_member_count": 46,
+  "gate_exit": 0,
+  "observed_stage_count": 8,
+  "once_passed_controls": 6,
+  "owned_source_file_count": 36,
+  "physical_qualified": false,
+  "public_raw_upload_authorized": false,
+  "readiness_or_activation_claim": false,
+  "required_controls": 6,
+  "required_stage_count": 8,
+  "scope_base": "4270083a2e32af70397be5c705ec42af046f7a33",
+  "semantic_index_sha256": "c415fe55378ff08f5d2eb5637345f8d5b833f03a0dd9df35e76fac1da8fad36f",
+  "source_file_count": 10454,
+  "source_map_sha256": "9a81df3aff68d4894628e07d9300262b4636220ec7498b505a5afab6ca8dab59",
+  "source_stable": true,
+  "tested_head": "f5d92567ef89f7a7aeebee1d591038bb586c7b20",
+  "tested_tree": "d454da643e6b9809a36c1cfc87ea5c8b03df110f"
+}
