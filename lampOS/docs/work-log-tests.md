@@ -4252,3 +4252,9 @@ Exactly one original-case observation passed, with the unchanged two-second help
 Ready for lamp-voice: no
 
 All ten planned event-helper controls passed once, with zero unrun observations and owned child cleanup verified. The fixture watchdog change is explicit; exact output, status and recovery checks remain. Current compilation and round inventory bind the tested source and executable. The separate old-loop gate comparison is compiling; the original one-pass diagnostic still proves no cause and leaves the historical 2/3 HOLD intact. The claimed no-pause ordering fix is in source preparation, with only input publication moved after setup. [Directed receipts](verification/tests-update-components-20261024/).
+
+## 24 October, 22:27 — Old-loop comparison validates the startup gap
+
+Ready for lamp-voice: no
+
+The single planned old-loop witness caught the original timeout at 2.000353195 seconds, before its scheduled 2.2-second output release, with pending child, no writes and complete gate/child cleanup. Its Rust PASS validates that expected timeout; it is not a historical-cause finding. The candidate passed the same startup intervention earlier. All four candidate files are restored byte-for-byte with modes checked, and fresh compilation is underway before full gates. [Old-loop and restoration receipts](verification/tests-update-old-loop-20261024/). The no-pause two-file fix and four-observation comparison are source-prepared on current43ac.

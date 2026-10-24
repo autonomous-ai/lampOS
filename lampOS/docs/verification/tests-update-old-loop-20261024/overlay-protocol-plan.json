@@ -1,0 +1,58 @@
+{
+  "status": "SOURCE-ONLY unexecuted apply/restore transaction plan; root explicit action approval required. It never invokes Cargo/binaries/tests.",
+  "seed_plan_sha256": "58cee80a55a63aad4a00ac0ba285066a8b74df8bfc4a881d23627c3d44f00e65",
+  "overlay_path": "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+  "overlay_candidate": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/old-helper-counterfactual/counterfactual-controls.rs",
+  "overlay_candidate_sha256": "5bf9cb8087c8b706c385075de74a1418bdbfd50d4087cb80bb7192cb67157957",
+  "overlay_patch_sha256": "65d5591d6304ebb8809d77f6a4e613503ecefd78ef3906b3c24c4dbbda06a969",
+  "old_case": "self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held",
+  "four_candidate_files": [
+    {
+      "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+      "baseline_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+      "candidate_sha256": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06",
+      "bytes": 14393,
+      "mode": 420,
+      "mtime_ns": 1792852660016733478,
+      "snapshot": "candidate-self_cuts.rs"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/runnable_events.rs",
+      "baseline_sha256": null,
+      "candidate_sha256": "22917963bb8cc2b378c52985fe897c8ba09fb093060444694e62dd643b64642e",
+      "bytes": 5896,
+      "mode": 420,
+      "mtime_ns": 1792852660013210479,
+      "snapshot": "candidate-runnable_events.rs"
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+      "baseline_sha256": null,
+      "candidate_sha256": "a6fbd54021a7e89acd0b0b012a3d6b9df21035554ebf00792303b4f48ed5c0ac",
+      "bytes": 9129,
+      "mode": 420,
+      "mtime_ns": 1792852660011354780,
+      "snapshot": "candidate-runnable_event_controls.rs"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "baseline_sha256": "0788dc9930dcc784ef180eb6eb9a0596693e0fdf96d099ca03c0a49ff9f8bdc4",
+      "candidate_sha256": "f84388e4c5b9df8305ef5c6ae687e05919359728945cd86bf3d0de12b9dae514",
+      "bytes": 151491,
+      "mode": 420,
+      "mtime_ns": 1792852569476135082,
+      "snapshot": "candidate-updates.md"
+    }
+  ],
+  "apply_requirements": "Current10444guard exact; all10candidate controls completedPASS; independentlyverify+backupall4bytes/fullmodes andcurrentroundreadonlywitness BEFORE changing ONLYcontrolfile toapprovedcandidate-prefix+old-loop suffix. Freezevariantactual10444guard; rootreviews generatedold planhash before ANYclean/compile/inventory/control grant.",
+  "expected_old_witness": "LibtestPASS validates exactold2s panic beforeSAMEscheduled2200ms release; oldelapsed>=2s AND<2200ms, heldsample<2200ms,pendingchild/nooutput,zeroactualwrites,canceljoin/flags/reap. Late/released/unrelated outcome invalid NOretry, no originalhistoricalcause claim.",
+  "restore_requirements": "Rootseparateactiongrant evenafteroldfailure; verifyvariantfullguard andall4independentbackups. RestoreONLYbytes thatchanged butverifyALL4 restoredbyte/fullmode identities. Keepother3files untouched. No os.utime/mtime fabrication. Captureactualnewcontrolmtime/newfullguard; source-switchclean+freshcompile required before future fullsuite. No directed10rerun afterrestore.",
+  "approval_schema": {
+    "action": "apply OR restore",
+    "protocol_plan_sha256": "actualoverlay-protocol-planSHA",
+    "protocol_controller_sha256": "actualold-overlay-protocol.pySHA",
+    "exclusive_CPU_target_allocation": true,
+    "root_reviewed": true
+  },
+  "executed": false
+}

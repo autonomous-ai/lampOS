@@ -1,0 +1,36 @@
+{
+  "four_restore_checks": [
+    {
+      "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+      "rewritten": false,
+      "sha256": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06",
+      "mode": 420,
+      "actual_mtime_ns": 1792852660016733478
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/runnable_events.rs",
+      "rewritten": false,
+      "sha256": "22917963bb8cc2b378c52985fe897c8ba09fb093060444694e62dd643b64642e",
+      "mode": 420,
+      "actual_mtime_ns": 1792852660013210479
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+      "rewritten": true,
+      "sha256": "a6fbd54021a7e89acd0b0b012a3d6b9df21035554ebf00792303b4f48ed5c0ac",
+      "mode": 420,
+      "actual_mtime_ns": 1792855451265952475
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "rewritten": false,
+      "sha256": "f84388e4c5b9df8305ef5c6ae687e05919359728945cd86bf3d0de12b9dae514",
+      "mode": 420,
+      "actual_mtime_ns": 1792852569476135082
+    }
+  ],
+  "only_changed_restore_path": "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+  "source_guard_sha256": "fad3bb4811b8395de530a13daf4050d59a7f975bb40cfdc812d4da4390d1ce5e",
+  "no_tests_or_Cargo_executed": true,
+  "next": "Root reviews NEW actual guard/plan; supported localclean+currentfreshcompile before separately authorized full-suite reuse. No directed component reruns."
+}

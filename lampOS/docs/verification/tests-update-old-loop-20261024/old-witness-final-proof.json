@@ -1,0 +1,93 @@
+{
+  "native_handle": 75757,
+  "native_exit": 0,
+  "actual_observations": 1,
+  "result": "LibtestPASS validates expected OLD-helper timeout witness; not original historical testFAIL/cause",
+  "actual_outcomes": [
+    {
+      "case": "self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held",
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held",
+          "--nocapture"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+        "started_at": "2026-10-24T15:22:59.224664+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 31758,
+        "owned_process_group": 31758,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.07908,
+        "finished_at": "2026-10-24T15:23:01.303824+00:00",
+        "stdout_sha256": "0715f82189bb71e9486f93aab23b2b05bff9671a12163c3d50ddb645c418f9c4",
+        "stdout_bytes": 233,
+        "stderr_sha256": "d35cbe695a5cfcae81d624d9ba2a90e911c6ebd94fb42d659d486d4a8ad6d1bd",
+        "stderr_bytes": 2042
+      },
+      "actual_summary": {
+        "source": "actual test result lines only, including any harness-compatible summaries",
+        "command_exit_code": 0,
+        "command_timed_out": false,
+        "rows": [
+          {
+            "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 167 filtered out; finished in 2.01s",
+            "status": "ok",
+            "passed": 1,
+            "failed": 0,
+            "ignored": 0,
+            "measured": 0,
+            "filtered_out": 167
+          }
+        ],
+        "totals": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 167
+        },
+        "qualification": "Nonzero or timeout is still a failed/incomplete gate regardless of parsed counts; compiled inventory is not execution."
+      },
+      "expected": "Libtest PASS is valid expected OLD2s timeout witness before scheduled2200ms release, not a historical testFAIL/cause claim."
+    }
+  ],
+  "terminal": {
+    "phase": "controls",
+    "lane": "old-counterfactual",
+    "started_at": "2026-10-24T15:22:52.552959+00:00",
+    "planned_directed_observations": 1,
+    "final_source_fullmode_mtime_guard": true,
+    "sealed_artifacts_guard": true,
+    "consumed_launch_allocations": 1,
+    "completed_case_command_receipts": 1,
+    "unconsumed_planned_controls": 0,
+    "finished_at": "2026-10-24T15:23:13.867480+00:00"
+  },
+  "streams": {
+    "exact.stdout.txt": {
+      "bytes": 233,
+      "sha256": "0715f82189bb71e9486f93aab23b2b05bff9671a12163c3d50ddb645c418f9c4",
+      "utf8": "\nrunning 1 test\ntest self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 167 filtered out; finished in 2.01s\n\n"
+    },
+    "exact.stderr.txt": {
+      "bytes": 2042,
+      "sha256": "d35cbe695a5cfcae81d624d9ba2a90e911c6ebd94fb42d659d486d4a8ad6d1bd",
+      "utf8": "\nthread 'self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held' (4162096) panicked at crates/update/tests/round/runnable_event_controls.rs:280:13:\nupdater fixture did not exit: old-after-spawn-control; scheduled-release=2200ms; pid=31759 elapsed=2.000353195s polls=352 last_poll=2.000350636s..2.000352318s final_status=Ok(None) (diagnostic only; timeout still fails)\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::runnable_events::controls::old_after_spawn_observation\n   3: round::self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held::{{closure}}\n   4: core::ops::function::FnOnce::call_once\n   5: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once\n   6: std::panicking::catch_unwind::do_call\n   7: ___rust_try\n   8: std::panic::catch_unwind\n   9: round::self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held\n  10: round::self_cuts::runnable_events::controls::the_old_spawn_watchdog_times_out_while_the_output_gate_is_still_held::{{closure}}\n  11: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\ncontrol cleanup: pid=31759 kill=Ok(()) wait=Ok(ExitStatus(unix_wait_status(0))) cached=Ok(Some(ExitStatus(unix_wait_status(0))))\nold helper EXPECTED TIMEOUT WITNESS (libtest PASS only on valid evidence): elapsed=2.009599285s held_observation_elapsed=2.009615865s planned_release=2.2s pending=Ok(None) gate_cancelled_and_joined=true releases=Ok([]) sample=Ok(Err(Os { code: 35, kind: WouldBlock, message: \"Resource temporarily unavailable\" })) restored=Ok(OFlags(0x0)) original_panic=updater fixture did not exit: old-after-spawn-control; scheduled-release=2200ms; pid=31759 elapsed=2.000353195s polls=352 last_poll=2.000350636s..2.000352318s final_status=Ok(None) (diagnostic only; timeout still fails)\n"
+    }
+  },
+  "no_retry": true,
+  "restoration_executed": false,
+  "other_controls_or_diagnostic_rerun": false
+}

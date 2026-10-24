@@ -1,0 +1,22 @@
+[
+  {
+    "file": "old-witness-final-proof.json",
+    "sha256": "ee9a765f9f1f0e9a84bb2a5bb13f27c46f566b3b6108801880c400a40c4ab0d9"
+  },
+  {
+    "file": "old-clean-compile.json",
+    "sha256": "93dc3af5a60a3a103e1fef4549872886eb8f64c01f840eac8c661c9dccd3aaf9"
+  },
+  {
+    "file": "old-inventory.json",
+    "sha256": "587079ca19eaba3a5d0f56a06dcd44faf534940c4cb4c7a0c8c9f0746cb7d1a4"
+  },
+  {
+    "file": "candidate-restoration.json",
+    "sha256": "7b7e54130fd170494810ac9cf1b8f1f7a5eaad55ac6fd7cfaf7a63c6f0361471"
+  },
+  {
+    "file": "overlay-protocol-plan.json",
+    "sha256": "d4839e35ae3cb35205d2923a258e1d2156645b031bff75d55655528e575f93b4"
+  }
+]
