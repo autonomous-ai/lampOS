@@ -3122,9 +3122,18 @@ after a take-over, but now for every turn:
   left alone end a conversation: the carry ends until the lamp answers
   again, and the caller's identity is not reused without a new answer. A
   colleague who calls the lamp by its name is answered and is the caller
-  from then on. The 20 s run from the lamp's last words: a held line
-  renews nothing, so the owner's next line must still begin within 20 s
-  of the lamp's last words. A stop (`Did::Stopped`, from the next line's `after_stop`) and
+  from then on. Following First's decision on Queue #3126 at 12:57 on
+  24 October, the 20 s run from the later of the lamp's last words and
+  one held colleague line's actual audio end, once per actual answer,
+  capped at 40 s from the lamp's last words. A colleague line begun at
+  +3 s and lasting 2 s admits the owner's +25 s start, not +45 s.
+  Late classification uses the recorded audio end, not the time the
+  print becomes known; duplicates or another held line after an owner's
+  admitted but unanswered line cannot buy a second extension. A new
+  actual answer renews the allowance; admitting a line does not. At most
+  four recent eligible line ends are kept, and missing, future or evicted
+  ends give no extension. Identity checks and the switch-off path remain
+  unchanged. A stop (`Did::Stopped`, from the next line's `after_stop`) and
   a privacy change end it, and a forgetting leaves no words to carry from.
   The caller's own face seen speaking turned away from the lamp is someone
   talking to a colleague (reviewer-two at 03:01): held, and it ends the
