@@ -1,0 +1,6 @@
+
+running 1 test
+test second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3843 filtered out; finished in 2.53s
+
