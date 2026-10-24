@@ -105,8 +105,8 @@ environment holding only what its role is given (`worker_command`,
 
 | Output | Required today? | Notes |
 |---|---|---|
-| `Started` | yes, first for every request | the cascade sends it at once; it never uses `NotDelivered` (`second_provider.rs:41-49`) |
-| `Audio` | yes | 24 kHz mono i16, at most 960 samples a packet, at most 30 s a reply, two packets of credit (`provider_flow.rs:6-7`); checked in `coordinator.rs:7029-7049` |
+| `Started` | yes, before any output that needs it | the cascade sends it at once (`second_provider.rs:41-49`). A request may instead fail `NotDelivered` without it: the coordinator takes `NotDelivered` only before `Started` and refuses it after (`coordinator/cloud.rs:283-303`), so a worker that never delivered must not invent a `Started` (reviewer-two on #3321) |
+| `Audio` | yes | 24 kHz mono i16, at most 960 samples a packet, at most 30 s of PCM queued or reserved at once (not a reply's whole length), and two events of credit, which counts transcripts and lifecycle events too (`provider_flow.rs:6-7, 73-116`); checked in `coordinator.rs:7029-7049` |
 | `Transcript` | yes | the person's words with `request: None`, the answer's text with the request |
 | `TurnComplete { idle }` | yes | |
 | `TurnFailed { stage }` | yes | `NotDelivered`, `InputOpen`, `AwaitingResponse`, `Responding` (`provider_worker.rs:1090`); the coordinator's handling is in `coordinator/cloud.rs` |
@@ -131,8 +131,12 @@ speech at once" (`second_provider.rs:1658-1667`).
 
 **Tools and function calls.** One module, `tools.rs`, declares and runs every
 function (the lamp's own, the actions part's `tools.json` and `call.sock`,
-skills, schedule, memory, tasks): `declared` (`:520`), the 32-function bound
-(`within_bound`, `:562`), `run_call` (`:1362`). Both routes call it; the
+skills, schedule, memory, tasks): `declared` (`:520`), Gemini Live's
+32-function bound (`within_bound`, `:562`), `run_call` (`:1362`). The bound
+is the route's own: the cascade's is 48 (`second_provider.rs:179-187`), and
+its worker takes `tools::uncut`, adds its own search and look, and fits that
+(`second_provider/worker.rs:1140-1167`); its search and `more_functions`
+are answered in the worker, outside `run_call` (reviewer-two on #3321). The
 cascade maps the declarations to the OpenAI `tools` schema
 (`docs/second-voice.md:1720-1742`). The types are Gemini's
 (`lamp_gemini::{Tool, ToolCall}`, `tools.rs:32`).
@@ -319,7 +323,7 @@ by every route's worker:
 |---|---|---|
 | Whom the lamp answers | `attention.rs`, run on Live's transcript and on the cascade's words separately | `judge(words, turn facts) -> answer / hold / ask again`, given a route's words for a request, before any sound is let out |
 | The Policy gate | `policy_holds.rs` and `second_provider/policy.rs` | one gate for every action a route runs |
-| Tools | `tools.rs` (Gemini's `Tool` type) | neutral `ToolSpec` / `Call` types, mapped by each route to its service's schema; the 32-function bound once |
+| Tools | `tools.rs` (Gemini's `Tool` type) | neutral `ToolSpec` / `Call` types, mapped by each route to its service's schema; **each route declares its own function bound** (Live 32, the cascade 48) and its worker-local answers (the cascade's search and `more_functions`), so moving tools to the shared library drops none of the cascade's |
 | Memory and the person | `memory_scope.rs`, `remember.rs`, `known_faces.rs`, wired per worker | `RequestScope` bound at `Start`, the note, the journal, the forget paths, one call each |
 | Notes beside a line | name note, staff note, session fact, room, air, health, seems, cut-in, after-stop | one builder that returns the notes for a request; a route only places them |
 | Character and thread | `config.rs:401-415`, the thread file | unchanged: already shared |
@@ -332,7 +336,8 @@ an understanding, getting the answer, and speaking it in its voice.
 (`route_contract.rs`) and in `docs/voice-routes.md`, from today's enums:
 
 - Required in: `Start`, `Audio`, `End`, `Called`, `CountOnly`, `Written`
-  (with `look`), `Reminder`. Required out: `Started` (first, every request),
+  (with `look`), `Reminder`. Required out: `Started` (before any output that
+  needs it; a request that was never delivered fails `NotDelivered` without it),
   `Audio`, `Transcript` (the person's words and the answer's), `TurnComplete`,
   `TurnFailed` with a stage the coordinator accepts; `Ready` and
   `ProviderLink` on control.
