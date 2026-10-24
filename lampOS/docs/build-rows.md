@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-24 08:47 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-24 12:54 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
 **Build 92.8% over 70 rows. Quality 63.8% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
@@ -16,7 +16,7 @@ Written by the first builder from the team's review page at 2026-10-24 08:47 (+0
 | Speed: tool turns and comma pauses | 1.00 | #799 #782 | second, fourth |  |
 | Who is talking, and when not to answer | 1.00 | #753 #792 #800 | fourth, second | #800 behind switches |
 | Privacy switch closes both microphones | 1.00 | #795 | — |  |
-| Faces: remember, hello by name | 0.92 | #759 #775 | first, seventh | 24 Oct 03:2x, up from 0.9: the recognition fault’s fix is merged behind LAMP_FACE_FULL_CROP, off (#3285, Sixth, train 57). |
+| Faces: remember, hello by name | 0.93 | #759 #775 | first, seventh | 24 Oct 09:4x, up from 0.92: with LAMP_REMEMBER_SPEAKER (off), a request to remember a face needs one face positively read as speaking it, and missing or conflicting evidence refuses (#3318, Third, merged 9ed44f88c). |
 | Hand work to Claude Code or Codex, and its news | 1.00 | #751 #765 #798 #733 | seventh |  |
 | Backup voice when Gemini is down | 1.00 | #778 #754 | sixth | The relay chat it uses has been down since 02:29 |
 | Gives way to a hand; wakes after power | 1.00 | #780 #790 #702 #703 #701 | fifth | Arm-goal guard merged (#1192) |
@@ -54,7 +54,7 @@ Written by the first builder from the team's review page at 2026-10-24 08:47 (+0
 | Dance when asked | 1.00 | #999 | jarvis | Built (the Dance skill, V1’s dance clips) |
 | Bedtime and Morning as a skill, with night caps on light and volume | 0.85 | #1672 #1732 #2803 #2804 | jarvis, second | 23 Oct 09:2x, up from 0.65: a full real night through the skills on lamp-06c1 met its done-when (#2803), the night caps on light and volume held across restarts and silence (#2804), and night sleep now runs through the s… |
 | “What do you see?” and showing it a page | 1.00 | #836 #842 | seventh | Built |
-| Seeing someone speak (is the face it looks at talking?) | 0.92 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 23 Oct 16:1x, up from 0.9: the lips read is back without its cost: 238 looks a minute against the base’s 235, talking read 138/139 against 214/215 on lamp-52e6 (Sixth, e4e470f24). |
+| Seeing someone speak (is the face it looks at talking?) | 0.94 | #720 #1470 #2008 #2026 #2859 #2860 | fifth, ten | 24 Oct 09:4x, up from 0.92: built and merged, all off unless set: with LAMP_EYES_SPEAKING_DROP_OUTLIER the eyes drop one misread look from a speaking window instead of voiding it (#3313, #3317), and with LAMP_EYES_SPEAKI… |
 | The eye: looks toward you, blinks, a face for each state | 1.00 | #712 | first | Built (ring eye, asleep face) |
 | Its light by voice and in the app, kept across a restart | 1.00 | #1472 #1484 #1464 #1468 | — | Built |
 | Volume by voice and in the app | 1.00 | #1458 #1465 | — | Built |
