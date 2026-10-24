@@ -1,0 +1,136 @@
+{
+  "rule_comment": 6370483473,
+  "resulting_head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+  "current_base_at_freeze": "8dbb6dc0a58023c98fab2b61096befbc60849e25",
+  "route": "fixed in PR",
+  "original_table": {
+    "commit": "6b41c238f1ad269f1b2b276f68b536725e0db593",
+    "path": "lampOS/docs/verification/tests-phone-e63a86d0-20261024/qualification-table.json",
+    "historical_rule_satisfied": false,
+    "full_counts": {
+      "passed": 7250,
+      "failed": 2,
+      "ignored": 34
+    },
+    "rows": [
+      {
+        "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+        "current_full": "FAILED",
+        "review": "Same strict index10<25ms predicate and unchanged source failed on frozen4a84base; exact source/phase review retained separately.",
+        "category": "matched prior base failure, not a historical-cause claim"
+      },
+      {
+        "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+        "original_failure_retained": true,
+        "current_full": "ok",
+        "standalone_outcomes": [
+          "ok",
+          "ok",
+          "ok"
+        ],
+        "category": "three prescribed standalone passes; accepted timing category only, not historical cause"
+      },
+      {
+        "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "original_failure_retained": true,
+        "current_full": "ok",
+        "standalone_outcomes": [
+          "ok",
+          "ok",
+          "ok"
+        ],
+        "category": "three prescribed standalone passes; accepted timing category only, not historical cause"
+      },
+      {
+        "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+        "current_full": "FAILED",
+        "standalone_outcomes": [
+          "FAILED",
+          "ok",
+          "ok"
+        ],
+        "category": "UNRESOLVED: two of three passed; standalone failure retained. No qualification waiver."
+      }
+    ]
+  },
+  "fixed_case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+  "fix_source": "qualified #3403 be88244fbd68c4cc08d7d1043635b3de416e2174 consumed in resulting head; exact patch and author/date/message preserved",
+  "fixture_behavior": {
+    "startup_first_byte_watchdog_seconds": 5,
+    "absolute_exit_and_eof_watchdog_after_first_byte_seconds": 2,
+    "later_bytes_renew_deadline": false,
+    "script_bytes_modes_output_recovery_assertions_retained": true,
+    "product_deadlines_changed": false
+  },
+  "local_result": {
+    "head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+    "voice": [
+      4032,
+      0,
+      21
+    ],
+    "update": [
+      395,
+      0,
+      6
+    ],
+    "changed_crates_only": true,
+    "source_hashes_unchanged": true,
+    "source_file_count": 7027,
+    "fixed_case_current_full": "ok",
+    "fixed_case_execution_count": 1,
+    "directed_controls": [
+      "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+      "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+      "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+      "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+      "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+      "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+      "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+      "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+      "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+      "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture"
+    ],
+    "all_ten_controls_pass": true,
+    "local_fixed_in_pr_evidence_complete": true
+  },
+  "native_result": "pending newly pushed resulting-head original checks",
+  "rule_satisfied": false,
+  "reader_disposition": "pending required native checks and Reviewer-two review; original table remains false",
+  "original_frozen_executable_rerun": false,
+  "historical_cause": "not established",
+  "historical_three_of_three": "not claimed",
+  "resulting_rows": [
+    {
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "historical_row_retained": true,
+      "resulting_head_full": "ok",
+      "historical_category_retained": "matched prior base failure, not a historical-cause claim"
+    },
+    {
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "historical_row_retained": true,
+      "resulting_head_full": "ok",
+      "historical_category_retained": "three prescribed standalone passes; accepted timing category only, not historical cause"
+    },
+    {
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "historical_row_retained": true,
+      "resulting_head_full": "ok",
+      "historical_category_retained": "three prescribed standalone passes; accepted timing category only, not historical cause"
+    },
+    {
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "historical_row_retained": true,
+      "resulting_head_full": "ok",
+      "category": "fixed in PR",
+      "fix": "qualified nonblocking output/exit/EOF fixture consumed in resulting head",
+      "historical_standalone_outcomes_unchanged": [
+        "FAILED",
+        "ok",
+        "ok"
+      ],
+      "current_head_observations_do_not_replace_historical": true
+    }
+  ]
+}

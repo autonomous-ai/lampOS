@@ -1,0 +1,14 @@
+crates/voice/src/messages.rs:908:        struct PhoneRound(Option<Arc<AtomicBool>>);
+crates/voice/src/messages.rs:909:        impl Drop for PhoneRound {
+crates/voice/src/messages.rs:933:        struct SlowForThePhone {
+crates/voice/src/messages.rs:937:        impl Model for SlowForThePhone {
+crates/voice/src/messages.rs:945:                        let mut round = PhoneRound(Some(self.cancelled.clone()));
+crates/voice/src/messages.rs:981:            SlowForThePhone {
+crates/update/tests/round/self_cuts.rs:14:#[path = "runnable_events.rs"]
+crates/update/tests/round/self_cuts.rs:15:mod runnable_events;
+crates/update/tests/round/self_cuts.rs:82:    let (status, output) = runnable_events::observe(&mut child.0, &stdout, started)
+crates/update/tests/round/self_cuts.rs:84:    assert_runnable_output(status, output, script, &context);
+crates/update/tests/round/self_cuts.rs:88:fn assert_runnable_output(status: ExitStatus, output: Vec<u8>, script: &str, context: &str) {
+crates/update/tests/round/runnable_event_controls.rs:3:use super::super::{OLD, Running, assert_runnable_output, forking};
+crates/update/tests/round/runnable_event_controls.rs:126:    assert_runnable_output(status, output, OLD, "pre-output gate control");
+crates/update/tests/round/runnable_event_controls.rs:176:                assert_runnable_output(status, output, OLD, script);

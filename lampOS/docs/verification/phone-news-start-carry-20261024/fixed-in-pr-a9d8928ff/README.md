@@ -1,0 +1,15 @@
+# Phone carry with qualified Update fixture consumed
+
+Exact head a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf contains current train 100 base 8dbb6dc0a. Three carried commits retain original author/date/messages and equal patches; six qualified blobs match the original phone carry and #3403 be88244fb. The six-file diff changes test fixtures and English docs, with no runtime changes. Affected helper-name grep remains confined to these fixture modules.
+
+Mac fmt, strict Voice+Update all-target Clippy and fresh compilation pass. Complete serial Voice: **4,032 passed / 0 failed / 21 ignored** (3,743 library + 1 main + 278 integration + 4 + 6, plus 21 ignored). Complete serial Update: **395 passed / 0 failed / 6 ignored**. Update round 167/ 0 includes the repaired cut-after-current-moves case once and all ten directed event controls. No failure is retried; these new-source observations do not replace any historical observation. All 7,027 source hashes match before/after both runs. Exact-source offline Linux fmt passes; all 7,027 files unchanged and owned container removed. No local full workspace or ARM build/test.
+
+Compiler projection observes 27 path identities, versus 26 invalidated package names. Those are different counts. Clippy 53/54 and compile 51/52 records are fresh=false; the single cached vendor record in each stage is Sonora. All observed workspace records are fresh=false. Primary compiler streams and original/redacted hashes are included; fifteen actual Running-path executable bindings are captured after the completed commands. Documentation tests have no executable-path binding claimed.
+
+## Qualification record
+
+The original table from public 6b41c238f1ad269f1b2b276f68b536725e0db593 is copied byte-for-byte. It still reports rule_satisfied=false, full 7,250/2/34, both original Update cases 3/3 and cut-after-current-moves FAILED/ok/ok 2/3. No original frozen executable is rerun. Original causes remain unestablished; prior matched-base and accepted timing categories stay as recorded.
+
+The separate resulting-head table follows Reviewer-two 6388095006 and owner rule 6370483473: **fixed in PR**. This head actually contains the qualified nonblocking output/exit/EOF repair, with five-second first-byte and absolute two-second finish watchdogs, unchanged script/output/mode/recovery assertions and unchanged product deadlines. The repaired current full case and ten controls pass. There is no retrospective 3/3 claim.
+
+New original native gates are pending: ARM64 40124664011 and Linux 40124663986. The new table therefore still has rule_satisfied=false pending those checks and Reviewer-two's disposition. Draft/HOLD remains. Earlier successful runs keep their own heads; this is new resulting-head evidence, not old-green relabelling. No device, physical power loss, acoustic latency or signature-trust acceptance.

@@ -1,0 +1,15 @@
+{
+  "head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+  "base": "8dbb6dc0a58023c98fab2b61096befbc60849e25",
+  "contained_qualified_update_fixture": "be88244fbd68c4cc08d7d1043635b3de416e2174",
+  "qualification_route": "fixed in PR",
+  "old_2_of_3_retained": true,
+  "files": [
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+    "lampOS/crates/update/tests/round/runnable_events.rs",
+    "lampOS/crates/update/tests/round/self_cuts.rs",
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/docs/messages.md",
+    "lampOS/docs/updates.md"
+  ]
+}

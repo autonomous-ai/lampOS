@@ -1,0 +1,3 @@
+1:  ae966726e = 1:  32b34f248 lampOS: wait for the phone-news round before timing text preemption
+2:  e288e8d0c = 2:  fd18a7eb9 lampOS: prove phone-round cancellation and guard fixture cleanup
+3:  072d8cdab = 3:  a9d8928ff lampOS: observe updater fixture output and exit as bounded events

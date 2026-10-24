@@ -1,0 +1,52 @@
+{
+  "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+  "full_counts": {
+    "passed": 7250,
+    "failed": 2,
+    "ignored": 34
+  },
+  "rule_satisfied": false,
+  "native_gates": "Not refreshed for this carried source; root owns dispatch/push when locally qualified.",
+  "rows": [
+    {
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "current_full": "FAILED",
+      "review": "Same strict index10<25ms predicate and unchanged source failed on frozen4a84base; exact source/phase review retained separately.",
+      "category": "matched prior base failure, not a historical-cause claim"
+    },
+    {
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "original_failure_retained": true,
+      "current_full": "ok",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "category": "three prescribed standalone passes; accepted timing category only, not historical cause"
+    },
+    {
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "original_failure_retained": true,
+      "current_full": "ok",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "category": "three prescribed standalone passes; accepted timing category only, not historical cause"
+    },
+    {
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "current_full": "FAILED",
+      "standalone_outcomes": [
+        "FAILED",
+        "ok",
+        "ok"
+      ],
+      "category": "UNRESOLVED: two of three passed; standalone failure retained. No qualification waiver."
+    }
+  ],
+  "target_reuse": "Allowed only after immutable private executable/observation witness was saved and all commands closed.",
+  "additional_executable_observations_authorized": false
+}

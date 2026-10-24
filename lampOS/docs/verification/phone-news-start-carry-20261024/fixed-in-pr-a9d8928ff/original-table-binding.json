@@ -1,0 +1,9 @@
+{
+  "public_commit": "6b41c238f1ad269f1b2b276f68b536725e0db593",
+  "path": "lampOS/docs/verification/tests-phone-e63a86d0-20261024/qualification-table.json",
+  "sha256": "ce79b313de8287b67ec8bb7ddebb4214cbfbd8ae7436e09ef2dff841050d5123",
+  "historical_rule_satisfied": false,
+  "historical_standalone": "FAILED/ok/ok, two of three",
+  "new_route": "fixed in PR; reviewer owns final disposition",
+  "additional_original_frozen_executable_observations": false
+}

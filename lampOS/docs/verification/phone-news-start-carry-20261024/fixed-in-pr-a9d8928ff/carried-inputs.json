@@ -1,0 +1,35 @@
+{
+  "three_equal_patches": true,
+  "owned_qualified_blobs": {
+    "lampOS/crates/update/tests/round/self_cuts.rs": {
+      "qualified_head": "be88244fb",
+      "old_blob": "876279be733d86116c59be4cfb1f13c2bf144792",
+      "new_blob": "876279be733d86116c59be4cfb1f13c2bf144792"
+    },
+    "lampOS/crates/update/tests/round/runnable_events.rs": {
+      "qualified_head": "be88244fb",
+      "old_blob": "8f1d99ba24dc7f2aa807c018e519909351944139",
+      "new_blob": "8f1d99ba24dc7f2aa807c018e519909351944139"
+    },
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs": {
+      "qualified_head": "be88244fb",
+      "old_blob": "357756e28b0fe397a2c46310eded0bc3e27b8566",
+      "new_blob": "357756e28b0fe397a2c46310eded0bc3e27b8566"
+    },
+    "lampOS/docs/updates.md": {
+      "qualified_head": "be88244fb",
+      "old_blob": "a22792661011bbc3ebd395686810a23d5fba3c49",
+      "new_blob": "a22792661011bbc3ebd395686810a23d5fba3c49"
+    },
+    "lampOS/crates/voice/src/messages.rs": {
+      "qualified_head": "e288e8d0c",
+      "old_blob": "5ca9cc5990a778ea36c64ddafd961733a7a39dd2",
+      "new_blob": "5ca9cc5990a778ea36c64ddafd961733a7a39dd2"
+    },
+    "lampOS/docs/messages.md": {
+      "qualified_head": "e288e8d0c",
+      "old_blob": "94da68b76cd7db4a051db132bfc35d88ff30cdf3",
+      "new_blob": "94da68b76cd7db4a051db132bfc35d88ff30cdf3"
+    }
+  }
+}

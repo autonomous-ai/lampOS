@@ -1,0 +1,23 @@
+[
+  {
+    "qualified_public_commit": "ae966726e626e17076947d95e5f6501959433cf5",
+    "resulting_commit": "32b34f248c0afc88e85f9b1e5914d0143dfa3b30",
+    "original_author_date_message_equal": true,
+    "metadata_sha256": "c9aca22892722de3ce1e5f42d61abd0c505c013818d30a6d3120e67a742b8c50",
+    "single_line_message": true
+  },
+  {
+    "qualified_public_commit": "e288e8d0c7cdc9534f121934d7553b4b77108f0a",
+    "resulting_commit": "fd18a7eb9a6fcddf1c0161f64f30dc9d627ef47c",
+    "original_author_date_message_equal": true,
+    "metadata_sha256": "1990b3d525150ea5165d8283f1d10a3455334d02f61ad32b75c508b169451b72",
+    "single_line_message": true
+  },
+  {
+    "qualified_public_commit": "be88244fbd68c4cc08d7d1043635b3de416e2174",
+    "resulting_commit": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+    "original_author_date_message_equal": true,
+    "metadata_sha256": "fe82c8c1fd17d696d4e7c9b1f5e65f33171168567785311f28ea8be2cd14995f",
+    "single_line_message": true
+  }
+]
