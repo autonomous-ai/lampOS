@@ -8487,3 +8487,9 @@ Reviewer-two and Third both renewed READ-OK on0882cb904, with all P1/P2 closed a
 Taken: #3329's nonblocking bounded-reader size-cap control follow-up, under #2809, after open and merged searches found no follow-up. Add direct exact-limit/limit-plus-one checks for4096-byte events and65536-byte member reads, separately from content parsing; preserve all six existing controls and production guards. Claimed on #3329 and Queue before code. Gate slots follow Common's exclusively held targets.
 
 First's15:41 voice freeze holds Common's new default-on voice/unit merge until the hearing acceptance bar is met. Local full qualification and review preparation continue; no activation or device action is inferred. Memory3333 is test-only and remains reader-cleared/green/offered to the train.
+
+## 2026-10-24: cap-control preparation and full Common progress
+
+Records P3 candidate5328b0dce modifies only the existing ordinary test and its verification note. [Isolated helper evidence](verification/records-cap-helper-20261024/README.md) passes1/0 with the real helper and records the intentional removed-guard mutant's expected0/1 failure. Full gates remain queued; this is not substituted for package/native qualification.
+
+Common fresh fmt, strict workspace Clippy, workspace build and full Eyes pass on both hosts: Mac357/0/5, Linux360/0/5; the required Linux capture/private-disclosure control passes exactly once. Full Voice now runs on both. A temporary-index application against latest c6dfe9809 finds one genuine conflict, docs/reuse-decisions.md only; active frozen sources/indices stay untouched. The current voice freeze still holds Common's default-on merge.

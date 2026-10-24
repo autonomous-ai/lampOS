@@ -1,0 +1,30 @@
+{
+  "source_path": "/private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/records/tests/support/release_pair/host.rs",
+  "extracted_helper_sha256": "6251ca00557bac676ce07698804ebe91f8f148457bdc4004b35bf42f919c5d81",
+  "current_harness_sha256": "8f56581753f9af5f9e3ec2d96a668ba18cbb33b49cdae4cf34cae24cd8e47247",
+  "mutation": "Scratch copy removes only bytes.len()>limit rejection; original source is unchanged",
+  "results": [
+    {
+      "variant": "current",
+      "compile_exit": 0,
+      "test_exit": 0,
+      "expected_exit": 0,
+      "command": [
+        "/private/tmp/fourth-records-cap-control-checks-20261024/current",
+        "--nocapture",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "variant": "without-cap-guard",
+      "compile_exit": 0,
+      "test_exit": 101,
+      "expected_exit": 101,
+      "command": [
+        "/private/tmp/fourth-records-cap-control-checks-20261024/without-cap-guard",
+        "--nocapture",
+        "--test-threads=1"
+      ]
+    }
+  ]
+}

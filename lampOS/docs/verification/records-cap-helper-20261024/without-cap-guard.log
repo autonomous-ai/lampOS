@@ -1,0 +1,15 @@
+
+running 1 test
+test exact_byte_caps_are_independent_of_parsing ... 
+thread 'exact_byte_caps_are_independent_of_parsing' (1156341) panicked at /private/tmp/fourth-records-cap-control-checks-20261024/without-cap-guard.rs:29:9:
+assertion failed: group_text(&path, limit as u64).is_none()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    exact_byte_caps_are_independent_of_parsing
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
