@@ -1,0 +1,458 @@
+{
+  "archive": {
+    "bytes": 620605,
+    "case_archive_members": 258,
+    "file": "pair/artifact.zip",
+    "seconds": 3.254,
+    "sha256": "f54e3987e9d3576508888590c33a49352622580afe8f7c0d8ed0735cde0744f7"
+  },
+  "authored_root_tree": "ef31b78bbeba5f6eae9cda6da8d32474af62b230",
+  "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "cases": [
+    {
+      "directory": "kr-8jWOa9",
+      "exit0": 6,
+      "kind": "on-off",
+      "persisted_refusals": [
+        {
+          "event": "persisted_state_refused_trigger",
+          "phase": "plain",
+          "reason": "plain-check not run: off",
+          "stage": "b"
+        }
+      ],
+      "reader": 6498,
+      "reaped": 8,
+      "signal9": 2,
+      "snapshot_files_hash_size_checked": 25,
+      "snapshot_manifests": 5,
+      "state_check": "opposite and return read preserve exact state/manifests; opposite write changes them and return write restores original state",
+      "transcript_sha256": "16729a13b1d40498fffea5b483c07166684a6b6ebb260550cfa2949d39ee4c29",
+      "writer": 6408
+    },
+    {
+      "directory": "kr-9wdrZf",
+      "exit0": 6,
+      "kind": "on-off",
+      "persisted_refusals": [
+        {
+          "event": "persisted_state_refused_trigger",
+          "phase": "plain",
+          "reason": "plain-check not run: off",
+          "stage": "b"
+        }
+      ],
+      "reader": 6408,
+      "reaped": 8,
+      "signal9": 2,
+      "snapshot_files_hash_size_checked": 25,
+      "snapshot_manifests": 5,
+      "state_check": "opposite and return read preserve exact state/manifests; opposite write changes them and return write restores original state",
+      "transcript_sha256": "58b8588571f4b8be4c95c2903a751dd60054fc436d53146ef83580838d8c715e",
+      "writer": 6498
+    },
+    {
+      "directory": "kr-WopdCX",
+      "exit0": 0,
+      "kind": "daily",
+      "persisted_refusals": [
+        {
+          "event": "persisted_state_refused_trigger",
+          "phase": "first",
+          "reason": "daily-check not run: its day already claimed",
+          "stage": "b"
+        },
+        {
+          "event": "persisted_state_refused_trigger",
+          "phase": "first",
+          "reason": "daily-check not run: its day already claimed",
+          "stage": "c"
+        }
+      ],
+      "reader": 6408,
+      "reaped": 3,
+      "signal9": 3,
+      "snapshot_files_hash_size_checked": 9,
+      "snapshot_manifests": 3,
+      "state_check": "schema2 daily claims grow1/2/3 while retaining all previous records",
+      "transcript_sha256": "cf1518408939bd5e3d057a19269d80817d8076eb8c9e044569b2b30308c85c7c",
+      "writer": 6498
+    },
+    {
+      "directory": "kr-iX3M2h",
+      "exit0": 0,
+      "kind": "daily",
+      "persisted_refusals": [
+        {
+          "event": "persisted_state_refused_trigger",
+          "phase": "first",
+          "reason": "daily-check not run: its day already claimed",
+          "stage": "b"
+        },
+        {
+          "event": "persisted_state_refused_trigger",
+          "phase": "first",
+          "reason": "daily-check not run: its day already claimed",
+          "stage": "c"
+        }
+      ],
+      "reader": 6498,
+      "reaped": 3,
+      "signal9": 3,
+      "snapshot_files_hash_size_checked": 9,
+      "snapshot_manifests": 3,
+      "state_check": "schema2 daily claims grow1/2/3 while retaining all previous records",
+      "transcript_sha256": "62a874356456f508f03621a307eec52f3614931660bd448dd7cf85c3ee6b84a6",
+      "writer": 6408
+    }
+  ],
+  "export_scope": "Compact derived qualification. All mapped case and selected provenance files are byte-identical copies; only the dedicated test log extension changes.",
+  "head": "6c8c52e371353b20fc729ffcdbcccaf839a46321",
+  "merge_api_sha256": "6c1454ac25272950eb336c7e0d1e4fca0fd3756d47b4dd611fbab1955f37a843",
+  "platform": "Linux aarch64",
+  "prior_partial_qualification_sha256": "6d64c720e4765c145daa05bf884f4ea6a1b31c86a3d9187e105b250d4f3451cd",
+  "qualification_source_sha256": "d9ae35c073ec2d05348932720777f4b7f42e875995d128f7920b2e548451eb5f",
+  "release_pins": {
+    "6408": [
+      "2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5",
+      8807104,
+      "ee53765c8d014eb00e41c1a5a7054d2546c18bdb"
+    ],
+    "6498": [
+      "87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984",
+      8786048,
+      "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+    ]
+  },
+  "runs": {
+    "arm": {
+      "artifact_metadata": [
+        {
+          "digest": "sha256:b492a311c0d80b7768ed93c19e35042e67a8d6a318e03377dbff94a949d37cfe",
+          "expired": false,
+          "id": 12546106592,
+          "name": "lampos-arm64-6c8c52e371353b20fc729ffcdbcccaf839a46321",
+          "size_in_bytes": 115940800
+        }
+      ],
+      "checkout_lines": [
+        288,
+        291
+      ],
+      "commands": [
+        "cargo nextest run --locked --release --workspace --profile pr --no-tests=pass -j num-cpus --partition hash:1/1 -E \"not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))\"",
+        "cargo test --locked --release --workspace --doc -- --test-threads=1",
+        "cargo test --locked --release -p lamp-ipc --test relay_signals",
+        "cargo test --locked --release -p lamp-turn-end-wire --test process"
+      ],
+      "conclusion": "success",
+      "doctests": {
+        "failed": 0,
+        "ignored": 0,
+        "log_lines": [
+          12281,
+          12564
+        ],
+        "passed": 4
+      },
+      "head": "6c8c52e371353b20fc729ffcdbcccaf839a46321",
+      "id": 40056204150,
+      "nextest": {
+        "counting": "Only numbered result rows before the single nextest summary. Captured nested test output is not added.",
+        "failed": 0,
+        "leaky_passes": 1,
+        "nonpass_rows": [
+          {
+            "line": 9674,
+            "text": "LEAK [   0.227s] ( 8992/11164) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+          }
+        ],
+        "passed": 11164,
+        "seconds": 199.161,
+        "skipped": 75,
+        "skipped_names": "Not emitted by this run.",
+        "status_rows": {
+          "LEAK": 1,
+          "PASS": 11163
+        },
+        "summary_line": 11848
+      },
+      "package": {
+        "binaries": 47,
+        "examples": 2,
+        "line": 12588,
+        "payloads": 49,
+        "verification": "Build and metadata only; ordinary ARM artifact payload was not downloaded."
+      },
+      "process_harness": {
+        "failed": 0,
+        "passed": 12,
+        "rows": [
+          {
+            "line": 12570,
+            "text": "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2007 ms)"
+          },
+          {
+            "line": 12571,
+            "text": "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)"
+          },
+          {
+            "line": 12572,
+            "text": "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)"
+          },
+          {
+            "line": 12573,
+            "text": "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)"
+          },
+          {
+            "line": 12574,
+            "text": "test missing_model_is_final_and_never_restarted ... ok (162 ms)"
+          },
+          {
+            "line": 12575,
+            "text": "test missing_executable_fails_at_once ... ok (2 ms)"
+          },
+          {
+            "line": 12576,
+            "text": "test startup_failures_are_final ... ok (411 ms)"
+          },
+          {
+            "line": 12577,
+            "text": "test serving_failures_are_replaced_within_budget ... ok (514 ms)"
+          },
+          {
+            "line": 12578,
+            "text": "test protocol_violations_are_replaced ... ok (177 ms)"
+          },
+          {
+            "line": 12579,
+            "text": "test cancelled_answers_are_never_delivered ... ok (155 ms)"
+          },
+          {
+            "line": 12580,
+            "text": "test close_during_inference_never_waits ... ok (233 ms)"
+          },
+          {
+            "line": 12582,
+            "text": "test sustained_requests_stay_bounded ... ok (693 ms)"
+          }
+        ],
+        "summary_line": 12583
+      },
+      "publication": "skipped",
+      "python_publisher_artifact_cli": [
+        {
+          "failed": 0,
+          "line": 333,
+          "passed": 35,
+          "seconds": 0.245
+        },
+        {
+          "failed": 0,
+          "line": 403,
+          "passed": 12,
+          "seconds": 0.862
+        },
+        {
+          "failed": 0,
+          "line": 629,
+          "passed": 7,
+          "seconds": 0.381
+        }
+      ],
+      "raw_sha256": {
+        "artifacts.json": "3b54980c84c791dab0601827188cebc54d7906d44ec84c351efd8ed029efb5a5",
+        "run.json": "d46fc1588b26fd2c2f13221bafc2a57f3a5ff8d0ad9549e28e60c4ecc981ac54",
+        "run.log": "c3154be590a5ea755407dc63edf68345fb99085adf2eae03c96f55b5b4cd5a5b"
+      },
+      "relay_signals": {
+        "line": 12566,
+        "result": "passed"
+      },
+      "tested_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tested_merge": "4c4c34bd5aac5d389af9f29463fdff04b6fb2423",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40056204150",
+      "warning_normalization": "Only the public CI workspace prefix is replaced by CI_WORKSPACE; raw log hash and line numbers bind original text.",
+      "warnings": [
+        {
+          "line": 135,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 420,
+          "text": "(node:8593) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 423,
+          "text": "(node:8593) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 501,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 506,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 511,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 516,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 652,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 657,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 662,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 667,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 12599,
+          "text": "(node:55823) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 12605,
+          "text": "(node:55823) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 12641,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ],
+      "watch_transport": "The parent watcher returned 1 after a TCP reset. This receipt independently verified the completed successful run and downloaded final log; the transport result is not a CI test failure."
+    },
+    "clippy": {
+      "artifact_metadata": [],
+      "checkout_lines": [
+        341,
+        344
+      ],
+      "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+      "conclusion": "success",
+      "head": "6c8c52e371353b20fc729ffcdbcccaf839a46321",
+      "id": 40056204205,
+      "raw_sha256": {
+        "artifacts.json": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c",
+        "run.json": "404a89a86fae3f746ce2e3be0b9ae636b5740bbf49875fa69fccb71a314de1f0",
+        "run.log": "e54f075066ec00ed13fbf6a5aa9493cdd8cf55432f16be60de20ac0dc0521adc"
+      },
+      "rust_diagnostics": [],
+      "tested_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tested_merge": "4c4c34bd5aac5d389af9f29463fdff04b6fb2423",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40056204205",
+      "warning_normalization": "Only the public CI workspace prefix is replaced by CI_WORKSPACE; raw log hash and line numbers bind original text.",
+      "warnings": [
+        {
+          "line": 181,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 407,
+          "text": "(node:8440) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 410,
+          "text": "(node:8440) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 487,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    "pair": {
+      "artifact_metadata": [
+        {
+          "digest": "sha256:f54e3987e9d3576508888590c33a49352622580afe8f7c0d8ed0735cde0744f7",
+          "expired": false,
+          "id": 12545124617,
+          "name": "lampos-routine-state-pair-6c8c52e371353b20fc729ffcdbcccaf839a46321",
+          "size_in_bytes": 620605
+        }
+      ],
+      "checkout_lines": [
+        182,
+        185
+      ],
+      "command": "cargo test --locked --release -p lamp-skills --test release_pair -- --ignored --nocapture --test-threads=1",
+      "conclusion": "success",
+      "head": "6c8c52e371353b20fc729ffcdbcccaf839a46321",
+      "id": 40056204113,
+      "raw_sha256": {
+        "artifacts.json": "2df2b42c972a2d11b9caacdfbb65d9e649aa5a3e0d57a8e27597c59aabe2ddf4",
+        "run.json": "ca9a190a93b24a003de44135bdc95436ce67168761e9ca740cac6836a9c81c17",
+        "run.log": "2f2d1ccb4bd1621542c0246b0206e8164cc1bbfae13f81c64459bac6cce53756"
+      },
+      "tested_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tested_merge": "4c4c34bd5aac5d389af9f29463fdff04b6fb2423",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40056204113",
+      "warning_normalization": "Only the public CI workspace prefix is replaced by CI_WORKSPACE; raw log hash and line numbers bind original text.",
+      "warnings": [
+        {
+          "line": 335,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 379,
+          "text": "(node:5423) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 932,
+          "text": "(node:10124) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 938,
+          "text": "(node:10124) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 966,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    }
+  },
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "scope_limits": [
+    "Dedicated released-binary cases, ordinary native ARM64 and strict x86 Clippy qualify only the exact named head and tested merge.",
+    "Synthetic bus, authored trigger inputs and Policy refusal only; no physical output, rested state, real providers, updater installation or physical reboot/power-loss durability.",
+    "Published binaries were captured and checked by the CI fixtures; this audit verified their retained pins and the full evidence archive, and did not independently re-download the executable assets.",
+    "Snapshot copies are deliberately written0600 by fixture.rs:82-91. Their bytes and sizes were verified; original live modes are retained in files.json, not reproduced by the snapshot copy mode.",
+    "Raw identity-bearing API objects, full workflow logs, archives and executable payloads are retained privately; only derived safe metadata and case text are selected for publication.",
+    "The ordinary nextest total includes one LEAK-marked pass; its captured nested output is not counted again. Skipped names are not listed in the run log."
+  ],
+  "source_comparison": {
+    "authored_map_sha256": "3f0e5e5704a909486975111577d9f2833954c974633c7667d045a79408d84677",
+    "before_after_identical": true,
+    "blob_bytes": 184487233,
+    "captured_manifest_sha256": "c3771a235891a1604f43bbc9638dc5e772b8fec36b979ad6de03728e8c33b7a7",
+    "distinct_blobs": 5861,
+    "extra": 0,
+    "files": 6972,
+    "method": "git ls-tree -rz HEAD:lampOS; one git cat-file --batch over all distinct Git blob objects; SHA-256 of each exact blob, compared with every captured before/after pathname and digest",
+    "mismatched": 0,
+    "missing": 0,
+    "scope": "All tracked lampOS subtree files captured by the workflow; no symlinks or submodules in this inventory. The CI root tree also equals the authored root tree."
+  },
+  "status": "Qualified at the exact recorded current head and tested merge; no claim for a later rebase.",
+  "tested_merge": "4c4c34bd5aac5d389af9f29463fdff04b6fb2423",
+  "tests": {
+    "failed": 0,
+    "filtered": 0,
+    "ignored": 0,
+    "log_sha256": "07b234108c217777feb2592d5672094feb5e215053fd8297fb3063d9d28ec84b",
+    "passed": 4,
+    "seconds": 1.99
+  }
+}

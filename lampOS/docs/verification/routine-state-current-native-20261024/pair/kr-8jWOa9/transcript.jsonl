@@ -1,0 +1,71 @@
+{"event":"environment","stage":"a-on","values":{"LAMP_SKILLS_ANY_ASKER":"on"}}
+{"argv":["asked","--dir","skills","--state-dir","state"],"event":"spawn","executable_sha256":"2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5","pid":10079,"release":6408,"stage":"a-on"}
+{"answer":{"done":"turned toggle-check on"},"event":"asked","request":{"on":"toggle-check"},"stage":"a-on"}
+{"code":0,"event":"reaped","pid":10079,"signal":null,"stage":"a-on"}
+{"event":"environment","stage":"a-off","values":{"LAMP_SKILLS_ANY_ASKER":"on"}}
+{"argv":["asked","--dir","skills","--state-dir","state"],"event":"spawn","executable_sha256":"2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5","pid":10081,"release":6408,"stage":"a-off"}
+{"answer":{"done":"turned plain-check off"},"event":"asked","request":{"off":"plain-check"},"stage":"a-off"}
+{"code":0,"event":"reaped","pid":10081,"signal":null,"stage":"a-off"}
+{"event":"snapshot","files":[{"absent":true,"file":"daily.json"},{"bytes":13,"file":"on","mode":420,"sha256":"befd3213cf9955847ffbd3411a895a1739e0ca49b384229e78dba0caf0a92855"},{"bytes":12,"file":"off","mode":420,"sha256":"a834f76d9db13086b44b94c575fe3c3ed0e891b14b08bc71190c1f202318448d"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":259,"file":"manifests/plain-check.toml","sha256":"bee6d7674a8ad02bc7d0658db34a7e9d820dd8cafce307745a46a6b3959d0772"},{"bytes":261,"file":"manifests/toggle-check.toml","sha256":"a713652380a17451cf40b18557e41a05cbee637194e2c56c9988ee9351d53c67"}],"name":"after-a"}
+{"event":"environment","stage":"b","values":{"LAMP_SKILLS_ASK":"policy"}}
+{"argv":["--dir","skills","--state-dir","state","--trust-clock","--utc-offset-minutes","541","--bus-root","/tmp/pair-output/kr-8jWOa9/b/b","--clock-control","b/clock","--gaze-socket","b/gaze","--mood-socket","b/mood","--actions-socket","b/actions","--say-socket","b/say"],"event":"spawn","executable_sha256":"87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984","pid":10083,"release":6498,"stage":"b"}
+{"answer":{"now_us":1012383834},"event":"drained_before_clock_barrier","stage":"b"}
+{"answer":{"now_us":1012383954},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"input","phase":"plain","sequence":1,"stage":"b"}
+{"answer":{"now_us":1012384169},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"persisted_state_refused_trigger","phase":"plain","reason":"plain-check not run: off","stage":"b"}
+{"answer":{"now_us":1012384302},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"input","phase":"toggle","sequence":2,"stage":"b"}
+{"answer":{"now_us":1012384539},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"skills_event","message":{"skill":"toggle-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"b"}
+{"event":"skills_event","message":{"skill":"toggle-check","stage":"asked","why":"policy nudge"},"stage":"b"}
+{"event":"skills_event","message":{"allowed":false,"skill":"toggle-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"b"}
+{"answer":{"now_us":1012384770},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"input","phase":"control","sequence":3,"stage":"b"}
+{"answer":{"now_us":1012385118},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"b"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"asked","why":"policy nudge"},"stage":"b"}
+{"event":"skills_event","message":{"allowed":false,"skill":"control-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"b"}
+{"answer":{"now_us":1012385312},"event":"drained_before_clock_barrier","stage":"b"}
+{"code":null,"event":"reaped","pid":10083,"signal":9,"stage":"b"}
+{"event":"snapshot","files":[{"absent":true,"file":"daily.json"},{"bytes":13,"file":"on","mode":420,"sha256":"befd3213cf9955847ffbd3411a895a1739e0ca49b384229e78dba0caf0a92855"},{"bytes":12,"file":"off","mode":420,"sha256":"a834f76d9db13086b44b94c575fe3c3ed0e891b14b08bc71190c1f202318448d"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":259,"file":"manifests/plain-check.toml","sha256":"bee6d7674a8ad02bc7d0658db34a7e9d820dd8cafce307745a46a6b3959d0772"},{"bytes":261,"file":"manifests/toggle-check.toml","sha256":"a713652380a17451cf40b18557e41a05cbee637194e2c56c9988ee9351d53c67"}],"name":"after-b-read"}
+{"event":"environment","stage":"b-off","values":{"LAMP_SKILLS_ANY_ASKER":"on"}}
+{"argv":["asked","--dir","skills","--state-dir","state"],"event":"spawn","executable_sha256":"87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984","pid":10086,"release":6498,"stage":"b-off"}
+{"answer":{"done":"turned toggle-check off"},"event":"asked","request":{"off":"toggle-check"},"stage":"b-off"}
+{"code":0,"event":"reaped","pid":10086,"signal":null,"stage":"b-off"}
+{"event":"environment","stage":"b-on","values":{"LAMP_SKILLS_ANY_ASKER":"on"}}
+{"argv":["asked","--dir","skills","--state-dir","state"],"event":"spawn","executable_sha256":"87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984","pid":10088,"release":6498,"stage":"b-on"}
+{"answer":{"done":"turned plain-check on"},"event":"asked","request":{"on":"plain-check"},"stage":"b-on"}
+{"code":0,"event":"reaped","pid":10088,"signal":null,"stage":"b-on"}
+{"event":"snapshot","files":[{"absent":true,"file":"daily.json"},{"bytes":0,"file":"on","mode":420,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"bytes":13,"file":"off","mode":420,"sha256":"befd3213cf9955847ffbd3411a895a1739e0ca49b384229e78dba0caf0a92855"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":259,"file":"manifests/plain-check.toml","sha256":"bee6d7674a8ad02bc7d0658db34a7e9d820dd8cafce307745a46a6b3959d0772"},{"bytes":262,"file":"manifests/toggle-check.toml","sha256":"86c22d73516f0d076d32837643ffffe91096ce20695847493400e4bebd0e8413"}],"name":"after-b-write"}
+{"event":"environment","stage":"c","values":{"LAMP_SKILLS_ASK":"policy"}}
+{"argv":["--dir","skills","--state-dir","state","--trust-clock","--utc-offset-minutes","541","--bus-root","/tmp/pair-output/kr-8jWOa9/c/b","--clock-control","c/clock","--gaze-socket","c/gaze","--mood-socket","c/mood","--actions-socket","c/actions","--say-socket","c/say"],"event":"spawn","executable_sha256":"2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5","pid":10090,"release":6408,"stage":"c"}
+{"answer":{"now_us":1012535846},"event":"drained_before_clock_barrier","stage":"c"}
+{"answer":{"now_us":1012535957},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"plain","sequence":1,"stage":"c"}
+{"answer":{"now_us":1012536242},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"skills_event","message":{"skill":"plain-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"c"}
+{"event":"skills_event","message":{"skill":"plain-check","stage":"asked","why":"policy nudge"},"stage":"c"}
+{"event":"skills_event","message":{"allowed":false,"skill":"plain-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"c"}
+{"answer":{"now_us":1012536495},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"control","sequence":2,"stage":"c"}
+{"answer":{"now_us":1012536741},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"c"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"asked","why":"policy nudge"},"stage":"c"}
+{"event":"skills_event","message":{"allowed":false,"skill":"control-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"c"}
+{"answer":{"now_us":1012536947},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"toggle","sequence":3,"stage":"c"}
+{"answer":{"now_us":1012537289},"event":"drained_before_clock_barrier","stage":"c"}
+{"answer":{"now_us":1012537379},"event":"drained_before_clock_barrier","stage":"c"}
+{"code":null,"event":"reaped","pid":10090,"signal":9,"stage":"c"}
+{"event":"snapshot","files":[{"absent":true,"file":"daily.json"},{"bytes":0,"file":"on","mode":420,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},{"bytes":13,"file":"off","mode":420,"sha256":"befd3213cf9955847ffbd3411a895a1739e0ca49b384229e78dba0caf0a92855"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":259,"file":"manifests/plain-check.toml","sha256":"bee6d7674a8ad02bc7d0658db34a7e9d820dd8cafce307745a46a6b3959d0772"},{"bytes":262,"file":"manifests/toggle-check.toml","sha256":"86c22d73516f0d076d32837643ffffe91096ce20695847493400e4bebd0e8413"}],"name":"after-return-read"}
+{"event":"environment","stage":"c-on","values":{"LAMP_SKILLS_ANY_ASKER":"on"}}
+{"argv":["asked","--dir","skills","--state-dir","state"],"event":"spawn","executable_sha256":"2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5","pid":10093,"release":6408,"stage":"c-on"}
+{"answer":{"done":"turned toggle-check on"},"event":"asked","request":{"on":"toggle-check"},"stage":"c-on"}
+{"code":0,"event":"reaped","pid":10093,"signal":null,"stage":"c-on"}
+{"event":"environment","stage":"c-off","values":{"LAMP_SKILLS_ANY_ASKER":"on"}}
+{"argv":["asked","--dir","skills","--state-dir","state"],"event":"spawn","executable_sha256":"2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5","pid":10095,"release":6408,"stage":"c-off"}
+{"answer":{"done":"turned plain-check off"},"event":"asked","request":{"off":"plain-check"},"stage":"c-off"}
+{"code":0,"event":"reaped","pid":10095,"signal":null,"stage":"c-off"}
+{"event":"snapshot","files":[{"absent":true,"file":"daily.json"},{"bytes":13,"file":"on","mode":420,"sha256":"befd3213cf9955847ffbd3411a895a1739e0ca49b384229e78dba0caf0a92855"},{"bytes":12,"file":"off","mode":420,"sha256":"a834f76d9db13086b44b94c575fe3c3ed0e891b14b08bc71190c1f202318448d"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":259,"file":"manifests/plain-check.toml","sha256":"bee6d7674a8ad02bc7d0658db34a7e9d820dd8cafce307745a46a6b3959d0772"},{"bytes":261,"file":"manifests/toggle-check.toml","sha256":"a713652380a17451cf40b18557e41a05cbee637194e2c56c9988ee9351d53c67"}],"name":"after-return-write"}
+{"artifacts_unchanged":true,"event":"case_complete"}
