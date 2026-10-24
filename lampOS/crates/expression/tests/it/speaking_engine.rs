@@ -249,9 +249,17 @@ fn while_it_speaks_it_nods_on_stressed_words_sways_its_base_between_sentences_an
                 r.max((w[1].1 - w[0].1).abs()),
             )
         });
+        // A smooth nod's own steepest step bounds the head's: `nod` over
+        // `nod_us`, in and out as a raised cosine, moves at most
+        // nod * PI / nod_us, 0.0105 rad a 20 ms tick for 0.075 over 0.45 s
+        // (24 Oct; 0.0061 for the old 0.035 over 0.36 s, under the 0.007 the
+        // base keeps). Anything past it is a jump, not a nod.
+        let speaking = catalogue(true).speaking.expect("it speaks");
+        let nod_step = speaking.nod.head_pitch.abs() * std::f64::consts::PI * 20_000.0
+            / speaking.nod_us as f64;
         assert!(
-            pitch_step < 0.007 && yaw_step < 0.007,
-            "{room:?} {pitch_step} {yaw_step}"
+            pitch_step < (nod_step * 1.1).max(0.007) && yaw_step < 0.007,
+            "{room:?} {pitch_step} {yaw_step} (a nod's own step {nod_step})"
         );
         // A nod on a stressed word in each of its three sentences, never
         // two in one, never two within 4 s (the first builder on #2030).
