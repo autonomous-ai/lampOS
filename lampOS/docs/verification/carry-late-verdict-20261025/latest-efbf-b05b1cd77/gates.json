@@ -3,7 +3,7 @@
   "base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
   "carried_head": "b05b1cd77d34dfe69caf0e01d4533ca09eab55b9",
   "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
-  "target_scope": "exclusive to this same current-base worktree, now reused after latest 42f comment-only rebase; no cross-worktree target reuse",
+  "target_scope": "Cargo target exclusive to this parent worktree and reused within it for the latest efbf42a02/b05b1cd77 composition; same-worktree prior artifacts may be reused; no cross-worktree or all-fresh claim",
   "environment_overrides": {
     "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
     "CARGO_NET_OFFLINE": "true",
@@ -97,5 +97,9 @@
       "source_unchanged": true
     }
   ],
-  "docker_available": false
+  "docker_available": false,
+  "metadata_correction": {
+    "original_target_scope": "exclusive to this same current-base worktree, now reused after latest 42f comment-only rebase; no cross-worktree target reuse",
+    "reason": "Correct stale comment-only 42f phrase; head/base/commands/maps/results unchanged; original generated record retained verbatim in gates.original.json"
+  }
 }

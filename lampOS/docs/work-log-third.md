@@ -5,6 +5,25 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 06:58 — Controls ready; current parent and child pushed
+
+Ready for lamp-voice: yes (#3419 ea4580c36); no (#3408/#3420 current gates/reads).
+
+Controls current local 510/0/3, Linux and original ARM are qualified with
+current reads; NEXT TRAIN is posted. Native has 8,001 PASS plus one LEAK,
+56 skipped and process 12/0, exact authored/tested tree identity. Parent
+b05 passes new full 4,655/0/21; child 106a passes 4,665/0/21, both on efbf.
+All source records bind to committed trees, with test-artifact digest
+records explicitly producer-bound. Their proofs and current read requests
+are pushed; child manual Linux passes, ARM remains pending. Parent Linux
+passes, ARM remains pending. Its watcher transport timeout was monitoring
+only, not a CI result; the supported watcher is reconnected. Parent proof
+metadata now corrects the stale target-scope phrase, preserving the exact
+original record. No local Cargo process remains, and no old failure,
+physical result, calibration or activation is relabelled. Next: original
+native/read dispositions and a source-only eligibility check of stalled
+#3355, preserving its authored clock/privacy fixes and acceptance lane.
+
 ## 2026-10-25 06:36 — latest-base Controls pushed; forget correction qualified
 
 Ready for lamp-voice: no (current native gates and reader dispositions remain).
