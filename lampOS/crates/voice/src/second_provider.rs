@@ -304,6 +304,24 @@ struct SpokenTurn {
     enrollment_generation: crate::remember_speaker::Generation,
 }
 
+// The background room-speaker publish must use the request's existing proof;
+// the room reading itself supplies no enrollment evidence.
+fn publish_room_line(
+    mut seen: crate::speaking_faces::LineSeen,
+    remember_speaker: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) {
+    if remember_speaker {
+        if let Some(lease) = lease {
+            crate::speaking_faces::saw_line_scoped(seen, lease);
+        }
+    } else {
+        // The off path keeps room-speaker attribution without enrollment.
+        seen.enrollment = None;
+        crate::speaking_faces::saw_line(seen);
+    }
+}
+
 fn audio_scope_current(
     scope: &crate::memory_scope::ScopeLease,
     context: &lamp_msgs::RequestedAudioContext,
@@ -4544,14 +4562,20 @@ async fn spoken(
             // when it is written simply has no speaker.
             let speakers = eyes.speakers_with_boot(begun, finishing);
             let (eyes, known) = (eyes.clone(), known.clone());
+            let enrollment = enrollment.clone();
+            let lease = scope.clone();
+            let remember_speaker = shared.remember_speaker;
             drop(tokio::task::spawn_blocking(move || {
-                crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
-                    request,
-                    speakers,
-                    known: eyes.known_with_boot(&known),
-                    // A room line's speaker, never an enrollment's proof.
-                    enrollment: None,
-                });
+                publish_room_line(
+                    crate::speaking_faces::LineSeen {
+                        request,
+                        speakers,
+                        known: eyes.known_with_boot(&known),
+                        enrollment,
+                    },
+                    remember_speaker,
+                    lease.as_ref(),
+                );
             }));
         }
     }
