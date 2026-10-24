@@ -1,0 +1,68 @@
+{
+  "head": "27b3695f0235bc7a721dfb216cd21203c249491d",
+  "tested_merge": "76ad068a719790768ddca08b602a475b38e47786",
+  "parents": [
+    "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+    "27b3695f0235bc7a721dfb216cd21203c249491d"
+  ],
+  "pair": "2/0/0 ignored/1 filtered",
+  "cases": [
+    {
+      "test": "release_6408_reads_6498_calibration_and_6498_reads_returned_pins",
+      "owned_reaps": 18,
+      "successful_commands": 12,
+      "expected_refusals": 6,
+      "identical_positive_replays": 9,
+      "frames_each": 47,
+      "matching_stored_pins": 3
+    },
+    {
+      "test": "release_6498_reads_6408_calibration_and_6408_reads_returned_pins",
+      "owned_reaps": 18,
+      "successful_commands": 12,
+      "expected_refusals": 6,
+      "identical_positive_replays": 9,
+      "frames_each": 47,
+      "matching_stored_pins": 3
+    }
+  ],
+  "archive_sha256": "e2125484e492fcf8ef895dd5b0c97f2569b077430ea4227354e96fbb17083195",
+  "regular_members": 195,
+  "authored_files_match_preview": [
+    {
+      "path": ".github/workflows/lampos-controls-pair.yml",
+      "sha256": "b7f5927a124fe78dda1c16c3baab98145bc2ba7dff64efa7fd3c22c9eec0c414"
+    },
+    {
+      "path": "lampOS/Cargo.lock",
+      "sha256": "6b7257a08c9a3efa708d74d1f48e3fe0ae0383ca13526dad83247bebe1bf9735"
+    },
+    {
+      "path": "lampOS/crates/controls/Cargo.toml",
+      "sha256": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/release_pair.rs",
+      "sha256": "b069a9ef44dc1ab5e44aefbdddde1f81eb8e6dc87fa3a10678cbbe6be5213489"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/release_pair/README.md",
+      "sha256": "718b469b6781ca14e8ef2858c1b5c20a5d4bd29c8f2973fe895594dcac26e923"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/release_pair/fixture.rs",
+      "sha256": "dc8db5200ae7fb9d1217c5a7d8f4d61f97a4d6d080e4fc9e77ce0f34b9dd9b1c"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "sha256": "35946a1c800f0b4e7229c319ac81438bdd70072ad1bac2dcf61c39dc79115479"
+    },
+    {
+      "path": "lampOS/docs/verification/controls-release-pair-20261024/README.md",
+      "sha256": "291f484b51102898df00fd6353fd3f87f52084401d41cfc9968504736b4397d6"
+    }
+  ],
+  "source_maps_unchanged": true,
+  "tracked_paths": 10347,
+  "scope": "retained official evidence audited; no released executable run by reviewer; transient per-command preservation additionally relies on executed fixture assertions"
+}

@@ -1,0 +1,6 @@
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/camera)
+    Checking lamp-audio v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/audio)
+    Checking lamp-voice v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/voice)
+    Checking lamp-skills v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/skills)
+    Checking lamp-cloud v0.1.0 (/private/tmp/second-cloud-provenance-pair-20261024/lampOS/crates/cloud)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.97s
