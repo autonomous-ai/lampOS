@@ -1,6 +1,10 @@
 ## Current checkpoint: 2026-10-24 15:19 +07, Settings qualification pushed
 
-New claimed #2809 Settings slice is draft #3347 `990919c8d`. Actual published
+New claimed #2809 Settings slice is draft #3347, now `8f5c600c1`.
+The first native attempt failed 0/2 before any child spawn because my workflow
+supplied the wrong input variable names. The workflow-only repair is pushed;
+[original failure and binding](verification/settings-first-native-failure-20261024/README.md)
+remain explicit. Fresh official pair/ordinary/Clippy runs are active. Actual published
 6408/6498 servers will exercise private guarded values/receipts both ways and
 back; no current domain reader substitutes. Expected per direction: seven
 exact reaps and 34 RPCs. Unknown fields/version/tagged values remain strict

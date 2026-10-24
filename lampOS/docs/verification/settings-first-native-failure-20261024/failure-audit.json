@@ -1,0 +1,17 @@
+{
+  "run": 40077517657,
+  "authored_head": "990919c8d4508887ec8e8930bf8a721714591693",
+  "result": "0 passed / 2 failed / 3 filtered",
+  "failure": "workflow supplied LAMP_COMPAT_CONTROLS_* instead of required LAMP_COMPAT_SETTINGS_*; refusal before any child spawn",
+  "child_spawns": 0,
+  "source_compare_exit": "0",
+  "cleanup_validation_exit": "1",
+  "archive_sha256": "5b2c3953b5cd7de90c56f196a902509ed42016d62a59bb470a1a76cf1e9abbd6",
+  "failure_lines": [
+    "thread 'release_6408_settings_reads_6498_and_6498_reads_return' (16587) panicked at crates/settings/tests/release_pair/fixture.rs:121:22:",
+    "released Settings input required",
+    "thread 'release_6498_settings_reads_6408_and_6408_reads_return' (16588) panicked at crates/settings/tests/release_pair/fixture.rs:121:22:",
+    "released Settings input required",
+    "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s"
+  ]
+}
