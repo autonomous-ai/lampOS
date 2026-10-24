@@ -1,3 +1,25 @@
+## Current checkpoint: 2026-10-24 21:49 +07, ready repair and controlled fixture follow-up
+
+Ready for lamp-voice: yes (#3380, software; First keeps played acceptance).
+Current29cbcd69f has two READ-OKs, both official gates green and accepted
+tracked standalone category. Marked non-draft and NEXT TRAIN posted; original
+Mac4,005/1/21 remains retained. Leading Lamp/Lamb noun phrases remain an
+inherited nonblocking office-negative case, not silently narrowed here.
+
+Ready for lamp-voice: no (#3382, historical Update2/3 classification remains).
+Current6cd08d29c has Mac4,004/0/21 and green current native checks; source P1/P2
+none and both P3s addressed. Tests/#1569 and Reviewer-two retain disposition.
+
+[Separate keep-alive framing proof](verification/chat-kept-framing-20261024/README.md)
+on5053a00c3: Mac4,005/0/21, fmt/strict Voice Clippy and exact Linux fmt pass.
+All seven original assertions and timing values are exact. A read barrier/
+half-close/EOF control passes once; one modeled old-per-read negative emits
+two complete responses instead of one and fails as expected. No historical
+cause inference. Runtime prefix unchanged; only test code/docs changed.
+Next: draft PR and one reader plus official native checks; no device action.
+
+---
+
 ## Current checkpoint: 2026-10-24 21:30 +07, both current native gates green
 
 [Literal-name current CI](verification/busy-room-real-call-20261024/current-22b753df5/official-ci/README.md)

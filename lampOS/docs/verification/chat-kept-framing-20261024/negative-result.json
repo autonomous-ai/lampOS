@@ -1,0 +1,59 @@
+{
+  "head": "5053a00c3bdd517093da5363a7a647ec5ba99d90",
+  "stages": [
+    {
+      "tag": "clean",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice"
+      ],
+      "exit": 0,
+      "seconds": 1.023
+    },
+    {
+      "tag": "compile",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 59.156
+    },
+    {
+      "tag": "case",
+      "command": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+        "--exact",
+        "second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 1.619
+    }
+  ],
+  "mutation": "Restore one response per TCP read in the shared mock, keeping reply delay and read-processed acknowledgement. This models the old mock; it is not the historical failing execution.",
+  "original_source_sha256": "134fd351e518ebd230bcdca410cedd7d71f7a30b529ddec240fd2801ad7b1c7b",
+  "mutant_source_sha256": "60c7b573ffeefd58802110f370fc076671a2d18cb29223e595fdc8aca63a9665",
+  "executable_sha256": "d48af7b0fd93b6672c29ce85538ef58d04c6fc0441218fb8be7c652b4ed02de2",
+  "compiler_fresh": false,
+  "expected_failure_observed": true,
+  "source_restored": true,
+  "private_worktree_clean": true,
+  "observed_complete_responses": 2,
+  "expected_complete_responses": 1,
+  "response_bytes_each": 40,
+  "eof_payload_verified": true
+}

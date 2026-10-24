@@ -1,0 +1,20 @@
+
+running 1 test
+test second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete ... FAILED
+
+failures:
+
+---- second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete stdout ----
+
+thread 'second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete' (84395289) panicked at crates/voice/src/second_provider/net/chat.rs:1608:9:
+assertion `left == right` failed
+  left: [72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110, 116, 45, 108, 101, 110, 103, 116, 104, 58, 32, 50, 13, 10, 13, 10, 123, 125, 72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110, 116, 45, 108, 101, 110, 103, 116, 104, 58, 32, 50, 13, 10, 13, 10, 123, 125]
+ right: [72, 84, 84, 80, 47, 49, 46, 49, 32, 50, 48, 48, 32, 79, 75, 13, 10, 99, 111, 110, 116, 101, 110, 116, 45, 108, 101, 110, 103, 116, 104, 58, 32, 50, 13, 10, 13, 10, 123, 125]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3738 filtered out; finished in 0.01s
+
