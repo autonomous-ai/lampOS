@@ -449,9 +449,16 @@ impl RoomTold {
         self.carried = Some(request);
     }
 
-    /// `request`, someone else's line while the same speaker's conversation
-    /// was carried, was held, the first in a row (`LAMP_SAME_SPEAKER_CARRIES`,
-    /// the first builder at 09:34 on #3296): a colleague's one interjection.
+    /// The room is known quiet, for a test.
+    #[cfg(test)]
+    pub fn set_quiet(&mut self) {
+        self.room = Room::Quiet;
+    }
+
+    /// `request`, a line while the same speaker's conversation was carried,
+    /// was held and left the carry standing (`LAMP_SAME_SPEAKER_CARRIES`,
+    /// the first builder at 09:34 on #3296): a colleague's one
+    /// interjection, or a line in a voice not surely the owner's.
     /// It is no talk and no second person: its verdict does not make the
     /// room busy by its voice ([`Self::judged`]), and left unanswered it
     /// neither ends the conversation nor joins the busy room's run

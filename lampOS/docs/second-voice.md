@@ -3140,13 +3140,26 @@ after a take-over, but now for every turn:
   colleague who calls the lamp by its name is answered and is the caller
   from then on. The 20 s run from the lamp's last words: a held line
   renews nothing, so the owner's next line must still begin within 20 s
-  of the lamp's last words; and a colleague's *question* held still makes
-  the owner's line within 10 s a reply to it (`attention::AFTER_QUESTION`),
-  unchanged. A stop (`Did::Stopped`, from the next line's `after_stop`) and
+  of the lamp's last words. A stop (`Did::Stopped`, from the next line's `after_stop`) and
   a privacy change end it, and a forgetting leaves no words to carry from.
   The caller's own face seen speaking turned away from the lamp is someone
-  talking to a colleague: held, the carry standing, not ended (reviewer-two
-  at 03:01). The faces read are those seen *speaking* the line.
+  talking to a colleague (reviewer-two at 03:01): held, and it ends the
+  carry, their voice sure or not, so turning back needs a fresh call or
+  answer (the first builder at 09:34; reviewer-two at 10:32 on #3331).
+  These signs are read in any room while a carry stands (reviewer-two at
+  10:35): in a room not busy, unknown or quiet, a line held by them, or
+  in a voice not surely the owner's, is judged as in a busy room for its
+  own verdict, the room itself unchanged. While the carry stands, the
+  owner's carried line is no reply to a colleague's question held just
+  before it (`Attention::carried_past_a_question`, no `AFTER_QUESTION`
+  hold; the reviewer-lead on #3331). Once a line has been held as someone
+  else's in a carry, the owner's voice alone carries only when its print
+  is nearer the conversation's than the held line's print by
+  `worker::CARRY_NEARER_BY` (0.10, provisional), with no held print known
+  only their face does (reviewer-three on #3331: two voices have read 0.69,
+  so owner and colleague lines could alternate, a colleague at 0.70
+  carried as the owner); the held print is kept until a new carry, a stop
+  or a privacy change. The faces read are those seen *speaking* the line.
   A line with no sure sign either way, a print not back, a short print
   under 0.70, no face seen speaking or only before the line, is held past
   the 8 s, goes on within them as any follow-up, and ends nothing. The existing score rows of
@@ -3167,9 +3180,10 @@ after a take-over, but now for every turn:
   short, the contract (the first builder at 04:33 on #3296): the first 8 s
   are not identity-gated, an uncertain, short or missing print there being
   no evidence either way; from 8 to 20 s only a sure same-speaker sign
-  carries; and three cases are always held, inside the 8 s too, ending
-  the carry only at the second in a row from someone else: another
-  face seen speaking, the caller turned away, and a sure other voice, the
+  carries; and three cases are always held, inside the 8 s too: another
+  face seen speaking and a sure other voice, ending the carry only at the
+  second in a row from someone else, and the caller turned away, which
+  ends it at once; the
   last not reachable today (prints carry at most 1.5 s of speech, under
   the provisional 2.5 s; its test is a synthetic classification control).
   A print that was no evidence never becomes evidence (reviewer-two's P2 at
