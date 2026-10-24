@@ -1,0 +1,1236 @@
+{
+  "cases": [
+    {
+      "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+      "package": "lamp-body",
+      "target_kind": "lib",
+      "target_name": "lamp_body",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-body",
+        "target": "lamp_body",
+        "case": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body-e3e309ea1afce98d",
+        "sha256": "477c8ac1513c6bc05579fbdd09dcf6db2508bb37d78dfdec2d1189ebcb9b80ce",
+        "raw_offset": 492190,
+        "raw_bytes": 501,
+        "raw_sha256": "88c188a597c33813167200e29a253ea3fc66c374c7117716fdb2d5805d77141f",
+        "utf8": "---- runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets stdout ----\n\nthread 'runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets' (5961905) panicked at crates/body/src/runtime/supervisor/tests.rs:941:18:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: InvalidData, error: \"motor packet boot/order/freshness violation\" }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "name": "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+      "package": "lamp-body",
+      "target_kind": "lib",
+      "target_name": "lamp_body",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-body",
+        "target": "lamp_body",
+        "case": "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body-e3e309ea1afce98d",
+        "sha256": "477c8ac1513c6bc05579fbdd09dcf6db2508bb37d78dfdec2d1189ebcb9b80ce",
+        "raw_offset": 492692,
+        "raw_bytes": 268,
+        "raw_sha256": "4596d2a7412db0104c0a87043615be24df28346f6b693927f676c1c67362ccd4",
+        "utf8": "---- bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began stdout ----\n\nthread 'bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began' (5961569) panicked at crates/body/src/bus_out.rs:1581:22:\na hand\n"
+      }
+    },
+    {
+      "name": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+      "package": "lamp-body",
+      "target_kind": "lib",
+      "target_name": "lamp_body",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-body",
+        "target": "lamp_body",
+        "case": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_body-e3e309ea1afce98d",
+        "sha256": "477c8ac1513c6bc05579fbdd09dcf6db2508bb37d78dfdec2d1189ebcb9b80ce",
+        "raw_offset": 492961,
+        "raw_bytes": 275,
+        "raw_sha256": "70a99d463d22d3a3eb2d31a6331312aae4871078ba9d9a6eec66c1088c7f7b5f",
+        "utf8": "---- unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails stdout ----\n\nthread 'unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails' (5962086) panicked at crates/body/src/unplug.rs:1005:17:\nno Ready in 2 s: Some((Folding, \"\"))\n"
+      }
+    },
+    {
+      "name": "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back",
+      "package": "lamp-cloud",
+      "target_kind": "lib",
+      "target_name": "lamp_cloud",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-cloud",
+        "target": "lamp_cloud",
+        "case": "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_cloud-3b3a9a4f82d4ebc1",
+        "sha256": "67f99be5b0c666fb4b9b897ee649edb757a5d012176b38560b2ae52c30265b6b",
+        "raw_offset": 521926,
+        "raw_bytes": 418,
+        "raw_sha256": "113a39b6a9fda9a73f306a33e5ecaae26febc4d803cd17c522101d5924f6ff0a",
+        "utf8": "---- lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back stdout ----\n\nthread 'lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back' (5970884) panicked at crates/cloud/src/lamp.rs:1085:9:\nassertion failed: saved.elapsed() < SHOWN_WITHIN + Duration::from_millis(500)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "name": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+      "package": "lamp-expression",
+      "target_kind": "lib",
+      "target_name": "lamp_expression",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "case": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_expression-87834248cbd87140",
+        "sha256": "6cd5349821cf62c8677603acf02b4af52351da9df3ce80803996bdd24460691a",
+        "raw_offset": 528282,
+        "raw_bytes": 385,
+        "raw_sha256": "d66c6ad90d1340a98f05b4527fad5610422ca262f3d68dae45940dcdbfa6da52",
+        "utf8": "---- runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges stdout ----\n\nthread 'runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges' (5980843) panicked at crates/expression/src/runtime.rs:1152:33:\ncalled `Option::unwrap()` on a `None` value\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "name": "runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge",
+      "package": "lamp-expression",
+      "target_kind": "lib",
+      "target_name": "lamp_expression",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "case": "runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_expression-87834248cbd87140",
+        "sha256": "6cd5349821cf62c8677603acf02b4af52351da9df3ce80803996bdd24460691a",
+        "raw_offset": 528668,
+        "raw_bytes": 305,
+        "raw_sha256": "1e072cd9785760d8339295beb745623d5b50cdff65a6d57d35439a5a78ed6775",
+        "utf8": "---- runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge stdout ----\n\nthread 'runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge' (5980847) panicked at crates/expression/src/runtime.rs:1262:41:\ncalled `Option::unwrap()` on a `None` value\n"
+      }
+    },
+    {
+      "name": "runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep",
+      "package": "lamp-expression",
+      "target_kind": "lib",
+      "target_name": "lamp_expression",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "case": "runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_expression-87834248cbd87140",
+        "sha256": "6cd5349821cf62c8677603acf02b4af52351da9df3ce80803996bdd24460691a",
+        "raw_offset": 528974,
+        "raw_bytes": 505,
+        "raw_sha256": "f27bea17f322444c701b85d9dc2842e6ce3598386b9f0af7b4db596d52d2226c",
+        "utf8": "---- runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep stdout ----\n\nthread 'runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep' (5980839) panicked at crates/expression/src/runtime.rs:1237:13:\nSome(State) ExpressionState { stamp: ClockStamp { clock_id: \"test\", at_us: 39588093739, sequence: 1 }, enabled: true, turn: None, request: None, behaviours: [], missing: [\"fresh voice timing\"], warnings: [], body: false, light: false, asleep: None }\n"
+      }
+    },
+    {
+      "name": "runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge",
+      "package": "lamp-expression",
+      "target_kind": "lib",
+      "target_name": "lamp_expression",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "case": "runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/lamp_expression-87834248cbd87140",
+        "sha256": "6cd5349821cf62c8677603acf02b4af52351da9df3ce80803996bdd24460691a",
+        "raw_offset": 529480,
+        "raw_bytes": 319,
+        "raw_sha256": "93c6f1fa003af1cb8bd672367663ac3f886733253254b502e30f8df304be5137",
+        "utf8": "---- runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge stdout ----\n\nthread 'runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge' (5980841) panicked at crates/expression/src/runtime.rs:1316:9:\nassertion failed: fixture.service.counts.output_errors > 0\n"
+      }
+    },
+    {
+      "name": "recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "it",
+        "case": "recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-d8575dda435eb43e",
+        "sha256": "3a2858d85eaa503709a1e3e71c9aa559816b91e215ad943c89b878f46c71969d",
+        "raw_offset": 555793,
+        "raw_bytes": 535,
+        "raw_sha256": "ff6379c4a6469ccdbb08b2322ed569ade09a6ded372306e1f968e3b5c2895bd4",
+        "utf8": "---- recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload stdout ----\nlamp-expression: refused an input (1 so far): stale body/joint_states: 1514 ms\n\nthread 'recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload' (5984592) panicked at crates/expression/tests/it/recent_playout_runtime.rs:227:5:\nassertion `left == right` failed\n  left: 3\n right: 4\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "name": "recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "it",
+        "case": "recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-d8575dda435eb43e",
+        "sha256": "3a2858d85eaa503709a1e3e71c9aa559816b91e215ad943c89b878f46c71969d",
+        "raw_offset": 556329,
+        "raw_bytes": 771,
+        "raw_sha256": "07de6a18f53754660a78f394ff7928d79aef3306ffd803f20d89549ca38f7e45",
+        "utf8": "---- recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators stdout ----\nlamp-expression: refused an input (1 so far): playout is expired, too far ahead, overlapping or out of order\nlamp-expression: refused an input (2 so far): stale body/joint_states: 2491 ms\nlamp-expression: refused an input (3 so far): playout is expired, too far ahead, overlapping or out of order\nlamp-expression: refused an input (4 so far): playout is expired, too far ahead, overlapping or out of order\n\nthread 'recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators' (5984593) panicked at crates/expression/tests/it/recent_playout_runtime.rs:214:13:\nassertion `left == right` failed\n  left: 3\n right: 4\n"
+      }
+    },
+    {
+      "name": "rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "it",
+        "case": "rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-d8575dda435eb43e",
+        "sha256": "3a2858d85eaa503709a1e3e71c9aa559816b91e215ad943c89b878f46c71969d",
+        "raw_offset": 557101,
+        "raw_bytes": 454,
+        "raw_sha256": "4e3300141a86f4f6322752c438d36d81054fbfcd20f95eb71e1786f8df42ea79",
+        "utf8": "---- rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol stdout ----\nlamp-expression: refused an input (1 so far): stale body/joint_states: 1118 ms\nlamp-expression: refused an input (2 so far): stale room/state: 3886 ms\n\nthread 'rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol' (5984781) panicked at crates/expression/tests/it/rest_replay.rs:712:9:\nassertion `left == right` failed\n  left: 1\n right: 5\n"
+      }
+    },
+    {
+      "name": "rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "it",
+        "case": "rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-d8575dda435eb43e",
+        "sha256": "3a2858d85eaa503709a1e3e71c9aa559816b91e215ad943c89b878f46c71969d",
+        "raw_offset": 557556,
+        "raw_bytes": 527,
+        "raw_sha256": "8439cbd418d11f459b28e6fa738dcb9df237fb885bb45bcbec13413f8ba4c236",
+        "utf8": "---- rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt stdout ----\nlamp-expression: night-sleep claims the night's sleep (on): Expression keeps no schedule of its own\nlamp-expression: refused a rest (1 so far): rest owner is unavailable or another routine owns it\n\nthread 'rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt' (5985339) panicked at crates/expression/tests/it/rest_requests.rs:784:5:\nassertion failed: output.body.is_some()\n"
+      }
+    },
+    {
+      "name": "rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "it",
+        "case": "rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-d8575dda435eb43e",
+        "sha256": "3a2858d85eaa503709a1e3e71c9aa559816b91e215ad943c89b878f46c71969d",
+        "raw_offset": 558084,
+        "raw_bytes": 593,
+        "raw_sha256": "54d0f7a6f578f97beadac706eecaf98d551ea4b180c9a4f7f5764bb5e3dd73ee",
+        "utf8": "---- rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error stdout ----\nlamp-expression: night-sleep claims the night's sleep (on): Expression keeps no schedule of its own\nlamp-expression: refused an input (1 so far): stale body/joint_states: 585 ms\nlamp-expression: refused an input (2 so far): input observation is future or stale at arrival\n\nthread 'rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error' (5985329) panicked at crates/expression/tests/it/rest_requests.rs:852:13:\nassertion `left == right` failed\n  left: Idle\n right: Resting\n"
+      }
+    },
+    {
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 561303,
+        "raw_bytes": 319,
+        "raw_sha256": "237c396ef27566161845b4bcec1a2fc38fd9929b282a63aa71cf61be7d4cb631",
+        "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (5987153) panicked at crates/expression/tests/runtime.rs:128:28:\nfresh voice and joints\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "name": "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 561623,
+        "raw_bytes": 447,
+        "raw_sha256": "ae083ca7a3b223e684a911c474f63c7b75626ee2a5dcf62a798fec9c7d528347",
+        "utf8": "---- sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had stdout ----\nlamp-expression: refused an input (1 so far): stale body/joint_states: 560 ms\nlamp-expression: refused an input (2 so far): input observation is future or stale at arrival\n\nthread 'sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had' (5987160) panicked at crates/expression/tests/runtime.rs:764:13:\nassertion `left == right` failed\n  left: 2\n right: 0\n"
+      }
+    },
+    {
+      "name": "slow_input_draining_does_not_make_old_joints_fresh",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "slow_input_draining_does_not_make_old_joints_fresh",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 562071,
+        "raw_bytes": 328,
+        "raw_sha256": "0b5f952548bf30f82a75ba5e598e095b7990a80641e504149541384c4c5b724d",
+        "utf8": "---- slow_input_draining_does_not_make_old_joints_fresh stdout ----\nlamp-expression: refused an input (1 so far): input observation is future or stale at arrival\n\nthread 'slow_input_draining_does_not_make_old_joints_fresh' (5987279) panicked at crates/expression/tests/runtime.rs:275:5:\nassertion failed: output.light.is_some()\n"
+      }
+    },
+    {
+      "name": "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 562400,
+        "raw_bytes": 387,
+        "raw_sha256": "4a43a68f9fba996ff80454c19cb020019a7c04d154f67d205750c0a5fd056e80",
+        "utf8": "---- sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus stdout ----\nlamp-expression: refused an input (1 so far): input observation is future or stale at arrival\n\nthread 'sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus' (5987273) panicked at crates/expression/tests/runtime.rs:764:13:\nassertion `left == right` failed\n  left: 1\n right: 0\n"
+      }
+    },
+    {
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 562788,
+        "raw_bytes": 265,
+        "raw_sha256": "a8b795ce5dd6ce768c72c2e063d43d25d04d3522d0be8e847481593040fcfa68",
+        "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (5987157) panicked at crates/expression/tests/runtime.rs:1049:14:\na light request\n"
+      }
+    },
+    {
+      "name": "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 563054,
+        "raw_bytes": 435,
+        "raw_sha256": "30ba3086598aaa689a893192a8f2dc413904f171096084f81110a35b82acd611",
+        "utf8": "---- sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does stdout ----\nlamp-expression: refused an input (1 so far): input observation is future or stale at arrival\nlamp-expression: refused an input (2 so far): stale room/state: 2034 ms\n\nthread 'sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does' (5987161) panicked at crates/expression/tests/runtime.rs:764:13:\nassertion `left == right` failed\n  left: 2\n right: 0\n"
+      }
+    },
+    {
+      "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 563490,
+        "raw_bytes": 604,
+        "raw_sha256": "59e0e6b57f2994f3beac6843559a44c7a549e5e89a364393f19ec87ba6218230",
+        "utf8": "---- sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service stdout ----\n\nthread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (5987194) panicked at crates/expression/tests/runtime.rs:948:9:\njournal fixture failed: lamp-expression: refused an input (1 so far): stale room/state: 2348 ms\n\nthread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (5987280) panicked at crates/expression/tests/runtime.rs:764:13:\nassertion `left == right` failed\n  left: 1\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+      }
+    },
+    {
+      "name": "sleep_name::the_switch_closed_mid_look_ends_it",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "sleep_name::the_switch_closed_mid_look_ends_it",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 564095,
+        "raw_bytes": 483,
+        "raw_sha256": "ce3bfd1d23de1ddb2a8649ab169b24c35674bb45973fc0b4c5064b481cf2193d",
+        "utf8": "---- sleep_name::the_switch_closed_mid_look_ends_it stdout ----\nlamp-expression: refused an input (1 so far): stale body/joint_states: 963 ms\nlamp-expression: refused an input (2 so far): input observation is future or stale at arrival\nlamp-expression: refused an input (3 so far): stale room/state: 2641 ms\n\nthread 'sleep_name::the_switch_closed_mid_look_ends_it' (5987277) panicked at crates/expression/tests/runtime.rs:764:13:\nassertion `left == right` failed\n  left: 3\n right: 0\n"
+      }
+    },
+    {
+      "name": "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 564579,
+        "raw_bytes": 511,
+        "raw_sha256": "b27b2aa118f14d9c6fc0ee72b5395d37fa44dba7fee15f9d11315d2378e7b68e",
+        "utf8": "---- paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed stdout ----\nlamp-expression: paused by the keeper: nothing is asked of the body or the light\nlamp-expression: refused an input (1 so far): stale body/joint_states: 501 ms\nlamp-expression: resumed by the keeper\n\nthread 'paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed' (5987158) panicked at crates/expression/tests/runtime.rs:989:5:\nassertion failed: resumed.body.is_some() && resumed.light.is_some()\n"
+      }
+    },
+    {
+      "name": "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 565091,
+        "raw_bytes": 449,
+        "raw_sha256": "e3c2c418abf1a9540b6a7d74b3118d010c8801ccfccbd0a0f75afa0b539646a0",
+        "utf8": "---- sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up stdout ----\nlamp-expression: refused an input (1 so far): input observation is future or stale at arrival\nlamp-expression: refused an input (2 so far): stale room/state: 3126 ms\n\nthread 'sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up' (5987162) panicked at crates/expression/tests/runtime.rs:764:13:\nassertion `left == right` failed\n  left: 2\n right: 0\n"
+      }
+    },
+    {
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "without_a_pause_said_expression_asks_exactly_as_before",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 565541,
+        "raw_bytes": 296,
+        "raw_sha256": "d6fa33a0e75caf7f6b9e27e829059a06c919bc2acc5ede91b6d41cc524b20a61",
+        "utf8": "---- without_a_pause_said_expression_asks_exactly_as_before stdout ----\nlamp-expression: refused an input (1 so far): stale body/joint_states: 654 ms\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (5987643) panicked at crates/expression/tests/runtime.rs:1009:57:\na body request\n"
+      }
+    },
+    {
+      "name": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "package": "lamp-expression",
+      "target_kind": "test",
+      "target_name": "runtime",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-expression",
+        "target": "runtime",
+        "case": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/runtime-b52f6baa2e80330c",
+        "sha256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+        "raw_offset": 565838,
+        "raw_bytes": 385,
+        "raw_sha256": "9caf096a5a138099ce3ecf922d862f32d33a348af9c5ce14556b8a5f25ba9f84",
+        "utf8": "---- sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus stdout ----\nlamp-expression: refused an input (1 so far): input observation is future or stale at arrival\n\nthread 'sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus' (5987275) panicked at crates/expression/tests/runtime.rs:764:13:\nassertion `left == right` failed\n  left: 1\n right: 0\n"
+      }
+    },
+    {
+      "name": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 605132,
+        "raw_bytes": 556,
+        "raw_sha256": "200aa0b8d434b61e7d5c65e69614948ac6169be4585a14fe6d05a04033bd324c",
+        "utf8": "---- health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves stdout ----\n\nthread 'health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves' (6021803) panicked at crates/memory/tests/it/health.rs:237:13:\nmemory never became ready; lamp-memory: memory across days was written by a newer build (database version 2, this build reads 1); it is set aside as memory-days.sqlite3.newer-db2-1792867726, and this build starts with an empty store\n\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "name": "health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 605689,
+        "raw_bytes": 492,
+        "raw_sha256": "9bc3509ace5954516a877151feb05b91bec586f896bb4739bd139a50eb2e31f7",
+        "utf8": "---- health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning stdout ----\n\nthread 'health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning' (6022105) panicked at crates/memory/tests/it/health.rs:237:13:\nmemory never became ready; lamp-memory: memory across days was written by a newer build (database version 2, this build reads 1); it is set aside as memory-days.sqlite3.newer-db2-1792867731, and this build starts with an empty store\n\n"
+      }
+    },
+    {
+      "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 606182,
+        "raw_bytes": 270,
+        "raw_sha256": "1c1a42a21a81f7ba8f5d51629e4b2c209e0401774467459bdd8dbf2de06c721c",
+        "utf8": "---- health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals stdout ----\n\nthread 'health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals' (6022160) panicked at crates/memory/tests/it/health.rs:237:13:\nmemory never became ready; \n"
+      }
+    },
+    {
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 606453,
+        "raw_bytes": 315,
+        "raw_sha256": "4559cd230441cc989eeca71e1c766b32a8982976cef215ac95133bb0a35b57f9",
+        "utf8": "---- health::the_environment_alone_does_not_enable_reporting_or_create_bus_data stdout ----\n\nthread 'health::the_environment_alone_does_not_enable_reporting_or_create_bus_data' (6022172) panicked at crates/memory/tests/it/health.rs:237:13:\nmemory never became ready; lamp-memory: health reports off: no --bus-root\n\n"
+      }
+    },
+    {
+      "name": "voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 606769,
+        "raw_bytes": 376,
+        "raw_sha256": "cd86634683c4951f86c7109575b9189c9864e5a7155d11acc115284fa30325b6",
+        "utf8": "---- voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them stdout ----\n\nthread 'voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them' (6023289) panicked at crates/memory/tests/it/voice.rs:293:5:\nassertion failed: client.run(&call(REMEMBER, json!({\"text\":\"synthetic violet secret\"})),\n        Duration::from_millis(1500)).1\n"
+      }
+    },
+    {
+      "name": "voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 607146,
+        "raw_bytes": 316,
+        "raw_sha256": "d48f8fd6227f9a4c0403bd9fab4f9fa27fbaeada73c6f5df796d4ee8ff14b31b",
+        "utf8": "---- voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append stdout ----\n\nthread 'voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append' (6023518) panicked at crates/memory/tests/it/voice.rs:478:6:\ncalled `Option::unwrap()` on a `None` value\n"
+      }
+    },
+    {
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 607463,
+        "raw_bytes": 316,
+        "raw_sha256": "b13c95832ba3c4678924be28983bdec679efeca178bb98630b9be8edb4e9498b",
+        "utf8": "---- voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note stdout ----\n\nthread 'voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note' (6023248) panicked at crates/memory/tests/it/voice.rs:142:18:\ncalled `Result::unwrap()` on an `Err` value: Timeout\n"
+      }
+    },
+    {
+      "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 607780,
+        "raw_bytes": 552,
+        "raw_sha256": "dcb7a5aa228c965940c556cba3af7b9f211846cf21f5fa548d671557a5231228",
+        "utf8": "---- voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence' (6023198) panicked at crates/memory/tests/it/voice.rs:708:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 608333,
+        "raw_bytes": 622,
+        "raw_sha256": "bf61351151fb19f314346bac3149b6f5a163e33103bf67b9ad8580cf13c5af21",
+        "utf8": "---- voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh' (6023267) panicked at crates/memory/tests/it/voice.rs:960:5:\nassertion `left == right` failed: the retry sends one forget: []\n  left: 0\n right: 1\n"
+      }
+    },
+    {
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 608956,
+        "raw_bytes": 550,
+        "raw_sha256": "b07f9a1123a88110842050b15645551c98a4b0a7a5d951ad8612f2397945add7",
+        "utf8": "---- voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about' (6023691) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 609507,
+        "raw_bytes": 668,
+        "raw_sha256": "eb9ab36127f5a7bd7b71df89474f4d3f063ce0846e7ca4b234c1183b7d7ef764",
+        "utf8": "---- voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: Days memory is answering\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation' (6023616) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nlamp-voice provider: memory conversation end was not acknowledged; no retry\n"
+      }
+    },
+    {
+      "name": "voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 610176,
+        "raw_bytes": 319,
+        "raw_sha256": "f223a68326b9fec8d22ee9727036df0ff655b521228a20bf4dd6fb74fcd4b9e0",
+        "utf8": "---- voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default stdout ----\n\nthread 'voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default' (6024744) panicked at crates/memory/tests/it/voice_people.rs:416:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "voice_name::a_told_name_against_each_way_a_run_of_turns_ends",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_name::a_told_name_against_each_way_a_run_of_turns_ends",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 610496,
+        "raw_bytes": 290,
+        "raw_sha256": "0912fba19ab5f662f300aaea0af1bbb4673ea4341698c16b57c0cbc8c2b5cb46",
+        "utf8": "---- voice_name::a_told_name_against_each_way_a_run_of_turns_ends stdout ----\n\nthread 'voice_name::a_told_name_against_each_way_a_run_of_turns_ends' (6024568) panicked at crates/memory/tests/it/voice_name.rs:207:13:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 610787,
+        "raw_bytes": 361,
+        "raw_sha256": "3ec46b3be4eee46bc282216c5315bcb6612bbe30b79f4542f848029d844e74ff",
+        "utf8": "---- voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten stdout ----\n\nthread 'voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten' (6024929) panicked at crates/memory/tests/it/voice_people.rs:362:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 611149,
+        "raw_bytes": 530,
+        "raw_sha256": "6abb28be4176c77821fea0d85ac4239cddd47ca22fe04b3798cc90049975cd9e",
+        "utf8": "---- voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled stdout ----\nlamp-voice provider: memory journal stopped: why=unacknowledged_write unacknowledged_writes=1 not_journalled=1\n\nthread 'voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled' (6024972) panicked at crates/memory/tests/it/voice_people.rs:782:5:\nassertion `left == right` failed: {\"error\":\"My memory is not answering right now, so I could not do that.\"}\n  left: Null\n right: true\n"
+      }
+    },
+    {
+      "name": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 611680,
+        "raw_bytes": 327,
+        "raw_sha256": "ab244799583568dd704f21bc62635874b9fca2f4672af3788c1fc4a9f8281d84",
+        "utf8": "---- voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused stdout ----\n\nthread 'voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused' (6025911) panicked at crates/memory/tests/it/voice_people.rs:416:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "voice_people::days_rules_kept_at_once_never_pass_the_most",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_people::days_rules_kept_at_once_never_pass_the_most",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 612008,
+        "raw_bytes": 285,
+        "raw_sha256": "e6317c2869017f4b9999aea1bb0cd330798fe8c7320e1b84811ccfab5a2dc659",
+        "utf8": "---- voice_people::days_rules_kept_at_once_never_pass_the_most stdout ----\n\nthread 'voice_people::days_rules_kept_at_once_never_pass_the_most' (6025948) panicked at crates/memory/tests/it/voice_people.rs:416:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 612294,
+        "raw_bytes": 475,
+        "raw_sha256": "0bb5d0894a86b7da813597e6e814eed8e78938139e43baef1aca452937902093",
+        "utf8": "---- voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten stdout ----\nlamp-voice provider: Days memory is answering\n\nthread 'voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten' (6025822) panicked at crates/memory/tests/it/voice_people.rs:416:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nlamp-voice provider: memory conversation end was not acknowledged; no retry\n"
+      }
+    },
+    {
+      "name": "voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other",
+      "package": "lamp-memory",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-memory",
+        "target": "it",
+        "case": "voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-b864a5069c6d724f",
+        "sha256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+        "raw_offset": 612770,
+        "raw_bytes": 337,
+        "raw_sha256": "e528255718fb8d4bc47a06b3b158d7e4511c8a85cce048046b3292b79fd11512",
+        "utf8": "---- voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other stdout ----\n\nthread 'voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other' (6026115) panicked at crates/memory/tests/it/voice_people.rs:253:9:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\n"
+      }
+    },
+    {
+      "name": "skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end",
+      "package": "lamp-skills",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-skills",
+        "target": "it",
+        "case": "skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-03d8e125c34f2f16",
+        "sha256": "b33fa53aa6dc679d4fa0c8a115332088e731d735dfdb2b55c2cbda0f338f8178",
+        "raw_offset": 674229,
+        "raw_bytes": 347,
+        "raw_sha256": "31f727ab883946aee241ab17c5e11af2b1e8f69935cbbb2132a456eeb5a51ca4",
+        "utf8": "---- skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end stdout ----\n\nthread 'skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end' (6051802) panicked at crates/skills/tests/it/skills.rs:4535:5:\n420.159431ms\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+      }
+    },
+    {
+      "name": "routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum",
+      "package": "lamp-skills",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-skills",
+        "target": "it",
+        "case": "routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-03d8e125c34f2f16",
+        "sha256": "b33fa53aa6dc679d4fa0c8a115332088e731d735dfdb2b55c2cbda0f338f8178",
+        "raw_offset": 674577,
+        "raw_bytes": 989,
+        "raw_sha256": "d4d69f68a74120cdd481a4e9e97ae116f249b0fdfdb74f4f081caa862575eab0",
+        "utf8": "---- routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum stdout ----\n\nthread 'routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum' (6051599) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-0162dS/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: routine-check Done: Expression is not fresh and enabled\n\n"
+      }
+    },
+    {
+      "name": "routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline",
+      "package": "lamp-skills",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-skills",
+        "target": "it",
+        "case": "routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-03d8e125c34f2f16",
+        "sha256": "b33fa53aa6dc679d4fa0c8a115332088e731d735dfdb2b55c2cbda0f338f8178",
+        "raw_offset": 675567,
+        "raw_bytes": 880,
+        "raw_sha256": "999d4ca53251e25d99bef6b0b5badf7c67d2c36d0a986e6151f688a6e1e48bc1",
+        "utf8": "---- routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline stdout ----\n\nthread 'routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline' (6051309) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-8uXHxC/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Answered: night chance dropped: it held, but the skill's conditions did not hold within its wait of 0 s; it comes again only once the trigger ends and holds again\n\n"
+      }
+    },
+    {
+      "name": "routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum",
+      "package": "lamp-skills",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-skills",
+        "target": "it",
+        "case": "routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-03d8e125c34f2f16",
+        "sha256": "b33fa53aa6dc679d4fa0c8a115332088e731d735dfdb2b55c2cbda0f338f8178",
+        "raw_offset": 676448,
+        "raw_bytes": 3099,
+        "raw_sha256": "59b7c3d4ebc4a48e3a59ec9e5240c867546fc11387ded47f7ae0817445c105e2",
+        "utf8": "---- routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum stdout ----\n\nthread 'routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum' (6051256) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-e6Uc4C/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: routine-check Done: \nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: routine-check Answered: night watch reset after 0 s: stopped holding: fixture/routine phase no longer night\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: routine-check Done: Expression is not fresh and enabled\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\n\n"
+      }
+    },
+    {
+      "name": "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest",
+      "package": "lamp-skills",
+      "target_kind": "test",
+      "target_name": "it",
+      "reference_profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "reference_features": [],
+      "original_failure": {
+        "package": "lamp-skills",
+        "target": "it",
+        "case": "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest",
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target/debug/deps/it-03d8e125c34f2f16",
+        "sha256": "b33fa53aa6dc679d4fa0c8a115332088e731d735dfdb2b55c2cbda0f338f8178",
+        "raw_offset": 679548,
+        "raw_bytes": 3363,
+        "raw_sha256": "fc6844c1af98115161ba590ba53a30da5d1e69704fc4f195bb041da716d4325d",
+        "utf8": "---- routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest stdout ----\n\nthread 'routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest' (6051446) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-laEL0F/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: routine-check Done: \nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: routine-check Answered: night watch reset after 0 s: stopped holding: fixture/routine phase no longer night\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: routine-check Done: Expression is not fresh and enabled\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: night sleep can rest again: its claim is said\n\n"
+      }
+    }
+  ],
+  "original_source": "208/427",
+  "actual_totals": {
+    "passed": 7265,
+    "failed": 49,
+    "ignored": 52
+  },
+  "frozen_only_after_whole_gate_closed": true
+}

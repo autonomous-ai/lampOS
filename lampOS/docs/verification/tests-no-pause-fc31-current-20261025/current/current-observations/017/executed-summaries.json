@@ -1,0 +1,24 @@
+{
+  "source": "actual test result lines only, including any harness-compatible summaries",
+  "command_exit_code": 0,
+  "command_timed_out": false,
+  "rows": [
+    {
+      "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 4.70s",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 26
+    }
+  ],
+  "totals": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 26
+  },
+  "qualification": "Nonzero or timeout is still a failed/incomplete gate regardless of parsed counts; compiled inventory is not execution."
+}

@@ -1,0 +1,4 @@
+lamp-skills: skills from /tmp/dn0lx3XR/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["nods"]
+lamp-skills: nods Triggered: the model called nods with {"long":true}
+lamp-skills: nods Done: after the say: spoken from 0 ms after the call, the turn over 535 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done

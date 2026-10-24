@@ -1,0 +1,764 @@
+{
+  "variant": "current-3d0455043-no-pause2",
+  "head": "3d045504355ba4c6918268da24466b9606587c08",
+  "source_guard_sha256": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3",
+  "case_count": 49,
+  "case_keys": [
+    "[\"lamp-body\", \"lib\", \"lamp_body\", \"runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets\"]",
+    "[\"lamp-body\", \"lib\", \"lamp_body\", \"bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began\"]",
+    "[\"lamp-body\", \"lib\", \"lamp_body\", \"unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails\"]",
+    "[\"lamp-cloud\", \"lib\", \"lamp_cloud\", \"lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back\"]",
+    "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges\"]",
+    "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge\"]",
+    "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep\"]",
+    "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge\"]",
+    "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload\"]",
+    "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators\"]",
+    "[\"lamp-expression\", \"test\", \"it\", \"rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol\"]",
+    "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt\"]",
+    "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"enabled_output_uses_a_new_session_and_expires_after_input_loss\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"slow_input_draining_does_not_make_old_joints_fresh\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_switch_closed_mid_look_ends_it\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"without_a_pause_said_expression_asks_exactly_as_before\"]",
+    "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"health::the_environment_alone_does_not_enable_reporting_or_create_bus_data\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_name::a_told_name_against_each_way_a_run_of_turns_ends\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_rules_kept_at_once_never_pass_the_most\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten\"]",
+    "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other\"]",
+    "[\"lamp-skills\", \"test\", \"it\", \"skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end\"]",
+    "[\"lamp-skills\", \"test\", \"it\", \"routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum\"]",
+    "[\"lamp-skills\", \"test\", \"it\", \"routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline\"]",
+    "[\"lamp-skills\", \"test\", \"it\", \"routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum\"]",
+    "[\"lamp-skills\", \"test\", \"it\", \"routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest\"]"
+  ],
+  "repetitions": 3,
+  "planned_observations": 147,
+  "fixed_schedule": [
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-cloud\", \"lib\", \"lamp_cloud\", \"lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-cloud\", \"lib\", \"lamp_cloud\", \"lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-cloud\", \"lib\", \"lamp_cloud\", \"lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"enabled_output_uses_a_new_session_and_expires_after_input_loss\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"enabled_output_uses_a_new_session_and_expires_after_input_loss\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"enabled_output_uses_a_new_session_and_expires_after_input_loss\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"slow_input_draining_does_not_make_old_joints_fresh\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"slow_input_draining_does_not_make_old_joints_fresh\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"slow_input_draining_does_not_make_old_joints_fresh\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_switch_closed_mid_look_ends_it\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_switch_closed_mid_look_ends_it\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_switch_closed_mid_look_ends_it\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"without_a_pause_said_expression_asks_exactly_as_before\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"without_a_pause_said_expression_asks_exactly_as_before\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"without_a_pause_said_expression_asks_exactly_as_before\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::the_environment_alone_does_not_enable_reporting_or_create_bus_data\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::the_environment_alone_does_not_enable_reporting_or_create_bus_data\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::the_environment_alone_does_not_enable_reporting_or_create_bus_data\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_name::a_told_name_against_each_way_a_run_of_turns_ends\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_name::a_told_name_against_each_way_a_run_of_turns_ends\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_name::a_told_name_against_each_way_a_run_of_turns_ends\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_rules_kept_at_once_never_pass_the_most\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_rules_kept_at_once_never_pass_the_most\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_rules_kept_at_once_never_pass_the_most\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest\"]",
+      "repetition": 3
+    }
+  ],
+  "outer_seconds": 600,
+  "minimum_free_bytes": 5368709120,
+  "case_scopes": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-fc31-prep/no-pause-profile2-case-scopes.json",
+  "input_hashes": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/run-current-observations.py": "6e228f7b6075fba282724932c5263bf51e4d6569cd3159e834c64ff6b3ada4bf",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/observation_support.py": "199360aaeebf18bb554938b049df7946d1993f245f6a6178938a71be00037da2",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/owned_session.py": "4a06b3b4779200d2b738a10ae795ba67e76dccade9011fd232b305ace8bf3f84",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/run-preparation.py": "0fcbfbe462ea4fe69488261b09f2b2539ac180576de25ba17f52214cf6b0efc3",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/plan.json": "f87b96f9ce89b27da391e2785b47d00db162162f716ea9ab6803205648b72723",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-fc31-prep/no-pause-source-guard.json": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-fc31-prep/no-pause-debug2-cases.json": "9717a8abae1b2e58cf0bb6e21f99731a260097ab68c629a49a05395f60357fe7",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-fc31-prep/no-pause-profile2-case-scopes.json": "9354f4f8dde7268800e739a237ace91e5bf751fd926507f876c6ec2d075910b7",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/verified-inventory-final-receipt.json": "439f72938b31396e219d6382c45a3ea67ef363f775fed62e7bab5b71d409f01f",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/verified-compile-final-receipt.json": "2d7910216f28bbe5b636782688071d60983e500be6f51a275994685458e35a3e",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/actual-local-packages.json": "e465a6b43624876efd12234b2287c966c907414fde0f4fe5e3886b053db37a75",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/metadata/metadata.stdout.txt": "a51afff8a7a0a8c0d5f32a9e3173e62fb2b53b99399b72958c7fd3ab53b494b8",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census.json": "9eea88d5792425620c634edca2bb6fc2cf7c9fed833636a81766877eb9905d32",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/file.json": "72175a6546e4bc94e35f83644f330e17e06e83fbad266f1d9ffa9c7407cf1893",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/census.json": "dd2270184c9682af29394a9a12181941840b1dc84db8115f2f33ab230f73473e",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/ignored.json": "d415dc7a23540b4dc17b97a8066434a2c589e857fa758e2f6be49207c77deea2",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/all.json": "a53c6455ac5ba20f21c9c08f149f9e1b9a0b0e5dd31959872d1e32812628632c",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/file.json": "843ec08d6b35cc578d3a8cdd97b2a9c352a93e5df11ebfe874c44472ed31e86d",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/census.json": "216fbfb02dd38ed0c93c8ee967145503544270f28490c4cf64f57e327bad0652",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/ignored.json": "06ce3a493e8b0c40980bc64e175edae672e6200775b156f0099783b91c5f0702",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/all.json": "846f68e5d72ebc21debd167d8c0e47351ebb86dd58cd4bbe0c84b1410e8e17ed",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/file.json": "24769b50d904d58f8983995d45f2a00ff3af25ee1bff8f36e17c9916b827f0f3",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/census.json": "4e9479745a2157433f997ec6682640c73cd75ae53c11c6a944e7a0050f70194f",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/ignored.json": "127b6be7a7345f14e36f31a805ad6308eefb0038b91152cbba3b9c223bd8afa9",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/all.json": "b30b746493a3133125dd767758f3eacfe2f931f4e2d16baf39a64fc993859319",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/file.json": "6349648aa29b840af56c97fddabd2d67796a2acb61fb055ac524a8b56939f670",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/census.json": "df61972eabf1b3dfba657aa741576b28b020ff05fe7bb5cfc467d2887e20659d",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/ignored.json": "048c2abfa184b39c3f4dde96caecc53dfbc50d254579b81a972ec42f6f1a67ec",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/all.json": "1bc6b0e67aea8af9cfda7501fa052c166ca10958228a34912ec72d1cc59dfbee",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/file.json": "bfa8a69af480da69f28273cffd9df5baf8e00fa657d70e6298a5ed213d79bc59",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/census.json": "f25204abe06e6e4428c753ba97e779a5c7a75f4207ad3f27a41416a1a22d4f40",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/ignored.json": "0112b41756e301b52dd93d42702406ac12a85da0da28cba5bf55d7a6c569a652",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/all.json": "39eb4ce8cff35f9337acf9388c37c50ee7375a311be21ae966984c052085dfee",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/file.json": "74a501b931fce94e607cf4a649249d6357fa5c700b5c144cfdd78c40286fba55",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/census.json": "fde1ea5ecded5b08b1f01a7fd76d7e79ecc3cb40c1a0f906f73df9ce5e3d6b42",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/ignored.json": "a5f754f85a8638ec2b865617f4b80d425b89eee5033242839ec02be88cf0d869",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/all.json": "6a995ddd5f946f6552c02856b462481a242ea4ac2c04856f85b520c9805aa57c",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/file.json": "71269c9ed97867b0785ef06414aec5a438ee8634d0d7c2d82595d94548a64546",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/census.json": "b78bef0c60f711f7f14640002ad56d9d46cb5a078c81e513c97013c932364d5c",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/ignored.json": "34d7a041ec263f9d5b2ddd7922778754199ff13d6dd087304127159237206fd9",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/all.json": "84424990292bc049bba226f0ebda881e19a20c20ebdd8fc7eb1fccdb971f8ce2",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/all.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/ignored.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/file.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/all.stdout.txt": "415f1cf0e5d0725e2f7d157193f049aa26d2d0d91de8196ad56e4c6ec427a2a6",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/ignored.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/file.stdout.txt": "33132d6a228d7a53947528b5fb04a8f5091f790a07f3c0a5d8711934f63aa3fa",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/all.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/ignored.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/file.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/all.stdout.txt": "de7efe0fa806e04d1bdf40df5fac23874d637caac75133ac9b5dd01c3c919abd",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/ignored.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/file.stdout.txt": "3bde79643187fe7f852ded29d18efea6173954b9a166cd6987947a6ab37f3921",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/all.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/ignored.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/file.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/all.stdout.txt": "34cef1e037f52a0b4b1610c00e236954880e2e11697845960c13728c4d1d0e75",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/ignored.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/file.stdout.txt": "8ce0767126670a87eccde58a7245247ce2e05a49c8231168fe48d2e87553eeab",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/all.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/ignored.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/file.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/all.stdout.txt": "65a1af78f7f5a5f4fae11cb562ec4172cb0283c09005f24b8c238aa3caaca0eb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/ignored.stdout.txt": "c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/file.stdout.txt": "0aa2f403595530c1aee2ed300bb8dcc1327a4294bfcd7c20ed6764ca65f058fd",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/all.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/ignored.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/file.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/all.stdout.txt": "6181a85a42cd283755388f42e211c7a65daa4d834bc33679d21424dc6f23e5cd",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/ignored.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/file.stdout.txt": "3c6eb83085e4a630fe85b87b2dae49c2b8e3cdca210fe1c6cb436e944f771d6a",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/all.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/ignored.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/file.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/all.stdout.txt": "a027127754ca063e375165d1f0c2d6813b3611ebe772d81dfde78b69234fcc7e",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/ignored.stdout.txt": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/file.stdout.txt": "d69e144f74e5a9b34737e4fa35ff4ebd7e8f35e7bd78cddc303fa93e767755f4",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/all.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/ignored.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/file.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/all.stdout.txt": "d89a6496b867fc09a82145e3bf00984ec02dd8e608ea6a1555de178e385d5ad5",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/ignored.stdout.txt": "1464fe30badbad989476eff83279c5f510934b883ca5efae66c8ca2c11a82de4",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/file.stdout.txt": "b09a263130aba14b6d0dc045cd6453ab0e090f959b7725c29f4b559adb4889c1",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/failed-import-launch-20261024/launch-failure.json": "9b43548694c535f69ed32be3a3d24013d4643e77267cb82f42df483921768fff",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/import-preflight.json": "7b3a55c23489e1d19d5d51e0170dc11a6fefa9aad67c008da63705c14406777a"
+  },
+  "required_current_inputs": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory-terminal.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/selected-case-bindings.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/frozen-executables-and-CLIs.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/compile-terminal.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/local-provenance.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/bound-artifacts.json"
+  ],
+  "current_artifact_input_hashes": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory-terminal.json": "ee430a564e917627560e06a2fa82bc5178fbc68b039f6c9bae5557ff876b9bdb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/selected-case-bindings.json": "ff39c852208f9a3f4744d880b72e5ee008b18d9db47451014935f0233fa780a7",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/frozen-executables-and-CLIs.json": "21b3fa78369a93b1424f47a8f420b9a3b4e9ce0d62cca8c73251ae3a9f05e045",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/compile-terminal.json": "ee430a564e917627560e06a2fa82bc5178fbc68b039f6c9bae5557ff876b9bdb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/local-provenance.json": "dcf68499d052e858317476ecb43fd381e870631b767b932036a0693f732c54de",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/bound-artifacts.json": "f7149a24d0ea75997db6f12c3cf93fa13756819f9a13b10963c8bf2342316a5f"
+  },
+  "execution_ready": true,
+  "scope": "Fixed49case-major x3 observations only after actualcurrentcompile/inventory and both compiler lanes terminal/quietwindow. No compile/targetmutation/restoration/retry. Defaultcaptured/profile2/runtimejobs4; normalCLI/selfexe bindings unchanged. All0/101 retained; invalidsetup/census/outertimeout stops. No historical cause or fullgreen claim.",
+  "actual_compile_and_inventory_closed": true,
+  "all_current_compilers_closed": true,
+  "no_execution_without_separate_root_grant": true,
+  "failed_import_launch_preserved": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/failed-import-launch-20261024",
+  "new_root_grant_required_after_import_failure": true
+}

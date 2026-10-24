@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error\"]", "name": "rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error", "repetition": 2, "consumed_before_any_launch": true}

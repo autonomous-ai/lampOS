@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-24T22:31:16.428583+00:00",
+  "cloud_native": 52313,
+  "no_pause_native": 95561,
+  "actual_native_launch_handles": true,
+  "actual_first_Cargo_command_start_pending_closed_records": true,
+  "compile_budget": {
+    "cloud": 2,
+    "no_pause_argv": 2,
+    "no_pause_inherited_runtime": 4,
+    "aggregate": 4
+  },
+  "distinct_targets": true,
+  "isolated_load_or_timing_claim": false
+}

@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets\"]", "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets", "repetition": 2, "consumed_before_any_launch": true}

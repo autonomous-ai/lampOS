@@ -1,0 +1,6 @@
+
+running 1 test
+test voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 2.38s
+

@@ -1,0 +1,21 @@
+
+running 1 test
+test sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus ... FAILED
+
+failures:
+
+---- sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus stdout ----
+lamp-expression: refused an input (1 so far): input observation is future or stale at arrival
+
+thread 'sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus' (8273623) panicked at crates/expression/tests/runtime.rs:764:13:
+assertion `left == right` failed
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 7.13s
+

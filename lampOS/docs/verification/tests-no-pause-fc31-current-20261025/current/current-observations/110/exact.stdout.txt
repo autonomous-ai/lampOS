@@ -1,0 +1,6 @@
+
+running 1 test
+test voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.42s
+

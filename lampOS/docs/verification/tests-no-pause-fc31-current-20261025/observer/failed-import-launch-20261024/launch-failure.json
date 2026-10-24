@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-24T22:49:38.526341+00:00",
+  "native_exit_code": 1,
+  "native_handle": null,
+  "tool_chunk": "1debf9",
+  "stderr_provenance": "Exact traceback text copied from native exec tool response; not an originally redirected process stream",
+  "no_session_returned": true,
+  "observations_launched": 0,
+  "execution_consumed_exists": false,
+  "source_or_target_mutation": false,
+  "cause": "Missing private copied support.py import dependency of census.py",
+  "retry_authorized": false
+}

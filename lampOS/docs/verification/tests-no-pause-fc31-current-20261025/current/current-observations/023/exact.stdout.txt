@@ -1,0 +1,6 @@
+
+running 1 test
+test runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 1.57s
+

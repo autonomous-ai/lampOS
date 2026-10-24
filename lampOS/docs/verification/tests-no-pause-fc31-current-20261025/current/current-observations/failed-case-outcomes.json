@@ -1,0 +1,278 @@
+[
+  {
+    "case_key": [
+      "lamp-body",
+      "lib",
+      "lamp_body",
+      "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets"
+    ],
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "compiler_features": [],
+    "test_sha256": "fc3acc3f37e627f247b4fed845c27a4a1b0a99e209b51c7d14753d8dfbfc75e4",
+    "observations": [
+      {
+        "repetition": 1,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/001",
+        "record_sha256": "772e27a4debf662f921cd60de42275485373d634abae09b90593e5cb64376cf3",
+        "stdout_sha256": "710439cbf1acc74143af3e3ca6d7158b8ef05049daec3d279fb2128361dbd682",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 2,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/002",
+        "record_sha256": "09b7aa9804a3b8f47e8a10a262f7863ae75cf58e752e3800ead8ab181f9a622b",
+        "stdout_sha256": "5a587aaf61c749b1c6dff38ae58439d827951abd25bda4298d1324b43838b136",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 3,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/003",
+        "record_sha256": "adb16309f59470a4058911fbfd84ea8b22c598d3ee25873c1eee962749d2b217",
+        "stdout_sha256": "37be633dd66fa9fb593410f930bae143edf6f0b64645fdb0becf5beca596ad83",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "passed": 2,
+    "failed": 1,
+    "qualifies_three_of_three": false
+  },
+  {
+    "case_key": [
+      "lamp-body",
+      "lib",
+      "lamp_body",
+      "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began"
+    ],
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "compiler_features": [],
+    "test_sha256": "fc3acc3f37e627f247b4fed845c27a4a1b0a99e209b51c7d14753d8dfbfc75e4",
+    "observations": [
+      {
+        "repetition": 1,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/004",
+        "record_sha256": "65fd129d44fa4a90060ee656c238fcc4b1aad204b61e824a0a84f77b5493bb6a",
+        "stdout_sha256": "9c0a5486f739ebe32dc0ab02e4f2a1d640973592e30f2cf10e043d1d9090d19b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 2,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/005",
+        "record_sha256": "8a3f45b3abadc86699c4d59e209b24e65a36460dae7240fb4d438a62bab709d4",
+        "stdout_sha256": "36939f4aee1c2a11453d0a64dd6f736a80b29012877f7ebcfe0d96f585b0588b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 3,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/006",
+        "record_sha256": "d561ca6862e88e55ad73e3df1ad5116c56c50e02c1b490f2b9d4a877520c7be2",
+        "stdout_sha256": "ae93dd1ae4c682045c40cbb73f19deffe9b583a308ffeef82b65386561a2ab80",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "passed": 0,
+    "failed": 3,
+    "qualifies_three_of_three": false
+  },
+  {
+    "case_key": [
+      "lamp-body",
+      "lib",
+      "lamp_body",
+      "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails"
+    ],
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "compiler_features": [],
+    "test_sha256": "fc3acc3f37e627f247b4fed845c27a4a1b0a99e209b51c7d14753d8dfbfc75e4",
+    "observations": [
+      {
+        "repetition": 1,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/007",
+        "record_sha256": "ceb25f2ebfc76bb9af2924b280b4cb95fd840fd3933f2f236b3f1a53ca9767a2",
+        "stdout_sha256": "ad782a2ef37b3eaaadd92cf6c7f8d20cd2b707fc912e03a302c25b453298c2d2",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 2,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/008",
+        "record_sha256": "8ea07d5d25ae1dd20132295d97ddec5367e0e9f3bfaddff3f894b1ce0a0936f4",
+        "stdout_sha256": "09714be613d726b59d090861e197f6b4616736695f45262c0e62108a18d95e38",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 3,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/009",
+        "record_sha256": "e88072e1e01767259d527b4cbeccaf49e662817e23ac5db19e15fb1074c0af45",
+        "stdout_sha256": "4b5f971bd75ae22b3bd57e4763b4a5736c2a23efb1248e646686e7cdd8e2f0b0",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "passed": 0,
+    "failed": 3,
+    "qualifies_three_of_three": false
+  },
+  {
+    "case_key": [
+      "lamp-cloud",
+      "lib",
+      "lamp_cloud",
+      "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back"
+    ],
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "compiler_features": [],
+    "test_sha256": "157432718cc07f425531a50f7ab9fd9993848553ebb5b226178d4b58eaccef06",
+    "observations": [
+      {
+        "repetition": 1,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/010",
+        "record_sha256": "2320abf50184d218021cbf4f07bdfa2f2e4dac95420f8c565178b570ecea81de",
+        "stdout_sha256": "628dc9b7067288cdf9822633c24bcae177b299c10f6c7cafaf78ed4e8da408f2",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 2,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/011",
+        "record_sha256": "1c2adcb816dcf13a1fe62a8481436a81ca251bd49042b0f68bbd1f8d00356bc8",
+        "stdout_sha256": "074f8bee71af2c6d4374626c59c5089e8e3273d5d58548b09c53b64f8bb90f1a",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 3,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/012",
+        "record_sha256": "a1040907041db3d2a01eb5690cd2da7cc4101c825ccc61e082ce7f2580af51ce",
+        "stdout_sha256": "74008f50b8374f4ce751acd7c1a3dcdca93d6c781b616fec0dde8165501141d9",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "passed": 2,
+    "failed": 1,
+    "qualifies_three_of_three": false
+  },
+  {
+    "case_key": [
+      "lamp-expression",
+      "lib",
+      "lamp_expression",
+      "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges"
+    ],
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "compiler_features": [],
+    "test_sha256": "030d38e16200a507724415194be4876cd3b5ef094257b0a4f31d762983381e94",
+    "observations": [
+      {
+        "repetition": 1,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/013",
+        "record_sha256": "08a09eef2caeed6f361c8b2015425c47ee47bff90450cb21984f8ad36ea2316c",
+        "stdout_sha256": "1663cca52c732a50fc495b12e1ac895de19961c13191d3a824cfab389d3229bc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 2,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/014",
+        "record_sha256": "fd8e6e73d9883be5714c498b9f90941c32f5f31ad18a31db44cba3cdf02cc0d2",
+        "stdout_sha256": "babb041268b213216a5f8163f8e1652c4dfb12c0bc743e47a46b23253f2baba0",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 3,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/015",
+        "record_sha256": "68d389358b4a9227de9246b2cfa5455136c17f0d7bc64cc603634cc8bdff121e",
+        "stdout_sha256": "5e00d9c61da565c8a728b64175c0b753f3d11b041015831225bff20284ded4a3",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "passed": 2,
+    "failed": 1,
+    "qualifies_three_of_three": false
+  },
+  {
+    "case_key": [
+      "lamp-expression",
+      "test",
+      "runtime",
+      "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus"
+    ],
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "compiler_features": [],
+    "test_sha256": "96e3e99fb5aca08aff7fa7f6b5aa58d3143fbba317e339105cc70acc629dc80c",
+    "observations": [
+      {
+        "repetition": 1,
+        "outcome": "FAILED",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/049",
+        "record_sha256": "bc668bc49fb02deb2c7ede600323f4d2bd5b6980d8c2cf2e4b0889b6c8eac622",
+        "stdout_sha256": "14ebd1f5bb4ff25bcf939115aec4763f491a93017f5c5a8071d848a27fcc41d9",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 2,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/050",
+        "record_sha256": "554ff7fcf1417c1c310fd7461fc12110316dfea5ace9a2926266c7d3bf4b6778",
+        "stdout_sha256": "f22139f50141c8bed8bf9b72274d4ce3efcaacf7bc31c4a0c79d0b142fcbfc43",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "repetition": 3,
+        "outcome": "ok",
+        "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/051",
+        "record_sha256": "4f87ea46476cc7ade0ec7301d737ccbff3dcf91844dfcaeab8b0e5e28b8f2166",
+        "stdout_sha256": "3c30382ef5fd99b8615622ab30867b24d356386a6f07ff12d849ecb43936aefd",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "passed": 2,
+    "failed": 1,
+    "qualifies_three_of_three": false
+  }
+]

@@ -1,0 +1,18 @@
+
+running 1 test
+test bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began ... FAILED
+
+failures:
+
+---- bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began stdout ----
+
+thread 'bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began' (8222176) panicked at crates/body/src/bus_out.rs:1581:22:
+a hand
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 439 filtered out; finished in 9.05s
+

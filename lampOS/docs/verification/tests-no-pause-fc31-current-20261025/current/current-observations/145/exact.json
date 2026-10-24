@@ -1,0 +1,51 @@
+{
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/readonly/577a118a730f6554cebc4b365f7cc1c6619dcb1a258d4e54718f9c12cdb0c1cf",
+    "--exact",
+    "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/current-3d-no-pause/lampOS/crates/skills",
+  "started_at": "2026-10-24T23:06:18.886349+00:00",
+  "timeout_seconds": 600,
+  "stdout": "exact.stdout.txt",
+  "stderr": "exact.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 16188,
+  "owned_process_group": 16188,
+  "validated_child_session": {
+    "pid": 16188,
+    "sid": 16188,
+    "pgid": 16188,
+    "start_new_session": true
+  },
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "owned_session_cleanup": {
+    "sid": 16188,
+    "censuses": [
+      {
+        "label": "before outer cleanup",
+        "members": []
+      },
+      {
+        "label": "after outer cleanup / empty recheck",
+        "members": []
+      }
+    ],
+    "signals": [],
+    "errors": [],
+    "absent": true
+  },
+  "wall_seconds": 1.306624,
+  "finished_at": "2026-10-24T23:06:20.193075+00:00",
+  "stdout_sha256": "f8f86d6d74e4b648083de1f6fb58bd37ef57496b5fe8a5965df943ad737d25bc",
+  "stdout_bytes": 210,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

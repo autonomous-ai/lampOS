@@ -1,0 +1,18 @@
+
+running 1 test
+test lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back ... FAILED
+
+failures:
+
+---- lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back stdout ----
+
+thread 'lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back' (8227198) panicked at crates/cloud/src/lamp.rs:1085:9:
+assertion failed: saved.elapsed() < SHOWN_WITHIN + Duration::from_millis(500)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 167 filtered out; finished in 4.94s
+

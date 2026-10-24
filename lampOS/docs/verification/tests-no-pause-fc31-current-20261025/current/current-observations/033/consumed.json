@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol\"]", "name": "rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol", "repetition": 3, "consumed_before_any_launch": true}

@@ -1,0 +1,6 @@
+
+running 1 test
+test voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.28s
+

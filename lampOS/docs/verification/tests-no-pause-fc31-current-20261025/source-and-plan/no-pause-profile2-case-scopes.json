@@ -1,0 +1,1524 @@
+{
+  "cases": [
+    {
+      "key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [
+        "LAMP_MOTOR_TEST_DIRECTORY",
+        "LAMP_MOTOR_TEST_PARENT",
+        "LAMP_MOTOR_TEST_WORKER",
+        "LAMP_MOTOR_TEST_MODE"
+      ],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "package": "lamp-body",
+        "target": "lamp_body",
+        "kind": "self-executable",
+        "compiled_programs": [],
+        "self_child": {
+          "executable": "same exact body unit-test executable",
+          "exact_case": "runtime::supervisor::tests::inert_child",
+          "args": [
+            "--exact",
+            "runtime::supervisor::tests::inert_child",
+            "--nocapture"
+          ],
+          "instances": [
+            "mode=crash",
+            "mode=normal"
+          ],
+          "environment": [
+            "LAMP_MOTOR_TEST_DIRECTORY",
+            "LAMP_MOTOR_TEST_PARENT",
+            "LAMP_MOTOR_TEST_WORKER",
+            "LAMP_MOTOR_TEST_MODE"
+          ],
+          "stdio": "Supervisor sets all stdin/stdout/stderr null"
+        },
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "fixture(crash) and fixture(normal), tests.rs130\u2013152,919\u2013951; children remain in inherited outer process group.",
+          "Success explicitly polls/reaps both; Supervisor Drop kills then try_wait (NOT guaranteed blocking reaping). Outer owned-PG cleanup/absence remains necessary on panic; do not claim fixture Drop alone reaps."
+        ],
+        "source_evidence": [
+          "body/src/runtime/supervisor/tests.rs:130-152,919-951",
+          "body/src/runtime/supervisor.rs:254-297, final Drop impl"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+        "package": "lamp-body",
+        "target": "lamp_body",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "BusOut::on publishes through an in-process worker thread; mkfifo command is only the other delayed-hand-I/O test, not selected hand-state case."
+        ],
+        "source_evidence": [
+          "body/src/bus_out.rs:1561-1595"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-body\", \"lib\", \"lamp_body\", \"unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "package": "lamp-body",
+        "target": "lamp_body",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Adapter configured on real local Bus with own worker; sample/phase wait paths no process launch."
+        ],
+        "source_evidence": [
+          "body/src/unplug.rs:968-1024"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-cloud\", \"lib\", \"lamp_cloud\", \"lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back",
+        "package": "lamp-cloud",
+        "target": "lamp_cloud",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real struct contains Wifi::default but selected light/preview/set_light path never calls Wifi polling/spawn; ring is a joined stdthread. iw/sleep command tests elsewhere in same file are unrelated."
+        ],
+        "source_evidence": [
+          "cloud/src/lamp.rs:1034-1098"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/src/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge",
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/src/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep",
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/src/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"lib\", \"lamp_expression\", \"runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge",
+        "package": "lamp-expression",
+        "target": "lamp_expression",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/src/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload",
+        "package": "lamp-expression",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/it/recent_playout_runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"it\", \"recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators",
+        "package": "lamp-expression",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/it/recent_playout_runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"it\", \"rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol",
+        "package": "lamp-expression",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/it/rest_replay.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt",
+        "package": "lamp-expression",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/it/rest_requests.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error",
+        "package": "lamp-expression",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/it/rest_requests.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"enabled_output_uses_a_new_session_and_expires_after_input_loss\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"slow_input_draining_does_not_make_old_joints_fresh\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "slow_input_draining_does_not_make_old_joints_fresh",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [
+        "LAMP_EXPRESSION_SLEEP_NAME_JOURNAL_CHILD"
+      ],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "self-executable",
+        "compiled_programs": [],
+        "self_child": {
+          "executable": "same exact expression runtime-test executable",
+          "exact_case": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+          "args": [
+            "--exact",
+            "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "environment": [
+            "LAMP_EXPRESSION_SLEEP_NAME_JOURNAL_CHILD=1"
+          ],
+          "stdio": "stdin inherited; stdout null; stderr owned journal file"
+        },
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Child enters only controlled env branch; SleepingService is in-process there, no further subprocess.",
+          "JournalChild Drop kill+wait; outer15s host watchdog; no process-group/session changes."
+        ],
+        "source_evidence": [
+          "expression/tests/runtime.rs:898-955"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_switch_closed_mid_look_ends_it\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "sleep_name::the_switch_closed_mid_look_ends_it",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"without_a_pause_said_expression_asks_exactly_as_before\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "without_a_pause_said_expression_asks_exactly_as_before",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+        "package": "lamp-expression",
+        "target": "runtime",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Service/Engine and real local Bus fixtures run in-process. rest_replay file has an unrelated replay-example CLI test at731; selected real_service test623 calls runtime::Service directly. SleepingService-only selected cases do not enter JournalChild helper except explicitly classified self-exec case."
+        ],
+        "source_evidence": [
+          "crates/expression/tests/runtime.rs"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-memory-fixture"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-memory-fixture"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Process::spawn chooses fixture binary only when controlled=true; ordinary environment-only case loopsdaysfalse/true using normal lamp-memory.",
+          "ProcessDrop kill+wait before control detach; startup helper guard also kill+wait on handshake failure; no setsid/process_group.",
+          "Child arguments --dir ownedstore --socket owned/m.sock, --memory-days for days=true, --bus-root only for reporting; env-only sets LAMP_BUS_ROOT but no bus flag. Controlled helper changes stdin to a one-frame bootstrap pipe; stderr regular owned log, stdout null."
+        ],
+        "source_evidence": [
+          "memory/tests/it/health.rs:26-28,112-166,297-303,399-461,530-548,705-763",
+          "memory/tests/support/health_control.rs:33-85,487-499"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-memory-fixture"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-memory-fixture"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Process::spawn chooses fixture binary only when controlled=true; ordinary environment-only case loopsdaysfalse/true using normal lamp-memory.",
+          "ProcessDrop kill+wait before control detach; startup helper guard also kill+wait on handshake failure; no setsid/process_group.",
+          "Child arguments --dir ownedstore --socket owned/m.sock, --memory-days for days=true, --bus-root only for reporting; env-only sets LAMP_BUS_ROOT but no bus flag. Controlled helper changes stdin to a one-frame bootstrap pipe; stderr regular owned log, stdout null."
+        ],
+        "source_evidence": [
+          "memory/tests/it/health.rs:26-28,112-166,297-303,399-461,530-548,705-763",
+          "memory/tests/support/health_control.rs:33-85,487-499"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-memory-fixture"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-memory-fixture"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Process::spawn chooses fixture binary only when controlled=true; ordinary environment-only case loopsdaysfalse/true using normal lamp-memory.",
+          "ProcessDrop kill+wait before control detach; startup helper guard also kill+wait on handshake failure; no setsid/process_group.",
+          "Child arguments --dir ownedstore --socket owned/m.sock, --memory-days for days=true, --bus-root only for reporting; env-only sets LAMP_BUS_ROOT but no bus flag. Controlled helper changes stdin to a one-frame bootstrap pipe; stderr regular owned log, stdout null."
+        ],
+        "source_evidence": [
+          "memory/tests/it/health.rs:26-28,112-166,297-303,399-461,530-548,705-763",
+          "memory/tests/support/health_control.rs:33-85,487-499"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"health::the_environment_alone_does_not_enable_reporting_or_create_bus_data\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-memory"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-memory"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Process::spawn chooses fixture binary only when controlled=true; ordinary environment-only case loopsdaysfalse/true using normal lamp-memory.",
+          "ProcessDrop kill+wait before control detach; startup helper guard also kill+wait on handshake failure; no setsid/process_group.",
+          "Child arguments --dir ownedstore --socket owned/m.sock, --memory-days for days=true, --bus-root only for reporting; env-only sets LAMP_BUS_ROOT but no bus flag. Controlled helper changes stdin to a one-frame bootstrap pipe; stderr regular owned log, stdout null."
+        ],
+        "source_evidence": [
+          "memory/tests/it/health.rs:26-28,112-166,297-303,399-461,530-548,705-763",
+          "memory/tests/support/health_control.rs:33-85,487-499"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_name::a_told_name_against_each_way_a_run_of_turns_ends\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_name::a_told_name_against_each_way_a_run_of_turns_ends",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_rules_kept_at_once_never_pass_the_most\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_people::days_rules_kept_at_once_never_pass_the_most",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-memory\", \"test\", \"it\", \"voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other\"]",
+      "profile_debug": 2,
+      "compiled_programs": [],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other",
+        "package": "lamp-memory",
+        "target": "it",
+        "kind": "in-process-only",
+        "compiled_programs": [],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "No CARGO_BIN_EXE/current_exe/system command reachable from selected case and its inspected fixture. No executable-child restoration needed.",
+          "Real Memory Server/SQLite plus Voice DaysClient runs on owned stdthreads; Stopper.stop then JoinHandle.join on drop/restart. Voice remember current_exe calls belong to other cfg(test) unit cases, excluded from linked normal Voice dependency; local_time offset uses TZ/files, no subprocess."
+        ],
+        "source_evidence": [
+          "memory/tests/it/voice.rs:68-171",
+          "memory/tests/it/voice_people.rs:49-123",
+          "memory/tests/it/voice_name.rs:65-149"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-skills\", \"test\", \"it\", \"skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-skills"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end",
+        "package": "lamp-skills",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-skills"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "the_dance(false,Line::Said) -> the_dance_saying(...Says::BeganOver) -> the_dance_asking(...body_requests=false). One normal CARGO_BIN_EXE_lamp-skills; RunningDrop kill+wait, no PG/session changes.",
+          "--dir --bus-root --actions/mood-socket --tools-dir plus fixture Clock args; removes LAMP_BODY_REQUESTS. NODS skill consists of say, light, body gesture actions via owned socket/Bus stand-ins; no shell/tool subprocess.",
+          "Fake ring/body peers are stdthreads (including detached fixture ring thread), not executable children. No whole-thread cleanup guarantee inferred; process scope remains outer-owned group."
+        ],
+        "source_evidence": [
+          "skills/tests/it/skills.rs:1100-1106,4048-4060,4308-4401,4422-4518,4522-4548"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-skills"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum",
+        "package": "lamp-skills",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-skills"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Fixture::new/with_presentation launches one normal CARGO_BIN_EXE_lamp-skills. RunningDrop kill+wait; no PG/session changes.",
+          "env_clear then only LAMP_SKILL_ROUTINES=on,LAMP_SKILLS_ASK=skip,LAMP_SKILLS_DAILY_FILE; --trust-clock --zone UTC --boot-id routine-service-host --dir --bus-root --clock-control --say/actions/gaze/mood-socket point to owned temp fixtures. FakeExpression/Say are local socket peers, no compiled Expression/Say child.",
+          "All four cases use same launch; cancellation case loopsfalse/true, each has its own child with guard. ProductSkills src no process launch apart from unrelated cfg(test) package mkfifo case."
+        ],
+        "source_evidence": [
+          "skills/tests/it/routine_service.rs:28-33,131-221,459-584"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-skills"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline",
+        "package": "lamp-skills",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-skills"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Fixture::new/with_presentation launches one normal CARGO_BIN_EXE_lamp-skills. RunningDrop kill+wait; no PG/session changes.",
+          "env_clear then only LAMP_SKILL_ROUTINES=on,LAMP_SKILLS_ASK=skip,LAMP_SKILLS_DAILY_FILE; --trust-clock --zone UTC --boot-id routine-service-host --dir --bus-root --clock-control --say/actions/gaze/mood-socket point to owned temp fixtures. FakeExpression/Say are local socket peers, no compiled Expression/Say child.",
+          "All four cases use same launch; cancellation case loopsfalse/true, each has its own child with guard. ProductSkills src no process launch apart from unrelated cfg(test) package mkfifo case."
+        ],
+        "source_evidence": [
+          "skills/tests/it/routine_service.rs:28-33,131-221,459-584"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-skills"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum",
+        "package": "lamp-skills",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-skills"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Fixture::new/with_presentation launches one normal CARGO_BIN_EXE_lamp-skills. RunningDrop kill+wait; no PG/session changes.",
+          "env_clear then only LAMP_SKILL_ROUTINES=on,LAMP_SKILLS_ASK=skip,LAMP_SKILLS_DAILY_FILE; --trust-clock --zone UTC --boot-id routine-service-host --dir --bus-root --clock-control --say/actions/gaze/mood-socket point to owned temp fixtures. FakeExpression/Say are local socket peers, no compiled Expression/Say child.",
+          "All four cases use same launch; cancellation case loopsfalse/true, each has its own child with guard. ProductSkills src no process launch apart from unrelated cfg(test) package mkfifo case."
+        ],
+        "source_evidence": [
+          "skills/tests/it/routine_service.rs:28-33,131-221,459-584"
+        ]
+      }
+    },
+    {
+      "key": "[\"lamp-skills\", \"test\", \"it\", \"routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest\"]",
+      "profile_debug": 2,
+      "compiled_programs": [
+        "lamp-skills"
+      ],
+      "system_programs": [],
+      "parent_environment_absent": [],
+      "inner_new_PG": false,
+      "scope": {
+        "case": "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest",
+        "package": "lamp-skills",
+        "target": "it",
+        "kind": "compiled-program",
+        "compiled_programs": [
+          "lamp-skills"
+        ],
+        "self_child": null,
+        "system_commands": [],
+        "inner_new_process_group_or_session": false,
+        "notes": [
+          "Fixture::new/with_presentation launches one normal CARGO_BIN_EXE_lamp-skills. RunningDrop kill+wait; no PG/session changes.",
+          "env_clear then only LAMP_SKILL_ROUTINES=on,LAMP_SKILLS_ASK=skip,LAMP_SKILLS_DAILY_FILE; --trust-clock --zone UTC --boot-id routine-service-host --dir --bus-root --clock-control --say/actions/gaze/mood-socket point to owned temp fixtures. FakeExpression/Say are local socket peers, no compiled Expression/Say child.",
+          "All four cases use same launch; cancellation case loopsfalse/true, each has its own child with guard. ProductSkills src no process launch apart from unrelated cfg(test) package mkfifo case."
+        ],
+        "source_evidence": [
+          "skills/tests/it/routine_service.rs:28-33,131-221,459-584"
+        ]
+      }
+    }
+  ],
+  "source_case_scopes_sha256": "8c5a471b4bf77db9e7d8b882805ad14d3b9cffcf8ba841cbaac7fcdb4ed82c79",
+  "profile_debug": 2,
+  "debug0_obligations_not_included": true,
+  "child_source_bridge": [
+    {
+      "path": "lampOS/crates/body/src/runtime/supervisor/tests.rs",
+      "old208_sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a",
+      "prior_ea10_sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145871683327,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a"
+    },
+    {
+      "path": "lampOS/crates/body/src/bus_out.rs",
+      "old208_sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+      "prior_ea10_sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145859784479,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811"
+    },
+    {
+      "path": "lampOS/crates/body/src/unplug.rs",
+      "old208_sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf",
+      "prior_ea10_sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145873285780,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf"
+    },
+    {
+      "path": "lampOS/crates/cloud/src/lamp.rs",
+      "old208_sha256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8",
+      "prior_ea10_sha256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145896358939,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8"
+    },
+    {
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "old208_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "prior_ea10_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145957007140,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732"
+    },
+    {
+      "path": "lampOS/crates/expression/tests/it/recent_playout_runtime.rs",
+      "old208_sha256": "80910fc320c3d42040d7b4753a868e60763d61eb969aa47816e91463685ebac2",
+      "prior_ea10_sha256": "80910fc320c3d42040d7b4753a868e60763d61eb969aa47816e91463685ebac2",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145961903288,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "80910fc320c3d42040d7b4753a868e60763d61eb969aa47816e91463685ebac2"
+    },
+    {
+      "path": "lampOS/crates/expression/tests/it/rest_replay.rs",
+      "old208_sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c",
+      "prior_ea10_sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145962987378,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c"
+    },
+    {
+      "path": "lampOS/crates/expression/tests/it/rest_requests.rs",
+      "old208_sha256": "74b152d143b3b75b6a0c1ce77220270d5051b66a50f70b2cd5851171a898149c",
+      "prior_ea10_sha256": "74b152d143b3b75b6a0c1ce77220270d5051b66a50f70b2cd5851171a898149c",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145963535537,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "74b152d143b3b75b6a0c1ce77220270d5051b66a50f70b2cd5851171a898149c"
+    },
+    {
+      "path": "lampOS/crates/expression/tests/runtime.rs",
+      "old208_sha256": "9a5cec8774cd62182d51444214f277152f052006a314d1109a8c0b82c33153b8",
+      "prior_ea10_sha256": "9a5cec8774cd62182d51444214f277152f052006a314d1109a8c0b82c33153b8",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792877815585634100,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "9a5cec8774cd62182d51444214f277152f052006a314d1109a8c0b82c33153b8"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/health.rs",
+      "old208_sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+      "prior_ea10_sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146037779354,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice.rs",
+      "old208_sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+      "prior_ea10_sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146040939362,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice_people.rs",
+      "old208_sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+      "prior_ea10_sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146041556206,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice_name.rs",
+      "old208_sha256": "e103e6921c1044bd60c93c74871ca970fc6e5901eef5495b83a0fe7facf261f9",
+      "prior_ea10_sha256": "e103e6921c1044bd60c93c74871ca970fc6e5901eef5495b83a0fe7facf261f9",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146041189049,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "e103e6921c1044bd60c93c74871ca970fc6e5901eef5495b83a0fe7facf261f9"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/skills.rs",
+      "old208_sha256": "ba5c06d90f777082416243ee82fbc4b55fe97a4eac78bf4eef7fd2805a100311",
+      "prior_ea10_sha256": "ba5c06d90f777082416243ee82fbc4b55fe97a4eac78bf4eef7fd2805a100311",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146188990230,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "ba5c06d90f777082416243ee82fbc4b55fe97a4eac78bf4eef7fd2805a100311"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/routine_service.rs",
+      "old208_sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+      "prior_ea10_sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146186623653,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d"
+    },
+    {
+      "path": "lampOS/crates/body/src/runtime/supervisor.rs",
+      "old208_sha256": "f3f997ed7fe30b77ba6c0753ca118ec26f96bbd1c128505f8ea773256f942c8d",
+      "prior_ea10_sha256": "f3f997ed7fe30b77ba6c0753ca118ec26f96bbd1c128505f8ea773256f942c8d",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876145871227500,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "f3f997ed7fe30b77ba6c0753ca118ec26f96bbd1c128505f8ea773256f942c8d"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/support/health_control.rs",
+      "old208_sha256": "a06cb3e241ac901f5729eefe89abedf96cf5c8f7eb580bfcc715540ee67f97db",
+      "prior_ea10_sha256": "a06cb3e241ac901f5729eefe89abedf96cf5c8f7eb580bfcc715540ee67f97db",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146044057440,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "a06cb3e241ac901f5729eefe89abedf96cf5c8f7eb580bfcc715540ee67f97db"
+    },
+    {
+      "path": "lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+      "old208_sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+      "prior_ea10_sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146023835880,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a"
+    },
+    {
+      "path": "lampOS/crates/voice/src/local_time.rs",
+      "old208_sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc",
+      "prior_ea10_sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc",
+      "current_full_mode": 420,
+      "current_mtime_ns": 1792876146373490795,
+      "byte_equal_to_reviewed_ea10": true,
+      "current_head_sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc"
+    }
+  ]
+}

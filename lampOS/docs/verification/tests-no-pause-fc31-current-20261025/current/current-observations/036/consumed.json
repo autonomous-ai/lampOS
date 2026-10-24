@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-expression\", \"test\", \"it\", \"rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt\"]", "name": "rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt", "repetition": 3, "consumed_before_any_launch": true}

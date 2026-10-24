@@ -1,0 +1,6 @@
+
+running 1 test
+test health::the_environment_alone_does_not_enable_reporting_or_create_bus_data ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.22s
+

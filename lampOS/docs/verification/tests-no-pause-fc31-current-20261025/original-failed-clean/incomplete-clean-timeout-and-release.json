@@ -1,0 +1,23 @@
+{
+  "native": 30040,
+  "native_terminal_exit_code": 1,
+  "phase": "compile",
+  "outcome": "FAILED infrastructure: supported local clean timed out before any no-run compile",
+  "clean_record": "lampOS/target/tests-recovery/evidence/no-pause-current-fc31-prep/runs/current-3d0455043-no-pause2/clean-compile/clean-local.json",
+  "clean_record_sha256": "cbcdf767f067baef0ec18c863e508f2003dfd68ae4014bbb6745c769c955462f",
+  "started_at": "2026-10-24T21:44:26.704497+00:00",
+  "finished_at": "2026-10-24T21:54:27.884426+00:00",
+  "watchdog_seconds": 600,
+  "wall_seconds": 601.139904,
+  "timed_out": true,
+  "actual_exit": -15,
+  "direct_wait": -15,
+  "group_absent": true,
+  "owned_jobs_outstanding": 0,
+  "stderr_sha256": "516e18ffd6695036e42d68226e4a211aa3294ae165a959ad8b551de37ae34dbc",
+  "stderr_bytes": 24498,
+  "stderr_diagnosis": "96 documented Cargo warnings (URL and version qualifiers for each of48localpackages are ignored; clean acts by package name). No error diagnostic or successful removal summary; not a concrete stall cause.",
+  "cause": "UNDETERMINED; a single earlier owned ps snapshot showed Us and Cargo target/global-cache FDs, which do not prove lock contention or filesystem cause.",
+  "no_run_compile_inventory_cases_executed": true,
+  "retry_target_mutation_or_watchdog_change": false
+}

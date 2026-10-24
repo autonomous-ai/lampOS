@@ -1,0 +1,21 @@
+[
+  {
+    "package": "lamp-expression",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "runtime",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/expression/tests/runtime.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "name": "without_a_pause_said_expression_asks_exactly_as_before",
+    "status": "FAILED"
+  }
+]

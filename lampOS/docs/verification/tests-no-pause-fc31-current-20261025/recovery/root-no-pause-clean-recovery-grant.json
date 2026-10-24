@@ -1,0 +1,18 @@
+{
+  "root_reviewed": true,
+  "execution_authorized": true,
+  "lane": "no-pause",
+  "scope": "ONE-supported-clean-ONLY-then-STOP",
+  "controller_sha256": "56a0f928ff092e1f0c004eb7def99e07ab5a946dd16b76d59a006848c93bdf98",
+  "plan_sha256": "0a14e6e3f82ffbb4370116576d1c2979ea354c7b16c9ea65aedd73bd1846156a",
+  "head": "3d045504355ba4c6918268da24466b9606587c08",
+  "source_guard": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2",
+  "target_exclusive": true,
+  "all_other_owned_jobs_closed": true,
+  "helper24_closed_sha256": "111ab2a9fc300e6ebd4607c71f2759ddea1eeb148f564bf4cee054631224678e",
+  "timeout_seconds": 600,
+  "grant_id": "root-nopause-clean-recovery-once-2026-10-24T22:22:29.165263+00:00",
+  "previous_cloud_recovery_closed_sha256": "43995e214cde8476d2586bac67c9472526fd39eb0a01ebb310b17f5b6e6906eb",
+  "limits": "Exactly one supportedclean using48actualdeclarednames; same600s bound, oldtimeout retained. No no-run/Clippy/tests/list/nextlane, no lock/directfile changes; stop on failure. All otherownedjobsclosed, causeunknown."
+}

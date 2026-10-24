@@ -1,0 +1,6 @@
+
+running 1 test
+test runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.91s
+

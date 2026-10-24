@@ -1,0 +1,18 @@
+
+running 1 test
+test runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges ... FAILED
+
+failures:
+
+---- runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges stdout ----
+
+thread 'runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges' (8230189) panicked at crates/expression/src/runtime.rs:1152:33:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 12.54s
+

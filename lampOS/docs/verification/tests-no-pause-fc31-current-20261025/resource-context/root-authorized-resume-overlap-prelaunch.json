@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-24T22:31:05.161580+00:00",
+  "authorization": "Root explicitly authorizes overlapping these two reviewed resumes,2compilerjobs each,aggregate4",
+  "cloud_native": 52313,
+  "cloud_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+  "no_pause_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2",
+  "cloud_compiler_jobs": 2,
+  "no_pause_compile_argv_jobs": 2,
+  "no_pause_inherited_runtime_jobs": 4,
+  "maximum_aggregate_compiler_jobs": 4,
+  "no_other_Cargo_active_at_initial_launch": true,
+  "isolated_load_or_timing_claim": false,
+  "no_pause_native": null,
+  "no_pause_launch_not_inferred_from_authorization": true
+}

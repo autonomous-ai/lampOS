@@ -1,0 +1,6 @@
+
+running 1 test
+test paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 2.26s
+

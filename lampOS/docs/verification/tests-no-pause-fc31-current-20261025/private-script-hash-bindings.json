@@ -1,0 +1,56 @@
+[
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/run-preparation.py",
+    "sha256": "0fcbfbe462ea4fe69488261b09f2b2539ac180576de25ba17f52214cf6b0efc3",
+    "bytes": 10938,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/reviewed-core.py",
+    "sha256": "613a43124d98f7865e0456e08da7112b1822e7a5186534ca3d438ef980c4cf8a",
+    "bytes": 15431,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/support.py",
+    "sha256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "bytes": 5896,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/census.py",
+    "sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+    "bytes": 14714,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/run-current-observations.py",
+    "sha256": "6e228f7b6075fba282724932c5263bf51e4d6569cd3159e834c64ff6b3ada4bf",
+    "bytes": 8044,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/observation_support.py",
+    "sha256": "199360aaeebf18bb554938b049df7946d1993f245f6a6178938a71be00037da2",
+    "bytes": 6287,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/owned_session.py",
+    "sha256": "4a06b3b4779200d2b738a10ae795ba67e76dccade9011fd232b305ace8bf3f84",
+    "bytes": 4113,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-inventory-only-prep/run-inventory-only.py",
+    "sha256": "e5f752364cffa27a20c863d6e7323225d00f92459f92b8283fe42b895162dd25",
+    "bytes": 2672,
+    "body_deliberately_omitted": true
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/fc31-supported-clean-recovery-prep/run-clean-only.py",
+    "sha256": "56a0f928ff092e1f0c004eb7def99e07ab5a946dd16b76d59a006848c93bdf98",
+    "bytes": 7566,
+    "body_deliberately_omitted": true
+  }
+]

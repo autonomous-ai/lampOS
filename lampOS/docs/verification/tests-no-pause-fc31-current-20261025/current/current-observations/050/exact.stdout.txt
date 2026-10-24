@@ -1,0 +1,6 @@
+
+running 1 test
+test sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.75s
+

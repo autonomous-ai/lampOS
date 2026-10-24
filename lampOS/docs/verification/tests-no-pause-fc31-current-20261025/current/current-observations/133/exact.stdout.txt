@@ -1,0 +1,6 @@
+
+running 1 test
+test skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 306 filtered out; finished in 2.13s
+

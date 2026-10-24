@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-25 06:14 — complete NoPause current failures published
+
+Ready for lamp-voice: no
+
+[Current fc31 primary proof](verification/tests-no-pause-fc31-current-20261025/) retains all 147 exact observations: 137 passed, 10 failed, zero unrun; 43 cases meet three-pass, six do not. The changed NoPause case passed3/3. Root independently checked147commands/294streams, actual rows/summaries, source and group/session closure; producer additionally verified172sealed outputs/99saved executables. The original600-second clean timeout, one recovery, zero-allocation import failure, fixed plans, successful current compile/inventory and reported external compilation context remain separately identified. Exact own patch/base/tree are published for reconstruction; no private binary or scratch script body is included. The original7,265/49/52 full run staysFAILED. NoPause remains draft and unpushed at this carried source pending six-case disposition and remaining gates; the independent Skills controls and latest Cloud qualification continue.
+
 ## 2026-10-25 06:10 — observation window closed; released-cache storage recovered
 
 Ready for lamp-voice: no

@@ -1,0 +1,14 @@
+{
+  "native_session": 23013,
+  "terminal_exit_code": 1,
+  "owned_jobs_outstanding": 0,
+  "owned_commands_reaped_group_absent": 209,
+  "all_witnesses_frozen_verified": 99,
+  "source_guard": {
+    "canonical": "e40b78ce78eb78aee9618f6e4b8401a772eb363a6888ae7b93be155c037817d7"
+  },
+  "target_not_cleaned_after_gate": true,
+  "additional_target_or_test_execution_authorized": false,
+  "qualification": "UNQUALIFIED:49 full failures including changed case; no subsequent observations granted",
+  "review_sha256": "73802220aabca0bbc797ef3c482e143f6099b777f06d744fa9599fe673630463"
+}

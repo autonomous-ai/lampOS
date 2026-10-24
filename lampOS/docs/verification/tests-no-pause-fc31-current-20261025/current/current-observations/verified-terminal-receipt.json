@@ -1,0 +1,1500 @@
+{
+  "native": 19863,
+  "terminal_controller_exit": 0,
+  "actual_observations": 147,
+  "passed": 137,
+  "failed": 10,
+  "unrun": 0,
+  "case_count": 49,
+  "exact_schedule": "49 case-major repetitions1,2,3; no retry",
+  "all_three_pass_case_count": 43,
+  "not_three_pass_case_count": 6,
+  "qualification_all_green": false,
+  "no_failure_cause_or_unrelatedness_claim": true,
+  "raw_command_stream_count": 147,
+  "raw_streams": 294,
+  "all_primary_rows_summaries_filtered_counts_verified": true,
+  "all_directwaits_and_owned_group_session_certificates_verified": true,
+  "owned_session_cleanup_signal_count": 0,
+  "source_guard": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3",
+  "all172_sealed_outputs_and99_readonly_witnesses_verified": true,
+  "results_sha256": "2e00ac7266962c027ff5c79647eb667102c786817b3fa62e05d2c9d340c71221",
+  "per_case_outcomes_sha256": "d2ed436f1efb992a459c219a551bd19c416700984d8f23c71697db0dec659f01",
+  "failed_case_outcomes_sha256": "1b24864670eb979455dcbcae24e935e6b7bbeea74c84d3c7fbeffab98477ec67",
+  "raw_bindings": [
+    {
+      "slot": 1,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/001/exact.json",
+      "sha256": "772e27a4debf662f921cd60de42275485373d634abae09b90593e5cb64376cf3",
+      "stdout_sha256": "710439cbf1acc74143af3e3ca6d7158b8ef05049daec3d279fb2128361dbd682",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 2,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/002/exact.json",
+      "sha256": "09b7aa9804a3b8f47e8a10a262f7863ae75cf58e752e3800ead8ab181f9a622b",
+      "stdout_sha256": "5a587aaf61c749b1c6dff38ae58439d827951abd25bda4298d1324b43838b136",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 3,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/003/exact.json",
+      "sha256": "adb16309f59470a4058911fbfd84ea8b22c598d3ee25873c1eee962749d2b217",
+      "stdout_sha256": "37be633dd66fa9fb593410f930bae143edf6f0b64645fdb0becf5beca596ad83",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 4,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/004/exact.json",
+      "sha256": "65fd129d44fa4a90060ee656c238fcc4b1aad204b61e824a0a84f77b5493bb6a",
+      "stdout_sha256": "9c0a5486f739ebe32dc0ab02e4f2a1d640973592e30f2cf10e043d1d9090d19b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 5,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/005/exact.json",
+      "sha256": "8a3f45b3abadc86699c4d59e209b24e65a36460dae7240fb4d438a62bab709d4",
+      "stdout_sha256": "36939f4aee1c2a11453d0a64dd6f736a80b29012877f7ebcfe0d96f585b0588b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 6,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/006/exact.json",
+      "sha256": "d561ca6862e88e55ad73e3df1ad5116c56c50e02c1b490f2b9d4a877520c7be2",
+      "stdout_sha256": "ae93dd1ae4c682045c40cbb73f19deffe9b583a308ffeef82b65386561a2ab80",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 7,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/007/exact.json",
+      "sha256": "ceb25f2ebfc76bb9af2924b280b4cb95fd840fd3933f2f236b3f1a53ca9767a2",
+      "stdout_sha256": "ad782a2ef37b3eaaadd92cf6c7f8d20cd2b707fc912e03a302c25b453298c2d2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 8,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/008/exact.json",
+      "sha256": "8ea07d5d25ae1dd20132295d97ddec5367e0e9f3bfaddff3f894b1ce0a0936f4",
+      "stdout_sha256": "09714be613d726b59d090861e197f6b4616736695f45262c0e62108a18d95e38",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 9,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/009/exact.json",
+      "sha256": "e88072e1e01767259d527b4cbeccaf49e662817e23ac5db19e15fb1074c0af45",
+      "stdout_sha256": "4b5f971bd75ae22b3bd57e4763b4a5736c2a23efb1248e646686e7cdd8e2f0b0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 10,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/010/exact.json",
+      "sha256": "2320abf50184d218021cbf4f07bdfa2f2e4dac95420f8c565178b570ecea81de",
+      "stdout_sha256": "628dc9b7067288cdf9822633c24bcae177b299c10f6c7cafaf78ed4e8da408f2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 11,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/011/exact.json",
+      "sha256": "1c2adcb816dcf13a1fe62a8481436a81ca251bd49042b0f68bbd1f8d00356bc8",
+      "stdout_sha256": "074f8bee71af2c6d4374626c59c5089e8e3273d5d58548b09c53b64f8bb90f1a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 12,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/012/exact.json",
+      "sha256": "a1040907041db3d2a01eb5690cd2da7cc4101c825ccc61e082ce7f2580af51ce",
+      "stdout_sha256": "74008f50b8374f4ce751acd7c1a3dcdca93d6c781b616fec0dde8165501141d9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 13,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/013/exact.json",
+      "sha256": "08a09eef2caeed6f361c8b2015425c47ee47bff90450cb21984f8ad36ea2316c",
+      "stdout_sha256": "1663cca52c732a50fc495b12e1ac895de19961c13191d3a824cfab389d3229bc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 14,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/014/exact.json",
+      "sha256": "fd8e6e73d9883be5714c498b9f90941c32f5f31ad18a31db44cba3cdf02cc0d2",
+      "stdout_sha256": "babb041268b213216a5f8163f8e1652c4dfb12c0bc743e47a46b23253f2baba0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 15,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/015/exact.json",
+      "sha256": "68d389358b4a9227de9246b2cfa5455136c17f0d7bc64cc603634cc8bdff121e",
+      "stdout_sha256": "5e00d9c61da565c8a728b64175c0b753f3d11b041015831225bff20284ded4a3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 16,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/016/exact.json",
+      "sha256": "1a026516ea9a566307b8ce82104f66a812538bb1b1c248d56acea79dc0b7ed39",
+      "stdout_sha256": "ac9bbdf293de2cf818332891af5c77c290e7ec6008343f05109550de7247f2bb",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 17,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/017/exact.json",
+      "sha256": "cc7c0a0c2cfaab15f0b16f01df9bb235e2bbfc7bba1a4ae82eb503578d822273",
+      "stdout_sha256": "4e1dd9acc94d0f64814a4b3ae2cf81ef4ae5560a4d891fb1c369c58170df8b76",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 18,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/018/exact.json",
+      "sha256": "ccb0b3fb7e70774c8b9a10b1a33d9f2d62fa54f9bac3228b5763c8fc0439680e",
+      "stdout_sha256": "6ad1579aae8e9eebfb24fbbec46d9b954a56be4a6ea6ad3e011b0bbdf9cde909",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 19,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/019/exact.json",
+      "sha256": "a9be7282d913dccaad62cec94cf5e638e7e32283a3b9cc43f6e21fd6588d60ae",
+      "stdout_sha256": "d2f4db34aae521a9d009cdff54296cd67a3b28907dd61c157f728d3329d21534",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 20,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/020/exact.json",
+      "sha256": "28e7598361431646bc16e11ad5e35a6df2592e6a72c4fa18a3e4fce51d5e011a",
+      "stdout_sha256": "f6a25c750858198da9035603676d15d3aa43eae17574ffacf14fbad4c6870579",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 21,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/021/exact.json",
+      "sha256": "ce8a2d56cdaf68871ccabed769baf80459e3b5e997731b928fb714f9f880fa1f",
+      "stdout_sha256": "ee7fa04744275e80e0d6e64702a0f9375416eef0adb70ff5cf44bc7e4ea7424f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 22,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/022/exact.json",
+      "sha256": "09eef18bc794894293061142ec0c65961014ed27e0cb5b728af742df63bf77f5",
+      "stdout_sha256": "fae544f0fcaeb0b5b4dc18b3c3fd514543796711a58db0b3293e530bc4315d64",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 23,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/023/exact.json",
+      "sha256": "8cae0120c52e4147c8fde945644c63e61c2ac7c602b092dcbcb4a53985c0e5d6",
+      "stdout_sha256": "a2bf2446f2867f061ff15ef9c7639fd0b8e68d2f49731411e02637f7ad895276",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 24,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/024/exact.json",
+      "sha256": "d7d31335c1d26bbea4ae5254c78892de1c7c44dbe28887deacab048e1d2cfba8",
+      "stdout_sha256": "7bacd57e22fc968eec896bae5e13e1d617f601ed18d07e76879f8e84f49edb2e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 25,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/025/exact.json",
+      "sha256": "57144965870a4607d6084e8fe21180a4a7078168af11c34fdbc7c26c3bff1278",
+      "stdout_sha256": "3969a7b0ea612744eab6f07af9a4d531716de8b7077cf295d750bfd97227f9a9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 26,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/026/exact.json",
+      "sha256": "7939169abd012435e3afa1efc47ed62c65751012f534f092c83efb83ec02ab72",
+      "stdout_sha256": "9ab80adeb00bd2078a62e185dde633b24a0807b67136ea93462938ce52d20001",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 27,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/027/exact.json",
+      "sha256": "2ca99413540c35d3b7e0827fc5b6bb5589f892e6296bc879705c15bc1c1964a9",
+      "stdout_sha256": "9ab80adeb00bd2078a62e185dde633b24a0807b67136ea93462938ce52d20001",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 28,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/028/exact.json",
+      "sha256": "7fc4625c2375ae850ac8b5bc185c5d23efe63fbb7cfddde8dd16921891495faf",
+      "stdout_sha256": "223e53fec7cca2b2663ea2ba6e5cae4de0ddea8a0229a58298af43ffd753eee7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 29,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/029/exact.json",
+      "sha256": "0b27641abd61210d9ba367f97e2fb9d9d9a4ef5695cdbffaf608fa1aa7959260",
+      "stdout_sha256": "159c2b8d5085f0f4d99646cf3232f9d802dfc793cf68cd27e6803f0662a3064f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 30,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/030/exact.json",
+      "sha256": "6d76f04cff51824390cc3707061f5f0f4c5c1ec1adda6b847685695f4da9eb10",
+      "stdout_sha256": "223e53fec7cca2b2663ea2ba6e5cae4de0ddea8a0229a58298af43ffd753eee7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 31,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/031/exact.json",
+      "sha256": "2fc5850f6bb7920fd85cec06fe43f27372d492d06948f5076b325f97eb6da53f",
+      "stdout_sha256": "7836aaa1d7d4d819c4d65a8926a2acb0e8bcb9a029309c8e724c2df5d7f8542f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 32,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/032/exact.json",
+      "sha256": "c4dc20ec37bfcc3efc7dc9fc1716794d102e879a2a6acbb85bff4244dcd7873e",
+      "stdout_sha256": "fdc538e78f338b34a96fc636ef8f63cf21237f1ac4a0dc2c3ac27a33f7c04140",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 33,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/033/exact.json",
+      "sha256": "5ccf600c2e4f77f59dc92d46d08124f3901c827748aaa5beea35f3a0f1fb23d8",
+      "stdout_sha256": "fdc538e78f338b34a96fc636ef8f63cf21237f1ac4a0dc2c3ac27a33f7c04140",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 34,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/034/exact.json",
+      "sha256": "5559d88c2e582d091a05f9e240e0268b3fa9721c9ca86029cbdc8241e10236a0",
+      "stdout_sha256": "e965358e6b74b1489793857d7188bed04e2e18aa75e766282a04d41ceaff46ca",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 35,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/035/exact.json",
+      "sha256": "1678e36f0e52c8bf511be7b7dfd3c5268cfb767bd9993dcb508b9570335960e2",
+      "stdout_sha256": "2986a8497288dd55affcc6f7ead4b0808198ff8ac4ce644547267213b0a50944",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 36,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/036/exact.json",
+      "sha256": "e92d4aa5fa0d96391dcf66856347903d0eafad2779242d2911b8f8df270ffa0d",
+      "stdout_sha256": "5077d6a9a3f8cfe90fd78c4e1b71de83d4b76e5df2ad82ca79201d0e6cfaa98c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 37,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/037/exact.json",
+      "sha256": "eeb4371353c0f53c0d80df690f8a7c5d3c6071fc9a397923c85ca0a33f3ff247",
+      "stdout_sha256": "8986680e83315755b18833fa8e3bac8cb0fd26fb5bc5b600cdf8d73cce947158",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 38,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/038/exact.json",
+      "sha256": "3d8d7a39589c8e24d120b97eb656e6410b4a2d0bc4667d0a4512229aff095e4b",
+      "stdout_sha256": "971894e7db13ac2c5227154e495c076ab3eef0b7d5183e58ec306092dd4c77d7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 39,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/039/exact.json",
+      "sha256": "55fc1b9b75cc6903e7a6762dfa6093247eac3db2e210c11e89466eb0b98410ef",
+      "stdout_sha256": "0a8535cceef2034c93f4f0ea2d645309bd67f71582f86df6226825f8d617cb32",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 40,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/040/exact.json",
+      "sha256": "971ad30cd5889775cc9db793af77fa9791b7c968a43967f9d17824390a2baf40",
+      "stdout_sha256": "0fba238504b1363dc9e8c3afef8ee5df73bfc392c2e0dbcf41a52c0b185b12ed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 41,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/041/exact.json",
+      "sha256": "b5674ce8325c1944e14b170e063eb80e14eb0cf1a8f9cf3f321aeb0d50e068b6",
+      "stdout_sha256": "0fba238504b1363dc9e8c3afef8ee5df73bfc392c2e0dbcf41a52c0b185b12ed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 42,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/042/exact.json",
+      "sha256": "767d22a183b7ca5671e7f5ea57070e5f4ad9787df3be418441d1febf604a878f",
+      "stdout_sha256": "0fba238504b1363dc9e8c3afef8ee5df73bfc392c2e0dbcf41a52c0b185b12ed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 43,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/043/exact.json",
+      "sha256": "aeb6d5484338778ff9e8407712d3d49936eb0d619d63460e778ca0c00b2e456a",
+      "stdout_sha256": "0cedad594aec564836479ca9806de217681a8cff1c5b695cfcb5f1d1907fbebb",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 44,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/044/exact.json",
+      "sha256": "03976cb616df205037213b87bb7769608c090f2b7dc66ba1e32c316ca443567e",
+      "stdout_sha256": "e72b06115f1bd4d59e4b04c5a096445981862e05c203b4cb145bfbbbc0d011cf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 45,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/045/exact.json",
+      "sha256": "566946a874d745cb2e02f1feaabc5a920d2c421cfcff30e24c288b9db7347ef1",
+      "stdout_sha256": "26c4ef231552648eeb9c21fa86609f094a49a1b7662161b087cfdde661eb94b0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 46,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/046/exact.json",
+      "sha256": "104edfffc54115174449327a9d666f38743f1445e15ff30b3face6fb18f392f4",
+      "stdout_sha256": "d3c5d7838b9c72719e01dec9e625eb4be23055cd644486139350ad7403f90b3a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 47,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/047/exact.json",
+      "sha256": "8911adc3e583e04d11899194d0e109d9cc9a6fb96f590dd950e7736c98c4bf25",
+      "stdout_sha256": "47953fe76469ff5d1b8e92dce9d12d9f2641270a28e560b1ac00021e2b37d8b7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 48,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/048/exact.json",
+      "sha256": "da22f4bb94d8d3ef53035781c460d4a9ee084dc6f7783b0245840fe8a89da85b",
+      "stdout_sha256": "d3c5d7838b9c72719e01dec9e625eb4be23055cd644486139350ad7403f90b3a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 49,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/049/exact.json",
+      "sha256": "bc668bc49fb02deb2c7ede600323f4d2bd5b6980d8c2cf2e4b0889b6c8eac622",
+      "stdout_sha256": "14ebd1f5bb4ff25bcf939115aec4763f491a93017f5c5a8071d848a27fcc41d9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 101,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 50,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/050/exact.json",
+      "sha256": "554ff7fcf1417c1c310fd7461fc12110316dfea5ace9a2926266c7d3bf4b6778",
+      "stdout_sha256": "f22139f50141c8bed8bf9b72274d4ce3efcaacf7bc31c4a0c79d0b142fcbfc43",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 51,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/051/exact.json",
+      "sha256": "4f87ea46476cc7ade0ec7301d737ccbff3dcf91844dfcaeab8b0e5e28b8f2166",
+      "stdout_sha256": "3c30382ef5fd99b8615622ab30867b24d356386a6f07ff12d849ecb43936aefd",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 52,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/052/exact.json",
+      "sha256": "0e2108f7c1cb33f9086203ed2955a18b86ec33bcb4fc7ddabc04be4fa01feac6",
+      "stdout_sha256": "ef9eb2459cce6b6cacc1bc8b46c46d4b5f625b83fc7b6187ef34651b5702fb24",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 53,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/053/exact.json",
+      "sha256": "dd17556684b375e36bf8d3c200e7b0d3836050dc41e7e9bd17ca4eca98d398fb",
+      "stdout_sha256": "4837173628b2d1f8bb2a2cb7d4eba4c672824d9378ebcc30db05193006ea2c3c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 54,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/054/exact.json",
+      "sha256": "ffbe795e7b25ec4ae65517cfae8b192c3b700ef534102cf7ce39730f75d2c0bd",
+      "stdout_sha256": "ef9eb2459cce6b6cacc1bc8b46c46d4b5f625b83fc7b6187ef34651b5702fb24",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 55,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/055/exact.json",
+      "sha256": "83f5e11e4070e7fe89f2dc0769b55d3fd1049569ee55529ddf627399294d6e7b",
+      "stdout_sha256": "35a10652e93bf16f089c93418171a31b374d8fd727595adad145c9bd71c1ea34",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 56,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/056/exact.json",
+      "sha256": "38d48b0128504d1091d40b038977828b0f4008a51a1ad29a58ea74531a77552b",
+      "stdout_sha256": "b5fbb68c3960bd7395bf67ce605c0ab75031a10b260bf54f1603176f2b44d53c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 57,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/057/exact.json",
+      "sha256": "7dcf614cb01a7f7ed47a07317df2b48ab61f05d95d09a0d4d51f0877ed043cd7",
+      "stdout_sha256": "d29ff30e237af8030545a50b95f170e1e832488633725562b0a21dd8c4bbc1d1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 58,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/058/exact.json",
+      "sha256": "3cf42ed55c55b39ff07a6af29e1894aa5dc7f831566ece332eeb86e5917d74e8",
+      "stdout_sha256": "860c5cfd42746df4358a7b20fde98d4e6e2e283c661d0ef853a42403ad063e86",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 59,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/059/exact.json",
+      "sha256": "6979a08c9a6656e799f4a26c8a548e28d7a152425885d86aae36957a0284cabc",
+      "stdout_sha256": "d42c82d7f0c302ea7d3129505e4354712cfa8d43a8224cc106b7bfcea4572390",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 60,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/060/exact.json",
+      "sha256": "5a04b74ce5419de16eefcf2e29a10ca7689555f3224a45468485620485ad36ed",
+      "stdout_sha256": "64af30050d8df4d49491e7ab63b907e356a17b907cd889e542b466a99f61f4a4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 61,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/061/exact.json",
+      "sha256": "1ae99a492cac8c24b35c3575359359842f4dbe32ff8bf6b08a1b8397f806a29c",
+      "stdout_sha256": "539a0a78799dcafdc81636bb7c8bd36cd281bb05bb52b732c51ddc44ad369228",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 62,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/062/exact.json",
+      "sha256": "4e9f01e7aac4c9ccac9d34519f72fc9cd5c8a4f92baa095cb54bb4bb3739d123",
+      "stdout_sha256": "132a3903e70efb0d4c53c02a8d821242ffd76a0b6aa0132a35570f730d137012",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 63,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/063/exact.json",
+      "sha256": "1bf21c6ae977a3ad2aaf30f974e076cf46c72bb23e6dbccf1da1617660115ddc",
+      "stdout_sha256": "fa3eaacbd52704d9497c299107450ddede7060b382d43ed184eaa4bc684cbe3d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 64,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/064/exact.json",
+      "sha256": "40adcba4de7d7afe63692b074d524fa7616304efecce9bbc8b29eb1037bbc84c",
+      "stdout_sha256": "487b92aaa689d038aac8ff93f11fd170b1bb984f4ea6ebe3ddeaf7fe21e7d3e2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 65,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/065/exact.json",
+      "sha256": "a5b198d87aface6746f3e71f71ee08a455358fec002f25541cbddb6c6f4830c2",
+      "stdout_sha256": "93c4291c59c8a2ebde91b295f3ba6abd20819f0dd668deae578a9eeb0c7770c2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 66,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/066/exact.json",
+      "sha256": "710d6cbe1c838e0410285753c09253c24e8f0649839dae23cc2cb555dcbadb32",
+      "stdout_sha256": "9875adf93ff1bb0047ee06236e5a7e3772777ea7073213090dc473790518423c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 67,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/067/exact.json",
+      "sha256": "e845697341afb19db58fd859c6d2a155362fd213796e6de188ab4b950cc683a0",
+      "stdout_sha256": "08eaee30039e7b35a4cff2c99d14a93337c7745a719c39514f287dfadc03f812",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 68,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/068/exact.json",
+      "sha256": "27dd32654117bba9b22ab61d56d5a081d294be7283747e92bbf079a222b78790",
+      "stdout_sha256": "300b572f059cb2939c538eac9a1c7afe3765823383a23694eca1d063372cf6d9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 69,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/069/exact.json",
+      "sha256": "bdb3097d2cfb554b9057fbc9f58a5b28c365a3bfaf1a7f03618b2d807b16487b",
+      "stdout_sha256": "08eaee30039e7b35a4cff2c99d14a93337c7745a719c39514f287dfadc03f812",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 70,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/070/exact.json",
+      "sha256": "bcf579855b0edfefc540f618f69b04a6dab9e5d4c2e2e357088a34f92fa6367c",
+      "stdout_sha256": "9a92250b34deecd9471f26fb4cb875f9a0afefe92a4f3d70e73cbd4718001027",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 71,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/071/exact.json",
+      "sha256": "4bb61372689a923a65d2b756b60a24f79ad06a594316c09a0b6fb34680237ee6",
+      "stdout_sha256": "81b0276f75d3ed1a2a9896bb9e11ad5abddaeedc50cbab0543d22ffb82d6dbfc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 72,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/072/exact.json",
+      "sha256": "a94e23b0fa9db3abfb8329e242303398d819e484e666564586575062a62a819d",
+      "stdout_sha256": "81b0276f75d3ed1a2a9896bb9e11ad5abddaeedc50cbab0543d22ffb82d6dbfc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 73,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/073/exact.json",
+      "sha256": "98b7e433b58bfb9a791b6a875cb450b182a9caab1ee8c4ad6f52bcf9890672fd",
+      "stdout_sha256": "a6f1e520444dcf2904757efe7c259feba9ad17910ba28ff75e074daf24fc0e57",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 74,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/074/exact.json",
+      "sha256": "e4e24d7422a1344aacd070bd01bcc5e9f5f73ccd4342e0fff65761fc5daff0fe",
+      "stdout_sha256": "54265441323115f0355cf2b3b9cbdce175c8bc2c0c572227b1480c37ad62f13b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 75,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/075/exact.json",
+      "sha256": "31db34c4561b56e44f4b4497a4fa63a71da1e2e9c760eff3380f40f25b3dc14f",
+      "stdout_sha256": "6bab6a6f43c0b68038a336ce80be6dd9b89e07293eb500a3c4a31657371214e9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 76,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/076/exact.json",
+      "sha256": "f49615ea21719454e164458891203143bf4e6d71c89afec9016994901f2dd6cb",
+      "stdout_sha256": "484088c03b838a6ffa69b28739d5b2256c7b8aa31f4e58068031d58ef4b61221",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 77,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/077/exact.json",
+      "sha256": "60d55ad439cc389e046b1579473a0c20ce1a5615aa8e3944cc0915456714ea34",
+      "stdout_sha256": "beaf40a86d27e8c4792fec3e1d87c2c6e368bfe3520febc202dec5738514ec89",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 78,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/078/exact.json",
+      "sha256": "1a3a37283b4e1c0951e150fa84ccea8d43df47b0015704f350210b9a52127cfd",
+      "stdout_sha256": "2da5fab167de801f9d03a1dda5e3b3d1b6012dcefc72c322d1c9ddcd52a3cd63",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 79,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/079/exact.json",
+      "sha256": "fa719938735f02ce621c8a297953165aae2d557d1df6f259a9c11bf8b22a669e",
+      "stdout_sha256": "c58e34ecba4c456f8dd3fd8bd601828c1c6b0c16f2c34a78d808ff888d689fc4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 80,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/080/exact.json",
+      "sha256": "233a647ae361a079e481704f2d63e49679d8c8dbd5a3d6e0e4b6ea13c7315b80",
+      "stdout_sha256": "86cad35cb8ac62b68c41fc9288a0d622772d754fbb2389f4cdd802fe922c4fc9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 81,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/081/exact.json",
+      "sha256": "dbb65b76cf599cd81880aea10fdf5b8eaa905080e6f981626d98a6f4aa6d858c",
+      "stdout_sha256": "3f1516827b5de083eb2dca6620e1f3e433a6b892d51ae94af20a5f35b271ef25",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 82,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/082/exact.json",
+      "sha256": "870b69dd17c8a9b8f81b0a3cfec0ee05b3b6df012ddec775c140067af4a82354",
+      "stdout_sha256": "8cbe14f7d4c4518096cb087ca25239292f88f9b0f32a37422f933581dfb637d7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 83,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/083/exact.json",
+      "sha256": "3667d3fbf7faea7699fdfa40d170a3ea08a3f9e2e676a6a590fb6f0e0e8905f3",
+      "stdout_sha256": "db2fa715650ceb94e7c676bab52f15277085a8faea86468cb4a4af009ebaa85f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 84,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/084/exact.json",
+      "sha256": "494ead1aa104792aa76d0f514051a9d8959eb5000bbd058b053ae15fb1cf9328",
+      "stdout_sha256": "a7627fd086f5f779c6d1c61ad38613728de9a23da8763e16623935008ec9a79d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 85,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/085/exact.json",
+      "sha256": "d7549138f22b41769f9bdb799b321c74cc74d1bcff9536ac12482cc05439b04b",
+      "stdout_sha256": "80ec6c12c6bb4a00f58e6168e64430c9844ffa0d59bd097bc8e439828d86bcf6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 86,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/086/exact.json",
+      "sha256": "0f0cde31e448b295c12b152d067bddbfb2f8329a60aa94c7810b74017d41dc7f",
+      "stdout_sha256": "bb65f14a8a478e62cc1b0517b55603fba09709108b79294f5b67ecebe4431937",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 87,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/087/exact.json",
+      "sha256": "ff24756ac7882a8febf80cb1514d61f30438aab2a93c34f142c52b6638a88d58",
+      "stdout_sha256": "edff9d30049f8ba62e5e1f38be193ec7362851da4a880ab9f5df71eede912b35",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 88,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/088/exact.json",
+      "sha256": "5a94ca1ac3e025140c0b3e5e2e2f76be5bb93974bcb8c5802c4362653b4e9284",
+      "stdout_sha256": "030859ea15857559260bf516e81ec846bff57d721777ede47c73e8dae43f9295",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 89,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/089/exact.json",
+      "sha256": "7d6469b26c5950db0648c7ce8c2e40e50e5168ac9672a63fe1b70a648b919bf5",
+      "stdout_sha256": "9d17b3813693a9d216f881b8258321db733baa6160ad1408d12ff2d9dc75c326",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 90,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/090/exact.json",
+      "sha256": "b409fcdc18d8c2d157dd2847002af5d60a84558194d858c73c90f11d4cf23300",
+      "stdout_sha256": "5a0cf1f665b6c67bd79cfed9b72fa6fec256017493587e95afc4647687e46cde",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 91,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/091/exact.json",
+      "sha256": "343f1db43b7da0c0dedfb593a1ae32bd1f8c2de554417a708fdd4f79ed15e91c",
+      "stdout_sha256": "549b3f229f80031642db353afddce132b10af1d67421bc6439587071c09d13c5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 92,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/092/exact.json",
+      "sha256": "2d175441e72cf6937fc1cff1c5fa6831673573915dd09f4851158435e75d5fc8",
+      "stdout_sha256": "e45c9365d20c8bb72fe50093e939e9866dc751db05c6446c53099bfe27685965",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 93,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/093/exact.json",
+      "sha256": "0e7d3adda3bb59e925f6c50e8796495e5bea5e2193f36ddf932eb895e1e7edbd",
+      "stdout_sha256": "b1deff1e42645a45d1172c12b5595e81d56d3d53b0f2364bb31dfda01efda575",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 94,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/094/exact.json",
+      "sha256": "f303c9f6a3463d1316fdf72ebbd0663b3d82b010da3d8d835a767f4adc725bb7",
+      "stdout_sha256": "0a9f6822d6d8bd6f0af2d1ce60eaec6f17f16e16ccf3f95bf777450f76e1339d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 95,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/095/exact.json",
+      "sha256": "4dd4f99ccd65cb3156b59531f7f3483a584580f9456c2f6b128ee1d64dc53dec",
+      "stdout_sha256": "aae8df0bf7d506b5aba2b04e87fc516577fdbee754ba93357d5e71d18c0a20e6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 96,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/096/exact.json",
+      "sha256": "8c0dcf786a4fb8b1728b17e3554cd7ce16c9487db49514f91df165d4adc344a3",
+      "stdout_sha256": "3ebf8f2959341fb1f0bfee7bda5fff9cd26c8173449d257a2e50884f4fb6acd9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 97,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/097/exact.json",
+      "sha256": "f9981e3b8fa2ef995811d4bfb0a03feb2cb16dc58b8e5c28703911e93d1c5786",
+      "stdout_sha256": "f79a3da30b683123ba5339b748854641fdd52c6af7b0267455b282cc63b86e2b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 98,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/098/exact.json",
+      "sha256": "ff811556583caf5828222243f629f100558fb90bb4de0392078a411f607b133c",
+      "stdout_sha256": "f79a3da30b683123ba5339b748854641fdd52c6af7b0267455b282cc63b86e2b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 99,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/099/exact.json",
+      "sha256": "cddcd3595621ee7be18ca734e80bf7869984ca078e78ee164595326405292f4a",
+      "stdout_sha256": "abf65f9bd0db713b6db5101ed3b192a38ad1cc29edfe1c1ffd3142f3f659606c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 100,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/100/exact.json",
+      "sha256": "89928cd3989931e1038b2bfda84f0ad5deb474fdb4bd718d3cd1b46985bbc095",
+      "stdout_sha256": "66f7e0441b3a2746f9aacda1d62411d995f7ca9e18de680564712db1f18c7832",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 101,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/101/exact.json",
+      "sha256": "70bc5130e38cd77364032e531ae3e7ac786b1f78cc28be73baa50b1e5d022741",
+      "stdout_sha256": "b5d38fabb61a9e3d26d827d34457b31d1ccb7734e6e34d3d77b0459bbe15ae67",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 102,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/102/exact.json",
+      "sha256": "bebce96a89afb23b141d9009b4adda22dcda26ce23ae2a2c27e47b3b341a5dd4",
+      "stdout_sha256": "30126f65afd27fb7b970c77c0456aa6c785115da8078890a22fc3fcba9815492",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 103,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/103/exact.json",
+      "sha256": "931849a4264130a8ef3c4fe16d79e5df0bc95a2895c0af44d2358bab63fa06cb",
+      "stdout_sha256": "e8cfbb3d7bd799e628de49ad61efc6c063c5c6de0b09cc74e2a6d108fb97e071",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 104,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/104/exact.json",
+      "sha256": "166d8117caef8fa707c304fe2116d6d613a8cc4305b07387068fbfcbc42942f5",
+      "stdout_sha256": "25878f2b14aeb4a5aeabf6b75d60ff3e7215bf70c1b616777cbe0f145f8e9fb0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 105,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/105/exact.json",
+      "sha256": "594898752f991baba0874e88ad40bd58b547eaca83ae209ecc3d22ff6dfa299d",
+      "stdout_sha256": "cd66fba1d267d5ed04d94394a058797f90fff27930e1a73016ad37816b638ce1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 106,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/106/exact.json",
+      "sha256": "da49d98fabafeb0c0576e9ee156bfd266499d79f3f3a0a620ea690bfd7d4aa50",
+      "stdout_sha256": "2bbeb4dae1bd44593f73db496f7fb7f2c2968e29bae87f4e4f0c57bafe4eb2a0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 107,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/107/exact.json",
+      "sha256": "e04c31fe3db1efff31dd23a1eca613e037b30bec48939035548698c1e92b2528",
+      "stdout_sha256": "4f839563825ff30b8e948fdb47ccbda55460157fa69f6b5d382b55749669ab74",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 108,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/108/exact.json",
+      "sha256": "4d5af5164e8177dc1f7cbf5861b5de6b8d8deae84142bcd5d6734e8f43800014",
+      "stdout_sha256": "7b2a1947ef848665d3a754243c36254f2cc7e0ac9b2faa20cf160e3944cba7fe",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 109,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/109/exact.json",
+      "sha256": "aabd7cf30af56349ac1ca99953bd49f8b3583664796814ae10e6b7bdbfcaf45e",
+      "stdout_sha256": "8fe06dc15291f7e42a6d149699f38d234f8e301309fe65bf9578a88268594752",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 110,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/110/exact.json",
+      "sha256": "3bebae87cc2008c45d6576cd04266bd3e8163ae0fe20897a6144ea1922fa6646",
+      "stdout_sha256": "3e05aaf05a0979d9bf9a1a60345ff8362cd12fdf30dbbd3d456947cb5b1febb3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 111,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/111/exact.json",
+      "sha256": "d65efa759e36714e5cbe7fe66036d35c32361a0106abe4050c252b9498ccef5c",
+      "stdout_sha256": "8fe06dc15291f7e42a6d149699f38d234f8e301309fe65bf9578a88268594752",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 112,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/112/exact.json",
+      "sha256": "807f31eee6b87bd9ff80abf5106b16bba7e497efa0ce75fa2775a7392d752b23",
+      "stdout_sha256": "52587f1ad1d7788fbdb9b999d53c35153a0e7a0506e663a672954ad3facab89b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 113,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/113/exact.json",
+      "sha256": "29ef3ac7f63dec3e970b9026a3771a5c83cbb12c49ad4f42ca8730bae9c866b8",
+      "stdout_sha256": "5bb5bac43dc0392c3cc1e839ef2c0373e38d05ff01ef6c7f16a8981b2ac3e702",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 114,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/114/exact.json",
+      "sha256": "068bd23676503c03d1bcb51a2c82f7f77d994a5a31ef641ab28487c2bbf973fd",
+      "stdout_sha256": "6df65972f5f25db78984d89b578b9bdec447e55e19399a5324a8786857d781f3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 115,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/115/exact.json",
+      "sha256": "0a48ab477d209ca36ebaba388e190b4feb82f9d9a0eaece107cbe52469a1a554",
+      "stdout_sha256": "0e853c3c651238e83c8bb05d8f97cdb0734d3d431b122b88a4bd0de4fe5793ef",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 116,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/116/exact.json",
+      "sha256": "63b0e721be72f3906c41f23be5702fa3c8b36ee7a2fa28bf3e42bf061921c87d",
+      "stdout_sha256": "22dbc9ed60df8aab92dad7670faf3514b78cf266c1eaa0cf4fd027438ca5d709",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 117,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/117/exact.json",
+      "sha256": "f544d2afda04f66412bd0f5bac126d868d9f87e32c25732b9d7b8fa1d76a88ff",
+      "stdout_sha256": "0e853c3c651238e83c8bb05d8f97cdb0734d3d431b122b88a4bd0de4fe5793ef",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 118,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/118/exact.json",
+      "sha256": "f068c75de5d68acddcff0c734d390d2ea9381fcdf52ab05fb16d74b069af5a3c",
+      "stdout_sha256": "02fb60e56a6125a616545550acca16120ffe09bbaabb66cfcc096e368bed8e33",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 119,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/119/exact.json",
+      "sha256": "1d4b5845192efed70f8c254ead87b7161f19bc9c8b0b1a9b357482613221bfcf",
+      "stdout_sha256": "1b05cf465945c4194c254fecdbcc633e7fae4904814cc74346d74cdb4b72a89a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 120,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/120/exact.json",
+      "sha256": "2ade4c17f29ada69a9fe40b09d68dd32b79bbaa4e47107db292694ae3c97eb9a",
+      "stdout_sha256": "19690900fe2f5160d9d0ce0c426dc347e4d44d0bfa42c63488cf68d2bf22fc11",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 121,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/121/exact.json",
+      "sha256": "60be244ae2c763d1a87a67fdcc222e766bd6b10e2fbc98569b14b531ba55e166",
+      "stdout_sha256": "aa9d3a424d3772426c6ce7842e8e4523b0437b2e461797ea9de13d6fc6fd262e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 122,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/122/exact.json",
+      "sha256": "bced833ca4a97fb94a2e8f9aa4d8f549737a07d844ec9ac15834f6434195980f",
+      "stdout_sha256": "49665c2b342930920ff5bfdc3402350d1526d0747ce88dffce556a655e560b55",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 123,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/123/exact.json",
+      "sha256": "2d476374231868a62485373011fe82a366dc82084832602bd84a48e87179ecdf",
+      "stdout_sha256": "90e4236274f6b15c6390f3b65beaa56b2dde51ada642ad053c222ea37bce654c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 124,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/124/exact.json",
+      "sha256": "ec93ab11b685bc74d9cf5fb39411f2f7754a162a7313ca613ed84858f9cb3074",
+      "stdout_sha256": "7f9e6f1e8ed767a101e217b0bed0f81babb74eea18ce410629f59bc36e48c833",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 125,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/125/exact.json",
+      "sha256": "a1eca2546c7f28349f7995d8e67c9a5c1c29788fc252e60248a013e43c52c9e0",
+      "stdout_sha256": "596e2e82d7ac19bb11d0169cb69b0486ec991da8aeace0748d6b2722899af98d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 126,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/126/exact.json",
+      "sha256": "3b070f62c95bd1bf948062898014e97da952e9a6f9dbb7adbd48d110347967ce",
+      "stdout_sha256": "7f9e6f1e8ed767a101e217b0bed0f81babb74eea18ce410629f59bc36e48c833",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 127,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/127/exact.json",
+      "sha256": "9aedab8c468bf6ab15938176db95890749d4cee38a4a86b6de12952efc71230a",
+      "stdout_sha256": "718862c8bc0a9da62e764f5aad45a37e4919b402e9bcc1ce6bd571e0a8210e41",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 128,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/128/exact.json",
+      "sha256": "de08d5cd3f0813df64260988d7aae585197a1efe64c7ca678fcfb263fadfa794",
+      "stdout_sha256": "fba2c9be765b8be9bb73aeb78e89b1b8821108bb70da4c087148e2f7b1e33902",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 129,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/129/exact.json",
+      "sha256": "48ee273cf4255999f92a9eb1ecc0b94e2b94f963c2e154edf5342f339d6c8ea6",
+      "stdout_sha256": "3680cc86f72141035df86c4382e4ee86efa24889d42ef27443902efa07e5b8ca",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 130,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/130/exact.json",
+      "sha256": "16a04a45d5b6ebddea65644da29c66593f792c90dc9f8864715f286dfa390dd1",
+      "stdout_sha256": "18ca6c66b34582fbb518cbc4232c284b58f3ad55ede79bbe5f74e976b2cdcaba",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 131,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/131/exact.json",
+      "sha256": "0d502c11210ebba1aeaabbc8439078ab3aed9e1e4cd26afe871a50aed132ff76",
+      "stdout_sha256": "f09fc543b9c6d92ea66223de40faedfcb55cfd4e12358d27d25ac38e1d50a00e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 132,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/132/exact.json",
+      "sha256": "2360985980bac565623a68bda6b7e58effee4dc47de4738168c22e29d512c818",
+      "stdout_sha256": "086fa3dfe63f569b77b69ffb4314f94dd7448692127af244008301b4fb6c6cb3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 133,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/133/exact.json",
+      "sha256": "cfc496b58223143bfa0da5563d61e6bafaaf238b6e0f840acf60fcc0acaa2ccc",
+      "stdout_sha256": "c01fac365cef2072d3869d1541de186512c1855401550452afb067cf722cea84",
+      "stderr_sha256": "b4aadb8f170e884934494ced3205334f80124f78a029e630850a2dacc4444bf6",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 134,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/134/exact.json",
+      "sha256": "70993489d116f5bd1bdd116da6aeef76646fa9e7497cf5b422d292ef0176c93c",
+      "stdout_sha256": "9edb65a7bbc36debe82903f5631ba6730fafd49f06a7585e689fe1c480ba1336",
+      "stderr_sha256": "c6ab35a97762465c9c2f409c8313af1acce7659e07c3f17c94b76006c3b799eb",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 135,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/135/exact.json",
+      "sha256": "84ad251e0d14bfd362ede16046d4a952f990e30490cb28a2cce83b5237c7f08f",
+      "stdout_sha256": "0d17016271f935a6c42823b9111b6448c3de8b77a9e4f62310427deae09f92e0",
+      "stderr_sha256": "09440d85fcaf2e83f3ede0b334689a65ef9174ff22b8aaadd243fc1f47277834",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 136,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/136/exact.json",
+      "sha256": "688266f0146fd2abf5c07c8a01055431cb04fc77699426bfa7a424adcfe2554d",
+      "stdout_sha256": "178983579e8db6e19f39b1dd1a6850861b3b3710ef600f61254cd2808b058f26",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 137,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/137/exact.json",
+      "sha256": "cc4f1ebfeb133c77bbcf9254ffff075fa043b74290f23216b4a66b4f6dcb495b",
+      "stdout_sha256": "7d7d80dbce6e99fac543e9a464f7cfbd0148666fcb9824941c146c5e12cde3e2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 138,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/138/exact.json",
+      "sha256": "ed380b010e3d4df79325d36637b133139c813651a310a3a47c3db99efc420f57",
+      "stdout_sha256": "bcb89e6183aa81b4b27895d084b762bc4c688fe72f17003fcc6dfbd684a47f1f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 139,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/139/exact.json",
+      "sha256": "c2ce02a664607267e6e7b6eafd43ff4f156a57fed7285395a43570809d389b34",
+      "stdout_sha256": "ba891a9b8937f11e83543c854f3a0cf13db240aec67690cbb7c0e38476bf65ec",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 140,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/140/exact.json",
+      "sha256": "94ce64dc85deca18600739ed81277274f5ab9d1e17ae729fd961940b53066261",
+      "stdout_sha256": "29cdffd01170f8c3066f76e3b53dacf3c23f6ef3854ca481dd535f4442bfdd47",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 141,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/141/exact.json",
+      "sha256": "4674c4a95737a08dcfe74fd7af0c1f4d7d732abfe35b71e53fdea2e26499e6db",
+      "stdout_sha256": "ba891a9b8937f11e83543c854f3a0cf13db240aec67690cbb7c0e38476bf65ec",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 142,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/142/exact.json",
+      "sha256": "4b0c27614bc25e732a849d0988a08b589a7d3aaa07155ca3d50183d56207a7e0",
+      "stdout_sha256": "cd3e9176f7913585a327244d7ab919829437ec30570f8c1dc111cf7297b3a35d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 143,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/143/exact.json",
+      "sha256": "e0248393dc06761978737d8ab874754a147c07d9c83e890f51b0a38b74ac7214",
+      "stdout_sha256": "af13c9ebdda94f665c3dbfe5a54bfcdf664084c52f8a35bec0ad3fa5ab755846",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 144,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/144/exact.json",
+      "sha256": "35ccba6386c12770ebd53e146b0fa0aeb3401ca33e88d181b84dfd17c0d27d2f",
+      "stdout_sha256": "af13c9ebdda94f665c3dbfe5a54bfcdf664084c52f8a35bec0ad3fa5ab755846",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 145,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/145/exact.json",
+      "sha256": "65a1d31267de2023e1d087e9da8ef01a985025b613158cd111169342f930d8dc",
+      "stdout_sha256": "f8f86d6d74e4b648083de1f6fb58bd37ef57496b5fe8a5965df943ad737d25bc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 146,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/146/exact.json",
+      "sha256": "7a75e4a967715c44bf761985136909cf46a5568e47a7b39dce4693b260c3c5ce",
+      "stdout_sha256": "e434368340303beebb3f7779be9a0a51653a2e18a2ad3d97037fa562149cbabd",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    },
+    {
+      "slot": 147,
+      "record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/current-observations/147/exact.json",
+      "sha256": "401c7573452e52b0df3b5097d4a473c24628c0259259c1aab39fb2ebd24b0611",
+      "stdout_sha256": "f8f86d6d74e4b648083de1f6fb58bd37ef57496b5fe8a5965df943ad737d25bc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "directwait": 0,
+      "owned_group_absent": true,
+      "owned_session_absent": true
+    }
+  ],
+  "all_owned_jobs_closed": true,
+  "target_release": "Preserved exclusively for root final inputs/review; no postgates authorized",
+  "bootstrap_failure_retained_zero_test_allocation": true,
+  "global_isolation_claim": false
+}

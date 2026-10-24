@@ -1,0 +1,33 @@
+{
+  "identity": "no-pause-fc31-one-inventory-only",
+  "variant": "current-3d0455043-no-pause2",
+  "head": "3d045504355ba4c6918268da24466b9606587c08",
+  "source_guard_sha256": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2",
+  "minimum_free_bytes": 5368709120,
+  "execution_ready": true,
+  "input_hashes": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/plan.json": "f87b96f9ce89b27da391e2785b47d00db162162f716ea9ab6803205648b72723",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/run-preparation.py": "0fcbfbe462ea4fe69488261b09f2b2539ac180576de25ba17f52214cf6b0efc3",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/reviewed-core.py": "613a43124d98f7865e0456e08da7112b1822e7a5186534ca3d438ef980c4cf8a",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-fc31-prep/no-pause-source-guard.json": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-fc31-prep/no-pause-debug2-cases.json": "9717a8abae1b2e58cf0bb6e21f99731a260097ab68c629a49a05395f60357fe7"
+  },
+  "required_compiled_inputs": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/compile-terminal.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/frozen-executables-and-CLIs.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/local-provenance.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/bound-artifacts.json",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/verified-compile-final-receipt.json"
+  ],
+  "compiled_input_hashes": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/compile-terminal.json": "ee430a564e917627560e06a2fa82bc5178fbc68b039f6c9bae5557ff876b9bdb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/frozen-executables-and-CLIs.json": "21b3fa78369a93b1424f47a8f420b9a3b4e9ce0d62cca8c73251ae3a9f05e045",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/local-provenance.json": "dcf68499d052e858317476ecb43fd381e870631b767b932036a0693f732c54de",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/clean-compile/bound-artifacts.json": "f7149a24d0ea75997db6f12c3cf93fa13756819f9a13b10963c8bf2342316a5f",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/verified-compile-final-receipt.json": "2d7910216f28bbe5b636782688071d60983e500be6f51a275994685458e35a3e"
+  },
+  "scope": "Call unchanged reviewed inventory implementation exactlyonce on actual current compile outputs. No clean/compile/test observations/metadataquery/targetreuse. Profile2 all49 actual cases."
+}

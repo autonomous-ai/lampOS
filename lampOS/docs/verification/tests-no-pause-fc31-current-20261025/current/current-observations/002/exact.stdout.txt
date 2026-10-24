@@ -1,0 +1,18 @@
+
+running 1 test
+test runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets ... FAILED
+
+failures:
+
+---- runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets stdout ----
+
+thread 'runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets' (8218707) panicked at crates/body/src/runtime/supervisor/tests.rs:949:5:
+Some("motor inhibit acknowledgement timed out")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.72s
+

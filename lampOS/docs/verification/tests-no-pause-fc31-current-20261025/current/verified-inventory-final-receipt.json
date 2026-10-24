@@ -1,0 +1,100 @@
+{
+  "native": 6897,
+  "terminal_exit_code": 0,
+  "actual_selected_case_bindings": 49,
+  "actual_binary_count": 7,
+  "command_count": 21,
+  "commands": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/all.json",
+      "sha256": "39eb4ce8cff35f9337acf9388c37c50ee7375a311be21ae966984c052085dfee"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/file.json",
+      "sha256": "bfa8a69af480da69f28273cffd9df5baf8e00fa657d70e6298a5ed213d79bc59"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-body-lamp_body-fc3acc3f37/ignored.json",
+      "sha256": "0112b41756e301b52dd93d42702406ac12a85da0da28cba5bf55d7a6c569a652"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/all.json",
+      "sha256": "1bc6b0e67aea8af9cfda7501fa052c166ca10958228a34912ec72d1cc59dfbee"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/file.json",
+      "sha256": "6349648aa29b840af56c97fddabd2d67796a2acb61fb055ac524a8b56939f670"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-cloud-lamp_cloud-157432718c/ignored.json",
+      "sha256": "048c2abfa184b39c3f4dde96caecc53dfbc50d254579b81a972ec42f6f1a67ec"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/all.json",
+      "sha256": "a53c6455ac5ba20f21c9c08f149f9e1b9a0b0e5dd31959872d1e32812628632c"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/file.json",
+      "sha256": "72175a6546e4bc94e35f83644f330e17e06e83fbad266f1d9ffa9c7407cf1893"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-it-26beeeb4e2/ignored.json",
+      "sha256": "d415dc7a23540b4dc17b97a8066434a2c589e857fa758e2f6be49207c77deea2"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/all.json",
+      "sha256": "b30b746493a3133125dd767758f3eacfe2f931f4e2d16baf39a64fc993859319"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/file.json",
+      "sha256": "24769b50d904d58f8983995d45f2a00ff3af25ee1bff8f36e17c9916b827f0f3"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-lamp_expression-030d38e162/ignored.json",
+      "sha256": "127b6be7a7345f14e36f31a805ad6308eefb0038b91152cbba3b9c223bd8afa9"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/all.json",
+      "sha256": "846f68e5d72ebc21debd167d8c0e47351ebb86dd58cd4bbe0c84b1410e8e17ed"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/file.json",
+      "sha256": "843ec08d6b35cc578d3a8cdd97b2a9c352a93e5df11ebfe874c44472ed31e86d"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-expression-runtime-96e3e99fb5/ignored.json",
+      "sha256": "06ce3a493e8b0c40980bc64e175edae672e6200775b156f0099783b91c5f0702"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/all.json",
+      "sha256": "84424990292bc049bba226f0ebda881e19a20c20ebdd8fc7eb1fccdb971f8ce2"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/file.json",
+      "sha256": "71269c9ed97867b0785ef06414aec5a438ee8634d0d7c2d82595d94548a64546"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-memory-it-ea7cbc8f31/ignored.json",
+      "sha256": "34d7a041ec263f9d5b2ddd7922778754199ff13d6dd087304127159237206fd9"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/all.json",
+      "sha256": "6a995ddd5f946f6552c02856b462481a242ea4ac2c04856f85b520c9805aa57c"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/file.json",
+      "sha256": "74a501b931fce94e607cf4a649249d6357fa5c700b5c144cfdd78c40286fba55"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-no-run-resume/runs/current-3d0455043-no-pause2/inventory/compiled-census/lamp-skills-it-577a118a73/ignored.json",
+      "sha256": "a5f754f85a8638ec2b865617f4b80d425b89eee5033242839ec02be88cf0d869"
+    }
+  ],
+  "all_directwait0_groups_absent": true,
+  "all_raw_stream_sha_verified": true,
+  "source_guard_passed_before_after": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3",
+  "inventory_terminal_sha256": "ee430a564e917627560e06a2fa82bc5178fbc68b039f6c9bae5557ff876b9bdb",
+  "selected_case_bindings_sha256": "ff39c852208f9a3f4744d880b72e5ee008b18d9db47451014935f0233fa780a7",
+  "no_compile_clean_metadataquery_or_test_observations": true,
+  "all_owned_jobs_closed": true
+}

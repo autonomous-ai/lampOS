@@ -1,0 +1,9 @@
+{
+  "module_import_completed": true,
+  "main_not_called": true,
+  "no_Cargo_target_or_test_allocation": true,
+  "execution_consumed_absent_before_after": true,
+  "observation_results_directory_absent_before_after": true,
+  "runner_sha256": "6e228f7b6075fba282724932c5263bf51e4d6569cd3159e834c64ff6b3ada4bf",
+  "support_sha256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d"
+}

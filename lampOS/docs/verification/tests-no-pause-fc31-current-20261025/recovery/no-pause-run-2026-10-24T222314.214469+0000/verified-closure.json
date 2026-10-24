@@ -1,0 +1,19 @@
+{
+  "native": 34023,
+  "terminal_exit_code": 0,
+  "one_supported_clean_only": true,
+  "actual_wall_seconds": 8.351708,
+  "actual_started_at": "2026-10-24T22:23:14.270908+00:00",
+  "actual_finished_at": "2026-10-24T22:23:22.622551+00:00",
+  "source_unchanged": {
+    "profile2": "d91b78610cde57f608e02e957fd094ae0041a3d68148321a8dcdf207685630b3"
+  },
+  "direct_wait": 0,
+  "group_absent": true,
+  "owned_jobs_outstanding": 0,
+  "no_automatic_next_phase": true,
+  "original600s_failure_preserved": true,
+  "cause_of_original_timeout_still_unknown": true,
+  "result_sha256": "c5564d262da28bcbb0b601b4f30148604af414eab0e7e8dc636d11671a0708c8",
+  "record_sha256": "33d9e80d6cdf86a7f3f7beb678423b47be413e42b2cc5305a0387835eb33f311"
+}

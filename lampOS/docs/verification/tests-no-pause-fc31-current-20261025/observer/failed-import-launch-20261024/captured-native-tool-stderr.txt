@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/run-current-observations.py", line 15, in <module>
+    import census
+  File "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-147-observer-prep/census.py", line 5, in <module>
+    import support as common
+ModuleNotFoundError: No module named 'support'

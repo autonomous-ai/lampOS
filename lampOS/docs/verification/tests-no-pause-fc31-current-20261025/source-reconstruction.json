@@ -1,0 +1,12 @@
+{
+  "head": "3d045504355ba4c6918268da24466b9606587c08",
+  "parent": "fc31e012334cda59eb3c489560454c515fb86386",
+  "tree": "0c7dc26287e3fba97714dc8259f3264e348afd6c",
+  "patch": "current-own-source.patch",
+  "patch_sha256": "c9eace763863a08c47a8de05de28f06f54a1bf82a966403468055e25b07a3bc2",
+  "files": [
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "scope": "Unpushed carried source; apply patch to exact public base. Full source guard binds actual observed bytes. Not ready and not a latest-base qualification."
+}
