@@ -771,6 +771,24 @@ fn while_answer_waits(
     }
 }
 
+/// A block's score before the faint floor, for a soft start
+/// (`LAMP_SOFT_START`, `TurnDetector::unfloored`): only while the lamp is
+/// silent, its sound not reaching the microphone (`sounding`), no busy answer
+/// kept, and no reply playing, so that a start never reaches back into the
+/// lamp's own voice. `None` otherwise, which a soft start never reaches past.
+fn unfloored_score(
+    sounding: bool,
+    keeping_answer: bool,
+    reply: Option<&Reply>,
+    probability: f32,
+) -> Option<f32> {
+    (!sounding
+        && !keeping_answer
+        && probability.is_finite()
+        && reply.is_none_or(|current| current.playback.is_none()))
+    .then_some(probability)
+}
+
 /// Whether `current` is an answer to someone's request that has ended, none
 /// of which has arrived or sounded: what a new sound may wait for.
 fn answer_unheard(current: &Reply) -> bool {
@@ -1296,6 +1314,9 @@ struct Rig {
     /// A sound just after a line that ended before its name goes on from it
     /// (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
     open_name: bool,
+    /// A sound just after a line that was only the lamp's name takes the turn
+    /// at once (`LAMP_CALL_TAKES_NEXT_LINE`, [`open_name::called`]).
+    call_takes_next: bool,
     /// A due end of the line in hand held while the second route's words so
     /// far end unfinished (`LAMP_SECOND_UNFINISHED_WAIT`, [`crate::unfinished_words`]).
     unfinished_wait: bool,
@@ -4121,6 +4142,7 @@ fn spawn_rig(
         early_end_blocks: options.early_end_blocks,
         early_finalize: early_finalize::from_environment(),
         open_name: open_name::from_environment(),
+        call_takes_next: open_name::call_takes_next_from_environment(),
         unfinished_wait: crate::unfinished_words::on(),
         faint_level: options.faint_level,
         playout_start: options.playout_start,
@@ -5347,6 +5369,9 @@ fn conversation_with_gate_inner(
     // The turn whose words ended before a name, and when its speech ended,
     // for the name said next (`LAMP_SECOND_OPEN_NAME`, [`open_name`]).
     let mut open_name_turn: Option<(u64, u64)> = None;
+    // The turn in hand that was only the lamp's name, and when its speech
+    // ended (`LAMP_CALL_TAKES_NEXT_LINE`).
+    let mut call_turn: Option<(u64, u64)> = None;
     // The turn that was asked while the room was busy, and when the lamp
     // began to be heard answering it.
     let mut asked_in_busy_room: Option<u64> = None;
@@ -5871,6 +5896,10 @@ fn conversation_with_gate_inner(
     // Off unless set.
     let counts_real = duplex && crate::turn_taking::cut_in_counts_real();
     detector.keep_first_words(first_words);
+    // A line that begins softly keeps its first word (`LAMP_SOFT_START=on`):
+    // an ordinary start, the lamp silent, may begin at it. Off unless set;
+    // only with first words kept.
+    detector.keep_soft_starts(first_words && crate::activity::soft_start());
     let hold = match (duplex, first_words) {
         (true, true) => Hold::DUPLEX.keeping_first_words(),
         (true, false) => Hold::DUPLEX,
@@ -7434,6 +7463,31 @@ fn conversation_with_gate_inner(
                             json!({"kind":"open_name","turn":turn,"ended_at_us":ended_us,"at_us":monotonic_us()}),
                         )?;
                     }
+                    // A line that was only the lamp's name, its answer
+                    // unheard and held by the second route for the line
+                    // after it: a sound begun within 2.5 s of its end takes
+                    // the turn at once (`LAMP_CALL_TAKES_NEXT_LINE`). Never
+                    // the words.
+                    if request.is_none()
+                        && finished
+                        && let Some((turn, ended_us)) = open_name::called(
+                            rig.call_takes_next && rig.provider.role == "second",
+                            &text,
+                            reply
+                                .as_ref()
+                                .map(|current| (current.owner.turn(), answer_unheard(current))),
+                            speech_ended,
+                        )
+                    {
+                        call_turn = Some((turn, ended_us));
+                        eprintln!(
+                            "lamp-voice: request {turn}: only the lamp's name: a sound begun within 2.5 s of its end takes the turn at once (LAMP_CALL_TAKES_NEXT_LINE)"
+                        );
+                        record(
+                            trace,
+                            json!({"kind":"call_takes_next","turn":turn,"ended_at_us":ended_us,"at_us":monotonic_us()}),
+                        )?;
+                    }
                     if request.is_some()
                         && let Some(walk) = onboarding.as_mut()
                     {
@@ -8105,6 +8159,12 @@ fn conversation_with_gate_inner(
             let sounding = frame.echo.as_ref().is_some_and(|echo| {
                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
             });
+            detector.unfloored(unfloored_score(
+                sounding,
+                keeping_answer,
+                reply.as_ref(),
+                frame.probability,
+            ));
             let (update, input_ended) = observe_prospective_heard(
                 &mut playback_mask,
                 &mut detector,
@@ -8290,6 +8350,16 @@ fn conversation_with_gate_inner(
                     // still do (the reviewer's P3 on #2355).
                     let goes_on_from_name = open_name::goes_on(
                         open_name_turn,
+                        reply
+                            .as_ref()
+                            .map(|current| (current.owner.turn(), answer_unheard(current))),
+                        candidate.first_read_at_us,
+                    );
+                    // The line after a bare name: decided at once, as the
+                    // name's carry waits for it; it is not marked as going on
+                    // from that line, which the second route joins itself.
+                    let after_the_call = open_name::goes_on(
+                        call_turn,
                         reply
                             .as_ref()
                             .map(|current| (current.owner.turn(), answer_unheard(current))),
@@ -8503,6 +8573,7 @@ fn conversation_with_gate_inner(
                     if let Some(motion) = motion_in.as_mut().filter(|_| {
                         !own_theirs_now
                             && !goes_on_from_name
+                            && !after_the_call
                             && motion_kept_for != Some(candidate.id)
                     }) {
                         let waits_until_us = candidate
@@ -8610,7 +8681,7 @@ fn conversation_with_gate_inner(
                         decided: answer_sounded_for == Some(candidate.id),
                         heard: !playback_mask.is_duplex() || frame.echo.is_some(),
                     };
-                    let mut waits = if goes_on_from_name {
+                    let mut waits = if goes_on_from_name || after_the_call {
                         WhileAnswerWaits::Decide
                     } else {
                         while_answer_waits(
@@ -8623,7 +8694,10 @@ fn conversation_with_gate_inner(
                         )
                     };
                     // With `words`, its words too (step 2).
-                    if let Some(words) = wait_words.as_mut().filter(|_| !goes_on_from_name) {
+                    if let Some(words) = wait_words
+                        .as_mut()
+                        .filter(|_| !goes_on_from_name && !after_the_call)
+                    {
                         let told;
                         (waits, told) = with_waited_words(
                             words,
@@ -8926,6 +9000,13 @@ fn conversation_with_gate_inner(
                         open_name_turn = None;
                         eprintln!(
                             "lamp-voice: request {}: goes on from the line that ended before its name (LAMP_SECOND_OPEN_NAME)",
+                            reply.as_ref().map_or(0, |current| current.owner.turn())
+                        );
+                    }
+                    if after_the_call {
+                        call_turn = None;
+                        eprintln!(
+                            "lamp-voice: request {}: the line after the bare name, taken at once (LAMP_CALL_TAKES_NEXT_LINE)",
                             reply.as_ref().map_or(0, |current| current.owner.turn())
                         );
                     }
@@ -14448,6 +14529,7 @@ mod tests {
             early_end_blocks: None,
             early_finalize: false,
             open_name: false,
+            call_takes_next: false,
             unfinished_wait: false,
             faint_level: None,
             microphone: crate::options::Microphone::Mic2,

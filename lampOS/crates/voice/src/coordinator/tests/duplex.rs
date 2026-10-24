@@ -103,6 +103,10 @@ pub(super) struct Harness {
     /// Every candidate is let go, as the session loop lets go talk over the
     /// lamp's own line in a busy room (`busy_room`, #2602).
     let_go: bool,
+    /// Each block's score before the faint floor is given to the detector,
+    /// as the session loop gives it with `LAMP_SOFT_START=on`
+    /// ([`unfloored_score`]).
+    pub(super) soft_start: bool,
 }
 
 impl Harness {
@@ -201,6 +205,7 @@ impl Harness {
             reach_past_reply: false,
             _clock: None,
             let_go: false,
+            soft_start: false,
         }
     }
     pub(super) fn old(&self) -> TurnOwner {
@@ -290,6 +295,13 @@ impl Harness {
             self.detector.reach_back();
         } else if reaches_past_reply(self.reach_past_reply, echo.as_ref()) {
             self.detector.reach_back_to_onset();
+        }
+        if self.soft_start {
+            let sounding = echo.as_ref().is_some_and(|echo| {
+                echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
+            });
+            self.detector
+                .unfloored(unfloored_score(sounding, false, self.reply.as_ref(), score));
         }
         let samples = observation.samples;
         let (update, _) = observe_prospective_heard(
@@ -839,6 +851,35 @@ fn with_the_reply_end_reach_a_line_long_after_the_lamps_sound_starts_as_before()
         }
         let line = h.blocks(6, 0.9, Some(evidence(64, None)));
         let accepted = line[5].accepted.as_ref().expect("the line was not let in");
+        (accepted.audio.clone(), accepted.trigger_sequence)
+    };
+    let (on, trigger) = request(true);
+    let (off, _) = request(false);
+    assert_eq!(on, off);
+    assert_eq!(on[0], trigger + 1 - crate::activity::PRE_ROLL_BLOCKS as u64);
+}
+
+/// The reviewer's P2 on #3392: with `LAMP_SOFT_START=on`, a line begun while a
+/// reply's playback is still held but its sound has been quiet 640 ms (not
+/// retired) has every block marked as heard with the lamp's reply playing,
+/// the onset's own among them. It starts as without the switch, with its
+/// audio, and is let in; it never starts with none, which admission refuses
+/// as an invalid prefix and which ended the conversation.
+#[test]
+fn with_soft_starts_a_line_under_a_quiet_unretired_reply_starts_as_before() {
+    let request = |soft: bool| {
+        let mut h = Harness::keeping_first_words(true, 100);
+        h.soft_start = soft;
+        h.detector.keep_soft_starts(soft);
+        h.blocks(50, 0.1, Some(evidence(0, OWN)));
+        // The lamp falls quiet, its playback still held, for 640 ms.
+        for quiet in 1..=63 {
+            h.block(0.1, Some(evidence(quiet, None)));
+        }
+        let line = h.blocks(6, 0.95, Some(evidence(64, None)));
+        let accepted = line[5].accepted.as_ref().expect("the line was not let in");
+        assert!(!accepted.audio.is_empty());
+        assert!(accepted.audio.windows(2).all(|pair| pair[1] == pair[0] + 1));
         (accepted.audio.clone(), accepted.trigger_sequence)
     };
     let (on, trigger) = request(true);
