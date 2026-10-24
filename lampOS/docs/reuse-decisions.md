@@ -1,5 +1,39 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Bind the requested name to the speaker's own declaration (2026-10-24)
+
+The V1 self-enrollment camera flow assumes the requester is the subject and
+prefers a name in the message; the earlier audit of
+`skills/face-enroll/reference/self-enroll-camera.md` records that boundary.
+Keep the existing Rust accent folding, spelling and letter-count checks.
+Those establish that a name occurred in the words, not whose name it is:
+`name_heard` accepts names said about a friend or child too. The guarded
+speaker-bound path therefore needs a separate ownership check before any
+Eyes request. A model instruction to name only the requester is insufficient.
+
+The new check consumes a direct self-introduction, a bare name or a spelling
+response, rather than searching mixed narration for any first-person phrase.
+An unrelated "I'm Alex" cannot authorize the tool's candidate Kess elsewhere
+in the same line. A request followed by a bare name can be a vocative:
+"Remember my face, Kess" therefore needs a fresh explicit self-introduction.
+The same applies to greetings or polite prefaces/suffixes ("Hi, Kess" or
+"Kess, please"); stripping them cannot turn an addressee into the speaker. Ambiguous, reported, quoted, negated and tentative forms
+refuse conservatively. Legacy/off behavior keeps its existing checks.
+Both the heard line and the raw requested name are capped at 4 KiB before
+validation; a padded model argument cannot evade that bound. Unsupported
+punctuation is refused before folding can discard quotation or uncertainty.
+The local check adds no I/O, inference or tool deadline. Its design target is
+under 1 ms per bounded line on the host. A pre-final debug-profile probe
+measured an ordinary introduction at 93.6 microseconds mean, but cap-sized
+inputs at up to 9.55 ms mean; the target is not met for those debug inputs.
+The probe excludes socket/proof construction and precedes the final
+vocative refusal; it is not a final-build or device latency claim.
+
+Reuse the existing Eyes refusal, but change guarded `known_as` wording: no
+stored name is exposed, and no impossible replacement confirmation is
+requested. Guarded replacement remains refused until a same-speaker
+confirmation design exists. Success is still only Eyes' actual saved result.
+
 ## Bind live face enrollment to its speaker (2026-10-24)
 
 Read V1's `hal/realtime/orchestrator.py` delegate description and
