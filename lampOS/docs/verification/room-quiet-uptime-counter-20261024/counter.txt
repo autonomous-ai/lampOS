@@ -1,0 +1,26 @@
+
+running 3 tests
+test original_quiet_assertion_at_300_seconds ... now_us=300000000 first=18446744073609551616 second=210000000 elapsed=0 room=Unknown
+
+thread 'original_quiet_assertion_at_300_seconds' (76663472) panicked at /private/tmp/second-room-quiet-uptime-20261024/counter.rs:17:5:
+assertion `left == right` failed
+  left: Unknown
+ right: Quiet
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test quiet_precondition_is_restorable_without_future_clock_values ... ok
+test release_arithmetic_characterizes_the_interval ... now_us=89999999 first=18446744073399551615 second=18446744073709551615 elapsed=310000000 room=Quiet
+now_us=90000000 first=18446744073399551616 second=0 elapsed=0 room=Unknown
+now_us=300000000 first=18446744073609551616 second=210000000 elapsed=0 room=Unknown
+now_us=399999999 first=18446744073709551615 second=309999999 elapsed=0 room=Unknown
+now_us=400000000 first=0 second=310000000 elapsed=310000000 room=Quiet
+now_us=500000000 first=100000000 second=410000000 elapsed=310000000 room=Quiet
+ok
+
+failures:
+
+failures:
+    original_quiet_assertion_at_300_seconds
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
