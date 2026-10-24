@@ -29,8 +29,9 @@ WORKDIR /work
 COPY build.sh /work/build.sh
 COPY build-pi5.sh /work/build-pi5.sh
 COPY build-orangepi.sh /work/build-orangepi.sh
+COPY build-orangepi-v2.sh /work/build-orangepi-v2.sh
 COPY lib /work/lib
-RUN chmod +x /work/build.sh /work/build-pi5.sh /work/build-orangepi.sh
+RUN chmod +x /work/build.sh /work/build-pi5.sh /work/build-orangepi.sh /work/build-orangepi-v2.sh
 
 # Default to OrangePi build; the Makefile overrides at run-time by appending
 # /work/build.sh when TARGET=rpi.

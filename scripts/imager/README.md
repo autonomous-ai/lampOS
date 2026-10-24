@@ -110,6 +110,67 @@ software. A failed filesystem check stops the build without publishing the stage
 image. An older completed output can remain after a failed build or `COMPRESS=0`;
 check that the chosen raw or compressed artifact is the intended build.
 
+## Lamp V2 image (lampOS): `build-orangepi-v2.sh`
+
+A new lamp that boots straight into lampOS's setup, with no V1 part (lampOS #2538). The base
+and board steps are `build-orangepi.sh`'s (the hardware team's lamp base, expand, the radio,
+the A733 overlays, resize-once); the payload is lampOS's **signed** build, put on by its own
+installer, `lamp-update install --setup on` (`lampOS/docs/install.md`, "The install
+command"). `build-orangepi.sh` is unchanged and still builds V1.
+
+```bash
+make build-v2 LAMPOS_UPDATE_KEY=<key.pub>                              # the product channel
+make build-v2 LAMPOS_UPDATE_KEY=<key.pub> LAMPOS_CHANNEL_DIR=<folder>  # a signed channel folder
+make build-v2 ... LAMPOS_MODELS_DIR=<dir>                             # while the models release is a draft
+# → output/lamp-v2/lamp-os-v2[-<variant>].img.xz  (COMPRESS=0: output/lamp-v2/lamp-os-v2.img)
+make sd-card-flash-raw DEVICE_TYPE=lamp-v2 DISK=N
+```
+
+| Variable | Default | Effect |
+|---|---|---|
+| `LAMPOS_UPDATE_KEY` | **(required)** | The update key's public half, baked as `/etc/lampOS/update/key.pub`. `install` checks the build with it, and so does every later update |
+| `LAMPOS_CHANNEL_DIR` | *(unset)* | A channel folder (`lampos-manifest.json` signed by that key, and the build's files, `files_url` `file:///var/tmp/lampos-channel/`), read at build and not left on the image. Unset: the build is read from `LAMPOS_CHANNEL_URL` |
+| `LAMPOS_MODELS_DIR` | *(unset)* | The models release's files (`gh release download models-2026-10-16 -R autonomous-ai/lampOS -D <dir>`). `install` fetches each model in `lampOS/deploy/product/models.json` itself; one it cannot (that release is still a draft, so its public links answer 404) is placed from here by the same size and SHA-256 checks, and a second `install` records it. Without it, a model install could not fetch fails the build |
+| `LAMPOS_CHANNEL_URL` | `https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/` | The product channel, the one `lamp-update.service` follows on the lamp |
+| `VARIANT` | `standard` | Which of `lampOS/deploy/image/shipped.json`'s variants (`standard`, `pro`, `pro-xvf3800`, `pro-respeaker-lite`) |
+| `OUT_IMG_SIZE` | `8G` | The raw image; resize-once fills the card at first boot |
+| `AP_BAND`, `COUNTRY_CODE`, `COMPRESS` | as V1 | as V1 |
+
+```
+Phase 0-1  the lamp base (input/lamp/golden-opi-dev.img.xz), expanded and mounted, as V1
+Phase 2    chroot: hostapd, dnsmasq, wpa_supplicant, dhcpcd, avahi, ssh, alsa (libasound2 is
+           the one library lampOS's binaries need beyond libc), nginx-light installed but not
+           enabled and with no site (setup's own page answers on port 80 and stops nginx);
+           V1's radio scripts device-ap-mode / device-sta-mode, which lamp-setup runs;
+           SPI3 + I2C0 overlays
+Phase 3    the image's own files: exactly the paths shipped.json names for VARIANT, from
+           robots/lamp/rootfs and overrides/<variant>/rootfs, each refused unless its SHA-256
+           is one shipped.json knows. V1's files in that tree (HAL's .env, led-boot,
+           led-shutdown, hal.service.d) are not copied
+Phase 4    key.pub; lamp-update from the build, checked against the manifest; then, in the
+           chroot, lamp-update install --setup on: every part, the product units and settings,
+           the models, setup's two settings, enabled and not started; any model it could not
+           fetch placed from LAMPOS_MODELS_DIR and install run again. Then read back: a build
+           recorded in state.json, setup's settings, no setup marker, no lamp.env, and none of
+           V1's units or binaries (hal, os-server, bootstrap, openclaw, led-boot, ...)
+Phase 5-6  resize-once, fake-hwclock seeded, e2fsck, xz
+```
+
+At first boot the lamp has no `/var/lib/lampos-setup/done`, so `lamp-setup` raises the hotspot
+`lamp-xxxx` and its own page at `http://192.168.100.1/`; the lamp's parts start once setup
+writes the marker. The body has no `/etc/lampOS/body/lamp.env`, its poses, so it stays seated
+and unpowered until they are measured (`lampOS/deploy/factory/steps.sh`, step 1). The update key
+is in the image, so `steps.sh --update-key` finds it already in place.
+
+Sanity checks after the first boot:
+
+```bash
+ls /var/lib/lampos-setup/done                 # missing until setup is done
+systemctl is-active lamp-setup                # active: the hotspot and the page
+sudo jq '.installed' /var/lib/lampos-update/state.json   # the build's sequence and commit
+systemctl list-unit-files 'hal*' 'os-server*' 'openclaw*' 'bootstrap*'   # none
+```
+
 ## Raspberry Pi build flow
 
 Different shape from OPi: the source is the **stock Raspberry Pi OS Lite arm64** image
@@ -228,6 +289,7 @@ imager/
 ├── Dockerfile             — Ubuntu 24.04 + qemu-aarch64-static + p7zip-full + gdown
 ├── Makefile               — build / flash / upload / upload-source targets
 ├── build-orangepi.sh      — OrangePi 4 Pro builder (~1200 lines)
+├── build-orangepi-v2.sh   — OrangePi 4 Pro lamp, lampOS (V2) builder (make build-v2)
 ├── build.sh               — Raspberry Pi 4B / 5 builder
 ├── input/                 — cached source images (gitignored)
 │   ├── orangepi.7z        — stock vendor image (Google Drive fallback)

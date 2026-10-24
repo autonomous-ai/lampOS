@@ -91,7 +91,7 @@ IMG_FILE := $(IMG_FILE_$(TARGET))
 # straight from the raw .img — skips waiting for xz compression, and writes via rdiskN.
 RAW_IMG_rpi := golden.img
 RAW_IMG_opi := $(DEVICE_TYPE)/golden-opi.img
-RAW_IMG := $(RAW_IMG_$(TARGET))
+RAW_IMG := $(if $(filter lamp-v2,$(DEVICE_TYPE)),lamp-v2/lamp-os-v2.img,$(RAW_IMG_$(TARGET)))
 
 # Preflight — check Docker resources + clean dangling layers before a long
 # build run. Avoids the most common failure modes: OOM (Docker memory < 4GB)
@@ -156,6 +156,46 @@ build: build-preflight
 	@# Name the output per device type so lamp/intern/dog images don't clobber.
 	@if [ "$(BUILT_IMG)" != "$(IMG_FILE)" ] && [ -f output/$(BUILT_IMG) ]; then mv -f output/$(BUILT_IMG) output/$(IMG_FILE); fi
 	@echo "==> Built image: output/$(IMG_FILE)  (device_type=$(DEVICE_TYPE))"
+
+# ── build-v2 — a lamp that boots straight into lampOS (V2) setup (#2538) ─────
+# Same base and board steps as build-orangepi.sh; the payload is lampOS's signed build, put on by
+# `lamp-update install --setup on`, with no V1 part. LAMPOS_UPDATE_KEY (the update key's public half)
+# is required. LAMPOS_CHANNEL_DIR, a signed channel folder, replaces the product channel at build.
+# LAMPOS_MODELS_DIR holds the models release's files, for those install cannot fetch (a draft release).
+#   make build-v2 LAMPOS_UPDATE_KEY=~/key.pub [LAMPOS_CHANNEL_DIR=~/lampos-channel] [VARIANT=pro] [COMPRESS=0]
+#   → output/lamp-v2/lamp-os-v2[-<variant>].img.xz (COMPRESS=0: output/lamp-v2/lamp-os-v2.img)
+LAMPOS_UPDATE_KEY ?=
+LAMPOS_CHANNEL_DIR ?=
+LAMPOS_CHANNEL_URL ?=
+LAMPOS_MODELS_DIR ?=
+V2_INPUT := input/lamp-v2
+V2_IMG_FILE := lamp-v2/lamp-os-v2$(VARIANT_SUFFIX).img.xz
+
+build-v2:
+	@[ -n "$(LAMPOS_UPDATE_KEY)" ] && [ -s "$(LAMPOS_UPDATE_KEY)" ] || { echo "ERROR: LAMPOS_UPDATE_KEY=<the update key's public half> is required"; exit 1; }
+	@[ -f input/lamp/golden-opi-dev.img.xz ] || { echo "ERROR: input/lamp/golden-opi-dev.img.xz missing (see Base image above)"; exit 1; }
+	@command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 || { echo "ERROR: Docker not running"; exit 1; }
+	@docker rmi pi-builder 2>/dev/null || true
+	docker build -t pi-builder .
+	# Stage what the build reads from the repo: the image's own files and their list, the key, the channel.
+	rm -rf $(V2_INPUT) && mkdir -p $(V2_INPUT)/robots-lamp
+	cp -R ../../robots/lamp/rootfs ../../robots/lamp/overrides $(V2_INPUT)/robots-lamp/
+	cp ../../lampOS/deploy/image/shipped.json $(V2_INPUT)/shipped.json
+	cp ../../lampOS/deploy/product/models.json $(V2_INPUT)/models.json
+	$(if $(LAMPOS_MODELS_DIR),cp -R "$(LAMPOS_MODELS_DIR)" $(V2_INPUT)/models,)
+	cp "$(LAMPOS_UPDATE_KEY)" $(V2_INPUT)/key.pub
+	$(if $(LAMPOS_CHANNEL_DIR),cp -R "$(LAMPOS_CHANNEL_DIR)" $(V2_INPUT)/channel,)
+	docker run --rm \
+	--privileged \
+	-v ./output:/output \
+	-v ./input:/input \
+	-e VARIANT=$(VARIANT) \
+	-e COMPRESS=$(COMPRESS) \
+	-e LAMPOS_CHANNEL_URL=$(LAMPOS_CHANNEL_URL) \
+	-e AP_BAND=$(AP_BAND) \
+	-e COUNTRY_CODE=$(COUNTRY_CODE) \
+	pi-builder /work/build-orangepi-v2.sh
+	@if [ -f output/lamp-v2/lamp-os-v2.img.xz ]; then mv -f output/lamp-v2/lamp-os-v2.img.xz output/$(V2_IMG_FILE); echo "==> Built image: output/$(V2_IMG_FILE)"; else echo "==> Built raw image: output/lamp-v2/lamp-os-v2.img"; fi
 
 sd-card-list:
 	diskutil list
