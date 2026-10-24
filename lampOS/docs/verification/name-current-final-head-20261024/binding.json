@@ -1,0 +1,72 @@
+{
+  "base": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "tested_tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7",
+  "final_tree": "e0513c6b625e56b4ff258c40d69b742040fef2e4",
+  "final_docs_only": [
+    "lampOS/docs/verification/known-name-product-prep-20261022/README.md"
+  ],
+  "all_other_blobs_and_modes_exact": true,
+  "receipts": {
+    "mac": {
+      "terminal_sha256": "a2f108a1ebaf167140d50cd7b193f573a462125b67dcadf6ab722ab34a2a04db",
+      "counts": {
+        "fmt": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 0
+        },
+        "clippy": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 0
+        },
+        "workspace-build": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 0
+        },
+        "full-voice": {
+          "failed": 0,
+          "ignored": 21,
+          "passed": 4125
+        },
+        "full-update": {
+          "failed": 0,
+          "ignored": 6,
+          "passed": 386
+        }
+      }
+    },
+    "linux": {
+      "terminal_sha256": "20b462c4b15770419a834788ba3c5a33ffe6699c8d131da47c4853bdacf0a375",
+      "counts": {
+        "fmt": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 0
+        },
+        "clippy": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 0
+        },
+        "workspace-build": {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 0
+        },
+        "full-voice": {
+          "failed": 0,
+          "ignored": 24,
+          "passed": 4186
+        },
+        "full-update": {
+          "failed": 0,
+          "ignored": 4,
+          "passed": 388
+        }
+      }
+    }
+  },
+  "head": "f7d8aab373f8f976ad7383e2b4a3915e20be5f81"
+}

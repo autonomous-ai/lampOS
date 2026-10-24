@@ -1,0 +1,76 @@
+1:  c1c56ca7b9 ! 1:  f7d8aab373 lampOS: prepare the known-person name product setting
+    @@ Metadata
+     Author: deehw <dee@autonomous.ai>
+     
+      ## Commit message ##
+    -    lampOS: prepare the known-person name product setting
+    +    lampOS: prepare known-face names with current private context
+     
+      ## lampOS/crates/update/tests/install.rs ##
+     @@ lampOS/crates/update/tests/install.rs: fn the_product_keeps_nothing_personal_while_nobody_is_known() {
+    @@ lampOS/docs/verification/known-name-product-prep-20261022/README.md (new)
+     @@
+     +# Known-face name: held product preparation
+     +
+    ++## Current local source qualification, 24 October
+    ++
+    ++Frozen tested tree `84239a2d16cdd81d8e036c80f7cb4ab9546745e7` on Common
+    ++`e9d00f935029a6d5054ddf35b0203fb8546f7995` completes all five required host
+    ++stages on Mac and offline Linux AMD64: fmt, strict workspace/all-target
+    ++Clippy, workspace build, full Voice and full Update.
+    ++
+    ++| Host | Voice passed / failed / ignored | Update passed / failed / ignored |
+    ++| --- | --- | --- |
+    ++| Mac | 4,125 / 0 / 21 | 386 / 0 / 6 |
+    ++| Linux AMD64 | 4,186 / 0 / 24 | 388 / 0 / 4 |
+    ++
+    ++All four retained Voice proof/frame controls and the actual installed-unit
+    ++assertion pass once per host. Exact-package invalidation and source-bound
+    ++post-clean fresh compilation cover all 46 local workspace members. Complete
+    ++source/index stability and process/container cleanup/release are verified.
+    ++Raw receipts: `/private/tmp/fourth-name-current-gates-20261024/{mac,linux}/attempt1/`.
+    ++The predecessor diagnostic failure remains retained and was not waived by
+    ++Linux target reuse. Captured artifact hashes are stage-time observations.
+    ++
+    ++The final result update changes this README only; every tested code/unit/
+    ++other documentation blob and mode remains exact. There is no runtime Rust
+    ++delta from Common; the installed-unit test changes intentionally. This is
+    ++a five-file Name-only delta after Common, not a new privacy guard or Photo
+    ++activation. The old preparation below remains historical.
+    ++
+    ++**Still draft / merge HOLD:** parent Common landing/full privacy read and
+    ++voice freeze; this head's native ARM64/Clippy and independent source read;
+    ++accepted matching pins and First's person/other-person/room/off-camera/privacy
+    ++round. Current helper/device latency remains unmeasured; the historical
+    ++5.547 ms miss is not erased. No lamp, score or activation claim. The memory
+    ++quality row remains 0.35, target 0.90.
+    ++
+    ++## Historical source-only carry preparation, 24 October
+    ++
+    ++Ready for lamp-voice: no. Activation remains draft under the voice freeze.
+    ++
+    ++This new preparation carries only the original five Name files onto Common
+    ++`e9d00f935029a6d5054ddf35b0203fb8546f7995`. The four existing product,
+    ++installed-unit assertion and prose files exactly match the clean three-way
+    ++text merge of the trusted `00c790722..c1c56ca7b` Name delta with that Common
+    ++head. This evidence preface is the only addition beyond that merge. All
+    ++runtime source and every path outside these five files remain byte and
+    ++mode identical to Common; no Photo or repair setting is added.
+    ++
+    ++This source has not run Cargo, host/native gates or a lamp. The 112/0/0
+    ++checks below belong to the older tree `49a8abb58`; the legacy Linux first
+    ++sample of 5.547 ms still misses the under-5-ms target. No older result is
+    ++relabelled as qualification of this carry. Current source/private-boundary
+    ++review, accepted Common routing, compatible pins, new independent gates
+    ++and First's authorized known-person/other-person/room/off-camera/privacy
+    ++acceptance remain required. No commit, push, new stacked PR, activation or
+    ++device action is part of this preparation. The current memory row is 0.35,
+    ++with target 0.90 (Owner, 24 October). The earlier 0.45 score and test counts
+    ++retained below are historical, not current qualification. There is no runtime
+    ++Rust delta; the Update Rust test intentionally gains the installed-unit assertion.
+    ++
+    ++## Earlier preparation and historical evidence
+    ++
+     +Part of #2539 and #3014. Ready for lamp-voice: no.
+     +
+     +This proposal adds one `LAMP_SECOND_FACE_NAME=on` setting to the product

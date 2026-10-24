@@ -8577,3 +8577,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: current Name Linux qualification retained
 
 [Linux-only Name84239 packet](verification/name-current-linux-20261024/README.md) verifies five stages0, Voice4186/0/24 and Update388/0/4, all five controls and fresh46/source/cleanup. It retains the predecessor diagnostic aggregate1 and its explicit non-waiving handoff. Mac Update remains active; no full two-host or new native/latency/physical/activation claim. Released Linux now checks corrected callback candidatea4ac including exact Cargo scratch census.
+
+## 2026-10-24: Name current carry pushed after both full gates
+
+#3014 is now f7d8aab373, one five-file Name commit after Common e9d, exact lease replacement of3e0. [Final binding/range-diff](verification/name-current-final-head-20261024/README.md) proves only the result README changes after tested84239. Both full five-stage gates pass; Mac Voice4125/0/21 Update386/0/6, Linux Voice4186/0/24 Update388/0/4, all five controls and fresh46/source/cleanup. Actual new ARM40112106010/Clippy40112106057 run, not passed. Mergeable but draft under parent/freeze/privacy/pin/physical holds; old performance miss remains. Released Mac starts corrected callback revision3 as60190; Linux23653 revision3 Voice remains active.

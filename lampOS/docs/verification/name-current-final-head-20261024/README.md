@@ -1,0 +1,9 @@
+# Current Name authored-head binding
+
+#3014 head `f7d8aab373f8f976ad7383e2b4a3915e20be5f81` is one Name commit after Common `e9d00f935029a6d5054ddf35b0203fb8546f7995`, five paths. Exact lease replaced old3e0 on Fourth's own branch. Final tree `e0513c6b625e56b4ff258c40d69b742040fef2e4` differs from frozen tested `84239a2d16cdd81d8e036c80f7cb4ab9546745e7` only in the result README. All other code/unit/prose Git blobs and modes remain exact. [Binding](binding.json) pins both hosts' terminal hashes/counts; the exact tested README is retained.
+
+[Exclusive Name range-diff](exclusive-range-diff.txt) compares trusted00c790722..c1c56ca7b against e9d..f7d. It is the five-file activation delta, not an assertion that the entire older Common-bearing PR is unchanged. Current Common guards and both boot owners remain intact. There is no runtime Rust delta from Common; the Update assertion changes intentionally.
+
+Both hosts complete five stages0: formatting, strict workspace/all-target Clippy, workspace build, full Voice and full Update. Mac Voice4,125/0/21, Update386/0/6; Linux AMD64 Voice4,186/0/24, Update388/0/4. All five required controls pass once;46 local members have post-clean source-bound fresh compilation, and source/index/process/container/release chains verify. [Linux raw packet](../name-current-linux-20261024/README.md) is published; completed Mac collection is separate. Predecessor diagnostic failure1 remains retained, not waived.
+
+First observed current-head GitHub state is mergeable. ARM40112106010 and Clippy40112106057 are active, not passed; Cloud/Surround also run. The lamp-voice comparison includes parent Common until #3064 lands. Do not merge Common through this activation PR. Draft/voice-freeze/privacy/pin/physical holds remain; current helper/device latency is unmeasured, with old112 and5.547ms miss explicitly historical. No lamp, score or activation claim.
