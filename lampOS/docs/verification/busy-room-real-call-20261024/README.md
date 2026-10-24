@@ -59,3 +59,10 @@ ARM build/test or full local workspace gate was run. No physical lamp,
 acoustic response, person attribution or end-to-end latency is qualified by
 these Mac checks. First retains the played acceptance. The original PR's
 historical gates and P2 are not relabelled as this repair's evidence.
+
+## Compiler-scope wording correction
+
+26 selected package names were invalidated, but the records observe25 path
+package identities (including vendor), not26 rebuilt workspace members.
+Earlier rebuilt-count wording was too broad. Original artifact records and
+raw hashes are unchanged; invalidation is not proof of compilation on Mac.

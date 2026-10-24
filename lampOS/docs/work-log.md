@@ -1,3 +1,26 @@
+## Current checkpoint: 2026-10-24 20:28 +07, current-base carry qualification
+
+Both carries are equally rebased onto latest22b753df5 (#3190 now landed):
+#3380 local29cbcd69f and #3382 local6cd08d29c. Current scoped gates run
+serially in Second's target: busy first, phone next. No old result is moved
+onto these new heads; neither rebase is pushed before its gate completes.
+Old9fe has both current-original native checks green and Reader-two READ-OK;
+[official exact tree/census proof](verification/busy-room-real-call-20261024/wording-9fe62cd69/README.md)
+retains7373PASS+1LEAK/53skipped and source equivalence. First keeps played
+acceptance. Correction:26 selected package names invalidated is not26
+rebuilt members; observed package identities are25, including vendor.
+
+[Phone fixture P3 proof](verification/phone-news-start-carry-20261024/p3-b66b39dbb/README.md)
+retains local4004/0/21, all5 original assertions and both new intentional
+failure controls with owned-root cleanup. Both P3s are repaired without
+changing30s/2s limits or product behavior. Historical Update2/3 HOLD remains
+with Tests' #1569 classification and Reviewer-two disposition; no full
+workspace rerun or retry-until-green. Records#3381 is landed; independent
+read/evidence and its compiler-cache runner limitation are published.
+#2809/#1812 physical/key/restoration inputs remain with their holders.
+
+---
+
 ## Current checkpoint: 2026-10-24 20:07 +07, current findings and independent Records read
 
 #3380 is at `9fe62cd69`, exactly one comment correcting three words (not
