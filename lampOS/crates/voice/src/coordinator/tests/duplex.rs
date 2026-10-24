@@ -103,9 +103,9 @@ pub(super) struct Harness {
     /// Every candidate is let go, as the session loop lets go talk over the
     /// lamp's own line in a busy room (`busy_room`, #2602).
     let_go: bool,
-    /// Each block's score before the faint floor is given to the detector,
-    /// as the session loop gives it with `LAMP_SOFT_START=on`
-    /// ([`unfloored_score`]).
+    /// Whether each block is heard with the lamp silent is given to the
+    /// detector, as the session loop gives it with `LAMP_SOFT_START=on`
+    /// ([`lamp_silent`]).
     pub(super) soft_start: bool,
 }
 
@@ -300,11 +300,10 @@ impl Harness {
             let sounding = echo.as_ref().is_some_and(|echo| {
                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
             });
-            self.detector.unfloored(unfloored_score(
+            self.detector.lamp_silent(lamp_silent(
                 sounding,
                 false,
                 reply_sounding(&self.mask, &self.reply, at),
-                score,
             ));
         }
         let samples = observation.samples;

@@ -1153,35 +1153,39 @@ on #3126).
   ask you?", four times of four that evening). With 171 ms of quiet before
   the "what", the same kind of line was heard whole.
 - **With the switch,** an ordinary start (not a yield's, nor a line begun as
-  the lamp's sound ends) keeps 200 ms more than the usual 300 ms
-  (`SOFT_START_LEAD_BLOCKS`). If the speech-like run it starts on began
-  earlier, it begins 200 ms (`REACH_LEAD_BLOCKS`) before the run. The run is
-  judged by each block's score before the faint floor, at 0.35 or more
-  (`SILENCE_PROBABILITY`), through gaps under 100 ms
-  (`SOFT_START_GAP_BLOCKS`). That keeps a soft first word that is still
-  under the floor (`TurnDetector::soft_begin`).
+  the lamp's sound ends) keeps 300 ms more than the usual 300 ms
+  (`SOFT_START_LEAD_BLOCKS`, `TurnDetector::soft_begin`). That's 600 ms before
+  the start's sixth block.
+  - **Why 300 ms:** in 60 lines recorded on lamp-4ace on 24 and 25 October,
+    a start came 58 to 458 ms after its speech began. Every line with 100 ms
+    or more of its sound before the word was heard whole.
+  - **Why a fixed lead, not the detector's scores:** they dip inside such a
+    word, so they are no guide to where it began. A first version reached
+    back along them, 200 ms more and through gaps under 100 ms. It stopped
+    short on q03 and q08, which lost their "what" again (the first builder's
+    A/B, 25 Oct, 01:58).
 - **Bounds:**
-  - It reaches at most 500 ms (`SOFT_START_BLOCKS`) before the usual start.
-    Talk across a room that runs straight into a line adds half a second at
-    most.
   - It never reaches past a block heard while the lamp was sounding, or kept
-    quiet for a busy answer. The coordinator gives the detector a block's
-    score before the floor only while the lamp is silent: its sound not
+    quiet for a busy answer. The coordinator tells the detector, block by
+    block, whether the lamp was silent (`lamp_silent`): its sound not
     reaching the microphone by the echo evidence, and nothing of a reply to
     yield as the duplex mask hears the block (`reply_sounding`: audio still
-    to hand over, or the lamp's sound accepted, queued or within its tail)
-    (`unfloored_score`). So a start never reaches into the lamp's own voice,
-    nor into the 300 ms after it. The reply's playback token is not the
-    test: it is held from a reply's start until its audio is retired, and
-    on 25 October it kept every line begun after an answer, or after a bare
-    "Lamp." whose answer waited, from a soft start.
-  - It never begins later than the usual start. A line begun while a reply's
-    playback is still held but its sound has gone quiet has every block
-    marked so, its onset's among them, and starts as without the switch
-    (the reviewer's P2: it had started with no audio, which admission
-    refuses and which ended the conversation).
-  - A pause of 100 ms or more ends the run, and neither lead crosses it: a
-    name said before the pause isn't taken with the question.
+    to hand over, or the lamp's sound accepted, queued or within its tail).
+    So a start never reaches into the lamp's own voice, nor into the 300 ms
+    after it.
+  - The reply's playback token is not the test. It is held from a reply's
+    start until its audio is retired, and on 25 October it kept every line
+    begun after an answer, or after a bare "Lamp." whose answer waited, from
+    a soft start.
+  - It never begins later than the usual start. A line begun while a reply
+    is not yet over has every block marked so, its onset's among them, and
+    starts as without the switch. Before this bound it started with no
+    audio, which admission refuses and which ended the conversation (the
+    reviewer's P2).
+  - What it costs: 300 ms more of the room before each line goes to speech
+    to text. A name said less than about half a second before the question
+    may come with it ("Lamp. What time…"), which the second route reads as
+    a call with its line.
 - `input_candidate`'s `first_read_at_us` shows where each line's sound began.
   With `mic2/audio` recorded off the bus, which is on the voice's clock, the
   line's onset can be set against it.
