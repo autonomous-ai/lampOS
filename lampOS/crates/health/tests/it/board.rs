@@ -479,6 +479,47 @@ fn a_zone_warns_from_its_first_passive_point_and_not_before() {
     assert_eq!(board::WARN_BELOW_PASSIVE_C, 0);
 }
 
+/// lamp-4ace, 24 Oct: the case (`skin_zone`, off at 50) read 40 to 42 °C
+/// all afternoon at work, an error at ten under, and the lamp drooped as
+/// unwell 18 times. A zone off at 60 or lower is a warning from eight under
+/// and an error from four under; one off higher is as before.
+#[test]
+fn the_case_is_a_warning_eight_under_its_off_point_and_an_error_four_under() {
+    let case = |milli_c| Reading {
+        zones: vec![zone("skin_zone", milli_c, &[], Some(50_000))],
+        ..well()
+    };
+    assert_eq!(said(&case(41_999)).0, Level::Ok);
+    assert_eq!(
+        said(&case(42_000)),
+        (
+            Level::Warn,
+            "skin_zone is at 42 °C: warm, and the board turns itself off at 50".into()
+        )
+    );
+    assert_eq!(said(&case(45_999)).0, Level::Warn);
+    assert_eq!(
+        said(&case(46_000)),
+        (
+            Level::Error,
+            "skin_zone is at 46 °C: the board turns itself off at 50".into()
+        )
+    );
+    // At 60 the low rule still holds; above it, ten under as before.
+    let sixty = |milli_c| Reading {
+        zones: vec![zone("skin_zone", milli_c, &[], Some(60_000))],
+        ..well()
+    };
+    assert_eq!(said(&sixty(55_999)).0, Level::Warn);
+    assert_eq!(said(&sixty(56_000)).0, Level::Error);
+    let higher = |milli_c| Reading {
+        zones: vec![zone("soc_thermal", milli_c, &[], Some(61_000))],
+        ..well()
+    };
+    assert_eq!(said(&higher(50_999)).0, Level::Ok);
+    assert_eq!(said(&higher(51_000)).0, Level::Error);
+}
+
 #[test]
 fn a_zone_is_an_error_at_its_second_passive_point_or_ten_degrees_under_critical() {
     assert_eq!(said(&cpu_at(89_999)).0, Level::Warn);
@@ -586,13 +627,14 @@ fn only_the_zones_named_are_judged_and_every_zone_is_still_published() {
         said(&hot).1,
         "cpub_thermal_zone is at 72 °C: the board slows itself down from 70"
     );
-    let mut warm_case = board(&["cpu", "skin"]);
-    warm_case.zones[2].milli_c = 41_000;
+    // The case, off at 50, is an error from four under it (24 Oct).
+    let mut hot_case = board(&["cpu", "skin"]);
+    hot_case.zones[2].milli_c = 47_000;
     assert_eq!(
-        said(&warm_case),
+        said(&hot_case),
         (
             Level::Error,
-            "skin_zone is at 41 °C: the board turns itself off at 50".into()
+            "skin_zone is at 47 °C: the board turns itself off at 50".into()
         )
     );
     // A beginning that no zone has judges none of them.
