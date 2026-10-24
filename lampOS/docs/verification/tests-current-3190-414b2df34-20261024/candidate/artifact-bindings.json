@@ -1,0 +1,2292 @@
+{
+  "source": "Actual Cargo artifact records, digested before shared target reuse.",
+  "records": [
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/admission_latency",
+      "sha256": "0e23be9c6acfb4f278401bf17c18a62826c3d39f7720155a60fe5e04f6f8675c",
+      "bytes": 895808,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "admission_latency",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "7a9567688dade1f58ae019679d62121be59993480a247bf1175eeb1b0bf5f239",
+      "bytes": 2737048,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "stop_words_stt_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "013480c0d7e20de0a3f5ab6c0ca38aa91b2e20932c251b44ac096141df04f88c",
+      "bytes": 1435672,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "render_line_second",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice",
+      "sha256": "9dc09f764849fcd3b8e008d2905327e0ae03927c4d787fe664c8ae16f6e45dc1",
+      "bytes": 40129096,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp-voice",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/hearing_replay",
+      "sha256": "7dcb03bcfdf25330883f47986860df55bbb37ed7e3fc57e4f6f88f5d59934c1b",
+      "bytes": 1608456,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "hearing_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/duplex_lab",
+      "sha256": "5b70e501754c2db4c6403f3641eb0f4443a1f6ad2ba01d7667aab8a558c3a485",
+      "bytes": 2898616,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "duplex_lab",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/ring_process_probe",
+      "sha256": "c1988e6d4855cc2c58c216bb170994e5534c5fa5a93bac0c2b5b0fc05207612c",
+      "bytes": 5619544,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "ring_process_probe",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/probe_handover",
+      "sha256": "96c24a500689502e5e588656b9ff19267defa8459b12c56e82f1a66ab1a1b432",
+      "bytes": 12630040,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "probe_handover",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_qualification_operator",
+      "sha256": "94e7aee3907665aa04ca213baef9bbffbf59f16af3a3d842bbbe598cc0ff9724",
+      "bytes": 1410568,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "head_qualification_operator",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "1a2bace3952a1134a8d9d5e43e8b4fb1dee481f2622922b4a0fe3a7e8769d465",
+      "bytes": 1119920,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp-voice",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/reference_pace",
+      "sha256": "db6adc51b0406f396b87d2dc17d98fe34de1aa9540030909555a9d71ba6cff15",
+      "bytes": 3775128,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "reference_pace",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "6b629f28f655b1e5d2c66e70ad370e46e83da04c9ac1cd7159fb66bb2f7ef4f2",
+      "bytes": 94222732,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "b02ea311220796cae53e040ff296351db7528b70469ac73ea4d020b48cadcd29",
+      "bytes": 114010992,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "name": "lamp_voice",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-bb7b8ca29d47dc1f",
+      "sha256": "e5b27000ff1b55d47a399f9a0b8deeda8b5a8c20f304febc709b29610e9b3064",
+      "bytes": 941832,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp-peek",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/peek-c90c67e1b5376e51",
+      "sha256": "d38c1d7cc3edf9521e83ffb69d7062c1cddb503e3b7e2f6cbbbfae3cb675b182",
+      "bytes": 6825120,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "peek",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-peek",
+      "sha256": "b4e65331bfb1fee14c7de8d3cdab0de0d34ba74fa26507775688e104d050170c",
+      "bytes": 5955456,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp-peek",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-7641d9289b7af3f6",
+      "sha256": "9a2fffb65103aab9ba27ec6cbed1fa4791ba2b745762f0c7e81ef37344b62304",
+      "bytes": 941832,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp-setup",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/wake-1879b0f98b9c49a0",
+      "sha256": "9cbd75c5c1537c0b6dd7fecb58810b24960e29aa185a1772b72bf4dde338f4d3",
+      "bytes": 1480288,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "wake",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-71b3c4366a177b0c",
+      "sha256": "2dba3a212798d7162add001bd38a9048e9444ee13d293d57db535aa788115f44",
+      "bytes": 3124464,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-setup",
+      "sha256": "73947571d2cd252cb5865e2ad22b4a4f9024de93417bce887cbcaf3439d1b2b0",
+      "bytes": 15567184,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp-setup",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/rest_cost",
+      "sha256": "e77e4b0fe30733121c1916fdd9e01b62715cabb9d84a8bbb136bb1d37713da40",
+      "bytes": 3958856,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "rest_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-expression",
+      "sha256": "355d098763ea193ac4a4debcd7dfce0db8898b8763a07a09c1f5dc67630b7e4b",
+      "bytes": 8533056,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp-expression",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-c5f75c9d30c5f818",
+      "sha256": "ba478723dc5bfbdd86ac5e89478cb679d4f59ec91abc6ccbf1cb0683649d0298",
+      "bytes": 12494972,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/runtime-8ba534de81614d18",
+      "sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6",
+      "bytes": 6631192,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "runtime",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_lean-bf9e165f7a87ea41",
+      "sha256": "44abcfe6641114b9f49709c85f63f32b0775ac8427602ef1b6f001d168e229e4",
+      "bytes": 1054320,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "lamp_lean",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/replay_cost",
+      "sha256": "22f61ba580fe402e9bf70b9a0616b467e53cfcb9096172000ba7bf38e37017d1",
+      "bytes": 3940072,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "replay_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-367629d2b98fd09c",
+      "sha256": "3e8fafd1fe4609130d8e8e6c3a123b475fb713b305f4064dea1b5f7161aa3f58",
+      "bytes": 2443000,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp-expression",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/check",
+      "sha256": "5ae1f72c766b7acd50b76d6f15029babc8a9218385a07630f12a37d1939718c4",
+      "bytes": 2156648,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "name": "check",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/recent_playout_cost",
+      "sha256": "2d158d8910a854df34a2c01518eef4f026f195a1c9d83a05916e1cd62d26f6c9",
+      "bytes": 3953112,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "recent_playout_cost",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-mood",
+      "sha256": "ae2bcf2f7a24926170bcbbe7bb433fc9f5021bd655d1769b7821c3a89ee709eb",
+      "bytes": 473720,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-mood",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-measure",
+      "sha256": "c4ded26fbae93d90834d72672ae3102a5977d491b5fd2d32bde64c6fadd242ae",
+      "bytes": 782320,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-measure",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_measure-7f0ba0e9571da263",
+      "sha256": "6877f43ac8a86b7b3092f9dd266a57ead968a697a4d41110869e4a7f6eea7945",
+      "bytes": 1296104,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-measure",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/expression_ask",
+      "sha256": "fa6126cb3ab2e4ae9f02e489840eb60d26aa4b073a2f70bb18c478f246b5408b",
+      "bytes": 1254816,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "expression_ask",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_mood-30267137783a16a9",
+      "sha256": "00ae69951be577363805fcb11bc35055693003f668525e290557543577b08054",
+      "bytes": 1031256,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-mood",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_inspect-637ece4159665738",
+      "sha256": "52ce979a830ca5657b1815f9a0168a16d57e20d7125248ffb7c97e14c93b87b0",
+      "bytes": 1161944,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-inspect",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-inspect",
+      "sha256": "61d1a9669a8ed8bc4865161f78e02e143e473a83b797b1eb9bf9de06c361b0d9",
+      "bytes": 597368,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-inspect",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body_worker-29a1b45163b9be85",
+      "sha256": "65ef242f197115e9525a3c4ece7d309a7053c931d0b7776741ce811ea6c4cabb",
+      "bytes": 1179176,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-worker",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/head_plan",
+      "sha256": "1f93b3a43274458bc10a2620139cb6b29e03f42a0fb144e2a599d5ccee6cfadf",
+      "bytes": 1410832,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "head_plan",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-d30071be32c9fc43",
+      "sha256": "ebf17b582b1a62e6281baeac6eb58e3be23e0c9a2ea4d47b5014dfff5aa2d060",
+      "bytes": 12994888,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-9ff199928743cc99",
+      "sha256": "73a894d5ddd2a12a5b683c2e7743e829997a5b50650af4475fa00e56942d8bb1",
+      "bytes": 2509280,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body-worker",
+      "sha256": "53118fbc3846f4ace479a33bd1eeec5baf0e2fa35a38dae72756a0166d07b5e4",
+      "bytes": 634832,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body-worker",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-body",
+      "sha256": "59cfcaf260f24a83277e4d461a9268cc1f8162b962e9b55898ed9e96c06ee100",
+      "bytes": 910384,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp-body",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_peek-2fa9472102c7793a",
+      "sha256": "9184005c99c4561f0a2dd1650559913e140c596542ecc056d42c03a40bbbd127",
+      "bytes": 3251640,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "name": "lamp_peek",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-8bf4d1aea99732a6",
+      "sha256": "dca24c2c0f330319df8076934af1a6d3c8ac588d6480ae029569e25fc0e07a80",
+      "bytes": 5773896,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-update",
+      "sha256": "ec0f502cb256a39b05942ee6ba2789e536c8627ebf2043cc4896d8990297f628",
+      "bytes": 10798748,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-a9f34008275109b0",
+      "sha256": "62496b8df5fb45ed6e75265565b62f781a86c1b77712bbec3ff0007a6c574d32",
+      "bytes": 1706112,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "name": "lamp-keeper",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default",
+        "prepare"
+      ],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_expression-9c5b6f2fc96ff8fb",
+      "sha256": "322713a18cfb073d67c116bac2dbac9558689f9c0305734a0b51db9fe24297b3",
+      "bytes": 6022288,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "name": "lamp_expression",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_keeper-d493629e7c7f7339",
+      "sha256": "c0c5a567ad0262c2908e10c223d0d5049dbf61c143f5738e83d968f3136d195d",
+      "bytes": 2590808,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "name": "lamp_keeper",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default",
+        "prepare"
+      ],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_setup-b7eab6c6ff05712c",
+      "sha256": "b376b81ef90055fc6a20897d3bec70f410d3cbdfe38311bfa6ef4805e84030a5",
+      "bytes": 10850456,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "name": "lamp_setup",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory-eval",
+      "sha256": "7d13c4a78686f470327ae0c494185022d5cb3fa7facefc01eb2ae87566b81dad",
+      "bytes": 4017004,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory",
+      "sha256": "bcc837356c4b865d483305f5a65869fd5171df3e8155fa076be00c79f90042f3",
+      "bytes": 7454660,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-memory-fixture",
+      "sha256": "52ea05994521e3f56d5848c617774b77ff54fa3c9f3fd40d6570ca2223554c88",
+      "bytes": 7712852,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-fixture",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-3e6428a6ad440a7c",
+      "sha256": "721c0bc4019717b69df2eb15380df697c764a72cbc6697c8ea78be7709a7673c",
+      "bytes": 7763996,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-skills",
+      "sha256": "8c6c7fbd8f23366628d6abd1517999aefde01d91cf3591e7a0a91b1ded69818a",
+      "bytes": 20174980,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/functions-a019e8e3d9f18c56",
+      "sha256": "16ea9ada118ed6312dad1d41f89732621933591e979709cb69ba664c7dead0b8",
+      "bytes": 18462392,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "functions",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-390c3d26497b9ea4",
+      "sha256": "4cbc593552df658662c206f2fda031ea634527f0a6b511ba07c8c5feb7b05cc1",
+      "bytes": 6352908,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp-voice-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_observe-f06824b26415b941",
+      "sha256": "6ba6e746ac3767efb1460e52fe4d6f0f243cc8a3c4e045c5843e60ed6f139715",
+      "bytes": 8458484,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_observe",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-cloud",
+      "sha256": "20577eedda6a4a6c955f177b67e0c0dc84268508a086855285cb52164e64abbd",
+      "bytes": 23493912,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp-cloud",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-44d498984d4c09df",
+      "sha256": "20d2cdd3ae4846c362caa471cd28af8abb7e10f97d7e7d6985c2dbe464933478",
+      "bytes": 941832,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp-cloud",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/lamp-voice-eval",
+      "sha256": "10c855485050349e35bd91f13d0713fa28ddb4b154f199dfa12fcad89a774897",
+      "bytes": 28879104,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp-voice-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory_eval-297b5b933d9c5e5c",
+      "sha256": "131320525e495d543c333105277264b0fcc67c9aa8a3ea3c18fb0937f521f773",
+      "bytes": 1785048,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp-memory-eval",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/health_control-ac8c12dcd2c7ad1a",
+      "sha256": "9013675e0b0488d5ee81774c91b88e3b0dc2c0175cbb32f2400a8bc7fd0e3051",
+      "bytes": 2012704,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "health_control",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_named-b3b64eb830ff6b4b",
+      "sha256": "5fe5a1d254d8ca68c7012fa0d907c28919583ba37739e005ff643157b3969bee",
+      "bytes": 9113660,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget_named",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/turn_end_replay",
+      "sha256": "a17bb5ad47ee2078a344202bae7d2759e0ff24a1d57f7631299a0a0aaae33fa1",
+      "bytes": 75422976,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "turn_end_replay",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forget_person-8deb8a5a5a1bec4c",
+      "sha256": "e29eb66b34b46b9969f811582004e80925e5861d816d0f236f200274a405e6a2",
+      "bytes": 7893860,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forget_person",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/round-58d23b5bf1a0fe16",
+      "sha256": "2bf5b847c7d0b63d9e5b9a535a8086e31960dca90d8a5461f0fbe05d2c86d5a3",
+      "bytes": 16352980,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "round",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget-74ce451f0225a361",
+      "sha256": "87ffc054953b2e6f8cf377d72dd3cb25943c6e4a614ef750eaadaeee80b826e7",
+      "bytes": 9441788,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_forget_about-8f04a42ed8e04aa3",
+      "sha256": "72a4c6d2beacd71747413a105fca1330248ee5bf9b72a61862121b2532ce839c",
+      "bytes": 9029420,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_forget_about",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/self_cli_exec-bc85a62cb2f27284",
+      "sha256": "61fb91665424db76a38946ae2172748ca2164d95891ecb58cead4186fa5bbca8",
+      "bytes": 474024,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "self-cli-exec",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "bytes": 14459132,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_voice_eval-dbe254449ccce883",
+      "sha256": "d9fc6080bc006840c7334032b731bd57b573a3efe9303e0345eca6a818a7dbcd",
+      "bytes": 24511012,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "lamp_voice_eval",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_since_until-4fd3a6b392a7d272",
+      "sha256": "53a7ea7b0e3db8344f64e9275a9bd9b41ea34b1422e70cc60f84929ecade7932",
+      "bytes": 9037588,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_since_until",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/release_pair-e881b76de672edbd",
+      "sha256": "e3eaa31486f56474cffa965dea7ec9d24d07e3ef155536f4430a94c195416226",
+      "bytes": 2799076,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "release_pair",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_early_words-ac6d63cbcd0176af",
+      "sha256": "7992bdbe2ec5a3c8c409c977c7555fef34d8cf2972f90827b556ae558a3f049d",
+      "bytes": 9251884,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_early_words",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_link_used-caa8157749a15aa8",
+      "sha256": "82bf2bcc6edb3b3b5004d291d24a9da059b2e8662ed7a249b5e88b822ccea7a7",
+      "bytes": 9188740,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_link_used",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/same_voice_pairs",
+      "sha256": "4211963d5f7fc406ce1cdd0aafdaaa353c9c1210e701a1d37b94c6acf94bbad9",
+      "bytes": 75511632,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "same_voice_pairs",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-2daae09844723b26",
+      "sha256": "04675acd41b4098a0936d0b2e2e82562dae5da14933884981bcc85b4f11d6b7e",
+      "bytes": 20863388,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/self_process_cuts-225e6342b519b0b0",
+      "sha256": "72da66f3abf7322c2d7347e3ffec4110c2ca72f4ef6a0d1bc557db722401d07c",
+      "bytes": 473944,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "self-process-cuts",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-e433beab2fb911b9",
+      "sha256": "46737efbe4707d0181cff4e8c511f8e502cc03799ad603c74521ba021be48901",
+      "bytes": 13211548,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forgot-0205b773d3329302",
+      "sha256": "a2983846c1027c104f3808fcd2125ffbfac164d413e959276f2e0b1cc055b60e",
+      "bytes": 4141328,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forgot",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/examples/render_relaxing_music",
+      "sha256": "415fa68842419fdddf7ebcf955d6f0846b4a947fb1739842e0a763dd5af63bb0",
+      "bytes": 548504,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "render_relaxing_music",
+        "kind": [
+          "example"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_cloud-14b8d1ecc993e2b4",
+      "sha256": "4e16bfdae865a0050fd34e6622fc492af0e9d320d0df163fcfd68df0e425483f",
+      "bytes": 29241080,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "lamp_cloud",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bed542c0cfe5e8a7",
+      "sha256": "b1fd2d652c18b3d321c7af58c30ae3c7d6823e012f3eb0c549e81c97787a712e",
+      "bytes": 1655392,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b",
+      "sha256": "53d55d5283493ace327ccab476c217c17551234e04f93a2a93c0934e1d55c5b2",
+      "bytes": 116330256,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "name": "lamp_body",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/forget_shared_exchange-14fe9e8e0d114920",
+      "sha256": "929da592b6c969f83fc285d524fb2fc5d290a0268ed32ffe25e6d6ceedb1bc72",
+      "bytes": 5544324,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "forget_shared_exchange",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/paraphrase_fixture-18e0766b1f009ff2",
+      "sha256": "a90b3281f7cf102673fb19257be347639ed9bbfd5acc7e5e24a9b72bf9305a54",
+      "bytes": 1480240,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "paraphrase_fixture",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/requested_audio-6d30f8c0024b0543",
+      "sha256": "b81c5c70ea9cfd9ec64ebd6f48bf025bc2715d27f6500af697b5700cf2041e0b",
+      "bytes": 13134924,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "requested_audio",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_memory-b9e503bdd61f7e70",
+      "sha256": "02ed03e635811b095b350df563f53b2de2d75d9a93733a30953dd03728f901fe",
+      "bytes": 9952540,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "lamp_memory",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-baf52b4e33708f12",
+      "sha256": "562ba370ae8a989f6bb17f7bd3aadae31f00b672e396ce98771cc0f08f783b13",
+      "bytes": 15427956,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-f337388f4e72a80e",
+      "sha256": "d7136cc8284053fbbeae3575d28cb411b3b4714fe957fc3b0521cd340bd71b0d",
+      "bytes": 15919488,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_skills-b2f0ae0b3b02a39a",
+      "sha256": "0e89e6a88c01a12766f3b7dc4cfa24606d8db7a6ddf6a9e86321cd54b11ba274",
+      "bytes": 13776564,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "name": "lamp_skills",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-aaea79408ab23117",
+      "sha256": "8ca372c7d8dc5e4f979c8859870eee3b05ba72f4a376510786fbedb5a122904d",
+      "bytes": 941840,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/voice_follows_face-2d49a4baff95c2cd",
+      "sha256": "56087f0ebbf87de5612eedda92815cd9a5e8bd27fa38da9f07eed2a437088eff",
+      "bytes": 9197588,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "name": "voice_follows_face",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/install-8ab651138ba2189d",
+      "sha256": "cef279c4a892d91531c26da841d05f5ed311debecb2ef5157c684d42f9ff119a",
+      "bytes": 13382604,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "install",
+        "kind": [
+          "test"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_update-dda903a1250bc605",
+      "sha256": "29f9d4a1ee9b85d90bfd7f948b511ef41c82509cbf3b5f45d35ba8045ee9d2b7",
+      "bytes": 11214316,
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "package_id": "path+file:///private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "name": "lamp_update",
+        "kind": [
+          "lib"
+        ],
+        "edition": "2024"
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    }
+  ],
+  "availability": "Full build JSON and saved raw artifact metadata remain external. Binaries are not published, and no claim is made that MAIN paths remain available after release."
+}

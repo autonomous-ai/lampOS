@@ -1,0 +1,35 @@
+{
+  "current_head": "414b2df34f5398d164affb128780fdad2ba78d63",
+  "comparison": "Frozen matched4a84/93 comparison remains intact; current414 carry additional failure review, not a newly matched baseline",
+  "light_call": {
+    "source": [
+      {
+        "head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+        "path": "lampOS/crates/voice/tests/it/light_call.rs",
+        "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+      },
+      {
+        "head": "414b2df34f5398d164affb128780fdad2ba78d63",
+        "path": "lampOS/crates/voice/tests/it/light_call.rs",
+        "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+      }
+    ],
+    "same_assertion": true,
+    "predicate": "index10 duration <25ms at light_call.rs:90",
+    "base_observed_ms": 106.352192,
+    "candidate93_observed_ms": 75.013172,
+    "current414_observed_ms": 43.129436,
+    "issue": 3315,
+    "owner": "Tests",
+    "qualification": "same identity and assertion failed on matched frozen base; retained without timing improvement or historical-cause claim"
+  },
+  "additional_memory_failures": {
+    "issue": 1569,
+    "owner": "Tests",
+    "cases": [
+      "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+      "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+    ],
+    "classification": "Each passed3of3exactstandalone observations on414; accepted load-timing category, not historical cause"
+  }
+}

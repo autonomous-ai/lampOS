@@ -1,0 +1,143 @@
+{
+  "change": "Narrow parser handling only; all test/build commands, source/environment maps and watchdogs unchanged. Exact known case/target, one complete readiness JSON with unique keys and seconds integer8, actual following status; ambiguous/missing/unknown/duplicate cases fail census. Original raw bytes retained with exact mapping.",
+  "parser_sha256": "d8da4c9a5d49ecd8a2e93e418281eafac521cfe8dd1a63ec0e4d1053cfa7498b",
+  "diff_sha256": "730759e68037199f5d52a32c5d2362787f3b9f91a9022694f8cf62ac87b5deef",
+  "validation": {
+    "status": "passed",
+    "source_test_executions": 0,
+    "executable_invocations": 0,
+    "parser_sha256": "d8da4c9a5d49ecd8a2e93e418281eafac521cfe8dd1a63ec0e4d1053cfa7498b",
+    "positive_replays": 4,
+    "negative_replays": 7,
+    "results": [
+      {
+        "label": "base-voice-default-parallel",
+        "synthetic_parser_negative": false,
+        "raw_original_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "parsed_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "complete_binding": true,
+        "errors": [],
+        "mapped_rows": 0
+      },
+      {
+        "label": "base-readers-default-parallel",
+        "synthetic_parser_negative": false,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "complete_binding": true,
+        "errors": [],
+        "mapped_rows": 1
+      },
+      {
+        "label": "candidate-voice-default-parallel",
+        "synthetic_parser_negative": false,
+        "raw_original_sha256": "d51fbd92678384f4e99b6cce263627501e8bcf3490ae6c923ebcb6973fef0113",
+        "parsed_stream_sha256": "d51fbd92678384f4e99b6cce263627501e8bcf3490ae6c923ebcb6973fef0113",
+        "complete_binding": true,
+        "errors": [],
+        "mapped_rows": 0
+      },
+      {
+        "label": "candidate-readers-default-parallel",
+        "synthetic_parser_negative": false,
+        "raw_original_sha256": "806f9b50310f47a3ac17b7dcb35ca12bea798ddac62a48fe3f552d5ad290a376",
+        "parsed_stream_sha256": "806f9b50310f47a3ac17b7dcb35ca12bea798ddac62a48fe3f552d5ad290a376",
+        "complete_binding": true,
+        "errors": [],
+        "mapped_rows": 0
+      },
+      {
+        "label": "missing_status",
+        "synthetic_parser_negative": true,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "11fd3f9e64fe77c5512156dcf58e1f9dc9a90e8af4f5549281d8b762473ea5da",
+        "complete_binding": false,
+        "errors": [
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+        ],
+        "mapped_rows": 0
+      },
+      {
+        "label": "two_statuses",
+        "synthetic_parser_negative": true,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "2b4269459c603e5b803847de3f349201768aad004e10fd10916d2ee7212b904b",
+        "complete_binding": false,
+        "errors": [
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+        ],
+        "mapped_rows": 0
+      },
+      {
+        "label": "unknown_case",
+        "synthetic_parser_negative": true,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "cd48ef2d4a1d341eb220f9945591e4422147fe82a3bc5c7a22ec3266db12a66f",
+        "complete_binding": false,
+        "errors": [
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+        ],
+        "mapped_rows": 0
+      },
+      {
+        "label": "duplicate_json_key",
+        "synthetic_parser_negative": true,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "adf36c78ad265b6b2f3b0ed81770836abc44d77a67091bd60e4ba62244eb2e60",
+        "complete_binding": false,
+        "errors": [
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+        ],
+        "mapped_rows": 0
+      },
+      {
+        "label": "malformed_json",
+        "synthetic_parser_negative": true,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "ed6205473c0605c829e2656573f68d1a3501eb3a32804aafdd4e2063e0a65105",
+        "complete_binding": false,
+        "errors": [
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+        ],
+        "mapped_rows": 0
+      },
+      {
+        "label": "two_json_records",
+        "synthetic_parser_negative": true,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "e8b273b914192dac06b92f67e24909a860f5a7e776b5e96bdceb1bc9f0766df0",
+        "complete_binding": false,
+        "errors": [
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+        ],
+        "mapped_rows": 0
+      },
+      {
+        "label": "duplicate_row",
+        "synthetic_parser_negative": true,
+        "raw_original_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "parsed_stream_sha256": "252eb0fdd01f4be64c0883ac8363e0c8d2d7d2e1c7c285e34b16969bf61ff546",
+        "complete_binding": false,
+        "errors": [
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row count does not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Test-row outcomes do not match the target summary",
+          "lamp-voice-eval:lib:lamp_voice_eval: Executed case names do not match the bound compiled census"
+        ],
+        "mapped_rows": 2
+      }
+    ]
+  },
+  "earlier_validation_preflight": "First validation script compared in-memory tuples with JSON lists; corrected the validation comparison only. Original partial replay is preserved in parser-replay-validation-type-mismatch. No executable invoked."
+}

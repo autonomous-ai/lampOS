@@ -1,0 +1,14 @@
+{
+  "head": "414b2df34f5398d164affb128780fdad2ba78d63",
+  "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+  "full_run": "/private/tmp/tests-3190-current-9ed44-20261024/candidate/run-2026-10-24T040155.939905Z",
+  "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+  "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+  "names": [
+    "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+  ],
+  "repetitions": 3,
+  "runner_sha256": "2b6774126de0f787e6e41fad0cd1e1e5b11fdef831ea91881d0615f8df444beb",
+  "rule": "Exactly three standalone observations per current additional failure; no retries or historical-cause claim. Matched frozen base light-call failure remains separate."
+}

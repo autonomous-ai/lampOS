@@ -1,0 +1,110 @@
+[
+  {
+    "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-1/exact.stdout.txt",
+    "bytes": 201,
+    "sha256": "a9909740fa1951091ee9d3f9b90fb65d6e6a12166396eea4416eb6e30ad47d8f",
+    "utf8": "\nrunning 1 test\ntest voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 1.54s\n\n"
+  },
+  {
+    "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-1/exact.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-2/exact.stdout.txt",
+    "bytes": 201,
+    "sha256": "29748ff48cd1cceceb282696f5d497c30f72c3be58bca7a97d54a94131560685",
+    "utf8": "\nrunning 1 test\ntest voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 1.55s\n\n"
+  },
+  {
+    "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-2/exact.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-3/exact.stdout.txt",
+    "bytes": 201,
+    "sha256": "80644e1715b9a6f523561cd5548e257aa228973b9d6b743ac352e2df55a37340",
+    "utf8": "\nrunning 1 test\ntest voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 2.21s\n\n"
+  },
+  {
+    "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-3/exact.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-1/exact.stdout.txt",
+    "bytes": 196,
+    "sha256": "e46759461969b66700c4e45d32cea12343bccfa32ff3e2a906bf8f4e504ddb40",
+    "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 2.45s\n\n"
+  },
+  {
+    "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-1/exact.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-2/exact.stdout.txt",
+    "bytes": 196,
+    "sha256": "6b76cacefeedeef0458214519c0ff5585f779e1b628d5131df73c8b4a284f816",
+    "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 1.93s\n\n"
+  },
+  {
+    "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-2/exact.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-3/exact.stdout.txt",
+    "bytes": 196,
+    "sha256": "6eaf08a00e27512d964719313e52efca8cbde30addac0ed898eadb27db770a66",
+    "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 1.97s\n\n"
+  },
+  {
+    "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-3/exact.stderr.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/range-diff.txt",
+  "original_bytes": 90,
+  "original_sha256": "a73ac272a8c110a35e72b48ea5b9f771365c3570f32d8d56147629eb7bd2f543",
+  "encoding": "Exact UTF-8 decoded bytes; no normalization",
+  "utf8": "1:  93c995a6b1 = 1:  414b2df34f lampOS: bind fixture clocks and wait for cue peer closure\n"
+}

@@ -1,0 +1,17 @@
+{
+  "source": "Current414 candidate gate on9ed integration",
+  "target_ownership": "Exclusive MAIN/CPU Cargo qualification ownership; no other builder Cargo build/test",
+  "interpretation": "Same recorded gate settings as frozen comparison. No idle-machine or equal instantaneous load claim; current run is not a new matched baseline.",
+  "events": [
+    {
+      "source": "Parent report",
+      "event": "All three exact-head Linux x86 source-only formatting containers completed and absence was verified before current gate began at04:01:55.940695Z.",
+      "own_receipt": "/private/tmp/tests-3190-linux-fmt-9ed-20261024/run-20261024T035806.282182Z/result.json",
+      "own_format_exit": 0,
+      "compilation": false,
+      "tests": false,
+      "ARM_build": false
+    }
+  ],
+  "earlier_context": "Prior88 checkout I/O and frozen4a84 source-formatting overlaps remain with their own receipts; they are not asserted to recur here."
+}

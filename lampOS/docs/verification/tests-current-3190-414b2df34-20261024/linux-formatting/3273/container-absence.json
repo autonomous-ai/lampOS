@@ -1,0 +1,14 @@
+{
+  "name": "tests-3273-4f969a57b-fmt-72851",
+  "command": [
+    "podman",
+    "container",
+    "exists",
+    "tests-3273-4f969a57b-fmt-72851"
+  ],
+  "exit_code": 1,
+  "absence_verified": true,
+  "stdout": "",
+  "stderr": "",
+  "checked_utc": "2026-10-24T03:59:45.209638+00:00"
+}

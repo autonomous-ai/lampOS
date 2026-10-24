@@ -1,0 +1,1222 @@
+{
+  "method": "Static complete workspace manifests: normal/dev/build/platform dependency edges and workspace inheritance, conservative transitive reverse closure; no Cargo invoked",
+  "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "head": "414b2df34f5398d164affb128780fdad2ba78d63",
+  "closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "direct_readers": [
+    "lamp-cloud",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice-eval"
+  ],
+  "workspace_packages": 46,
+  "workspace_manifest_sha256": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+  "manifests": {
+    "lamp-sound-fixtures": {
+      "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+      "sha256": "b790403fada9e341620a67350d6c09844ff2e243ec44c8b549ef7b1f461fd28f"
+    },
+    "lamp-turn-owner": {
+      "path": "lampOS/crates/turn-owner/Cargo.toml",
+      "sha256": "ec4874833178228f469757f2a652bb9f16408cd2bcdfa0552e75c94e216d76d4"
+    },
+    "lamp-ipc": {
+      "path": "lampOS/crates/ipc/Cargo.toml",
+      "sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54"
+    },
+    "lamp-audio": {
+      "path": "lampOS/crates/audio/Cargo.toml",
+      "sha256": "1217da4568c1f6b78abfed2dde059b1e6f0294cfe5bff8b8d637a8840ade331c"
+    },
+    "lamp-ring": {
+      "path": "lampOS/crates/ring/Cargo.toml",
+      "sha256": "3e66786b7841a5d26c563f428e4705f9b09566b3af51df46e41bec02015c4e5d"
+    },
+    "lamp-gemini": {
+      "path": "lampOS/crates/gemini/Cargo.toml",
+      "sha256": "9b2f7c250fc853d7736da0f2f8655e89755742b6b0fb3ff7562bbd0a54a0e9e0"
+    },
+    "lamp-voice": {
+      "path": "lampOS/crates/voice/Cargo.toml",
+      "sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+    },
+    "lamp-turn-end-wire": {
+      "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+      "sha256": "cbe9801fc8288a139af537fac219710a2a8a4d74aa061057d3e7c9092e9eb6f2"
+    },
+    "lamp-turn-end": {
+      "path": "lampOS/crates/turn-end/Cargo.toml",
+      "sha256": "00baa6bc919c905199d1a3581e19195cd0b0292fc29d8bd6a77d1b80a5ee4153"
+    },
+    "lamp-observer": {
+      "path": "lampOS/crates/observer/Cargo.toml",
+      "sha256": "5cd6a10993b4922534b8a9546a33444465eb5323e5a3c14a73f875027f21201b"
+    },
+    "lamp-body": {
+      "path": "lampOS/crates/body/Cargo.toml",
+      "sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227"
+    },
+    "lamp-camera": {
+      "path": "lampOS/crates/camera/Cargo.toml",
+      "sha256": "fc40d4ec1d0531c4dc7abde83bda7aee98b79d88dfe789db390002f472db43b1"
+    },
+    "lamp-eyes": {
+      "path": "lampOS/crates/eyes/Cargo.toml",
+      "sha256": "d64054a50be704348c702ec88bf807f467ce4f94756e6467343b97b80fd790fe"
+    },
+    "lamp-environment": {
+      "path": "lampOS/crates/environment/Cargo.toml",
+      "sha256": "d8ccf1efc3d22b827075dad2c24a8f92b1ccfe839bbd6b3f2920a6bd8c2bd52b"
+    },
+    "lamp-voice-eval": {
+      "path": "lampOS/crates/voice-eval/Cargo.toml",
+      "sha256": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7"
+    },
+    "lamp-memory": {
+      "path": "lampOS/crates/memory/Cargo.toml",
+      "sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553"
+    },
+    "lamp-bus": {
+      "path": "lampOS/crates/bus/Cargo.toml",
+      "sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34"
+    },
+    "lamp-msgs": {
+      "path": "lampOS/crates/msgs/Cargo.toml",
+      "sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec"
+    },
+    "lamp-actions": {
+      "path": "lampOS/crates/actions/Cargo.toml",
+      "sha256": "c0c1cb5be866440582c92ece0e0f70122567643ed70cc93a5ee0adfd88f5d5a7"
+    },
+    "lamp-policy": {
+      "path": "lampOS/crates/policy/Cargo.toml",
+      "sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82"
+    },
+    "lamp-name": {
+      "path": "lampOS/crates/name/Cargo.toml",
+      "sha256": "fbd95fe8ac4d9a80188f7de3e06b88ac5f192de56c8fc2db063a4255a9d25e7f"
+    },
+    "lamp-health": {
+      "path": "lampOS/crates/health/Cargo.toml",
+      "sha256": "2e3ce14aeacb0bfe189499392baed7356738e9252279ad502f32ddd84f42a19d"
+    },
+    "lamp-expression": {
+      "path": "lampOS/crates/expression/Cargo.toml",
+      "sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4"
+    },
+    "lamp-controls": {
+      "path": "lampOS/crates/controls/Cargo.toml",
+      "sha256": "4b11ef59117b599bc6f936293e885d92bb1a8b39ef24dce5fb6147158e59976f"
+    },
+    "lamp-records": {
+      "path": "lampOS/crates/records/Cargo.toml",
+      "sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99"
+    },
+    "lamp-lean": {
+      "path": "lampOS/crates/lean/Cargo.toml",
+      "sha256": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6"
+    },
+    "lamp-surround": {
+      "path": "lampOS/crates/surround/Cargo.toml",
+      "sha256": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73"
+    },
+    "lamp-keeper": {
+      "path": "lampOS/crates/keeper/Cargo.toml",
+      "sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44"
+    },
+    "lamp-ears": {
+      "path": "lampOS/crates/ears/Cargo.toml",
+      "sha256": "15092825ec95e74d0a1fe0317f14b1f7aba793b87e1b1c50fcd5aeac9f319ce3"
+    },
+    "lamp-schedule": {
+      "path": "lampOS/crates/schedule/Cargo.toml",
+      "sha256": "b96f73df3f89b8c76c3278216bad8f5ecec36e69d3e14a13dbc0dbb0425ca73f"
+    },
+    "lamp-tasks": {
+      "path": "lampOS/crates/tasks/Cargo.toml",
+      "sha256": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9"
+    },
+    "lamp-air": {
+      "path": "lampOS/crates/air/Cargo.toml",
+      "sha256": "795020feb9e842ceddc67b334d5088850d7af3f185875d97932e433a4bcf48e8"
+    },
+    "lamp-mood": {
+      "path": "lampOS/crates/mood/Cargo.toml",
+      "sha256": "2f105fca474e979705906e5aabaf08f60ce6fd843ca24a009bc949955565d540"
+    },
+    "lamp-update": {
+      "path": "lampOS/crates/update/Cargo.toml",
+      "sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792"
+    },
+    "lamp-setup": {
+      "path": "lampOS/crates/setup/Cargo.toml",
+      "sha256": "586d2dffe23e80f94d8d75ab9f7a05e7b40e39bb9ae929eea379b5f188ddcd4e"
+    },
+    "lamp-settings": {
+      "path": "lampOS/crates/settings/Cargo.toml",
+      "sha256": "2a81f720c4a925b4b353575e48a187e6d71af8dde3677f3cfda7e534fb71241f"
+    },
+    "lamp-same-voice": {
+      "path": "lampOS/crates/same-voice/Cargo.toml",
+      "sha256": "156eaaf0b32f316690d229b66a2b4f02d9ee0790527205bdc3f72a3b17b142f3"
+    },
+    "lamp-selftest": {
+      "path": "lampOS/crates/selftest/Cargo.toml",
+      "sha256": "ed7f0e2eaa35e588ba085dc8a4bbfba36ff6ed0c077cdcdc6181d0e7709f15e1"
+    },
+    "lamp-skills": {
+      "path": "lampOS/crates/skills/Cargo.toml",
+      "sha256": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b"
+    },
+    "lamp-local-time": {
+      "path": "lampOS/crates/local-time/Cargo.toml",
+      "sha256": "d58feea860df9b3d83ec2e5963a2e529cb963f143e4fc9074b44c619626d84ea"
+    },
+    "lamp-voice-processes": {
+      "path": "lampOS/crates/voice-processes/Cargo.toml",
+      "sha256": "300431dab9923809f63632cca6a107171c8df39a8e8e50efe6c93275d85761b3"
+    },
+    "lamp-cloud": {
+      "path": "lampOS/crates/cloud/Cargo.toml",
+      "sha256": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8"
+    },
+    "lamp-near-call": {
+      "path": "lampOS/crates/near-call/Cargo.toml",
+      "sha256": "3b375ca80370b7fb22c6b9a596b424d2cd9ecfa0f2324faeab9d898af9988816"
+    },
+    "lamp-station": {
+      "path": "lampOS/crates/station/Cargo.toml",
+      "sha256": "636baa8ceca9e7cc87349170ffd3b9bbbace785b00ddf3421214522b82fc26a3"
+    },
+    "lamp-peek": {
+      "path": "lampOS/crates/peek/Cargo.toml",
+      "sha256": "6f5014cd4095e438afda490a0c5aa12492780f5265729b6d58ec8e3b5e47ae8b"
+    },
+    "lamp-addons": {
+      "path": "lampOS/crates/addons/Cargo.toml",
+      "sha256": "2313f6976e096857edc27ce74df34a88cab5cbec28576186143ed515232640bd"
+    }
+  },
+  "paths_to_voice": {
+    "lamp-voice": [],
+    "lamp-voice-eval": [
+      {
+        "from": "lamp-voice-eval",
+        "package": "lamp-voice",
+        "kind": "dependencies"
+      }
+    ],
+    "lamp-memory": [
+      {
+        "from": "lamp-memory",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ],
+    "lamp-update": [
+      {
+        "from": "lamp-update",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ],
+    "lamp-setup": [
+      {
+        "from": "lamp-setup",
+        "package": "lamp-update",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-update",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ],
+    "lamp-skills": [
+      {
+        "from": "lamp-skills",
+        "package": "lamp-voice",
+        "kind": "dependencies"
+      }
+    ],
+    "lamp-cloud": [
+      {
+        "from": "lamp-cloud",
+        "package": "lamp-skills",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-skills",
+        "package": "lamp-voice",
+        "kind": "dependencies"
+      }
+    ],
+    "lamp-keeper": [
+      {
+        "from": "lamp-keeper",
+        "package": "lamp-update",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-update",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ],
+    "lamp-peek": [
+      {
+        "from": "lamp-peek",
+        "package": "lamp-keeper",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-keeper",
+        "package": "lamp-update",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-update",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ],
+    "lamp-body": [
+      {
+        "from": "lamp-body",
+        "package": "lamp-keeper",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-keeper",
+        "package": "lamp-update",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-update",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ],
+    "lamp-expression": [
+      {
+        "from": "lamp-expression",
+        "package": "lamp-body",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-body",
+        "package": "lamp-keeper",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-keeper",
+        "package": "lamp-update",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-update",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ],
+    "lamp-lean": [
+      {
+        "from": "lamp-lean",
+        "package": "lamp-expression",
+        "kind": "dev-dependencies"
+      },
+      {
+        "from": "lamp-expression",
+        "package": "lamp-body",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-body",
+        "package": "lamp-keeper",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-keeper",
+        "package": "lamp-update",
+        "kind": "dependencies"
+      },
+      {
+        "from": "lamp-update",
+        "package": "lamp-voice",
+        "kind": "dev-dependencies"
+      }
+    ]
+  },
+  "all_workspace_dependency_edges": [
+    {
+      "from": "lamp-actions",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-actions",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-actions",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-actions",
+      "package": "lamp-schedule",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-addons",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-addons",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-addons",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-air",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-air",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-air",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-audio",
+      "package": "lamp-ipc",
+      "kind": "target.cfg(unix).dependencies"
+    },
+    {
+      "from": "lamp-audio",
+      "package": "lamp-turn-owner",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-body",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-body",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-body",
+      "package": "lamp-keeper",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-body",
+      "package": "lamp-lean",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-body",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-body",
+      "package": "lamp-turn-owner",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-camera",
+      "package": "lamp-ipc",
+      "kind": "target.cfg(target_os = \"linux\").dependencies"
+    },
+    {
+      "from": "lamp-camera",
+      "package": "lamp-turn-owner",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-actions",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-ipc",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-keeper",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-schedule",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-setup",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-skills",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-update",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-cloud",
+      "package": "lamp-voice",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-controls",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-controls",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-controls",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-ears",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-ears",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-ears",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-environment",
+      "package": "lamp-turn-owner",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-expression",
+      "package": "lamp-body",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-expression",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-expression",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-expression",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-expression",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-eyes",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-eyes",
+      "package": "lamp-camera",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-eyes",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-eyes",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-eyes",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-eyes",
+      "package": "lamp-turn-end",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-eyes",
+      "package": "lamp-turn-owner",
+      "kind": "target.cfg(target_os = \"linux\").dependencies"
+    },
+    {
+      "from": "lamp-health",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-health",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-health",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-keeper",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-keeper",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-keeper",
+      "package": "lamp-update",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-lean",
+      "package": "lamp-expression",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-lean",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-memory",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-memory",
+      "package": "lamp-gemini",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-memory",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-memory",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-memory",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-memory",
+      "package": "lamp-voice",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-mood",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-mood",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-mood",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-msgs",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-name",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-name",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-name",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-observer",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-peek",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-peek",
+      "package": "lamp-keeper",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-peek",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-policy",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-policy",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-policy",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-policy",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-records",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-records",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-records",
+      "package": "lamp-voice-processes",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-ring",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-ring",
+      "package": "lamp-turn-owner",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-schedule",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-schedule",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-schedule",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-schedule",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-selftest",
+      "package": "lamp-air",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-selftest",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-selftest",
+      "package": "lamp-controls",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-selftest",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-selftest",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-settings",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-settings",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-settings",
+      "package": "lamp-records",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-setup",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-setup",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-setup",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-setup",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-setup",
+      "package": "lamp-ring",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-setup",
+      "package": "lamp-update",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-body",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-expression",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-schedule",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-update",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-skills",
+      "package": "lamp-voice",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-station",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-surround",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-surround",
+      "package": "lamp-gemini",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-surround",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-surround",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-tasks",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-tasks",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-tasks",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-turn-end",
+      "package": "lamp-turn-end-wire",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-turn-end-wire",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-update",
+      "package": "lamp-actions",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-update",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-update",
+      "package": "lamp-controls",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-update",
+      "package": "lamp-gemini",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-update",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-update",
+      "package": "lamp-skills",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-update",
+      "package": "lamp-voice",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-actions",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-audio",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-body",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-bus",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-camera",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-controls",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-ears",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-expression",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-gemini",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-gemini",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-health",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-near-call",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-policy",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-ring",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-schedule",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-tasks",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-turn-end-wire",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-turn-owner",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice",
+      "package": "lamp-voice-processes",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-audio",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-expression",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-ipc",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-local-time",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-memory",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-msgs",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-observer",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-policy",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-same-voice",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-skills",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-sound-fixtures",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-turn-end",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-turn-end-wire",
+      "kind": "dev-dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-turn-owner",
+      "kind": "dependencies"
+    },
+    {
+      "from": "lamp-voice-eval",
+      "package": "lamp-voice",
+      "kind": "dependencies"
+    }
+  ],
+  "harness_false_targets": [
+    {
+      "package": "lamp-update",
+      "kind": "test",
+      "name": "self-process-cuts",
+      "path": "lampOS/crates/update/tests/self_process_cuts.rs",
+      "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3"
+    },
+    {
+      "package": "lamp-update",
+      "kind": "test",
+      "name": "self-cli-exec",
+      "path": "lampOS/crates/update/tests/self_cli_exec.rs",
+      "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd"
+    }
+  ],
+  "doctest_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "custom_harness_limit": "Exact source hashes equal the previously inspected peer gate; list modes return before process execution; ignored Mac harness cases remain ignored."
+}

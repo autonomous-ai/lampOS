@@ -1,0 +1,14 @@
+{
+  "name": "tests-3218-e63a86d0d-fmt-74370",
+  "command": [
+    "podman",
+    "container",
+    "exists",
+    "tests-3218-e63a86d0d-fmt-74370"
+  ],
+  "exit_code": 1,
+  "absence_verified": true,
+  "stdout": "",
+  "stderr": "",
+  "checked_utc": "2026-10-24T03:59:45.054802+00:00"
+}

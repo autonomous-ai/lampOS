@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-24 13:29 +0700 — carried qualification classified and published
+
+Ready for lamp-voice: no; native ARM64 and Linux Clippy remain pending push.
+
+The [carried-head receipt](verification/tests-current-3190-414b2df34-20261024/) retains **7,249 passed / 3 failed / 34 ignored**, all actual target bindings and 88 authored passes. Both additional Memory failures passed exactly three standalone observations at the same executable hash. Light-call's unchanged predicate failed on the frozen matched base too. The accepted local classification is satisfied, with every original failed run visible and no historical-cause claim. The completed source will now be pushed; #3218 has the local gate slot, and #3315's seven-file privacy clock draft has completed source review but no execution gate.
+
 ## 2026-10-24 13:27 +0700 — carried gate complete; bounded standalone checks
 
 Ready for lamp-voice: no; current standalone classification and native ARM64/Linux Clippy remain.

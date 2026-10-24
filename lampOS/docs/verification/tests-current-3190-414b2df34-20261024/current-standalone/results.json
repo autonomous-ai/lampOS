@@ -1,0 +1,192 @@
+{
+  "status": "complete; all actual outcomes retained",
+  "observations": [
+    {
+      "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T06:26:39.542358+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 90968,
+        "owned_process_group": 90968,
+        "exit_code": 0,
+        "wall_seconds": 1.664622,
+        "finished_at": "2026-10-24T06:26:41.208363+00:00",
+        "stdout_sha256": "a9909740fa1951091ee9d3f9b90fb65d6e6a12166396eea4416eb6e30ad47d8f",
+        "stdout_bytes": 201,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-1",
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "outcome": "ok"
+    },
+    {
+      "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T06:26:46.042164+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 91618,
+        "owned_process_group": 91618,
+        "exit_code": 0,
+        "wall_seconds": 1.621702,
+        "finished_at": "2026-10-24T06:26:47.664341+00:00",
+        "stdout_sha256": "29748ff48cd1cceceb282696f5d497c30f72c3be58bca7a97d54a94131560685",
+        "stdout_bytes": 201,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-2",
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "outcome": "ok"
+    },
+    {
+      "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T06:26:52.886678+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 92057,
+        "owned_process_group": 92057,
+        "exit_code": 0,
+        "wall_seconds": 2.276094,
+        "finished_at": "2026-10-24T06:26:55.163444+00:00",
+        "stdout_sha256": "80644e1715b9a6f523561cd5548e257aa228973b9d6b743ac352e2df55a37340",
+        "stdout_bytes": 201,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/01-3",
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "outcome": "ok"
+    },
+    {
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T06:27:00.507146+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 92404,
+        "owned_process_group": 92404,
+        "exit_code": 0,
+        "wall_seconds": 2.500394,
+        "finished_at": "2026-10-24T06:27:03.008047+00:00",
+        "stdout_sha256": "e46759461969b66700c4e45d32cea12343bccfa32ff3e2a906bf8f4e504ddb40",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-1",
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "outcome": "ok"
+    },
+    {
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T06:27:08.589590+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 92804,
+        "owned_process_group": 92804,
+        "exit_code": 0,
+        "wall_seconds": 1.976735,
+        "finished_at": "2026-10-24T06:27:10.566957+00:00",
+        "stdout_sha256": "6b76cacefeedeef0458214519c0ff5585f779e1b628d5131df73c8b4a284f816",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-2",
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "outcome": "ok"
+    },
+    {
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T06:27:15.781304+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 93499,
+        "owned_process_group": 93499,
+        "exit_code": 0,
+        "wall_seconds": 2.027612,
+        "finished_at": "2026-10-24T06:27:17.809455+00:00",
+        "stdout_sha256": "6eaf08a00e27512d964719313e52efca8cbde30addac0ed898eadb27db770a66",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-current-9ed44-20261024/standalone-current/02-3",
+      "source_aggregate_sha256": "091edb1c89bde9f592e99c109c33d2b08da86efc39dd718826e0a0f3b0ed138e",
+      "sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "outcome": "ok"
+    }
+  ],
+  "unrun": 0
+}

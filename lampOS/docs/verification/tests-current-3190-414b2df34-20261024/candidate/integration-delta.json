@@ -1,0 +1,287 @@
+{
+  "base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "head": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "head_tree": "4668b6542f7b095229776c9953e848a8f641d569",
+  "commits": [
+    "9ed44f88c573837c50451c94f4d88f010e8a6721 lampOS: test enrollment cadence and state classifier limits",
+    "0062658af545356505ac5c2f961020a66c5f9428 lampOS: bind requested face enrollment to the speaking face",
+    "090847e59f89b8d02923eca79707c42b3da0a0a6 lampOS: the eyes can mesh up to three faces' mouths a look within a 200 ms budget, so another face reads speaking from its lips (LAMP_EYES_SPEAKING_ALL_FACES)",
+    "59c4ac7959bfe4709e85c2be4799f58bbefe2736 lampOS: a dropped speaking look leaves a gap, so the looks around it are never joined as one 250 ms step"
+  ],
+  "changed_paths": [
+    {
+      "status": "M",
+      "path": "lampOS/crates/eyes/src/lib.rs",
+      "head_blob": "f9113af8ad41294907252f4feee437df78126c10",
+      "head_sha256": "cfbc105e7c8a045be90ca1e5572ca70436c589f067dca295d846ad41bfed7776",
+      "base_sha256": "76abd52decf53ce56e4ec7a9ec5011b649e9c8a411db40599a3958fffd8ef404"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/eyes/src/main.rs",
+      "head_blob": "1f15038b96c6adff9baa9babdd39248595a34e4f",
+      "head_sha256": "15fcd743ceff1eeff95ac27482c92b5c1703378ec12dd88b0056249b0c740434",
+      "base_sha256": "703dc14d75920065e3a5963d0398cecdde2b977ec253f239ceefe49c5adf9c9d"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/eyes/src/mesh.rs",
+      "head_blob": "31b38a2dafcd3287a475e9698ff641673a529488",
+      "head_sha256": "172e5cd7ebb332bc0f939d6c5854c774dba6714889bea198bb9dc52fdd52866a",
+      "base_sha256": "1eb693347f8a42d7c4f01046fd604e628ccfe404cbe8850dc3e1b1a4d436aea8"
+    },
+    {
+      "status": "A",
+      "path": "lampOS/crates/eyes/src/remember_speaker.rs",
+      "head_blob": "d868b20a9588f3a56777673ccff38fb09303d6cc",
+      "head_sha256": "2de555e20c4431c1a0ca77c05bcc2a78ec29821c647fe7c6bb6539a8ee366fb7",
+      "base_sha256": null
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/eyes/src/speaking.rs",
+      "head_blob": "f58713f91942697d08f316d58360dfce8c39cb2e",
+      "head_sha256": "6b012fdac51b5b5f5e64de9e1550545d95dc56d45d47515b2cab434a65a8c6fe",
+      "base_sha256": "c3984789651380d7b65a39245de425b823507cea1128b5bc2276108105169126"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/eyes/src/who.rs",
+      "head_blob": "8efbef401fcc94f3c61dd1ed5f2813ab404de9ff",
+      "head_sha256": "5e3f7beebca16e7ef2acf1642863d518136fe27e1cef0e9d460f86532f3e1599",
+      "base_sha256": "c7b5fb2d4fa5c559c17897c7508f24b5428f2c8e21826fbaf49b173553309230"
+    },
+    {
+      "status": "A",
+      "path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+      "head_blob": "86201511f978f2ae0a6969e298893e28c4369a27",
+      "head_sha256": "f9944d4e2f9b7aa916ae8754ba900cf5bece558b41e7e17642c5b01a6405dc01",
+      "base_sha256": null
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/known_faces.rs",
+      "head_blob": "cc41c216bc3e4b5b795f7fcaed642b1b6461351f",
+      "head_sha256": "2892daf6061fd0b434aaf1a04d33a9b07f369aae07aa5006ddb34a6ccb64ba06",
+      "base_sha256": "bd86fa1c71df38d9e001cdc674c3a8842865e2d7dcff0d37c9fb42c552fff54e"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/lib.rs",
+      "head_blob": "97bb12a8560eea027f19830c35b3daf4abf940d1",
+      "head_sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+      "base_sha256": "743f759a1b899724c2f31501600db0802d3ca324421982497e3cff9d6acd6b18"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/memory_scope.rs",
+      "head_blob": "36366150666b6a92f1c890181d6b9ef04ce19f6b",
+      "head_sha256": "f37f1efb5580d70ebc2c16c4830bc4b98e208b01abc4e93c1b65bd0340914a01",
+      "base_sha256": "7aaccb186131f81e419f9b871d9f998392dca80c4504b49d5612ea2bf63ad394"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+      "head_blob": "dc71041a9cdc4de112ef523df8ccd1fda28166f0",
+      "head_sha256": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c",
+      "base_sha256": "ca138b1211e34bbc3e2a997891b6bcac6db218cef725e186d39e64b5044ed119"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/provider_worker/tests/reminders.rs",
+      "head_blob": "f5bde7c891d5a97d6d758863068ed4aef1295269",
+      "head_sha256": "f4c145a9cf53684997c39c5d110c26e9783ca1bc392aa44561e4ee046ae279a8",
+      "base_sha256": "310ef8dd0635bb19147f510d9e62834fd6620c0447faf168c12a61f5b1ceb391"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "head_blob": "c906ca6725486ad42718cfd98dcc3eedf884ec6b",
+      "head_sha256": "ffc50f75011e22fe83b78aa1bab3fb2fe12c8088758770f3b4bf8ffb6bf1d483",
+      "base_sha256": "3ac1aba38a8097167ca3973b3f4e072b83104d1a222da50446fc4cb0ce387277"
+    },
+    {
+      "status": "A",
+      "path": "lampOS/crates/voice/src/remember_speaker.rs",
+      "head_blob": "72d3d1357e2273d53fa681ec898a380c03ab7c9d",
+      "head_sha256": "a6ddb53d368c90d6f1c905f3c27c4e03953e9653919297b702d44d5b50b8025e",
+      "base_sha256": null
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "head_blob": "b9670304b9e5e64179c7dfce2f47d05201dbec40",
+      "head_sha256": "d889f8e71430903237a944ec677ccaeea7227dd8fb2bdc80db61c3ba03d81881",
+      "base_sha256": "eb0b319bbaaada6ba6831e5725fa3ebd42bdc80b0006c54cde028ae243009887"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "head_blob": "0336bbdabaf378d17c4de9e313351397ea437611",
+      "head_sha256": "1c9edec80a4e7558d5b04a96975c3bcd26d2fcc23cb8ff470242503bb162924d",
+      "base_sha256": "df684aac2b3ad8299d01f8557c9a930c05033c6d48b0856cf1df8f523d42596d"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+      "head_blob": "86c3a6782f2539ae76a161fcc7a8ace370148c02",
+      "head_sha256": "16991e8bbbb3373702ea0748d2941078babd409a5e7168fb54edba8ec0a5e289",
+      "base_sha256": "1e37757c488eb8af520f3cc3c4613f15aa530eec5b33f48c9fcf1410a0e16033"
+    },
+    {
+      "status": "A",
+      "path": "lampOS/crates/voice/src/second_provider/tests/remember_speaker.rs",
+      "head_blob": "2a6eed888d195634b82912cdec8f78eba189d002",
+      "head_sha256": "0262e1b9bf28d0316742c9f51a58211d803a01345d334a9c9cafd00419165d30",
+      "base_sha256": null
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "head_blob": "7aab1066dc54eb99f88cc8ac00573d8e2a8679b5",
+      "head_sha256": "889bd22b144bc7d93361e87455b8018bfabeb15a8b9f3f9b67670af0bd338e3f",
+      "base_sha256": "b618f69620b3f90056d739ae6ca68cec39866f040990569f3bfadcc0f17e5293"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/speaking_faces.rs",
+      "head_blob": "30c2205ff1003815a1e0c6092a2b59dabfae12e1",
+      "head_sha256": "69b246d705ba365617e9e21dfcda49c9f265b7f2f295aad4f4075e3570cf1efe",
+      "base_sha256": "6651b57664eecc92a71767c36ea0a3b54e5cc1504b26ab12c3b0ffd8cc12cc60"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/crates/voice/src/tools.rs",
+      "head_blob": "30cdef17e21bcb5d90ec04406dce02b9a75fda95",
+      "head_sha256": "2d6265c95b352806885931967972b3dc8295e193118e44f9c35a2e6b620c1545",
+      "base_sha256": "a6bbaadc5befad84e1e44f0f438a8afc747ff4a2c3dbda977c3c89e68a049610"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/docs/eyes.md",
+      "head_blob": "5bbb937e55e47ef48dd68bb83c0cc3f82139a7e0",
+      "head_sha256": "3441f129174c80f9797527bfa5a118008e48ee525d992bce81d30f22c3ef8b34",
+      "base_sha256": "64f5bead6058e9f0a713c659de7ffdbf55a07339daa90c0c45ca9e5096f64757"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/docs/reuse-decisions.md",
+      "head_blob": "40d2cb01764ccf126ebc2071567f9643c29cde27",
+      "head_sha256": "b2b3649d870cae582762a4e725eaa4ab77ad28e9288c67fa3231f1ce908f83c5",
+      "base_sha256": "a3bcd45b461cfd3c4a15c1fa91994ee1559f5416efcc4f1e17b42399feb2cb9a"
+    },
+    {
+      "status": "M",
+      "path": "lampOS/docs/switches.md",
+      "head_blob": "ab23d0e721e5d99cfc32f638ad8223fda615718b",
+      "head_sha256": "7809e3a043f92ee3d4f0ffb96c050ba7495cb0e476b18929cab42ba2fa158a8d",
+      "base_sha256": "789f4da67557547717038730883310574e0b1527ae05b1ff58ece62816b98d5d"
+    }
+  ],
+  "unchanged_workspace_manifests": [
+    "lampOS/crates/sound-fixtures/Cargo.toml",
+    "lampOS/crates/turn-owner/Cargo.toml",
+    "lampOS/crates/ipc/Cargo.toml",
+    "lampOS/crates/audio/Cargo.toml",
+    "lampOS/crates/ring/Cargo.toml",
+    "lampOS/crates/gemini/Cargo.toml",
+    "lampOS/crates/voice/Cargo.toml",
+    "lampOS/crates/turn-end-wire/Cargo.toml",
+    "lampOS/crates/turn-end/Cargo.toml",
+    "lampOS/crates/observer/Cargo.toml",
+    "lampOS/crates/body/Cargo.toml",
+    "lampOS/crates/camera/Cargo.toml",
+    "lampOS/crates/eyes/Cargo.toml",
+    "lampOS/crates/environment/Cargo.toml",
+    "lampOS/crates/voice-eval/Cargo.toml",
+    "lampOS/crates/memory/Cargo.toml",
+    "lampOS/crates/bus/Cargo.toml",
+    "lampOS/crates/msgs/Cargo.toml",
+    "lampOS/crates/actions/Cargo.toml",
+    "lampOS/crates/policy/Cargo.toml",
+    "lampOS/crates/name/Cargo.toml",
+    "lampOS/crates/health/Cargo.toml",
+    "lampOS/crates/expression/Cargo.toml",
+    "lampOS/crates/controls/Cargo.toml",
+    "lampOS/crates/records/Cargo.toml",
+    "lampOS/crates/lean/Cargo.toml",
+    "lampOS/crates/surround/Cargo.toml",
+    "lampOS/crates/keeper/Cargo.toml",
+    "lampOS/crates/ears/Cargo.toml",
+    "lampOS/crates/schedule/Cargo.toml",
+    "lampOS/crates/tasks/Cargo.toml",
+    "lampOS/crates/air/Cargo.toml",
+    "lampOS/crates/mood/Cargo.toml",
+    "lampOS/crates/update/Cargo.toml",
+    "lampOS/crates/setup/Cargo.toml",
+    "lampOS/crates/settings/Cargo.toml",
+    "lampOS/crates/same-voice/Cargo.toml",
+    "lampOS/crates/selftest/Cargo.toml",
+    "lampOS/crates/skills/Cargo.toml",
+    "lampOS/crates/local-time/Cargo.toml",
+    "lampOS/crates/voice-processes/Cargo.toml",
+    "lampOS/crates/cloud/Cargo.toml",
+    "lampOS/crates/near-call/Cargo.toml",
+    "lampOS/crates/station/Cargo.toml",
+    "lampOS/crates/peek/Cargo.toml",
+    "lampOS/crates/addons/Cargo.toml",
+    "lampOS/Cargo.toml"
+  ],
+  "conservative_voice_reverse_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "direct_voice_readers": [
+    "lamp-cloud",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice-eval"
+  ],
+  "prepared_candidates": {
+    "3190": {
+      "frozen_candidate": "93c995a6b1757af77d5d2a25f1567f314ad5f72d",
+      "owned_paths": [
+        "lampOS/crates/voice/src/coordinator/second.rs",
+        "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+        "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+        "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+        "lampOS/crates/voice/src/scenario_clock.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs",
+        "lampOS/crates/voice/src/stop_words.rs",
+        "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "lampOS/docs/voice-test-fixtures.md"
+      ],
+      "upstream_path_overlap": [
+        "lampOS/crates/voice/src/second_provider/worker.rs"
+      ]
+    },
+    "3218": {
+      "frozen_candidate": "a33454886353abeaff87bb1c92e26cf644867839",
+      "owned_paths": [
+        "lampOS/crates/voice/src/messages.rs",
+        "lampOS/docs/messages.md"
+      ],
+      "upstream_path_overlap": []
+    },
+    "3273": {
+      "frozen_candidate": "64065a88edbe5c9cfbf839982a1d15eff8bc004a",
+      "owned_paths": [
+        "lampOS/crates/expression/tests/runtime.rs",
+        "lampOS/docs/expression.md"
+      ],
+      "upstream_path_overlap": []
+    }
+  },
+  "caution": "Source-only audit; unchanged dependency edges do not waive current-head execution. No worktree/candidate modification, tests/build/Cargo or CI monitoring performed."
+}

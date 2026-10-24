@@ -1,0 +1,60 @@
+{
+  "head": "414b2df34f5398d164affb128780fdad2ba78d63",
+  "comparison_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "count": 3,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "6b629f28f655b1e5d2c66e70ad370e46e83da04c9ac1cd7159fb66bb2f7ef4f2",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/candidate/run-2026-10-24T040155.939905Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 655045,
+        "original_stream_sha256": "a314a0ae674c20d3736673822902099831e3e5b2ad146c9ecdf098e35b1b6d2a",
+        "byte_offset": 652642,
+        "bytes": 1217,
+        "sha256": "79e9561ec3ae670bc9d25a001394c93d99a6c33ab382f0c6ba0fedd077a31b0f",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [3.002156ms, 3.142427ms, 3.15551ms, 4.547582ms, 5.322637ms, 20.074311ms, 38.604182ms, 39.946507ms, 40.205747ms, 43.100293ms, 43.129436ms, 57.276549ms, 58.086469ms, 75.819242ms, 77.098699ms, 79.463504ms, 90.472839ms, 93.560536ms, 96.977807ms, 119.088501ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (719076208) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[3.002156ms, 3.142427ms, 3.15551ms, 4.547582ms, 5.322637ms, 20.074311ms, 38.604182ms, 39.946507ms, 40.205747ms, 43.100293ms, 43.129436ms, 57.276549ms, 58.086469ms, 75.819242ms, 77.098699ms, 79.463504ms, 90.472839ms, 93.560536ms, 96.977807ms, 119.088501ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence",
+      "actual_status": "FAILED",
+      "binary_sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/candidate/run-2026-10-24T040155.939905Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 664888,
+        "original_stream_sha256": "9a7c573f58991c82cdc97aa4dfbd2ab248e9d71251e4dd070ca5fe3887a063d8",
+        "byte_offset": 492585,
+        "bytes": 954,
+        "sha256": "ab313dd3c5a7e39828ea60c6456272f0fa7f1133d5870bcabba2afc48058fb6e",
+        "utf8": "---- voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence' (719137190) panicked at crates/memory/tests/it/voice.rs:708:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence\n   3: it::voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "actual_status": "FAILED",
+      "binary_sha256": "be441559641017cfc82450088adbc93dc1d3174e5c6459632a41f93307a125ec",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-current-9ed44-20261024/candidate/run-2026-10-24T040155.939905Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 664888,
+        "original_stream_sha256": "9a7c573f58991c82cdc97aa4dfbd2ab248e9d71251e4dd070ca5fe3887a063d8",
+        "byte_offset": 493539,
+        "bytes": 1111,
+        "sha256": "5a0476547e1324e1150b2b823d47924aa61b69524c0e2d53138de59fb02bdfd2",
+        "utf8": "---- voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh' (719137313) panicked at crates/memory/tests/it/voice.rs:960:5:\nassertion `left == right` failed: the retry sends one forget: []\n  left: 0\n right: 1\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed::<usize, usize>\n   4: it::voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\n   5: it::voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "paired_baseline_run_in_this_plan": false,
+  "failed_candidate_runs_repeated": false
+}

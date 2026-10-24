@@ -1,0 +1,161 @@
+[
+  {
+    "name": "source-identity",
+    "command": [
+      "git",
+      "show",
+      "-s",
+      "--format=%H%n%T%n%P",
+      "e63a86d0d470d95cceb8c6dea75015838207953a"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+    "started_utc": "2026-10-24T03:58:27.719926+00:00",
+    "finished_utc": "2026-10-24T03:58:27.753199+00:00",
+    "elapsed_seconds": 0.033300126902759075,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 123,
+    "stderr_bytes": 0,
+    "stdout_sha256": "70dec65d3e0866d28a724972d6abe24d8e045e9cb7884e26c9cfb84b8e8ddc74",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "workspace-tree",
+    "command": [
+      "git",
+      "rev-parse",
+      "e63a86d0d470d95cceb8c6dea75015838207953a:lampOS"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+    "started_utc": "2026-10-24T03:58:27.753542+00:00",
+    "finished_utc": "2026-10-24T03:58:27.783363+00:00",
+    "elapsed_seconds": 0.029850345104932785,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 41,
+    "stderr_bytes": 0,
+    "stdout_sha256": "0dccf72ba2b6b87c1c7289aef38cab281d1326b8806c1bd96e795a3a1ac44591",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "image-inspect",
+    "command": [
+      "podman",
+      "image",
+      "inspect",
+      "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c"
+    ],
+    "cwd": null,
+    "started_utc": "2026-10-24T03:58:27.783736+00:00",
+    "finished_utc": "2026-10-24T03:58:27.900160+00:00",
+    "elapsed_seconds": 0.11647132132202387,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 7701,
+    "stderr_bytes": 0,
+    "stdout_sha256": "652ea20edb0a6e30d4b6137b3850070ef4256df7252e65599574eec747eb2e74",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "archive",
+    "command": [
+      "git",
+      "archive",
+      "--format=tar",
+      "--output=/private/tmp/tests-3218-linux-fmt-9ed-20261024/run-20261024T035827.718602Z/source-lampOS.tar",
+      "e63a86d0d470d95cceb8c6dea75015838207953a",
+      "lampOS"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+    "started_utc": "2026-10-24T03:58:27.900979+00:00",
+    "finished_utc": "2026-10-24T03:58:30.837294+00:00",
+    "elapsed_seconds": 2.9364181091077626,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 600,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "archive-commit",
+    "command": [
+      "git",
+      "get-tar-commit-id"
+    ],
+    "cwd": null,
+    "started_utc": "2026-10-24T03:58:30.837964+00:00",
+    "finished_utc": "2026-10-24T03:58:30.873747+00:00",
+    "elapsed_seconds": 0.03581667598336935,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 41,
+    "stderr_bytes": 0,
+    "stdout_sha256": "51e38ff0322b93abcbaf3db7de44ba79854a5fbeb9a72050778da8576799199a",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "format",
+    "command": [
+      "podman",
+      "run",
+      "--rm",
+      "--pull=never",
+      "--network=none",
+      "--read-only",
+      "--tmpfs",
+      "/tmp:rw,size=1g,mode=1777",
+      "--workdir",
+      "/tmp",
+      "--env",
+      "CARGO_NET_OFFLINE=true",
+      "--env",
+      "CARGO_TARGET_DIR=/tmp/format-target",
+      "--entrypoint",
+      "/bin/sh",
+      "--name",
+      "tests-3218-e63a86d0d-fmt-74370",
+      "-i",
+      "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+      "-ec",
+      "set -eu\nuname -a\ncargo --version\nrustfmt --version\nrustc -vV\nrustc -vV | grep -Fx 'host: x86_64-unknown-linux-gnu'\ncargo --version | grep -F 'cargo 1.96.0 '\nrustfmt --version | grep -F 'rustfmt 1.9.0-stable '\nmkdir /tmp/source\ntar -xf - -C /tmp/source\ncd /tmp/source\nsource_fingerprint() {\n  find lampOS -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum\n  find lampOS -type l -printf '%p -> %l\\n' | LC_ALL=C sort\n}\nsource_fingerprint > /tmp/source-before.sha256\nprintf 'source-before-manifest '\nsha256sum /tmp/source-before.sha256\ncd lampOS\nset +e\ncargo fmt --all --check\nformat_status=$?\nset -e\ncd ..\nsource_fingerprint > /tmp/source-after.sha256\nprintf 'source-after-manifest '\nsha256sum /tmp/source-after.sha256\nif ! cmp -s /tmp/source-before.sha256 /tmp/source-after.sha256; then\n  diff -u /tmp/source-before.sha256 /tmp/source-after.sha256 >&2 || true\n  printf 'source changed during formatting check\\n' >&2\n  exit 125\nfi\nprintf 'cargo_fmt_exit=%s\\n' \"$format_status\"\nexit \"$format_status\"\n"
+    ],
+    "cwd": null,
+    "started_utc": "2026-10-24T03:58:31.828449+00:00",
+    "finished_utc": "2026-10-24T03:58:49.876451+00:00",
+    "elapsed_seconds": 18.048355406615883,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 300,
+    "stdout_bytes": 746,
+    "stderr_bytes": 0,
+    "stdout_sha256": "69a100baf5c92a7b10cee5e4eff948841fca0fe886a5c7b91bcdb42272be39e6",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "final-source-identity",
+    "command": [
+      "git",
+      "show",
+      "-s",
+      "--format=%H%n%T%n%P",
+      "e63a86d0d470d95cceb8c6dea75015838207953a"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier",
+    "started_utc": "2026-10-24T03:58:49.877148+00:00",
+    "finished_utc": "2026-10-24T03:58:49.927563+00:00",
+    "elapsed_seconds": 0.050450162030756474,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 123,
+    "stderr_bytes": 0,
+    "stdout_sha256": "70dec65d3e0866d28a724972d6abe24d8e045e9cb7884e26c9cfb84b8e8ddc74",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]
