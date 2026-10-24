@@ -5,6 +5,21 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 04:48 — Controls native failure claimed separately
+
+Ready for lamp-voice: no.
+
+- #3408 ARM64 40132824870 failed the Controls finished-recording assertion:
+  **1,648/1, 9,616 unrun, 106 skipped**. New Voice controls and later stages
+  are unrun; Linux Clippy passed. No retry/cause/native pass claimed.
+- Took the unowned Controls fixture contract after open/merged search and
+  the complete 17-PR file census. [Plan and source evidence](verification/controls-recording-stop-20261025/README.md).
+  Runtime finish already waits only 100 ms and permits incomplete evidence;
+  that deadline and all production bytes will remain unchanged.
+- Parent is rebased onto actual latest fc31; new full gate is active.
+  Child's separate bcb-source full gate passed **4,666/0/21** and is being
+  preserved before its latest composition. No old execution transfers.
+
 ## 2026-10-25 04:07 — current bcb carry qualified
 
 Ready for lamp-voice: no (#3408 remains draft for new native/current reads).
