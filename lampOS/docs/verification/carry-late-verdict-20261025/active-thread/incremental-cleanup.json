@@ -1,0 +1,6 @@
+{
+  "path": "/private/tmp/third-carry-window-target-ld637ldg/debug/incremental",
+  "kind": "own same-worktree disposable compiler incremental cache only; no binaries, dependency metadata or source removed",
+  "reason": "disk below 300 MiB during current test execution; all compilation stages already completed",
+  "time": "2026-10-24T20:00:19.150564+00:00"
+}

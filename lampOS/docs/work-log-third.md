@@ -5,6 +5,22 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 03:05 — delayed-verdict reader finding in progress
+
+Ready for lamp-voice: no (#3408 remains draft).
+
+- Original fdf Linux Clippy and ARM64 succeeded: main 11,257 PASS plus one
+  LEAK / 106 skipped, process 12/0, both named controls PASS. Actual preview
+  and three owned blob bindings are [retained](verification/carry-late-verdict-20261025/original-native/README.md).
+- Reviewer-two's active 30 s thread control reproduces the valid +25 s
+  owner held in Unknown. The correction retains consumed current likeness;
+  the expanded 60-row focused control passes, with production bars unchanged.
+- Rebased onto f978 with equal earlier range-diff; full current Mac gate
+  is active with socket access after a retained sandbox-invalid attempt.
+  [Finding and scope](verification/carry-late-verdict-20261025/active-thread/README.md).
+- Fixing this own finding before newest-held-print work. New native gates,
+  fresh reads, physical/acoustic and Sixth's separate holds remain. No lamp action.
+
 ## 2026-10-24 16:52 — current Body carry read complete
 
 - #3308 `b5b89efa6`: both equal range-diffs, Body/test/doc bytes unchanged

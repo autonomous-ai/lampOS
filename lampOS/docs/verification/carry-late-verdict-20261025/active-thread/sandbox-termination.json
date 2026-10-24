@@ -1,0 +1,20 @@
+{
+  "reason": "terminated after demonstrated sandbox Unix listener EPERM, not a product gate disposition",
+  "processes": {
+    "71253": [
+      66022,
+      "/private/tmp/third-carry-window-target-ld637ldg/debug/deps/lamp_voice-6afccc7ec26c06bc --test-threads=1 --quiet"
+    ],
+    "66022": [
+      59047,
+      "/Users/d/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo test -q --locked --offline -p lamp-voice -p lamp-voice-eval --message-format=json -- --test-threads=1"
+    ],
+    "59047": [
+      65463,
+      "/Library/Frameworks/Python.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /private/tmp/third-carry-late-active-gates.py"
+    ]
+  },
+  "action": "SIGTERM to own exact gate and descendants only",
+  "prior_fmt_clippy_build": "passed",
+  "test_stage": "incomplete; observed fixture failures retained"
+}

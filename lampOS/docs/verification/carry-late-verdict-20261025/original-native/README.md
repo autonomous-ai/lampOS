@@ -1,0 +1,7 @@
+# Original fdf gates, retained before the active-thread correction
+
+Authored fdf6b0598ad84ad1b9ffac1296314f59bb496c5f. Original ARM64 run 40125514751 and Linux formatting/strict workspace-all-target Clippy run 40125514775 succeeded. The actual checkout is d855f50451bde38440436620a11d1e859f2fbb22, merging the authored head onto f9780cb2a117f5c5d2c0960cd28cfbee866bd59b. All three owned blobs match; the complete trees differ in the two coordinator files and duplex documentation named in audit.json. No whole-tree authored equivalence is claimed.
+
+The main nextest summary is 11,258 passed including one leaky, 106 skipped. Independently deduplicating repeated slow-test result lines by ordinal and identity gives 11,257 literal PASS plus one LEAK, no conflicts and no FAIL. Both new named controls are literal PASS. Separate process tests finish 12 passed / 0 failed. These results belong only to fdf and its tested preview, not to a later correction.
+
+Reviewer-two found a latent active-thread failure after these gates: answered(30) retains the thread's 45 s eligibility, the first lookup consumes the current likeness, and a second lookup discards it. The valid owner at +25 s is incorrectly held in Unknown. The PR remains draft pending the correction, new current-base gates and fresh reads. Production 2.5 s calibration, physical/acoustic acceptance and Sixth's personal-scope hold remain unchanged.
