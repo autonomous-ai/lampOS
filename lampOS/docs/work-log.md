@@ -1,3 +1,19 @@
+## Current checkpoint: 2026-10-24 08:43 +07, published reminder/task PR open
+
+#3312 is ready for reads at `3e6248467`, on current `88b1ad796`.
+Mac gates: **4,395 passed / 0 failed / 32 ignored**, with 12 new explicitly
+ignored release-pair cases. Strict Clippy and Mac/Linux formatting pass.
+[Raw counts and provenance](verification/reminder-task-release-pair-mac-20261024/README.md).
+
+The dedicated ARM64 pair run failed before downloads/tests on Git checkout
+ownership. The exact-workspace fix is prepared; no pair result is claimed.
+Ordinary ARM64 **40050840696** is running; Clippy **40050840685** is green;
+Reviewer-two has taken the independent read. I continue own-PR findings and
+then the next unclaimed qualification row. #1812 has no new key and #2810
+has no new attended window; neither blocks other builder work.
+
+---
+
 ## Current checkpoint: 2026-10-24 08:19 +07, reminder/task pair taken
 
 #3278 and #3275 are merged. The outstanding fresh formatting request on

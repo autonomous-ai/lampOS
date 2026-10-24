@@ -1,0 +1,26 @@
+{
+  "head": "3e6248467a795d90d5840e0e93fed57644d9aaf4",
+  "base": "88b1ad796",
+  "environment": "macOS ARM64, Rust 1.96.0",
+  "test_commands": [
+    {
+      "command": "cargo +1.96.0 test -q --locked -p lamp-voice",
+      "passed": 3961,
+      "failed": 0,
+      "ignored": 21,
+      "exit": 0,
+      "log": "voice-tests.txt",
+      "sha256": "758b52f8e0a74631b063c239ef2d03fe883d5a1bdc24a979efdf3982b1561845"
+    },
+    {
+      "command": "cargo +1.96.0 test -q --locked -p lamp-schedule -p lamp-tasks",
+      "passed": 434,
+      "failed": 0,
+      "ignored": 11,
+      "exit": 0,
+      "log": "schedule-tasks-tests.txt",
+      "sha256": "2a47e5d3703184bfbc95add5e52900c354734850edc549a4aa66d512146da503"
+    }
+  ],
+  "released_binary_cases_executed": 0
+}

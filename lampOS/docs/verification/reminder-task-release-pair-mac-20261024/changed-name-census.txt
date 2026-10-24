@@ -1,0 +1,17 @@
+lampOS/crates/tasks/tests/release_pair.rs:2://! Run on Linux ARM64 with LAMP_COMPAT_TASKS_6408 and LAMP_COMPAT_TASKS_6498
+lampOS/crates/tasks/tests/release_pair/linux.rs:38:    variable: "LAMP_COMPAT_TASKS_6408",
+lampOS/crates/tasks/tests/release_pair/linux.rs:44:    variable: "LAMP_COMPAT_TASKS_6498",
+lampOS/crates/schedule/tests/release_pair.rs:20:    schedule_6408_to_6498_to_6408_same_boot,
+lampOS/crates/schedule/tests/release_pair.rs:26:    schedule_6498_to_6408_to_6498_same_boot,
+lampOS/crates/schedule/tests/release_pair.rs:32:    schedule_6408_to_6498_to_6408_changed_boot_identity,
+lampOS/crates/schedule/tests/release_pair.rs:38:    schedule_6498_to_6408_to_6498_changed_boot_identity,
+lampOS/crates/schedule/tests/release_pair/driver.rs:126:            let input = std::env::var_os(format!("LAMP_COMPAT_SCHEDULE_{release}"))
+lampOS/crates/voice/tests/release_pair.rs:15:fn release_6498_reads_6408_unfinished_delivery_and_completes_it() {
+lampOS/crates/voice/tests/release_pair.rs:21:fn release_6408_reads_6498_unfinished_delivery_and_completes_it() {
+lampOS/crates/voice/tests/release_pair.rs:27:fn release_6498_reads_6408_completed_delivery_without_another_offer() {
+lampOS/crates/voice/tests/release_pair.rs:33:fn release_6408_reads_6498_completed_delivery_without_another_offer() {
+lampOS/crates/voice/tests/release_pair.rs:39:fn release_6498_replays_6408_exact_ack_intent_without_another_offer() {
+lampOS/crates/voice/tests/release_pair.rs:45:fn release_6408_replays_6498_exact_ack_intent_without_another_offer() {
+lampOS/crates/voice/tests/release_pair/README.md:10:LAMP_COMPAT_VOICE_6408=/artifacts/6408/lamp-voice \
+lampOS/crates/voice/tests/release_pair/README.md:11:LAMP_COMPAT_VOICE_6498=/artifacts/6498/lamp-voice \
+lampOS/crates/voice/tests/release_pair/fixture.rs:60:        let variable = format!("LAMP_COMPAT_VOICE_{}", self.number());
