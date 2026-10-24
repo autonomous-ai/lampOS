@@ -1,0 +1,15 @@
+{
+  "prepared_at": "2026-10-24T10:38:50.541985+00:00",
+  "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+  "branch": "tests/1569-update-timeout-diagnostic",
+  "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+  "before_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+  "after_sha256": "1edc7f1c6de393a672aa4e42e90a9305ca045216970f64db4606cc580cd6521b",
+  "file_mode": "0o644",
+  "only_dirty_path": "M lampOS/crates/update/tests/round/self_cuts.rs",
+  "patch_sha256": "9c414b22add189270489bcdccef8e441c58d38626f87ed71e8342b3c3a1e2cb1",
+  "applied": true,
+  "executed": false,
+  "compilation": false,
+  "full_source_guard": "Deferred before compilation under exclusive target allocation; only this diagnostic file/hash/mode and clean initial Git identity checked here"
+}

@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "isolated-allocation.json",
+      "bytes": 809,
+      "sha256": "86b99c893b60ee2fade060a20100808cf5bcc713135a7db48b1c35ccf7ec1da8"
+    },
+    {
+      "path": "own-open-pr-inventory.json",
+      "bytes": 823,
+      "sha256": "0765b056de0aff0802b639d5b963bb1613b240b7b462001e2a557011b9ca64a6"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1880,
+      "sha256": "211c899a2234d80e6ed7fdfab218686f975ecea4b79fb4bc90821e5d1b1a5b3b"
+    }
+  ]
+}

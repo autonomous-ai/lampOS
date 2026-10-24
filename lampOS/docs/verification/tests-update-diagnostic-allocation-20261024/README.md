@@ -1,0 +1,9 @@
+Ready for lamp-voice: no
+
+The original Phone source is preserved at `e63a86d0d`; an isolated own branch, `tests/1569-update-timeout-diagnostic`, now carries only the previously reviewed timeout-probe overlay. Before applying it, the checkout was clean and its head and original file hash matched the diagnostic plan. After application, exactly one path is dirty, its mode is unchanged, the expected candidate hash matches, and `git diff --check` passes. The receipt records the exact source, patch and allocation time. The original Phone and active clock worktrees remain clean.
+
+This is source allocation only: no compiler, Rust formatter, test, diagnostic binary, Cargo cleanup or target mutation ran. The full source guard, workspace-package cleanup and fresh-library provenance records are required before any future compilation, under exclusive allocation after the current run, prescribed standalone observations and provenance review. The planned original-case observation count remains exactly one; a normal pass would give no historical cause finding and would not authorize a retry.
+
+The diagnostic checkout ran concurrently as host preparation from about 10:16 UTC until 10:38:50 UTC during the current clock reader suite. This is workload context, not an explanation for any test duration or failure. The active suite is retained under its original watchdog. Its terminal counts and compiler-lineage verdict remain pending.
+
+An independent current GitHub inventory confirms the three own open pull requests are #3190, #3218 and #3273, all drafts on the recorded published heads. Local unqualified carries have not been pushed. #3190's body now distinguishes published historical results from local `42cf24d5a`, pending full gates and provenance checks. The latest checked train base `9bd23ebf0` merges cleanly with that frozen local head; no new rebase was performed.

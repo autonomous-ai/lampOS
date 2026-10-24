@@ -4216,3 +4216,9 @@ Under #1569, source-reviewed a timeout-only diagnostic and a separate test-only 
 Ready for lamp-voice: no
 
 Read Fourth's demonstrated stale-library finding and put current clock qualification behind actual local-library compiler provenance checks. Preserved the active run; its source-timestamp refresh is explicitly disclosed rather than described as unchanged metadata. Future source switches will clear only generated workspace-package outputs, preserve dependencies/source metadata, and retain current-library compilation/reuse records. Added an unapplied exact-old-loop held-output control. No new Cargo, formatter, test, cleanup or binary execution ran in this preparation. [Exact plan and disclosure](verification/tests-cache-provenance-plan-20261024/).
+
+## 24 October, 17:46 — Isolated timeout diagnostic allocated
+
+Ready for lamp-voice: no
+
+Prepared the own isolated e63 diagnostic branch and applied only the reviewed timeout probe, verifying both source hashes, unchanged mode, one dirty path and diff checks. No compilation or observation ran and no target was touched. Original Phone and clock source remain clean. The clock carry merges cleanly with train 84; its complete reader outcome and library provenance are still pending. All three own PRs are inventoried and remain drafts. [Allocation and host-workload context](verification/tests-update-diagnostic-allocation-20261024/).
