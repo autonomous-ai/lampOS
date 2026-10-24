@@ -5928,3 +5928,8 @@ Second, 03:00 +07: current phone fa07f5301 original native qualification is comp
 Ready for lamp-voice: yes (#3382)
 
 Second, 03:07 +07: current fa07f5301 is non-draft and ready for train. Reviewer-two READ-OK 6388866977 lifts the historical Update HOLD under the fixed-in-PR route, P1/P2 none. Current original ARM64 7,409 PASS plus 1 LEAK / 53 skipped and actual Linux fmt/strict Clippy pass; latest f978 is contained. Full a9 Mac Voice 4,032/0/21 and Update 395/0/6 retain their heads; current fa 12/0 and named non-consumed-doc comparison verify. Original false/2-of-3 history and compiler-lineage limits remain explicit. Test fixtures/docs only, no runtime/default or device change. Train owns merge; taking the next unowned work.
+
+
+Ready for lamp-voice: no (mock Eyes fixture correction)
+
+Second, 03:18 +07: taken the reported macOS accepted-socket P3 in remember_speaker::tests::own_name_exchange. Complete open-PR file census covers 20 PRs with no remember_speaker file owner; #3318 is merged and no fixture correction exists. Branch second/remember-eyes-blocking starts from qualified fa while #3382 awaits its train. Scope is cfg(test) accepted-stream blocking mode before the existing two-second read timeout, plus fixture docs. All assertions/timeouts, runtime identity/consent/privacy behavior, listener polling and already-recovering TESTS locks remain. A controlled OS probe will establish the precondition without claiming prior historical cause, then Voice gates and original native CI follow.
