@@ -1,0 +1,6 @@
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called
+lamp-voice second: request 1: its answer is played: a conversation with the lamp is going on
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on
+
+thread 'second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker' (1441436) panicked at crates/voice/src/second_provider/worker.rs:17120:9:
+one face each, a busy room

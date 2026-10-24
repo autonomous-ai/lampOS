@@ -1,0 +1,22 @@
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called
+lamp-voice second: request 1: its answer is played: a conversation with the lamp is going on
+lamp-voice second: request 2: no conversation going on: it was never heard saying words, to their end,, it was never called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on
+lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 4 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called web_search
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 4 words, the last 0 ms after the line ended
+lamp-voice second: request 2: of its 4 words, 0 in request 1's words it cut short
+lamp-voice second: request 2: not joined with request 1's words, cut short by it: no voice check, and no one face was seen speaking both; no fresh look from the eyes at request 1's end, 1 face in view at request 2's, in a busy room (LAMP_JOIN_CUT_WORDS)
+lamp-voice second: request 1's words, cut short, are let go: request 2 is answered
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 3 words
+lamp-voice second: request 2 first answer audio 1 ms after the words were heard
+
+thread 'second_provider::worker::tests::a_request_with_a_pause_and_one_face_in_view_is_asked_whole' (1438906) panicked at crates/voice/src/second_provider/worker.rs:17286:9:
+assertion `left == right` failed: one face
+  left: Message { role: "user", content: Some(String("in Saigon this weekend?")), tool_calls: [], tool_call_id: None, reasoning_details: None }
+ right: Message { role: "user", content: Some(String("What's the weather like in Saigon this weekend?")), tool_calls: [], tool_call_id: None, reasoning_details: None }

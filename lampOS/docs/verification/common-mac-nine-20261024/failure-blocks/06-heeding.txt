@@ -1,0 +1,12 @@
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called
+lamp-voice second: request 1: its answer is played: someone is turned to the lamp
+lamp-voice second: request 2: its answer is played: someone is turned to the lamp
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called
+lamp-voice second: request 1: its answer is played: a conversation with the lamp is going on
+lamp-voice second: request 2: no conversation going on: it was never heard saying words, to their end,, it was never called
+lamp-voice second: request 2: its answer is played: a conversation with the lamp is going on
+
+thread 'second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short' (1447598) panicked at crates/voice/src/second_provider/worker.rs:16728:9:
+assertion `left == right` failed: one face: a busy room too
+  left: Not("no voice check, and no one face was seen speaking both; no fresh look from the eyes at request 1's end, no fresh look from the eyes at request 2's, in a busy room")
+ right: NoSecond("no sign of a second person: 1 face in view at request 1's end, 1 face in view at request 2's, no other voice heard and no two faces seen speaking in the conversation")

@@ -1,0 +1,280 @@
+{
+  "refs": {
+    "base": "5074d860c2be76d1f201a59f8380e33f70de6618",
+    "candidate": "5191c66e97f7407fd136f9582454c3643be22cc1",
+    "future_base": "9872cb69288b9e113bb95e6b25140a60a1e91e19",
+    "future_carry": "a4c9ffa283506dc79576d74b3aed1729b37c92ff"
+  },
+  "files": [
+    {
+      "path": "lampOS/crates/voice/src/ring_unplug.rs",
+      "sha256": {
+        "base": "ccc8e7cd201cf90cfb24875102cb40200df454d99911cbd6d63f4314ff252de1",
+        "candidate": "ccc8e7cd201cf90cfb24875102cb40200df454d99911cbd6d63f4314ff252de1",
+        "future_base": "ccc8e7cd201cf90cfb24875102cb40200df454d99911cbd6d63f4314ff252de1",
+        "future_carry": "ccc8e7cd201cf90cfb24875102cb40200df454d99911cbd6d63f4314ff252de1"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 12795
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_worker.rs",
+      "sha256": {
+        "base": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2",
+        "candidate": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2",
+        "future_base": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2",
+        "future_carry": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 44836
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_light.rs",
+      "sha256": {
+        "base": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+        "candidate": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+        "future_base": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+        "future_carry": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 81921
+    },
+    {
+      "path": "lampOS/crates/voice/src/bus_out.rs",
+      "sha256": {
+        "base": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0",
+        "candidate": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0",
+        "future_base": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0",
+        "future_carry": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 92068
+    },
+    {
+      "path": "lampOS/crates/bus/src/lib.rs",
+      "sha256": {
+        "base": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+        "candidate": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+        "future_base": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+        "future_carry": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 17782
+    },
+    {
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "sha256": {
+        "base": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+        "candidate": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+        "future_base": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+        "future_carry": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 13555
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "sha256": {
+        "base": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+        "candidate": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+        "future_base": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+        "future_carry": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 32256
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "sha256": {
+        "base": "8d7b3245c601fce24b47592bbc773d8ebb638655e286738925c83618a3b17994",
+        "candidate": "24ea8d7465f64320f300dd6e1998ade833ae9b1f739cfd8b5a30d7680c1b5609",
+        "future_base": "8d7b3245c601fce24b47592bbc773d8ebb638655e286738925c83618a3b17994",
+        "future_carry": "24ea8d7465f64320f300dd6e1998ade833ae9b1f739cfd8b5a30d7680c1b5609"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      },
+      "candidate_bytes": 59872
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "sha256": {
+        "base": "882d9cf8a1350195a35eb72709d87636963d16d5d5632083149f1bc19e234547",
+        "candidate": "f55320ab99170d7ab62a3a8746c7f9136ccec95673115af8c9a14e78aa4ba6ab",
+        "future_base": "882d9cf8a1350195a35eb72709d87636963d16d5d5632083149f1bc19e234547",
+        "future_carry": "f55320ab99170d7ab62a3a8746c7f9136ccec95673115af8c9a14e78aa4ba6ab"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      },
+      "candidate_bytes": 870494
+    },
+    {
+      "path": "lampOS/crates/voice/src/session_reader.rs",
+      "sha256": {
+        "base": "c4f76b716b2e7d1b606a901537327f6212c1303073f816c2b0689940d9ceb712",
+        "candidate": "c4f76b716b2e7d1b606a901537327f6212c1303073f816c2b0689940d9ceb712",
+        "future_base": "c4f76b716b2e7d1b606a901537327f6212c1303073f816c2b0689940d9ceb712",
+        "future_carry": "c4f76b716b2e7d1b606a901537327f6212c1303073f816c2b0689940d9ceb712"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 18532
+    },
+    {
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+      "sha256": {
+        "base": "94940c5bcdaa9cffb7e7cf69b5f682249edb18308e804b6de404223136d5063a",
+        "candidate": "94940c5bcdaa9cffb7e7cf69b5f682249edb18308e804b6de404223136d5063a",
+        "future_base": "94940c5bcdaa9cffb7e7cf69b5f682249edb18308e804b6de404223136d5063a",
+        "future_carry": "94940c5bcdaa9cffb7e7cf69b5f682249edb18308e804b6de404223136d5063a"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 30147
+    },
+    {
+      "path": "lampOS/crates/voice/src/service_trace.rs",
+      "sha256": {
+        "base": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+        "candidate": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+        "future_base": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+        "future_carry": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 30629
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "sha256": {
+        "base": "8eddd365fd7d0857cca5ffb9439c595543ec7bd1026bda917ccd81fec729c593",
+        "candidate": "8eddd365fd7d0857cca5ffb9439c595543ec7bd1026bda917ccd81fec729c593",
+        "future_base": "8eddd365fd7d0857cca5ffb9439c595543ec7bd1026bda917ccd81fec729c593",
+        "future_carry": "8eddd365fd7d0857cca5ffb9439c595543ec7bd1026bda917ccd81fec729c593"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 106776
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "sha256": {
+        "base": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+        "candidate": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+        "future_base": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+        "future_carry": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 3214
+    },
+    {
+      "path": "lampOS/crates/actions/src/light.rs",
+      "sha256": {
+        "base": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+        "candidate": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+        "future_base": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+        "future_carry": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 32086
+    },
+    {
+      "path": "lampOS/crates/voice/src/memory_scope.rs",
+      "sha256": {
+        "base": "f37f1efb5580d70ebc2c16c4830bc4b98e208b01abc4e93c1b65bd0340914a01",
+        "candidate": "9f44aff9a3e1ca4ad368f7fbe6338a7d6c6cc6a0593c8ddaccf9fcc11d6ff046",
+        "future_base": "f37f1efb5580d70ebc2c16c4830bc4b98e208b01abc4e93c1b65bd0340914a01",
+        "future_carry": "9f44aff9a3e1ca4ad368f7fbe6338a7d6c6cc6a0593c8ddaccf9fcc11d6ff046"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      },
+      "candidate_bytes": 105477
+    },
+    {
+      "path": "lampOS/crates/voice/src/speaking_faces.rs",
+      "sha256": {
+        "base": "69b246d705ba365617e9e21dfcda49c9f265b7f2f295aad4f4075e3570cf1efe",
+        "candidate": "17c0160bc184cd58ced1c6324ab5233d1ed14a85ecc89db2239fef3ed795b0fb",
+        "future_base": "69b246d705ba365617e9e21dfcda49c9f265b7f2f295aad4f4075e3570cf1efe",
+        "future_carry": "17c0160bc184cd58ced1c6324ab5233d1ed14a85ecc89db2239fef3ed795b0fb"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      },
+      "candidate_bytes": 65889
+    },
+    {
+      "path": "lampOS/crates/voice/src/known_faces.rs",
+      "sha256": {
+        "base": "d11844f6c49c460fa1ccfb1950d11e632d2295bf340324ab2977a486bb6684f5",
+        "candidate": "d11844f6c49c460fa1ccfb1950d11e632d2295bf340324ab2977a486bb6684f5",
+        "future_base": "d11844f6c49c460fa1ccfb1950d11e632d2295bf340324ab2977a486bb6684f5",
+        "future_carry": "d11844f6c49c460fa1ccfb1950d11e632d2295bf340324ab2977a486bb6684f5"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      },
+      "candidate_bytes": 128043
+    }
+  ]
+}

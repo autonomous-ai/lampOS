@@ -1,0 +1,2 @@
+thread 'ring_unplug::tests::explicit_light_off_cannot_prepare_or_acknowledge_asleep' (1406866) panicked at crates/voice/src/ring_unplug.rs:195:9:
+assertion failed: ring.prepare(1_000_000).is_some()

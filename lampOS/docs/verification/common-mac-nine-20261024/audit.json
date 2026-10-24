@@ -1,0 +1,164 @@
+{
+  "candidate_tree": "5191c66e97f7407fd136f9582454c3643be22cc1",
+  "candidate_base": "5074d860c2be76d1f201a59f8380e33f70de6618",
+  "future_base": "9872cb69288b9e113bb95e6b25140a60a1e91e19",
+  "future_carry_tree": "a4c9ffa283506dc79576d74b3aed1729b37c92ff",
+  "source_packet": "/private/tmp/fourth-common-recovery-checks-20261024/mac/attempt1",
+  "source_log_sha256": "9706e6ec3730f7bbf44e1de9eff1761383e8b70a2db8f1e06c642433d6825749",
+  "result_json_sha256": "98cb91de861d42ad736cc5d58c049f6c6c105a42fac43824596f0823eff3b67b",
+  "mac_aggregate": {
+    "failed": 9,
+    "ignored": 21,
+    "passed": 4101
+  },
+  "mac_counts_by_target": {
+    "lib": {
+      "passed": 3821,
+      "failed": 8,
+      "ignored": 15
+    },
+    "integration": {
+      "passed": 269,
+      "failed": 1,
+      "ignored": 0
+    },
+    "other": {
+      "passed": 11,
+      "failed": 0,
+      "ignored": 6
+    }
+  },
+  "linux_reported_by_parent": {
+    "passed": 4171,
+    "failed": 0,
+    "ignored": 24,
+    "not_independently_recounted_in_this_audit": true
+  },
+  "historical_name_overlap": [],
+  "historical_unique_failures": 27,
+  "new_unique_failures": 9,
+  "new_failures": [
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "ring_unplug::tests::actual_resting_and_speaking_frames_show_asleep_before_receipt",
+      "status": "FAILED",
+      "family": "ring",
+      "panic_path": "crates/voice/src/ring_unplug.rs",
+      "panic_line": 342,
+      "panic_column": 13,
+      "panic_message": "assertion failed: ack",
+      "body_sha256": "2348b3666b11cc641b263ea389faced0e64b3a5cecbbe4e72c8cd5ffe87d51b4",
+      "observed_boundary": "Acknowledgement false before the pixel-membership assertion; loop does not print which resting/speaking iteration failed.",
+      "source_boundary_and_unresolved_state": "Ready body/expression proof must remain <=500000us old and unexpired; show/show_resting and drew revalidate after sink receipt. Actual proof ages, authority/lapse state, accepted frame path and which iteration were not logged."
+    },
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "ring_unplug::tests::explicit_light_off_cannot_prepare_or_acknowledge_asleep",
+      "status": "FAILED",
+      "family": "ring",
+      "panic_path": "crates/voice/src/ring_unplug.rs",
+      "panic_line": 195,
+      "panic_column": 9,
+      "panic_message": "assertion failed: ring.prepare(1_000_000).is_some()",
+      "body_sha256": "86c15b49b612a58dfe940fc7ce1cebc066cbd4f30717dc0776c700bde739d228",
+      "observed_boundary": "Positive prepare.is_some() failed before the explicit light-off was published; this is not evidence that an off was overridden.",
+      "source_boundary_and_unresolved_state": "The synthetic monotonic timestamp is passed consistently to prepare; Bus expiry instead uses current publication wall time (500ms plus50ms grace). Which prerequisite failed or its age was not logged."
+    },
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+      "status": "FAILED",
+      "family": "memory_note_retries",
+      "panic_path": "crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "panic_line": 1401,
+      "panic_column": 9,
+      "panic_message": "not waited for",
+      "body_sha256": "19cf50d38f763e64d7c17c274534be6cfeb48be650f968139e9adeef8ae004bf",
+      "observed_boundary": "Only elapsed<50ms failed, with no numeric elapsed value; subsequent no-overlap, note equality, final fresh fact and five-open assertions were not reached.",
+      "source_boundary_and_unresolved_state": "Common added two synchronous synthetic observation-file writes inside Turns::answered and thus inside the timed span, plus new permission/context checks. A still-reading void is retained by tidy/ask_if_due and rejected by ready_now before done.wait_for. Ahead::ready may first await Pending permission; if the old read completed before forget, forget removes it and a new read may be selected. The failed run records none of those phase states or durations, so functional wait versus I/O/scheduling is unresolved."
+    },
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "second_provider::worker::tests::a_request_with_a_pause_and_one_face_in_view_is_asked_whole",
+      "status": "FAILED",
+      "family": "heeding",
+      "panic_path": "crates/voice/src/second_provider/worker.rs",
+      "panic_line": 17286,
+      "panic_column": 9,
+      "panic_message": "assertion `left == right` failed: one face\n  left: Message { role: \"user\", content: Some(String(\"in Saigon this weekend?\")), tool_calls: [], tool_call_id: None, reasoning_details: None }\n right: Message { role: \"user\", content: Some(String(\"What's the weather like in Saigon this weekend?\")), tool_calls: [], tool_call_id: None, reasoning_details: None }",
+      "body_sha256": "6713c538904759d2810acc4d9bc759e8e76e08465d5018fb394086434e1c45ec",
+      "observed_boundary": "First one-face/busy scene returns only the second line rather than the joined line; later scenes in the same test were not reached.",
+      "source_boundary_and_unresolved_state": "Runtime log says no fresh look at request1 end and one face at request2. judged_lines publishes each look with300ms expiry (plus50ms bus grace). No actual header age or scheduling gap is recorded."
+    },
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker",
+      "status": "FAILED",
+      "family": "heeding",
+      "panic_path": "crates/voice/src/second_provider/worker.rs",
+      "panic_line": 17120,
+      "panic_column": 9,
+      "panic_message": "one face each, a busy room",
+      "body_sha256": "7a8fb90d5c255af18feffacdd7b6b3c0598fc62d3feb5711fa0c1f7f076885d3",
+      "observed_boundary": "First one-face-each/busy assertion failed because result did not match Not ending with the quiet-room qualifier.",
+      "source_boundary_and_unresolved_state": "Actual Joined value is not printed. Shared fixture/function/source parity alone cannot identify which look or runtime state differed."
+    },
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+      "status": "FAILED",
+      "family": "heeding",
+      "panic_path": "crates/voice/src/second_provider/worker.rs",
+      "panic_line": 16728,
+      "panic_column": 9,
+      "panic_message": "assertion `left == right` failed: one face: a busy room too\n  left: Not(\"no voice check, and no one face was seen speaking both; no fresh look from the eyes at request 1's end, no fresh look from the eyes at request 2's, in a busy room\")\n right: NoSecond(\"no sign of a second person: 1 face in view at request 1's end, 1 face in view at request 2's, no other voice heard and no two faces seen speaking in the conversation\")",
+      "body_sha256": "49ab796d9c3f4d4a6dce49a5dc2f516490c9b6ddc59f788ed2988021316ece66",
+      "observed_boundary": "The second one-face/busy scene gets Not: no fresh look at both request ends, instead of NoSecond with one face each.",
+      "source_boundary_and_unresolved_state": "The preceding one-face/quiet scene passed. The same300ms look lease and live bus reads apply; expired versus absent/parse/read failure cannot be distinguished by this log."
+    },
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "status": "FAILED",
+      "family": "session_reader",
+      "panic_path": "crates/voice/src/session_reader/tests.rs",
+      "panic_line": 74,
+      "panic_column": 5,
+      "panic_message": "assertion failed: report.acknowledged && report.degraded && !report.writer_failed",
+      "body_sha256": "462f2c7666f531a751c98d72d33c7bdc01da2fb2eaef94a6927a7c30d9ea19db",
+      "observed_boundary": "Conjunct acknowledged && degraded && !writer_failed failed; individual report fields are not printed and permission checks afterwards were unrun.",
+      "source_boundary_and_unresolved_state": "Reader-unavailable is expected and set true in health before launch, so degraded is expected true from source. Missing acknowledgement by500ms or writer_failed remains unresolved. Detached writer finishes with segment/health sync_all; no full Report or completion-time receipt is present."
+    },
+    {
+      "cargo_target": "unittests src/lib.rs",
+      "name": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "status": "FAILED",
+      "family": "session_reader",
+      "panic_path": "crates/voice/src/session_reader/tests.rs",
+      "panic_line": 111,
+      "panic_column": 5,
+      "panic_message": "assertion failed: report.acknowledged && report.degraded && !report.writer_failed",
+      "body_sha256": "540aa351a25b5b2190a2d1d71c50c6b4fbd5bce932a5d9d2706d063c605bec92",
+      "observed_boundary": "Non-Linux control correctly gets Reader::prepare Err, then same unprinted report conjunct fails; later permission checks were unrun.",
+      "source_boundary_and_unresolved_state": "Same500ms finish boundary and source report alternatives; Linux excludes this specific cfg(not linux) case, so Linux suite success cannot qualify it."
+    },
+    {
+      "cargo_target": "tests/it/main.rs",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "status": "FAILED",
+      "family": "light_call",
+      "panic_path": "crates/voice/tests/it/light_call.rs",
+      "panic_line": 76,
+      "panic_column": 9,
+      "panic_message": "call 9, blue: Failed(\"I asked for it but could not confirm my light changed.\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+      "body_sha256": "935526b521207c442f95f79e05e76fe4ad2a6ea6b9b9d424fa134cb4e1179280",
+      "observed_boundary": "Call9 (zero-based tenth call, blue) returns unconfirmed failure. Calls0..8 completed; calls10..19 and final25ms median assertion were not reached.",
+      "source_boundary_and_unresolved_state": "Actions set() emits this refusal after no matching shown light by its600ms deadline while the ring fixture ticks nominally every2ms. No command/state headers, actual tick gaps or per-call elapsed value were emitted for this failure."
+    }
+  ],
+  "file_parity_receipt": "file-parity.json",
+  "function_parity_receipt": "function-parity.json",
+  "no_runtime_cause_established": true,
+  "no_failed_gate_waived": true,
+  "no_cargo_tests_cache_runtime_or_source_actions": true
+}

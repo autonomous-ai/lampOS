@@ -1,0 +1,4 @@
+lamp-voice serve: session reader unavailable; metadata remains private
+
+thread 'session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure' (1453190) panicked at crates/voice/src/session_reader/tests.rs:74:5:
+assertion failed: report.acknowledged && report.degraded && !report.writer_failed

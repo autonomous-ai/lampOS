@@ -1,0 +1,309 @@
+{
+  "method": "balanced Rust function text extraction ignoring strings and comments; candidate function identity bound by file-parity.json",
+  "functions": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "same_speaker",
+      "after_marker": null,
+      "sha256": {
+        "base": "06f0284e08ac5325e9b63b583ae47e5ad5a6334a582c7c47ee87c54428e0b029",
+        "candidate": "06f0284e08ac5325e9b63b583ae47e5ad5a6334a582c7c47ee87c54428e0b029",
+        "future_base": "06f0284e08ac5325e9b63b583ae47e5ad5a6334a582c7c47ee87c54428e0b029",
+        "future_carry": "06f0284e08ac5325e9b63b583ae47e5ad5a6334a582c7c47ee87c54428e0b029"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "one_speaker",
+      "after_marker": null,
+      "sha256": {
+        "base": "48f9d5bd3c70e176f726aa6f6f45569cc885b002ab6d524b6ce709a3a9cf805d",
+        "candidate": "48f9d5bd3c70e176f726aa6f6f45569cc885b002ab6d524b6ce709a3a9cf805d",
+        "future_base": "48f9d5bd3c70e176f726aa6f6f45569cc885b002ab6d524b6ce709a3a9cf805d",
+        "future_carry": "48f9d5bd3c70e176f726aa6f6f45569cc885b002ab6d524b6ce709a3a9cf805d"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "no_second_person",
+      "after_marker": null,
+      "sha256": {
+        "base": "d51520f8718087d5ef295490ef1bb076fd1642232bd6eb03e56526f4a8e265a9",
+        "candidate": "d51520f8718087d5ef295490ef1bb076fd1642232bd6eb03e56526f4a8e265a9",
+        "future_base": "d51520f8718087d5ef295490ef1bb076fd1642232bd6eb03e56526f4a8e265a9",
+        "future_carry": "d51520f8718087d5ef295490ef1bb076fd1642232bd6eb03e56526f4a8e265a9"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "judged_in_rooms",
+      "after_marker": null,
+      "sha256": {
+        "base": "e42c8467fc9e7179c17014f813048d3ee79ab8331c33b33627f7cb4b5a28160d",
+        "candidate": "e42c8467fc9e7179c17014f813048d3ee79ab8331c33b33627f7cb4b5a28160d",
+        "future_base": "e42c8467fc9e7179c17014f813048d3ee79ab8331c33b33627f7cb4b5a28160d",
+        "future_carry": "e42c8467fc9e7179c17014f813048d3ee79ab8331c33b33627f7cb4b5a28160d"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "judged_lines",
+      "after_marker": null,
+      "sha256": {
+        "base": "e7e148581dea43f48819766b283d694838fd66bedc91288f6ab40d73df505d03",
+        "candidate": "e7e148581dea43f48819766b283d694838fd66bedc91288f6ab40d73df505d03",
+        "future_base": "e7e148581dea43f48819766b283d694838fd66bedc91288f6ab40d73df505d03",
+        "future_carry": "e7e148581dea43f48819766b283d694838fd66bedc91288f6ab40d73df505d03"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "keep_line_room",
+      "after_marker": null,
+      "sha256": {
+        "base": "71407f3ec3f259c67d9d3fd052caf80993574dd0f37a09622aa4aaa5c63430fb",
+        "candidate": "71407f3ec3f259c67d9d3fd052caf80993574dd0f37a09622aa4aaa5c63430fb",
+        "future_base": "71407f3ec3f259c67d9d3fd052caf80993574dd0f37a09622aa4aaa5c63430fb",
+        "future_carry": "71407f3ec3f259c67d9d3fd052caf80993574dd0f37a09622aa4aaa5c63430fb"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "keep_spoken",
+      "after_marker": null,
+      "sha256": {
+        "base": "d83c89e45516023506976dc32e6e454a7a603a52cd48da00a35ecc76a17a592f",
+        "candidate": "d83c89e45516023506976dc32e6e454a7a603a52cd48da00a35ecc76a17a592f",
+        "future_base": "d83c89e45516023506976dc32e6e454a7a603a52cd48da00a35ecc76a17a592f",
+        "future_carry": "d83c89e45516023506976dc32e6e454a7a603a52cd48da00a35ecc76a17a592f"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "keep_unjudged",
+      "after_marker": null,
+      "sha256": {
+        "base": "e68758eecc2ff5f60c58c32101d6731e5c4f63058c251618a8ea5fbcdd2a3e0d",
+        "candidate": "e68758eecc2ff5f60c58c32101d6731e5c4f63058c251618a8ea5fbcdd2a3e0d",
+        "future_base": "e68758eecc2ff5f60c58c32101d6731e5c4f63058c251618a8ea5fbcdd2a3e0d",
+        "future_carry": "e68758eecc2ff5f60c58c32101d6731e5c4f63058c251618a8ea5fbcdd2a3e0d"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "signs",
+      "after_marker": null,
+      "sha256": {
+        "base": "0271175b99774dc2bfc5696bb05e2e8c4063a691f271f3e462c3f6574ce8156c",
+        "candidate": "0271175b99774dc2bfc5696bb05e2e8c4063a691f271f3e462c3f6574ce8156c",
+        "future_base": "0271175b99774dc2bfc5696bb05e2e8c4063a691f271f3e462c3f6574ce8156c",
+        "future_carry": "0271175b99774dc2bfc5696bb05e2e8c4063a691f271f3e462c3f6574ce8156c"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "a_request_with_a_pause_and_one_face_in_view_is_asked_whole",
+      "after_marker": null,
+      "sha256": {
+        "base": "e97a37523857ac2b16f116367472d6befdcf2a3b5c36f09e416ee7923a97ace8",
+        "candidate": "e97a37523857ac2b16f116367472d6befdcf2a3b5c36f09e416ee7923a97ace8",
+        "future_base": "e97a37523857ac2b16f116367472d6befdcf2a3b5c36f09e416ee7923a97ace8",
+        "future_carry": "e97a37523857ac2b16f116367472d6befdcf2a3b5c36f09e416ee7923a97ace8"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "the_lamps_name_carries_only_on_a_sign_of_one_speaker",
+      "after_marker": null,
+      "sha256": {
+        "base": "049606127359bedf51f99576c5c9559aeb025c6da81b98f138e8ef9b927a7a20",
+        "candidate": "049606127359bedf51f99576c5c9559aeb025c6da81b98f138e8ef9b927a7a20",
+        "future_base": "049606127359bedf51f99576c5c9559aeb025c6da81b98f138e8ef9b927a7a20",
+        "future_carry": "049606127359bedf51f99576c5c9559aeb025c6da81b98f138e8ef9b927a7a20"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+      "after_marker": null,
+      "sha256": {
+        "base": "7aab4501b63763da0982441cced71e8866aa2b79191131fd49e2f4274eae55eb",
+        "candidate": "7aab4501b63763da0982441cced71e8866aa2b79191131fd49e2f4274eae55eb",
+        "future_base": "7aab4501b63763da0982441cced71e8866aa2b79191131fd49e2f4274eae55eb",
+        "future_carry": "7aab4501b63763da0982441cced71e8866aa2b79191131fd49e2f4274eae55eb"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "begin",
+      "after_marker": "impl Ahead {",
+      "sha256": {
+        "base": "4807d71714eb11a9cec391372a0a0907dcba9d60bd8d4ccda7df184697213a17",
+        "candidate": "4b056f5fb68e3623104a31de0c3878c18f688499f3826f042eeb06d36d43bbf4",
+        "future_base": "4807d71714eb11a9cec391372a0a0907dcba9d60bd8d4ccda7df184697213a17",
+        "future_carry": "4b056f5fb68e3623104a31de0c3878c18f688499f3826f042eeb06d36d43bbf4"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "ready_now",
+      "after_marker": "impl Ahead {",
+      "sha256": {
+        "base": "b8f66789ecbb1f9b7f6eb781cb4ebf500ffc9431bd75191d3d8b25bdc4e6214d",
+        "candidate": "759bbe1795f6bf932ecbacd1a0d4b3426d23d7b09adff0e903440a7a0e3cd91e",
+        "future_base": "b8f66789ecbb1f9b7f6eb781cb4ebf500ffc9431bd75191d3d8b25bdc4e6214d",
+        "future_carry": "759bbe1795f6bf932ecbacd1a0d4b3426d23d7b09adff0e903440a7a0e3cd91e"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "ready",
+      "after_marker": "impl Ahead {",
+      "sha256": {
+        "base": "4a1484ccb444678fea13778432c4d9ffbb9e08e3a18e9ea087e5161d5a8a1db1",
+        "candidate": "1f14fc06fc199ec49e9b3e1ebbdfd99492e5a7baf6b26be202b641453262173e",
+        "future_base": "4a1484ccb444678fea13778432c4d9ffbb9e08e3a18e9ea087e5161d5a8a1db1",
+        "future_carry": "1f14fc06fc199ec49e9b3e1ebbdfd99492e5a7baf6b26be202b641453262173e"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "function": "forget",
+      "after_marker": "impl Ahead {",
+      "sha256": {
+        "base": "ac42b88fbafc4e1f380df255c5c636a00daa260d0ed34f03744d1b8c1395e56f",
+        "candidate": "ac42b88fbafc4e1f380df255c5c636a00daa260d0ed34f03744d1b8c1395e56f",
+        "future_base": "ac42b88fbafc4e1f380df255c5c636a00daa260d0ed34f03744d1b8c1395e56f",
+        "future_carry": "ac42b88fbafc4e1f380df255c5c636a00daa260d0ed34f03744d1b8c1395e56f"
+      },
+      "candidate_equals": {
+        "base": true,
+        "future_base": true,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "function": "a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+      "after_marker": null,
+      "sha256": {
+        "base": "2593e4203f4d02f3e2d2413988f3c2ad75492b111c1e2c451b377f08d391b243",
+        "candidate": "80023e92327f312c41575d845d11c445d50770e7627adedc5abcaabc936de76d",
+        "future_base": "2593e4203f4d02f3e2d2413988f3c2ad75492b111c1e2c451b377f08d391b243",
+        "future_carry": "80023e92327f312c41575d845d11c445d50770e7627adedc5abcaabc936de76d"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "function": "answered",
+      "after_marker": null,
+      "sha256": {
+        "base": "55b0fa00d58c892ae6f53d7eac700c9a195368f090af4a115832686304878cfb",
+        "candidate": "c0d7148766dcb61a68ea3fa6bf8decd38414b9d11c92d8594ab998e6732598d8",
+        "future_base": "55b0fa00d58c892ae6f53d7eac700c9a195368f090af4a115832686304878cfb",
+        "future_carry": "c0d7148766dcb61a68ea3fa6bf8decd38414b9d11c92d8594ab998e6732598d8"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "function": "observed",
+      "after_marker": null,
+      "sha256": {
+        "base": null,
+        "candidate": "e1b50966fad64cacff89c0bd28db7f61593e4d238ab061caa1334bd56eb4f84e",
+        "future_base": null,
+        "future_carry": "e1b50966fad64cacff89c0bd28db7f61593e4d238ab061caa1334bd56eb4f84e"
+      },
+      "candidate_equals": {
+        "base": false,
+        "future_base": false,
+        "future_carry": true
+      }
+    }
+  ]
+}

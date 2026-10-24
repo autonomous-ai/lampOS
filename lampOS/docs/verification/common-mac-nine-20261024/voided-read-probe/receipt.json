@@ -1,0 +1,34 @@
+{
+  "source_tree": "5191c66e97f7407fd136f9582454c3643be22cc1",
+  "bound_driver_source": "Fresh full Voice Cargo-target executable, retained by hardlink; no Cargo or target write",
+  "driver_original_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-9a168c072d9e2113",
+  "driver_sha256": "8999217601599646468825ed64b1cc857559bbe58112d820937cb4ada67e9dda",
+  "diagnostic_only": true,
+  "does_not_waive_full_suite": true,
+  "observations": [
+    {
+      "attempt": 1,
+      "exit": 0,
+      "elapsed_seconds": 3.8483968820000882,
+      "process_group_absent": true,
+      "exact_name": "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+      "driver_sha256": "8999217601599646468825ed64b1cc857559bbe58112d820937cb4ada67e9dda"
+    },
+    {
+      "attempt": 2,
+      "exit": 0,
+      "elapsed_seconds": 2.5762603329994818,
+      "process_group_absent": true,
+      "exact_name": "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+      "driver_sha256": "8999217601599646468825ed64b1cc857559bbe58112d820937cb4ada67e9dda"
+    },
+    {
+      "attempt": 3,
+      "exit": 0,
+      "elapsed_seconds": 2.591545405999568,
+      "process_group_absent": true,
+      "exact_name": "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+      "driver_sha256": "8999217601599646468825ed64b1cc857559bbe58112d820937cb4ada67e9dda"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+lamp-voice serve: session reader unavailable; metadata remains private
+
+thread 'session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata' (1453391) panicked at crates/voice/src/session_reader/tests.rs:111:5:
+assertion failed: report.acknowledged && report.degraded && !report.writer_failed

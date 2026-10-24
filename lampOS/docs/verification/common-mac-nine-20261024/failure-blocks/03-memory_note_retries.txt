@@ -1,0 +1,5 @@
+lamp-voice second: memory note asked as the turn is told; incomplete in 1 ms
+lamp-voice second: memory note incomplete; retry on the next turn; cause=own_missing
+
+thread 'second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends' (1430527) panicked at crates/voice/src/second_provider/worker/memory_note_retries.rs:1401:9:
+not waited for
