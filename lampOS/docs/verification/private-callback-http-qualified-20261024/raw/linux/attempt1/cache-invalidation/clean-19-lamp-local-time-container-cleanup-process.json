@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-combined-private-a16d4129d0c0-clean-19-lamp-local-time"
+  ],
+  "elapsed_seconds": 0.13959914700171794,
+  "exit": 0,
+  "pid": 51530,
+  "process_group": 51530,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

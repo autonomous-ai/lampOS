@@ -1,0 +1,17 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "path+file:///private/tmp/fourth-common-private-callback-composition-20261024/lampOS/crates/lean#lamp-lean@0.1.0"
+  ],
+  "elapsed_seconds": 0.2562811789975967,
+  "exit": 0,
+  "pid": 50978,
+  "process_group": 50978,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

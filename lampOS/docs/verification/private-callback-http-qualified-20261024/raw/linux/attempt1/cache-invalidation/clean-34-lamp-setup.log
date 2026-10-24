@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/setup#lamp-setup@0.1.0` is ignored, cleaning all versions of `lamp-setup` found
+warning: url qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/setup#lamp-setup@0.1.0` ignored, cleaning all versions of `lamp-setup` found
+     Removed 51 files, 47.3MiB total

@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/surround#lamp-surround@0.1.0` is ignored, cleaning all versions of `lamp-surround` found
+warning: url qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/surround#lamp-surround@0.1.0` ignored, cleaning all versions of `lamp-surround` found
+     Removed 61 files, 105.9MiB total

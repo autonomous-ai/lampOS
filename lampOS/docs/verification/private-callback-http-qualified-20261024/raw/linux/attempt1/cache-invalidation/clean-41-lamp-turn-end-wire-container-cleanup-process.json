@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-combined-private-a16d4129d0c0-clean-41-lamp-turn-end-wire"
+  ],
+  "elapsed_seconds": 0.1376118249972933,
+  "exit": 0,
+  "pid": 52855,
+  "process_group": 52855,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

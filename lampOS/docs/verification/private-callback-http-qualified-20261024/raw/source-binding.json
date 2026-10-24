@@ -1,0 +1,46 @@
+{
+  "base": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "branch": "fourth/common-private-callback-composition-20261024",
+  "frozen_sha256": "b207ba40d0e4254e0653206d88370771832a7a3395b3b1ce171e2e9f1678df4a",
+  "helpers": {
+    "cache.py": {
+      "bytes": 10654,
+      "helper_code_not_included": true,
+      "sha256": "de6f8b4418b61605846aa230022754f045a557feb2eeae7cc3c1adb840e221e9"
+    },
+    "gate.py": {
+      "bytes": 33111,
+      "helper_code_not_included": true,
+      "sha256": "9bcaa32f02c6eb096a12dc90362ba81a0fedb910559aa0b95978cfc3231af758"
+    }
+  },
+  "outside_owned_base_exact": 10451,
+  "owned_paths": {
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs": {
+      "bytes": 65912,
+      "git_blob": "4dc95ccfc08621550abcef332d5f52ff83ffe053",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792852068937975640,
+      "sha256": "5223aed53bc95643a66d50dd7034b752dd2bc741fd7e507a38443f01a70a2ca6"
+    },
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs": {
+      "bytes": 39533,
+      "git_blob": "33a4229b62997b6a6d4fbdaba6cf2c8282cc56a7",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792852068937811570,
+      "sha256": "127ec2743f70acd81584ad9da04fabd4c82f535ea0123da99ded83d4347a8bf9"
+    }
+  },
+  "reconstruction": {
+    "semantic_index_sha256": "c93e6a54c805981f37bbd981b9cb6cd6faf5be80b0afc06633064ca2c9122495",
+    "source_files": 10453,
+    "tree": "be860815986f43c8a1b37a8ac50a210216977039"
+  },
+  "source_files": 10453,
+  "source_root": "/private/tmp/fourth-common-private-callback-composition-20261024",
+  "tested_tree": "be860815986f43c8a1b37a8ac50a210216977039"
+}

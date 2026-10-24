@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-combined-private-a16d4129d0c0-workspace-build"
+  ],
+  "elapsed_seconds": 0.14945970999906422,
+  "exit": 0,
+  "pid": 75285,
+  "process_group": 75285,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

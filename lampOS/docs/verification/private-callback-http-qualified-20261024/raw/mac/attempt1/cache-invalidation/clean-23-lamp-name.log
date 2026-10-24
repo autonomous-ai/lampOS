@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-common-private-callback-composition-20261024/lampOS/crates/name#lamp-name@0.1.0` is ignored, cleaning all versions of `lamp-name` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-common-private-callback-composition-20261024/lampOS/crates/name#lamp-name@0.1.0` ignored, cleaning all versions of `lamp-name` found
+     Removed 71 files, 184.0MiB total

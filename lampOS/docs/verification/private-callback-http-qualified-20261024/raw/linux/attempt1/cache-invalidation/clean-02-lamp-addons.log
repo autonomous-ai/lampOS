@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/addons#lamp-addons@0.1.0` is ignored, cleaning all versions of `lamp-addons` found
+warning: url qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/addons#lamp-addons@0.1.0` ignored, cleaning all versions of `lamp-addons` found
+     Removed 47 files, 8.6MiB total

@@ -1,0 +1,344 @@
+{
+  "base": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "final_binding_separately_verified": true,
+  "four_stages_each_verified": true,
+  "historical_failures_not_waived": true,
+  "hosts": [
+    {
+      "combined_fixture": {
+        "captured_timing_lines": [],
+        "internal_cases_in_exact_source": 2,
+        "internal_cases_independently_counted": false,
+        "timings_note": "Formal pretty success output captures child stderr; absent timing lines are unobserved, not inferred",
+        "timings_observed": false,
+        "top_level_tests_observed": 1
+      },
+      "compiler_output_hashes_stage_time_only": true,
+      "controls": [
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch",
+          "observed_once_passed": true
+        }
+      ],
+      "current_cache_outputs_not_read": true,
+      "freshly_compiled_local_members": 46,
+      "platform": "mac",
+      "source_stable_and_cleanup_verified": true,
+      "stages": [
+        {
+          "bound_seconds": 300,
+          "elapsed_seconds": 12.607084506998945,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "2ef1dc4a5b004d97ee49812e7017dbc851ffbca15cf2277d900082648302f747",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "fmt",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 309.10390913599986,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "fc3a101eaa7ee6ae802262f1c5cbfae302b02065cd8aa88ab175a97be593e1cf",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "clippy",
+          "stdout_sha256": "d5c72f31dede37aaa342b879a22c27051e0b8564ac5c179de525c6440b4ecd03"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 275.0868285880024,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "fed1d6f7857e5fa04c8e379f84d5af5e7d96c3e83541cd80572c269e020e7385",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "workspace-build",
+          "stdout_sha256": "c02f36a856b7087c00181e4b74f2ff08cfedcbc97e399c9aa7e44fa21a88c838"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 1135.9644993799993,
+          "exact_control_count": 5,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 21,
+            "passed": 4126
+          },
+          "process_sha256": "6043d5477e99126902dd6f908324977eb2f22107e58cec8c2c40219db1fa25e2",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 21,
+            "passed": 4126
+          },
+          "stage": "full-voice",
+          "stdout_sha256": "dbf4f6be3e5084c57e9689287d412f1aaf0c607b38f7c94c0c78256c4a3ab279"
+        }
+      ],
+      "terminal_sha256": "17dba7e03de0fd3e7017dc9aafc88ddf030afc219f074853f8598c840e35b474",
+      "tree": "be860815986f43c8a1b37a8ac50a210216977039",
+      "voice_counts": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4126
+      }
+    },
+    {
+      "combined_fixture": {
+        "captured_timing_lines": [],
+        "internal_cases_in_exact_source": 2,
+        "internal_cases_independently_counted": false,
+        "timings_note": "Formal pretty success output captures child stderr; absent timing lines are unobserved, not inferred",
+        "timings_observed": false,
+        "top_level_tests_observed": 1
+      },
+      "compiler_output_hashes_stage_time_only": true,
+      "controls": [
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch",
+          "observed_once_passed": true
+        }
+      ],
+      "current_cache_outputs_not_read": true,
+      "freshly_compiled_local_members": 46,
+      "platform": "linux",
+      "source_stable_and_cleanup_verified": true,
+      "stages": [
+        {
+          "bound_seconds": 300,
+          "elapsed_seconds": 12.773772952998115,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "971a33b8bbf2bd9862351a1db13293a264981edd7d6a9d15c10a81e214f997e6",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "fmt",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 331.6250434350004,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "39abd9d69e3e4aad81814ee7fc7743ef9bab0f067298b1168cafc0bc131a266f",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "clippy",
+          "stdout_sha256": "1cb4bcd1716a3bfaf7e0811f45a7c1e78720502eb3c78ddc7031af77928e2a38"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 203.27516931199716,
+          "exact_control_count": 0,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "process_sha256": "61669e9891adef389f05a723646ef047d656b3a6e18c85f480ba7e27eadaf41a",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "stage": "workspace-build",
+          "stdout_sha256": "ead6ba848ad56d7c40768c6687d136d47821b2354a440f24c7edd7c747814f57"
+        },
+        {
+          "bound_seconds": 5400,
+          "elapsed_seconds": 931.1937986849989,
+          "exact_control_count": 5,
+          "exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4187
+          },
+          "process_sha256": "7f601f9383b1953e6c324989395cf1f2b8b886f77750695d4cfc81c96b677674",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4187
+          },
+          "stage": "full-voice",
+          "stdout_sha256": "4ae25dc2d8f1376cc0d83e08c09acb0fd057d66757cb290d101630f094567b21"
+        }
+      ],
+      "terminal_sha256": "e05a0f89bc8935e048847c1ad9776f82eb9c311dfd5ffbe1c881b5c1312fda36",
+      "tree": "be860815986f43c8a1b37a8ac50a210216977039",
+      "voice_counts": {
+        "failed": 0,
+        "ignored": 24,
+        "passed": 4187
+      }
+    }
+  ],
+  "immutable_explicit_git_objects_read_for_final_binding_only": true,
+  "no_current_source_index_refs_targets_caches_read_or_written": true,
+  "not_claimed": [
+    "ARM64 CI",
+    "lamp behavior",
+    "readiness",
+    "product activation",
+    "independent two-test count for child/internal cases",
+    "uncaptured callback timings"
+  ],
+  "old_778e_665d_epochs_unchanged": true,
+  "tested_tree": "be860815986f43c8a1b37a8ac50a210216977039"
+}

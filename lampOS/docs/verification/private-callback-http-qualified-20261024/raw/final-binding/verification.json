@@ -1,0 +1,25 @@
+{
+  "after_tests_delta": [
+    "lampOS/docs/verification/private-callback-http-20261024/README.md"
+  ],
+  "all_other_git_blobs_modes_exact": true,
+  "commit_object_sha256": "d61d0bd253642a04d89cd25685141c13685ea62707b36ddbe921b33750e5ce10",
+  "current_refs_index_worktree_not_read": true,
+  "final_source_files": 10454,
+  "head": "8aed9d14acadbbf66fd5e309c880dead0225643d",
+  "independently_verified_from_explicit_immutable_git_objects": true,
+  "new_document": {
+    "bytes": 2971,
+    "git_blob": "0745e346b194011482f3e95115fe641fea94695a",
+    "git_mode": "100644",
+    "sha256": "6e95c3c1d89f33359ec2733fdd0f57ebafd332a2913208ab6bdb5455a78a7eca"
+  },
+  "parent": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "post_test_documentation_not_reexecuted": true,
+  "tested_tree_reconstructed_from_frozen_map": {
+    "semantic_index_sha256": "c93e6a54c805981f37bbd981b9cb6cd6faf5be80b0afc06633064ca2c9122495",
+    "source_files": 10453,
+    "tree": "be860815986f43c8a1b37a8ac50a210216977039"
+  },
+  "tree": "ac72aaab7bae5a5fd8145f2fc21faee5f48820f6"
+}

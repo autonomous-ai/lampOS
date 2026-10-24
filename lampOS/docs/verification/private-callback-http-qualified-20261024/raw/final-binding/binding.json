@@ -1,0 +1,28 @@
+{
+  "base": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "tested_tree": "be860815986f43c8a1b37a8ac50a210216977039",
+  "final_tree": "ac72aaab7bae5a5fd8145f2fc21faee5f48820f6",
+  "after_tests_documentation_only": [
+    "lampOS/docs/verification/private-callback-http-20261024/README.md"
+  ],
+  "all_other_git_blobs_modes_exact": true,
+  "receipts": {
+    "mac": {
+      "terminal_sha256": "17dba7e03de0fd3e7017dc9aafc88ddf030afc219f074853f8598c840e35b474",
+      "counts": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4126
+      }
+    },
+    "linux": {
+      "terminal_sha256": "e05a0f89bc8935e048847c1ad9776f82eb9c311dfd5ffbe1c881b5c1312fda36",
+      "counts": {
+        "failed": 0,
+        "ignored": 24,
+        "passed": 4187
+      }
+    }
+  },
+  "head": "8aed9d14acadbbf66fd5e309c880dead0225643d"
+}

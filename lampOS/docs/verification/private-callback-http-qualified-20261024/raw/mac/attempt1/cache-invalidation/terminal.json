@@ -1,0 +1,16 @@
+{
+  "exit": 0,
+  "expected_local_members": 46,
+  "operations_sha256": "9b5cbccdfbd4676ed6b2b9aaa9b434b51236462dc0a79ae8e2ce9939b21ca783",
+  "platform": "mac",
+  "registry_git_dependency_outputs_not_selected_for_clean": true,
+  "separate_prerequisite_not_test_pass": true,
+  "source_mtimes_not_rewritten": true,
+  "source_stable": true,
+  "successful_local_cleans": 46,
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+  "target_release_permitted": true,
+  "total_elapsed_seconds": 20.94378222800151,
+  "tree": "be860815986f43c8a1b37a8ac50a210216977039",
+  "validated_local_members": 46
+}

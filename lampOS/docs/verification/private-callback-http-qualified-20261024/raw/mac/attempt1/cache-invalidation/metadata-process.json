@@ -1,0 +1,18 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "metadata",
+    "--no-deps",
+    "--offline",
+    "--locked",
+    "--format-version=1"
+  ],
+  "elapsed_seconds": 0.1471506000016234,
+  "exit": 0,
+  "pid": 50768,
+  "process_group": 50768,
+  "process_group_absent": true,
+  "stderr_log": "metadata.stderr",
+  "timeout_seconds": 300
+}

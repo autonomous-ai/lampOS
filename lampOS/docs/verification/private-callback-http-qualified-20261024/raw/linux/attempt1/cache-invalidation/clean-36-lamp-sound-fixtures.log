@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/sound-fixtures#lamp-sound-fixtures@0.1.0` is ignored, cleaning all versions of `lamp-sound-fixtures` found
+warning: url qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/sound-fixtures#lamp-sound-fixtures@0.1.0` ignored, cleaning all versions of `lamp-sound-fixtures` found
+     Removed 47 files, 9.1MiB total

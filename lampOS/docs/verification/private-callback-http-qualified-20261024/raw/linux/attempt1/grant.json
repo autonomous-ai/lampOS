@@ -1,0 +1,19 @@
+{
+  "at_unix": 1792852308.643973,
+  "authorized_by": "Fourth: exact be860815 test-only scope, four-stage design, five controls, fresh46 and current778e Linux release reviewed; target execution granted",
+  "design_sha256": "75d21aa4a9f3d8c064092be60c76612b64d33ef215cdcc4c3b8df0a533c15fe9",
+  "frozen_sha256": "b207ba40d0e4254e0653206d88370771832a7a3395b3b1ce171e2e9f1678df4a",
+  "no_lamp_action": true,
+  "previous_release": {
+    "diagnostic_only": false,
+    "exit": 0,
+    "no_cache_freshness_inferred_from_handoff": true,
+    "path": "/private/tmp/fourth-common-current-gates-20261024/linux/attempt1/terminal.json",
+    "prior_failure_not_waived": false,
+    "prior_failures": [],
+    "prior_source_stable": true,
+    "sha256": "41004331c90d1714e04cae06aac40bd4fdddbaf92aeaa61268151c55ac3fb477",
+    "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024"
+  },
+  "tree": "be860815986f43c8a1b37a8ac50a210216977039"
+}

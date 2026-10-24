@@ -1,0 +1,1932 @@
+{
+  "files": [
+    {
+      "bytes": 2516,
+      "path": "README.md",
+      "sha256": "191d6c9f164bc7fc7c369046b36ab7bcdeda050ff330e0c1f78bf4a1b2c667f5"
+    },
+    {
+      "bytes": 22369,
+      "path": "bindings/config.json",
+      "sha256": "60493a3b17bce66245696358a7c7a51d1ea4c2cd333d8a66fc7f05d8762b1076"
+    },
+    {
+      "bytes": 612,
+      "path": "bindings/design.json",
+      "sha256": "75d21aa4a9f3d8c064092be60c76612b64d33ef215cdcc4c3b8df0a533c15fe9"
+    },
+    {
+      "bytes": 3702492,
+      "path": "bindings/frozen.json",
+      "sha256": "b207ba40d0e4254e0653206d88370771832a7a3395b3b1ce171e2e9f1678df4a"
+    },
+    {
+      "bytes": 824,
+      "path": "final-binding/binding.json",
+      "sha256": "b5dd9a113b84337f3a80b72efdb0ae4b70b578a27abd490df11601b75e2343de"
+    },
+    {
+      "bytes": 41,
+      "path": "final-binding/head.txt",
+      "sha256": "c210536b76380093eeac6040a5fd2524659eeccc9941f873d9b841f81f781272"
+    },
+    {
+      "bytes": 2287,
+      "path": "final-binding/pr-body.md",
+      "sha256": "949c95185b7c833cbb56619b5c96a595676d2981beb24e1b73f342d1ba58d344"
+    },
+    {
+      "bytes": 2971,
+      "path": "final-binding/result-README.md",
+      "sha256": "6e95c3c1d89f33359ec2733fdd0f57ebafd332a2913208ab6bdb5455a78a7eca"
+    },
+    {
+      "bytes": 1049,
+      "path": "final-binding/verification.json",
+      "sha256": "56280d02e56914b0f1261f41168dff47ec042c067fd81d4cc583bb31d7eee393"
+    },
+    {
+      "bytes": 307,
+      "path": "linux/attempt1/cache-invalidation/clean-01-lamp-actions-container-cleanup-process.json",
+      "sha256": "a6bdcce97f5201fe109ffcea0c9546c47791e9950f83f1fda030e1495eac7cd4"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-01-lamp-actions-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2011,
+      "path": "linux/attempt1/cache-invalidation/clean-01-lamp-actions-process.json",
+      "sha256": "f31b672d0bad4cf11bb64b645f913b30990a4a3ab85d2b0249b3723b2acd1d6c"
+    },
+    {
+      "bytes": 386,
+      "path": "linux/attempt1/cache-invalidation/clean-01-lamp-actions.log",
+      "sha256": "5c29ea7dfd6853494e3ae6f23a84e2eff544335af7f6c3cd34eed8579e40ea62"
+    },
+    {
+      "bytes": 306,
+      "path": "linux/attempt1/cache-invalidation/clean-02-lamp-addons-container-cleanup-process.json",
+      "sha256": "da4b52bc981dc66639deb0f89fd067b62fcdc2d5fc582e0f9e5d9881d827afee"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-02-lamp-addons-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2006,
+      "path": "linux/attempt1/cache-invalidation/clean-02-lamp-addons-process.json",
+      "sha256": "89a65b5764658e6a559ec970c526224fe4cee014504c869ab8122d6ad74f2aee"
+    },
+    {
+      "bytes": 377,
+      "path": "linux/attempt1/cache-invalidation/clean-02-lamp-addons.log",
+      "sha256": "d47cdfba7f7e9afedc9dd3d957e5ec519bc6760f888ad0edd73ed6c6d36c21ca"
+    },
+    {
+      "bytes": 303,
+      "path": "linux/attempt1/cache-invalidation/clean-03-lamp-air-container-cleanup-process.json",
+      "sha256": "e75581b901d3ea0ed4905643a72e0cd432aad068cb746803c69936cf75b28d3a"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-03-lamp-air-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1995,
+      "path": "linux/attempt1/cache-invalidation/clean-03-lamp-air-process.json",
+      "sha256": "c0e17312be8ae4d1e754063d5823fc6c1dd67c9639dd07e6a09e316e75d9e5d6"
+    },
+    {
+      "bytes": 359,
+      "path": "linux/attempt1/cache-invalidation/clean-03-lamp-air.log",
+      "sha256": "1f0fe9314c62c5e5fbd32afdcf0fa20023bcc4119165a7652dfd553f87a93076"
+    },
+    {
+      "bytes": 305,
+      "path": "linux/attempt1/cache-invalidation/clean-04-lamp-audio-container-cleanup-process.json",
+      "sha256": "0af0c44b3e0644bb483afbed2ddb9763ded378dac670fac8a32f5ab1d7db2a55"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-04-lamp-audio-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2003,
+      "path": "linux/attempt1/cache-invalidation/clean-04-lamp-audio-process.json",
+      "sha256": "8de62a6f36498ce7c47288c776c55928cc387f454b568fb7b6e1d248dd023f39"
+    },
+    {
+      "bytes": 372,
+      "path": "linux/attempt1/cache-invalidation/clean-04-lamp-audio.log",
+      "sha256": "ed86b9ddf201672dd37a02de94aee11d52799bbc25d237096b742feb99d85ce3"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-05-lamp-body-container-cleanup-process.json",
+      "sha256": "f48fe6cd61388670fbbbd1581ea9abc4f0a5cc566eb374ba4ae4af6514dafefc"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-05-lamp-body-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1999,
+      "path": "linux/attempt1/cache-invalidation/clean-05-lamp-body-process.json",
+      "sha256": "3aa7dc78911459c8fda4b5390b8d6d89e89eccb508de57079431bfae4545adab"
+    },
+    {
+      "bytes": 367,
+      "path": "linux/attempt1/cache-invalidation/clean-05-lamp-body.log",
+      "sha256": "d38b2bff7125b85da508d05c2441d85377957d199cc41edaa0ad16273dd931ab"
+    },
+    {
+      "bytes": 303,
+      "path": "linux/attempt1/cache-invalidation/clean-06-lamp-bus-container-cleanup-process.json",
+      "sha256": "f585f134b901ae52291e750f60d27f861e567ee7a06b7924abcd66356fd4b5bc"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-06-lamp-bus-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1994,
+      "path": "linux/attempt1/cache-invalidation/clean-06-lamp-bus-process.json",
+      "sha256": "53f8130852a4e5d15a432f70f368b90c124292e257b0f5fc4eed9711c0a91fd8"
+    },
+    {
+      "bytes": 360,
+      "path": "linux/attempt1/cache-invalidation/clean-06-lamp-bus.log",
+      "sha256": "fa8e519cae25cfaff3d84e9b3d691730d4c810061b32501fe4f57b63dbb89ac9"
+    },
+    {
+      "bytes": 305,
+      "path": "linux/attempt1/cache-invalidation/clean-07-lamp-camera-container-cleanup-process.json",
+      "sha256": "eff9ed4a034f2eab8c8c38d675816b7693ebfcfc1c33d6bee47e12b3101a3e1c"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-07-lamp-camera-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2006,
+      "path": "linux/attempt1/cache-invalidation/clean-07-lamp-camera-process.json",
+      "sha256": "216a8fafbf904583c063788905f8989e9a733a4690688aef91d8d4f44964d84c"
+    },
+    {
+      "bytes": 378,
+      "path": "linux/attempt1/cache-invalidation/clean-07-lamp-camera.log",
+      "sha256": "138702bb0870e47efdc0d9331ab045e36642f5c8c213ce6d6bb4fbeadb3fd747"
+    },
+    {
+      "bytes": 305,
+      "path": "linux/attempt1/cache-invalidation/clean-08-lamp-cloud-container-cleanup-process.json",
+      "sha256": "29207fb6a33716a3d6d83aa4f3a7f270b8d8a13702c1d57fa41bf7d1a3a8b969"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-08-lamp-cloud-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2003,
+      "path": "linux/attempt1/cache-invalidation/clean-08-lamp-cloud-process.json",
+      "sha256": "30f722773358f04f7f0dbd2ffc7067af960e11b414e41f2245a574cb8f7a449c"
+    },
+    {
+      "bytes": 372,
+      "path": "linux/attempt1/cache-invalidation/clean-08-lamp-cloud.log",
+      "sha256": "06ce9404b36bd3b3017e4bfbb6e421104f9a622faa82e09d427562b7accbbb24"
+    },
+    {
+      "bytes": 308,
+      "path": "linux/attempt1/cache-invalidation/clean-09-lamp-controls-container-cleanup-process.json",
+      "sha256": "b928b35651707ce00dab5fd40f4852dc006cf40ff81fb01a50157ef9a090dacc"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-09-lamp-controls-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2015,
+      "path": "linux/attempt1/cache-invalidation/clean-09-lamp-controls-process.json",
+      "sha256": "85859acb94cbcdc77a65b3a2ccdb32a974347574e164b909f6c698232afecbf0"
+    },
+    {
+      "bytes": 390,
+      "path": "linux/attempt1/cache-invalidation/clean-09-lamp-controls.log",
+      "sha256": "dd984b0ee0b2ee607a4304dcf45357d1d8455b355cf3b48035aa9e24ae556a7f"
+    },
+    {
+      "bytes": 303,
+      "path": "linux/attempt1/cache-invalidation/clean-10-lamp-ears-container-cleanup-process.json",
+      "sha256": "c9ffb49fb2835b337f3d4d7e180d06d201555d7147bb2e0f52e9269349b7c3ce"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-10-lamp-ears-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1998,
+      "path": "linux/attempt1/cache-invalidation/clean-10-lamp-ears-process.json",
+      "sha256": "3835b475a3bd52c208c557c916b75987542e5cf3f4771c21f2ed6df503914641"
+    },
+    {
+      "bytes": 367,
+      "path": "linux/attempt1/cache-invalidation/clean-10-lamp-ears.log",
+      "sha256": "c0c162f2f11fe348e0121c6c4d69587bf309a30e1b9144752077bdfb7a4327c4"
+    },
+    {
+      "bytes": 311,
+      "path": "linux/attempt1/cache-invalidation/clean-11-lamp-environment-container-cleanup-process.json",
+      "sha256": "c37545c6e4dce6c667a811f0de9fa6c0d311dc06aa0b3c37cac0a21e35bf8c80"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-11-lamp-environment-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2027,
+      "path": "linux/attempt1/cache-invalidation/clean-11-lamp-environment-process.json",
+      "sha256": "213fad0b96b007340adfac8df383f6b19f3ce06f4e64e5bbc846788b08349d36"
+    },
+    {
+      "bytes": 409,
+      "path": "linux/attempt1/cache-invalidation/clean-11-lamp-environment.log",
+      "sha256": "5aa76ffe92a0d10f939dc662a74419403b29704d24d983d7481d6fab5091313d"
+    },
+    {
+      "bytes": 309,
+      "path": "linux/attempt1/cache-invalidation/clean-12-lamp-expression-container-cleanup-process.json",
+      "sha256": "f5f8402323de0ca1cebf53c464f05c36c27fdf94a66b13ce93d671ad78f4dac1"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-12-lamp-expression-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2022,
+      "path": "linux/attempt1/cache-invalidation/clean-12-lamp-expression-process.json",
+      "sha256": "2e5309b06023bfc5259e97750991d273aecf53f8742bb5c886969cf12dfc48e4"
+    },
+    {
+      "bytes": 402,
+      "path": "linux/attempt1/cache-invalidation/clean-12-lamp-expression.log",
+      "sha256": "46ca6f8bbfa6791d5f6bccd3f0b9f9e83503058e6450e48e1de550b4cc72ea25"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-13-lamp-eyes-container-cleanup-process.json",
+      "sha256": "f70e0e5cbad19403567a8375091718b56929f7317860da353c6b489092c8558d"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-13-lamp-eyes-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1999,
+      "path": "linux/attempt1/cache-invalidation/clean-13-lamp-eyes-process.json",
+      "sha256": "9347303fe5654189a12867a1ad9f9a38eeeb7f44ad9729f144d7edeb3065a219"
+    },
+    {
+      "bytes": 368,
+      "path": "linux/attempt1/cache-invalidation/clean-13-lamp-eyes.log",
+      "sha256": "f5f5fc6bb5308c95bb4581444ec4af114bc0b84c5e4aa33d387d4f4449078296"
+    },
+    {
+      "bytes": 306,
+      "path": "linux/attempt1/cache-invalidation/clean-14-lamp-gemini-container-cleanup-process.json",
+      "sha256": "568f66969b41f1a71f7be093ddf05b3ce6f7227a36f3b480660714e11f8fef33"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-14-lamp-gemini-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2007,
+      "path": "linux/attempt1/cache-invalidation/clean-14-lamp-gemini-process.json",
+      "sha256": "1c4ea12e1ad6a8f13af153d4eea65f85b5931f639c37a36f2468c7f28fbaa7e9"
+    },
+    {
+      "bytes": 378,
+      "path": "linux/attempt1/cache-invalidation/clean-14-lamp-gemini.log",
+      "sha256": "7cdfde218a515e6e83f55858dab341e6055d6d085dae3fedbf16bd6c1c20bd09"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-15-lamp-health-container-cleanup-process.json",
+      "sha256": "3f45a301c92f2529713048868a9981d8ba96f0a33b34f8fe3d157a9698eea739"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-15-lamp-health-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2005,
+      "path": "linux/attempt1/cache-invalidation/clean-15-lamp-health-process.json",
+      "sha256": "b883648d7a661b6b6d7c4b91a1a27b27b97f37fafe52131fb6ec90921abae7a9"
+    },
+    {
+      "bytes": 378,
+      "path": "linux/attempt1/cache-invalidation/clean-15-lamp-health.log",
+      "sha256": "608e64c82131af0a1cd62d0bd1f1e2c1a32fb0fbc66ffd10d124695131f43bb0"
+    },
+    {
+      "bytes": 303,
+      "path": "linux/attempt1/cache-invalidation/clean-16-lamp-ipc-container-cleanup-process.json",
+      "sha256": "2dc39cf16bd6f71c0cc0cbbc8edae1903f02ee1169250813139a0ece1ffe0193"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-16-lamp-ipc-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1995,
+      "path": "linux/attempt1/cache-invalidation/clean-16-lamp-ipc-process.json",
+      "sha256": "3474a9d76c9bb1921985603454e3763e79e763f4e22d0cb061436694c3f93859"
+    },
+    {
+      "bytes": 359,
+      "path": "linux/attempt1/cache-invalidation/clean-16-lamp-ipc.log",
+      "sha256": "4f696351d6f7a187e99fae8ce1e2900fa1d43d7fdc28c9f713a929d7d434d50c"
+    },
+    {
+      "bytes": 306,
+      "path": "linux/attempt1/cache-invalidation/clean-17-lamp-keeper-container-cleanup-process.json",
+      "sha256": "c9589a2335d84b6ea05681a8c4d7a0df7ef993d333b96929bbe6b4c58a41c1cb"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-17-lamp-keeper-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2007,
+      "path": "linux/attempt1/cache-invalidation/clean-17-lamp-keeper-process.json",
+      "sha256": "749e0e3baabf3005c4916ea3c13813c6702dacca150d8316b969e28d5dfb239f"
+    },
+    {
+      "bytes": 378,
+      "path": "linux/attempt1/cache-invalidation/clean-17-lamp-keeper.log",
+      "sha256": "588e5c9b9f90ff0d8d4ea67cf434c138f37ac32392664f66e58a2399d5bbb32d"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-18-lamp-lean-container-cleanup-process.json",
+      "sha256": "bd683fb01b173851c8ca0282a58f62041dbc70e42e6edb2c9f47755b3d918442"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-18-lamp-lean-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1999,
+      "path": "linux/attempt1/cache-invalidation/clean-18-lamp-lean-process.json",
+      "sha256": "6c482762c8ec9f3f01752d0204b2040e87fbb25918f28ee18777ffbfb27bb4db"
+    },
+    {
+      "bytes": 365,
+      "path": "linux/attempt1/cache-invalidation/clean-18-lamp-lean.log",
+      "sha256": "252b8eb908f232ad7f246df512ad323a8e54ff8090eecaeef800d19a04ddaa03"
+    },
+    {
+      "bytes": 310,
+      "path": "linux/attempt1/cache-invalidation/clean-19-lamp-local-time-container-cleanup-process.json",
+      "sha256": "59be634a175c6ee356653b6f8727eb804d769a9ca7283264cd3f9c1ba90b6b77"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-19-lamp-local-time-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2022,
+      "path": "linux/attempt1/cache-invalidation/clean-19-lamp-local-time-process.json",
+      "sha256": "720bdf479925588fd2c7609497ae03d138e02001e8edba81052d4db023a715ad"
+    },
+    {
+      "bytes": 401,
+      "path": "linux/attempt1/cache-invalidation/clean-19-lamp-local-time.log",
+      "sha256": "eb669eb24b2b990b8dc66a84050a23ad4d23602d53dd4257962e40b22936c264"
+    },
+    {
+      "bytes": 306,
+      "path": "linux/attempt1/cache-invalidation/clean-20-lamp-memory-container-cleanup-process.json",
+      "sha256": "0bb72ee75f77b0e95ce74f12e4442fe2ab2c872c7ef23548b7c3cbf74d9007c7"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-20-lamp-memory-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2005,
+      "path": "linux/attempt1/cache-invalidation/clean-20-lamp-memory-process.json",
+      "sha256": "2fe12130833405a511ea4ec3b5218cd4e6a6e26fc39256e8b83f69a362a33fa4"
+    },
+    {
+      "bytes": 380,
+      "path": "linux/attempt1/cache-invalidation/clean-20-lamp-memory.log",
+      "sha256": "07d3cbed7cb02cad198e03f4424718475d42480724b87da19890ef155907d8ab"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-21-lamp-mood-container-cleanup-process.json",
+      "sha256": "cdf93bb6daa1097cfa7fe5f9f9af6b0df65fba2559087c5d7b5fc0866a049c1f"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-21-lamp-mood-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1999,
+      "path": "linux/attempt1/cache-invalidation/clean-21-lamp-mood-process.json",
+      "sha256": "aff8f46078dc09c758eb028506bafd8b3b819e6854d6e0286a3a57d2ce2e7173"
+    },
+    {
+      "bytes": 366,
+      "path": "linux/attempt1/cache-invalidation/clean-21-lamp-mood.log",
+      "sha256": "da2e8f3b685647f2b43ffdae39b7906ed2f4a6472646e765c0b2f5813d9d48af"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-22-lamp-msgs-container-cleanup-process.json",
+      "sha256": "ea16eac99019818b4d8013664dba37000b7a093cc7baa0b3a6f0e52a03f13059"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-22-lamp-msgs-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1999,
+      "path": "linux/attempt1/cache-invalidation/clean-22-lamp-msgs-process.json",
+      "sha256": "3565849a61997b32c1b47edcc222ea90a221fc729ae7b58df42b8cfb7c098d35"
+    },
+    {
+      "bytes": 366,
+      "path": "linux/attempt1/cache-invalidation/clean-22-lamp-msgs.log",
+      "sha256": "5dd7532de406ea8ab3b874df3e7a6004b1c58ffbcdcd324e190504b8015418c9"
+    },
+    {
+      "bytes": 303,
+      "path": "linux/attempt1/cache-invalidation/clean-23-lamp-name-container-cleanup-process.json",
+      "sha256": "17e9e4a50616e4c097384e7f2dac2e088b0f57aaef3554643e1438e0abd493dc"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-23-lamp-name-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1998,
+      "path": "linux/attempt1/cache-invalidation/clean-23-lamp-name-process.json",
+      "sha256": "3053cf2a5ea6cffd7fdcaa75f7576eb61f8e9abcb7d961d585349eff1296633c"
+    },
+    {
+      "bytes": 367,
+      "path": "linux/attempt1/cache-invalidation/clean-23-lamp-name.log",
+      "sha256": "e25fea116e010be1d59c8908622672cd9a529a1dd5ccf9c1aad7e758aa0041b5"
+    },
+    {
+      "bytes": 309,
+      "path": "linux/attempt1/cache-invalidation/clean-24-lamp-near-call-container-cleanup-process.json",
+      "sha256": "fec5a6da8cc3c21dfbc4122d1f227a77519aa11eb54179c1d7a080292b37c98e"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-24-lamp-near-call-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2019,
+      "path": "linux/attempt1/cache-invalidation/clean-24-lamp-near-call-process.json",
+      "sha256": "2391230ee4db4cd18185a63fbf3b0098cf0b9031ea493b29a3de93d1ab04fe58"
+    },
+    {
+      "bytes": 395,
+      "path": "linux/attempt1/cache-invalidation/clean-24-lamp-near-call.log",
+      "sha256": "e57f865e8b5d99628ea892aa1b3bfce0ef7984dddc73780c62e9a5aa37754129"
+    },
+    {
+      "bytes": 308,
+      "path": "linux/attempt1/cache-invalidation/clean-25-lamp-observer-container-cleanup-process.json",
+      "sha256": "5236f1987bb8550c411f391e3a03b2452db378318d855d6470ccb13ee6c5e1b7"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-25-lamp-observer-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2015,
+      "path": "linux/attempt1/cache-invalidation/clean-25-lamp-observer-process.json",
+      "sha256": "592db5822616753a527e5146f7e02e26ed6086f8627b89e75e3c2a6bbc431208"
+    },
+    {
+      "bytes": 389,
+      "path": "linux/attempt1/cache-invalidation/clean-25-lamp-observer.log",
+      "sha256": "2ef6ce00031aa3a50f60bd15637b44f040a0cadeb040ceea6b84138c0f6ecc4e"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-26-lamp-peek-container-cleanup-process.json",
+      "sha256": "0bab21188b2fefd141290fa0e1431dcdb0ab0bff3197d0f1740037332b19c781"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-26-lamp-peek-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1999,
+      "path": "linux/attempt1/cache-invalidation/clean-26-lamp-peek-process.json",
+      "sha256": "e2784243c9cd25cee129be2a33a0c90878af775a45e2858165c5009fb441daf1"
+    },
+    {
+      "bytes": 366,
+      "path": "linux/attempt1/cache-invalidation/clean-26-lamp-peek.log",
+      "sha256": "5cc2258f936f4a423a39891ccb8cf391bc53993e8e73a88a041d364b4f234075"
+    },
+    {
+      "bytes": 305,
+      "path": "linux/attempt1/cache-invalidation/clean-27-lamp-policy-container-cleanup-process.json",
+      "sha256": "e8e658327549b47cb3b45dd25abab8cfc998b7fe1e0aa7fabf45998f8bc51012"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-27-lamp-policy-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2005,
+      "path": "linux/attempt1/cache-invalidation/clean-27-lamp-policy-process.json",
+      "sha256": "94300560ca5a21432e9b1e8d88f6482533960a8c225b6ad273ddca783c106798"
+    },
+    {
+      "bytes": 380,
+      "path": "linux/attempt1/cache-invalidation/clean-27-lamp-policy.log",
+      "sha256": "d45201bd04fb91dabf973c786dc1eb607c6a63f7e842676e823d07a7b1e2de35"
+    },
+    {
+      "bytes": 307,
+      "path": "linux/attempt1/cache-invalidation/clean-28-lamp-records-container-cleanup-process.json",
+      "sha256": "450c80ffc95dbd03a2b766b00db9fd8c1ad3cb7017ce1815b9cb562682508f16"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-28-lamp-records-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2011,
+      "path": "linux/attempt1/cache-invalidation/clean-28-lamp-records-process.json",
+      "sha256": "36d15b31fd86299cad56c0481b65f29d19d56d5e6c23f872f8cbf3a55f8a23a3"
+    },
+    {
+      "bytes": 384,
+      "path": "linux/attempt1/cache-invalidation/clean-28-lamp-records.log",
+      "sha256": "4733601d4cf23d3188dd5aeea04eee54a9ee23193653225b55513dcb4fa10c68"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-29-lamp-ring-container-cleanup-process.json",
+      "sha256": "758ddc710627c747aff10ed79b697c458f255bc4de17970c00525cf24f34c203"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-29-lamp-ring-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1999,
+      "path": "linux/attempt1/cache-invalidation/clean-29-lamp-ring-process.json",
+      "sha256": "a2f206596bad36b76872fd3f3300d76cea4219f37116f75df14c43643720e5b6"
+    },
+    {
+      "bytes": 365,
+      "path": "linux/attempt1/cache-invalidation/clean-29-lamp-ring.log",
+      "sha256": "d2311a47bead919a7bae5b3bfb28032cd0aca371128c1c792ab88a63d218f81a"
+    },
+    {
+      "bytes": 310,
+      "path": "linux/attempt1/cache-invalidation/clean-30-lamp-same-voice-container-cleanup-process.json",
+      "sha256": "8c8190b4972958508769e010ea86064a03bff6fca87f71cc5f0294ae34a0a2d6"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-30-lamp-same-voice-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2023,
+      "path": "linux/attempt1/cache-invalidation/clean-30-lamp-same-voice-process.json",
+      "sha256": "ea4ffe3c6fe7c90448ddd031ba615d9b2a3564b380fb10d782408917902530b6"
+    },
+    {
+      "bytes": 403,
+      "path": "linux/attempt1/cache-invalidation/clean-30-lamp-same-voice.log",
+      "sha256": "ae81614c57404880901ba0f9a33491cd82fbac2719d65f3bd6b73840720e68cf"
+    },
+    {
+      "bytes": 308,
+      "path": "linux/attempt1/cache-invalidation/clean-31-lamp-schedule-container-cleanup-process.json",
+      "sha256": "b7571cb6fddb3e0a7d8dd050afc5abc70951ab4d79872315206f7790c0014a9c"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-31-lamp-schedule-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2015,
+      "path": "linux/attempt1/cache-invalidation/clean-31-lamp-schedule-process.json",
+      "sha256": "1c718557c412c180001e323de499c2357664e93d9593ab15e13c9266288bd529"
+    },
+    {
+      "bytes": 390,
+      "path": "linux/attempt1/cache-invalidation/clean-31-lamp-schedule.log",
+      "sha256": "2be56ef468a9709c6221f81d96c20937dfdb80d07a88d2efe214951f8e9237d5"
+    },
+    {
+      "bytes": 308,
+      "path": "linux/attempt1/cache-invalidation/clean-32-lamp-selftest-container-cleanup-process.json",
+      "sha256": "051fc879c9f7ef84dee0eba95087ba5317a4aaa9eee6b4e3967bacfc5cfc0123"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-32-lamp-selftest-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2015,
+      "path": "linux/attempt1/cache-invalidation/clean-32-lamp-selftest-process.json",
+      "sha256": "26a027d194a09f0a44e34b2aca0243d2c1e556978d026f0539fa242a9717c59e"
+    },
+    {
+      "bytes": 390,
+      "path": "linux/attempt1/cache-invalidation/clean-32-lamp-selftest.log",
+      "sha256": "aa7dc28831e6c62672f82ed8b4611c5e6ed1d32d1f0d99f5c5121a4d1bd25fdc"
+    },
+    {
+      "bytes": 308,
+      "path": "linux/attempt1/cache-invalidation/clean-33-lamp-settings-container-cleanup-process.json",
+      "sha256": "56cfe3691d1ace68b80e6470af9a0dcaa7a416c386a83cf23dc409e1116f2d8e"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-33-lamp-settings-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2015,
+      "path": "linux/attempt1/cache-invalidation/clean-33-lamp-settings-process.json",
+      "sha256": "55650496aaee60f6afe2db86981e752d2de83f305edcaf7cf555f5d36c6d3bc9"
+    },
+    {
+      "bytes": 390,
+      "path": "linux/attempt1/cache-invalidation/clean-33-lamp-settings.log",
+      "sha256": "9cd4c038cff1deef4263ef7f9c592754f7c6c1fc50affdedcea18e27d600c9a7"
+    },
+    {
+      "bytes": 305,
+      "path": "linux/attempt1/cache-invalidation/clean-34-lamp-setup-container-cleanup-process.json",
+      "sha256": "490011f8ab16ae08a564a88557a6dea49ae4c69096cfbade20cac63ebc49fed3"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-34-lamp-setup-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2003,
+      "path": "linux/attempt1/cache-invalidation/clean-34-lamp-setup-process.json",
+      "sha256": "49327ca6a670791195bcda90a5a13844f153994180de1ff887de9d5e765413d6"
+    },
+    {
+      "bytes": 372,
+      "path": "linux/attempt1/cache-invalidation/clean-34-lamp-setup.log",
+      "sha256": "c42806802a4b037359ccffeefb8c85ad04ebec0ef3c6df3607f53df806a074ad"
+    },
+    {
+      "bytes": 306,
+      "path": "linux/attempt1/cache-invalidation/clean-35-lamp-skills-container-cleanup-process.json",
+      "sha256": "acc932ccbb3371f08eab0450b522f9835e16448dfab0f6ab4ae5098e1eba727a"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-35-lamp-skills-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2006,
+      "path": "linux/attempt1/cache-invalidation/clean-35-lamp-skills-process.json",
+      "sha256": "1423e6239270668c7068b2863bb4012a7413e54085b33469cf6f0cbf2982e492"
+    },
+    {
+      "bytes": 380,
+      "path": "linux/attempt1/cache-invalidation/clean-35-lamp-skills.log",
+      "sha256": "e2ce809937ca8cdebaee9223729e2946c4a5b9129cd660768d62aa8e857db409"
+    },
+    {
+      "bytes": 314,
+      "path": "linux/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures-container-cleanup-process.json",
+      "sha256": "83d10505b279d2e77edae8f6c682b36312c5c4ba05c0c819f1e224431d946610"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2038,
+      "path": "linux/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures-process.json",
+      "sha256": "72e6601b429a6ea99b55c8de9d647af3c5b2382eb465c34cbc17f5ddcc85be6d"
+    },
+    {
+      "bytes": 425,
+      "path": "linux/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures.log",
+      "sha256": "46e0166d51df715f8005bcc93a522483dc6bd51db4f77e447f65fce258db0e63"
+    },
+    {
+      "bytes": 307,
+      "path": "linux/attempt1/cache-invalidation/clean-37-lamp-station-container-cleanup-process.json",
+      "sha256": "959a572f931bcd06548774994db1eb6b2a7cc2792a6f42d74d3d9323e1cd15c8"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-37-lamp-station-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2011,
+      "path": "linux/attempt1/cache-invalidation/clean-37-lamp-station-process.json",
+      "sha256": "b38b1d78d1873d271b9fd64f12da6b21ea6610a4eb1bb3879ff794c0147010b6"
+    },
+    {
+      "bytes": 384,
+      "path": "linux/attempt1/cache-invalidation/clean-37-lamp-station.log",
+      "sha256": "f3f84f5854662b9229b2928d7b9014690d2816b38bf78b9cb3951f99fa959bd4"
+    },
+    {
+      "bytes": 306,
+      "path": "linux/attempt1/cache-invalidation/clean-38-lamp-surround-container-cleanup-process.json",
+      "sha256": "e0e58d904a5d9a1dbb9b0b058f82cf5062db5ffa2e7947e1b540bc41dc666a41"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-38-lamp-surround-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2013,
+      "path": "linux/attempt1/cache-invalidation/clean-38-lamp-surround-process.json",
+      "sha256": "5a50cbff35d0e3e549a19fd1a972fc92414cf425f9cf44def7b8f256ba4c8cbc"
+    },
+    {
+      "bytes": 391,
+      "path": "linux/attempt1/cache-invalidation/clean-38-lamp-surround.log",
+      "sha256": "6f18f3aa5b055250c457effd73bb7b3bcd45d57fdf3cece7b91fcf80690c8c6f"
+    },
+    {
+      "bytes": 305,
+      "path": "linux/attempt1/cache-invalidation/clean-39-lamp-tasks-container-cleanup-process.json",
+      "sha256": "d0fa96ac158b810984b1b3bac44d7a7dc1aa85af63160983e88bdbba9f94f6c5"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-39-lamp-tasks-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2003,
+      "path": "linux/attempt1/cache-invalidation/clean-39-lamp-tasks-process.json",
+      "sha256": "f8fa69a32cd5e6afbc61c870f10e7f2c8a23be703f9eb8da75241e017ae3efac"
+    },
+    {
+      "bytes": 373,
+      "path": "linux/attempt1/cache-invalidation/clean-39-lamp-tasks.log",
+      "sha256": "0c88a580c244b604ffdcac00730fcce33859715f9ce289d82b9d866057fec27d"
+    },
+    {
+      "bytes": 308,
+      "path": "linux/attempt1/cache-invalidation/clean-40-lamp-turn-end-container-cleanup-process.json",
+      "sha256": "8740ec8f3d0cffca65aeeacac0bdbc017780f607bd91cec8201ae3f652930840"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-40-lamp-turn-end-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2015,
+      "path": "linux/attempt1/cache-invalidation/clean-40-lamp-turn-end-process.json",
+      "sha256": "5acbac70c14d8e949ba2ecc46d64a6602587daf9472c4f07b1bb01476d067c50"
+    },
+    {
+      "bytes": 391,
+      "path": "linux/attempt1/cache-invalidation/clean-40-lamp-turn-end.log",
+      "sha256": "a4430a2b1a38632f5241ac75cf7ccc76bda54c59466b383284b2614fd71824fe"
+    },
+    {
+      "bytes": 312,
+      "path": "linux/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire-container-cleanup-process.json",
+      "sha256": "f4a376290213af60858554b1b3d86a547e1b72aabe9c883a2b42339a6019c02c"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2034,
+      "path": "linux/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire-process.json",
+      "sha256": "fb5e8ae0bfd9e714cb835f64b6261483139ccb4c2325539b72075fa06bbae8d4"
+    },
+    {
+      "bytes": 419,
+      "path": "linux/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire.log",
+      "sha256": "df99b72e579f78f1d27010a44ef7bad681558875ef5f41231099ec9d1b23e2a9"
+    },
+    {
+      "bytes": 310,
+      "path": "linux/attempt1/cache-invalidation/clean-42-lamp-turn-owner-container-cleanup-process.json",
+      "sha256": "b63fc4e73d26b93a7bbbd13887276765f521dd28562f0021d90fed74ad806a2f"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-42-lamp-turn-owner-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2023,
+      "path": "linux/attempt1/cache-invalidation/clean-42-lamp-turn-owner-process.json",
+      "sha256": "ccda7b788bdfedcd7c71a4c73458705fc05c82d9b8319560c88b2ecbb68ff60f"
+    },
+    {
+      "bytes": 401,
+      "path": "linux/attempt1/cache-invalidation/clean-42-lamp-turn-owner.log",
+      "sha256": "c01851c8b0f07de6ec6f50c801118daba2951836e7acc347a86f676e1b679330"
+    },
+    {
+      "bytes": 306,
+      "path": "linux/attempt1/cache-invalidation/clean-43-lamp-update-container-cleanup-process.json",
+      "sha256": "48363b87e0965dd5e69075faa93bc4ede59e0124a73610da94803591fe0aa927"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-43-lamp-update-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2007,
+      "path": "linux/attempt1/cache-invalidation/clean-43-lamp-update-process.json",
+      "sha256": "59ec7cae66ec3eab91b4deb82b56763c3cd9e63e520c60da879e0c3e907e764c"
+    },
+    {
+      "bytes": 380,
+      "path": "linux/attempt1/cache-invalidation/clean-43-lamp-update.log",
+      "sha256": "34d70a4bef092e92bb142206892b2eda459e873b72879430e91189aaa0afa575"
+    },
+    {
+      "bytes": 304,
+      "path": "linux/attempt1/cache-invalidation/clean-44-lamp-voice-container-cleanup-process.json",
+      "sha256": "ed26a803b786e93acd078431b76eb346107b84e1ce9bd9a2d45539922cc3714a"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-44-lamp-voice-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2002,
+      "path": "linux/attempt1/cache-invalidation/clean-44-lamp-voice-process.json",
+      "sha256": "98e467f68959549b7048568dcfc5981e72076941b8af716d8777a84d940615e5"
+    },
+    {
+      "bytes": 374,
+      "path": "linux/attempt1/cache-invalidation/clean-44-lamp-voice.log",
+      "sha256": "c945bfa24149d13ef8160bd73aea240f8e2ad398a01c935c35df36748f90afd3"
+    },
+    {
+      "bytes": 309,
+      "path": "linux/attempt1/cache-invalidation/clean-45-lamp-voice-eval-container-cleanup-process.json",
+      "sha256": "91d95f64140f3f1f0cb171e842eb27092b1472b29e56f088caf8ea8588ea1448"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-45-lamp-voice-eval-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2022,
+      "path": "linux/attempt1/cache-invalidation/clean-45-lamp-voice-eval-process.json",
+      "sha256": "ff7681b2a99df116c3c26f53fe847e173221d426e6d12521916da303d125e3de"
+    },
+    {
+      "bytes": 403,
+      "path": "linux/attempt1/cache-invalidation/clean-45-lamp-voice-eval.log",
+      "sha256": "4c238935dd15bc714a67d5a0f192f4798fc01f89f87df082f1ddadbf1bdc74ff"
+    },
+    {
+      "bytes": 315,
+      "path": "linux/attempt1/cache-invalidation/clean-46-lamp-voice-processes-container-cleanup-process.json",
+      "sha256": "225ebc236d467e8c75f5a006f6b0a69f5a30c928094e8c9cdccbc7539ac1a26b"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/clean-46-lamp-voice-processes-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2043,
+      "path": "linux/attempt1/cache-invalidation/clean-46-lamp-voice-processes-process.json",
+      "sha256": "2cdfb574feaca1208b3bf023c6576ed0f7c1a5eea253e7033ee82ae682fe2dbf"
+    },
+    {
+      "bytes": 433,
+      "path": "linux/attempt1/cache-invalidation/clean-46-lamp-voice-processes.log",
+      "sha256": "2c2f66ac3bcb66bf85217d59e1c3474b6f040f1c16e67f9b8e3d25d5a881583b"
+    },
+    {
+      "bytes": 2,
+      "path": "linux/attempt1/cache-invalidation/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 293,
+      "path": "linux/attempt1/cache-invalidation/metadata-container-cleanup-process.json",
+      "sha256": "0dc94aaa8e798cc02ef55145a3ab56beb62a1a99d8f095eb3349f1b9f7dc3541"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/metadata-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1964,
+      "path": "linux/attempt1/cache-invalidation/metadata-process.json",
+      "sha256": "6d556f6ee3f291466b8c6ced0e989356ab4102474cd70076390b81f35dd73098"
+    },
+    {
+      "bytes": 491,
+      "path": "linux/attempt1/cache-invalidation/metadata-validation.json",
+      "sha256": "69f23a4c9fdd90d1baeeb72a87fa1be75ed295e063b90d4ff3578910999e636b"
+    },
+    {
+      "bytes": 290130,
+      "path": "linux/attempt1/cache-invalidation/metadata.json",
+      "sha256": "758c2cfedc5ea9efa050b10da039ed74201c27ec3776925382da9a4a839fb82b"
+    },
+    {
+      "bytes": 176316,
+      "path": "linux/attempt1/cache-invalidation/metadata.log",
+      "sha256": "ce284ad1ede387fd112297e8ad94730cf7a28211efabfa790017a27881cd1015"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/cache-invalidation/metadata.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 122031,
+      "path": "linux/attempt1/cache-invalidation/operations.json",
+      "sha256": "d7848d93e280c0fe792c57c3f21ca2c80a0a78c4e1ef454cdbf78fdb644c1a43"
+    },
+    {
+      "bytes": 222,
+      "path": "linux/attempt1/cache-invalidation/source-after-metadata.json",
+      "sha256": "46267baca7b28eb279d8ffd45e57e215973c2f0483bdf6fc0fe445c486deb53c"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/cache-invalidation/source-after.json",
+      "sha256": "7bee15fad2461036c7427b9fd9ea5c762f6ca4b53ecc6f274175181131c43b98"
+    },
+    {
+      "bytes": 224,
+      "path": "linux/attempt1/cache-invalidation/source-before.json",
+      "sha256": "ed690d19a6bb2b95874479614acbe86ee21ea1088d92f3e5189717b73e54b3dd"
+    },
+    {
+      "bytes": 614,
+      "path": "linux/attempt1/cache-invalidation/terminal.json",
+      "sha256": "17cfbfa4b31af78d79cd6ad0ab7d2a1b21bb3d86ad8d113f08432b193e30be69"
+    },
+    {
+      "bytes": 117628,
+      "path": "linux/attempt1/cache-invalidation/validated-packages.json",
+      "sha256": "566f6ec92c275e752d5b2f440a5fb7a04273a3a4595d0adc9010688b62056ae4"
+    },
+    {
+      "bytes": 291,
+      "path": "linux/attempt1/clippy-container-cleanup-process.json",
+      "sha256": "4789e716f84301925c62680c3e8fcce61318ab64d64796d70d898d566b91e26d"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/clippy-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2014,
+      "path": "linux/attempt1/clippy-process.json",
+      "sha256": "39abd9d69e3e4aad81814ee7fc7743ef9bab0f067298b1168cafc0bc131a266f"
+    },
+    {
+      "bytes": 2927,
+      "path": "linux/attempt1/clippy-result.json",
+      "sha256": "77066617e88ddd580c6f1876cfce0f3b5e976334458a0df145b8d3f34390a4b5"
+    },
+    {
+      "bytes": 221,
+      "path": "linux/attempt1/clippy-source-after.json",
+      "sha256": "4c8d0a0c48bf1e5f6c68c11ead16753dc92b0babadb301bc4961c752b62e4397"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/clippy-source-before.json",
+      "sha256": "203f4673d6fec3656223c44558cf0e7bb4cab51e6917b6a96341ad5523237871"
+    },
+    {
+      "bytes": 471244,
+      "path": "linux/attempt1/clippy.log",
+      "sha256": "1cb4bcd1716a3bfaf7e0811f45a7c1e78720502eb3c78ddc7031af77928e2a38"
+    },
+    {
+      "bytes": 486601,
+      "path": "linux/attempt1/compiler-clippy.json",
+      "sha256": "d8ea78ab955b30db3c6e49eda0dcefa61318a97bb3a2c83adce1bafecb2dde5a"
+    },
+    {
+      "bytes": 162956,
+      "path": "linux/attempt1/compiler-workspace-build.json",
+      "sha256": "811050e17245ac5a8cc7b5d9063f75be58c3f69ece7297fbf2b17e0e3d69bd77"
+    },
+    {
+      "bytes": 289,
+      "path": "linux/attempt1/fmt-container-cleanup-process.json",
+      "sha256": "ec796a3b50dc68f1c1b9d77f3f5deef2b5b13d1306ee3beadfe9ad6703e0bcca"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/fmt-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1867,
+      "path": "linux/attempt1/fmt-process.json",
+      "sha256": "971a33b8bbf2bd9862351a1db13293a264981edd7d6a9d15c10a81e214f997e6"
+    },
+    {
+      "bytes": 2762,
+      "path": "linux/attempt1/fmt-result.json",
+      "sha256": "ca4fb73be73c6d98cd791194032186c6902ac2b2f64c984095fc4675e2244ce5"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/fmt-source-after.json",
+      "sha256": "505703a995ea5f8d6b58d6efd64442fa359ba9c036d5598b92707dbea83748a4"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/fmt-source-before.json",
+      "sha256": "4206784ad00fab4c8430667d0ce4004a9a83c9f44564844ba0912fd01a36e7ae"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 296,
+      "path": "linux/attempt1/full-voice-container-cleanup-process.json",
+      "sha256": "f8cecf9a006061b357b462f4eb29651f3e5f68430de7200ba1d9aa025dab9563"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/full-voice-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2001,
+      "path": "linux/attempt1/full-voice-process.json",
+      "sha256": "7f601f9383b1953e6c324989395cf1f2b8b886f77750695d4cfc81c96b677674"
+    },
+    {
+      "bytes": 826113,
+      "path": "linux/attempt1/full-voice-result.json",
+      "sha256": "e29d94cfd5578d45d90d11544d6964d3ca3ffb47d6ba45e961f7d83992d9efe8"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/full-voice-source-after.json",
+      "sha256": "a62df134dd535023dbb9b109ed65e95c7a2cf1d7c21168ac73a84bcc3cc75756"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/full-voice-source-before.json",
+      "sha256": "d2a6db265cee577e2e8b05c6eeced09bc62d6c15a790d7ed3880020f545daf22"
+    },
+    {
+      "bytes": 421519,
+      "path": "linux/attempt1/full-voice.log",
+      "sha256": "4ae25dc2d8f1376cc0d83e08c09acb0fd057d66757cb290d101630f094567b21"
+    },
+    {
+      "bytes": 2,
+      "path": "linux/attempt1/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 934,
+      "path": "linux/attempt1/grant.json",
+      "sha256": "ee0a7fa47b5f41fc45932a6656d55150e80c7ba3afba5e85cd3bc547bcac53b0"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/initial-source-guard.json",
+      "sha256": "9511c82958ed5edb318c2d248983ef7b4db39f76554704f5c48182ffb24450ee"
+    },
+    {
+      "bytes": 878221,
+      "path": "linux/attempt1/stages.json",
+      "sha256": "a4757ed234de9a59716e892c1e577b672990db7afdb7a435e0bdc248361c1a8d"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/terminal-source-guard.json",
+      "sha256": "cbb6cd72c634b2d899d9d67e1856d74ac6448f66284ae129426bab4432fb89ec"
+    },
+    {
+      "bytes": 148298,
+      "path": "linux/attempt1/terminal.json",
+      "sha256": "e05a0f89bc8935e048847c1ad9776f82eb9c311dfd5ffbe1c881b5c1312fda36"
+    },
+    {
+      "bytes": 301,
+      "path": "linux/attempt1/workspace-build-container-cleanup-process.json",
+      "sha256": "acdb8136f8d9282f3b126ce2d73ec0f1346ab6fb2f80433be06a9fd49f0dcee3"
+    },
+    {
+      "bytes": 0,
+      "path": "linux/attempt1/workspace-build-container-cleanup.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1976,
+      "path": "linux/attempt1/workspace-build-process.json",
+      "sha256": "61669e9891adef389f05a723646ef047d656b3a6e18c85f480ba7e27eadaf41a"
+    },
+    {
+      "bytes": 2890,
+      "path": "linux/attempt1/workspace-build-result.json",
+      "sha256": "2a68cd4f1d2f147ae4d001e567df1e29687187480c9fb3598bf1b80d9610d17a"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/workspace-build-source-after.json",
+      "sha256": "ee6f72d693029e3605c9724c9095e2bf30627e6a15b20e48cdf8fbd0ae35dccd"
+    },
+    {
+      "bytes": 223,
+      "path": "linux/attempt1/workspace-build-source-before.json",
+      "sha256": "9a4c8e696b12522bdca1ec75bf8487b8d357bf014fe1734e8b01bc17bea62da5"
+    },
+    {
+      "bytes": 334620,
+      "path": "linux/attempt1/workspace-build.log",
+      "sha256": "ead6ba848ad56d7c40768c6687d136d47821b2354a440f24c7edd7c747814f57"
+    },
+    {
+      "bytes": 138259,
+      "path": "linux/attempt1/workspace-compilation-freshness.json",
+      "sha256": "56658dd9bf69ba71304077add73cc0ef85d3712b2709b223cbc788d3f204c8bc"
+    },
+    {
+      "bytes": 2,
+      "path": "linux/previous-owner/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 147800,
+      "path": "linux/previous-owner/terminal.json",
+      "sha256": "41004331c90d1714e04cae06aac40bd4fdddbaf92aeaa61268151c55ac3fb477"
+    },
+    {
+      "bytes": 399,
+      "path": "mac/attempt1/cache-invalidation/clean-01-lamp-actions-process.json",
+      "sha256": "4dc54c30e48df5febeef58245d29aa92fe1ac9111d23a3b7890b7ec651f72df1"
+    },
+    {
+      "bytes": 454,
+      "path": "mac/attempt1/cache-invalidation/clean-01-lamp-actions.log",
+      "sha256": "818a0385565412fbb254ee42e376dbb727c929a4a0edb307a7a7b7df3102962f"
+    },
+    {
+      "bytes": 398,
+      "path": "mac/attempt1/cache-invalidation/clean-02-lamp-addons-process.json",
+      "sha256": "d44cceb7897aa3a051c96a6ae8fbc6a10d6895147420924ac200fd253600ca78"
+    },
+    {
+      "bytes": 446,
+      "path": "mac/attempt1/cache-invalidation/clean-02-lamp-addons.log",
+      "sha256": "df69fca9667fe4c21f4433f7e2256e9473e796b1c281aab7c7f305ba3f2779d0"
+    },
+    {
+      "bytes": 390,
+      "path": "mac/attempt1/cache-invalidation/clean-03-lamp-air-process.json",
+      "sha256": "27d5745514cf0c7e7fb626bcf244bec529d56bcd2a196b7579daa374412d1237"
+    },
+    {
+      "bytes": 427,
+      "path": "mac/attempt1/cache-invalidation/clean-03-lamp-air.log",
+      "sha256": "99f64825f768748afb4d62d130d1ea6a4eb96c248459c6e56f6b846abe372cc9"
+    },
+    {
+      "bytes": 395,
+      "path": "mac/attempt1/cache-invalidation/clean-04-lamp-audio-process.json",
+      "sha256": "00a7112e83f8f6f50e10609180ac32f5b8fde240716b0e8c9690e318c027e660"
+    },
+    {
+      "bytes": 441,
+      "path": "mac/attempt1/cache-invalidation/clean-04-lamp-audio.log",
+      "sha256": "208625248814cc6040125d5ad73b9b9928f08433cfb5b68b918071dff8ba9b72"
+    },
+    {
+      "bytes": 394,
+      "path": "mac/attempt1/cache-invalidation/clean-05-lamp-body-process.json",
+      "sha256": "ce09ff7e9d567e2fb846cf81b4d350584307ef718dd994183a8d21faadab83d0"
+    },
+    {
+      "bytes": 435,
+      "path": "mac/attempt1/cache-invalidation/clean-05-lamp-body.log",
+      "sha256": "690914444e7252dd27678c20c016a5fd8cd72f3c912f54df1386f836c8dcfe09"
+    },
+    {
+      "bytes": 392,
+      "path": "mac/attempt1/cache-invalidation/clean-06-lamp-bus-process.json",
+      "sha256": "2c66573fc4e8e7de7a34b95fa5ad2478f97ae831b413e857d9b3c73a2f9b8d8f"
+    },
+    {
+      "bytes": 429,
+      "path": "mac/attempt1/cache-invalidation/clean-06-lamp-bus.log",
+      "sha256": "f40436ef8b161921d89c9cf18d2ad418213fdd2838c5091324d1ed9a8674c83d"
+    },
+    {
+      "bytes": 398,
+      "path": "mac/attempt1/cache-invalidation/clean-07-lamp-camera-process.json",
+      "sha256": "387e955dcea38fd165a38af5747e4d0331caad238222ce515d1a101d51ca69e8"
+    },
+    {
+      "bytes": 447,
+      "path": "mac/attempt1/cache-invalidation/clean-07-lamp-camera.log",
+      "sha256": "0f4850b8881c20f0ca7cca642b68e73dcf2f3ee1bda2d17cedc9158d82966d53"
+    },
+    {
+      "bytes": 395,
+      "path": "mac/attempt1/cache-invalidation/clean-08-lamp-cloud-process.json",
+      "sha256": "2d7e351551e378a6748d08a77e63b67329dc2f61ee8ccc1b5b432fb5eabfc9fb"
+    },
+    {
+      "bytes": 441,
+      "path": "mac/attempt1/cache-invalidation/clean-08-lamp-cloud.log",
+      "sha256": "fca76e6c990e7b7deaf8fddcf1663e6f2d774e74ddcd24a71cc771da40725d50"
+    },
+    {
+      "bytes": 402,
+      "path": "mac/attempt1/cache-invalidation/clean-09-lamp-controls-process.json",
+      "sha256": "fce1086a868f81f23421bc7860536c410fb52d2a0d10f9a0bebedf0ef0f8f9d2"
+    },
+    {
+      "bytes": 460,
+      "path": "mac/attempt1/cache-invalidation/clean-09-lamp-controls.log",
+      "sha256": "9e286d4689c81008851b59886e92124382a48b7093e268ec7e3155926ee7a4c4"
+    },
+    {
+      "bytes": 393,
+      "path": "mac/attempt1/cache-invalidation/clean-10-lamp-ears-process.json",
+      "sha256": "c60033b9575bd7cbb071f861a1d53d08ca024b0b2d7f6623292419794622bf69"
+    },
+    {
+      "bytes": 435,
+      "path": "mac/attempt1/cache-invalidation/clean-10-lamp-ears.log",
+      "sha256": "ee8e141ca5b0e32b71a62d8747a44bca8b67be69a8c4b73f7b9824958f8d938c"
+    },
+    {
+      "bytes": 408,
+      "path": "mac/attempt1/cache-invalidation/clean-11-lamp-environment-process.json",
+      "sha256": "7ff85a4164253b893a94bc2aa47210060adb0284b53af66bfa681d55cefeecfe"
+    },
+    {
+      "bytes": 475,
+      "path": "mac/attempt1/cache-invalidation/clean-11-lamp-environment.log",
+      "sha256": "751b299bea7055cb4b3660aa24a6f1992292aca8a421b169b0a500bf6d8689e0"
+    },
+    {
+      "bytes": 406,
+      "path": "mac/attempt1/cache-invalidation/clean-12-lamp-expression-process.json",
+      "sha256": "16cb809eefe43febb0ae56b8fe48f0a39d0b492719880a18a640b6ffbd9b5725"
+    },
+    {
+      "bytes": 472,
+      "path": "mac/attempt1/cache-invalidation/clean-12-lamp-expression.log",
+      "sha256": "b9b59925f82c6b5426a7141f1f878e53c9e15aa2af0bd1dbe184dfcf1c350a4e"
+    },
+    {
+      "bytes": 393,
+      "path": "mac/attempt1/cache-invalidation/clean-13-lamp-eyes-process.json",
+      "sha256": "b1f6042394ea037785846d72f4720f037e83d2ac413c1d1407cfc78f39b76860"
+    },
+    {
+      "bytes": 434,
+      "path": "mac/attempt1/cache-invalidation/clean-13-lamp-eyes.log",
+      "sha256": "1346b2cc140971b5ac14033a190e30e5ca87a829bc4ad44a0b1d36192f7c16a3"
+    },
+    {
+      "bytes": 398,
+      "path": "mac/attempt1/cache-invalidation/clean-14-lamp-gemini-process.json",
+      "sha256": "d860e141935cd08dabd971007903cdf773f1a1b035e1920e22e079f7f707788c"
+    },
+    {
+      "bytes": 447,
+      "path": "mac/attempt1/cache-invalidation/clean-14-lamp-gemini.log",
+      "sha256": "dfc83b511f2e075a445c5ba8274012f740174093234ef6736822140299910467"
+    },
+    {
+      "bytes": 398,
+      "path": "mac/attempt1/cache-invalidation/clean-15-lamp-health-process.json",
+      "sha256": "f3acc4d9a3b070dafe9d4b54f9a5f5ec275742c743ac9221271d11fcb5d0072f"
+    },
+    {
+      "bytes": 447,
+      "path": "mac/attempt1/cache-invalidation/clean-15-lamp-health.log",
+      "sha256": "bf575fee213c8e9c3f01ea7cab0bd6d51fc0efba4a007ad10ec0a907cee2f590"
+    },
+    {
+      "bytes": 392,
+      "path": "mac/attempt1/cache-invalidation/clean-16-lamp-ipc-process.json",
+      "sha256": "e05f051ec81eb7bd1e99f49167d12817561c52e994a2384f2ff6b5022de96fe8"
+    },
+    {
+      "bytes": 428,
+      "path": "mac/attempt1/cache-invalidation/clean-16-lamp-ipc.log",
+      "sha256": "8ad15a86454ed8e714ceb3b5f24203daf01242b8dbbdd32af161c807180a48e9"
+    },
+    {
+      "bytes": 398,
+      "path": "mac/attempt1/cache-invalidation/clean-17-lamp-keeper-process.json",
+      "sha256": "a07867499f1d96cf2bb2358d9a8985a71fc1b8c638a7ce88b23dc4a915717224"
+    },
+    {
+      "bytes": 447,
+      "path": "mac/attempt1/cache-invalidation/clean-17-lamp-keeper.log",
+      "sha256": "2b9cddec6728941216bb99521839011c7718631e6c6932226a5b265e333db0eb"
+    },
+    {
+      "bytes": 393,
+      "path": "mac/attempt1/cache-invalidation/clean-18-lamp-lean-process.json",
+      "sha256": "b0afa4211b2c0afa25b97cf101dd9a51488f08d4165f83b7558e66fe5e7052f3"
+    },
+    {
+      "bytes": 434,
+      "path": "mac/attempt1/cache-invalidation/clean-18-lamp-lean.log",
+      "sha256": "78cbf63f07ce00bab2cd305f3c938f4bcfe8d80d99f7fec0f2429cd4eb57f031"
+    },
+    {
+      "bytes": 405,
+      "path": "mac/attempt1/cache-invalidation/clean-19-lamp-local-time-process.json",
+      "sha256": "98109bd5b8f496d54c6f32849f98a091d102acffe2e18527dc222ede7e2cb2e2"
+    },
+    {
+      "bytes": 469,
+      "path": "mac/attempt1/cache-invalidation/clean-19-lamp-local-time.log",
+      "sha256": "30280fef3ce0812a166915abd18a0f368f568e2e3594f5349b209a9cdca1b2b1"
+    },
+    {
+      "bytes": 398,
+      "path": "mac/attempt1/cache-invalidation/clean-20-lamp-memory-process.json",
+      "sha256": "d05d21b22e7576dffb2715af2ca4689733fc23ec25ab78d4078c2597a689bc87"
+    },
+    {
+      "bytes": 448,
+      "path": "mac/attempt1/cache-invalidation/clean-20-lamp-memory.log",
+      "sha256": "7eab71426a7676d063ef4dcd9f7012d67900d1a7c499c73ad294e21c32160b35"
+    },
+    {
+      "bytes": 393,
+      "path": "mac/attempt1/cache-invalidation/clean-21-lamp-mood-process.json",
+      "sha256": "8823e52f8c5aa2ecbf58512cc5b6dad7fad5ae9e045709f66a1b187aecb8e679"
+    },
+    {
+      "bytes": 434,
+      "path": "mac/attempt1/cache-invalidation/clean-21-lamp-mood.log",
+      "sha256": "6a5f25870a03b21ae54ea76f9c355aaa934b6faff3eadffdb0d2b925ddf3048d"
+    },
+    {
+      "bytes": 393,
+      "path": "mac/attempt1/cache-invalidation/clean-22-lamp-msgs-process.json",
+      "sha256": "a3fb3faa9fe73c69253588a3a3ded8b3f09e234631790b7d85360270d66629ae"
+    },
+    {
+      "bytes": 436,
+      "path": "mac/attempt1/cache-invalidation/clean-22-lamp-msgs.log",
+      "sha256": "e41d7245cc11332a6357062e8f4db626b8945e2d559c24ba270473c8ef70b589"
+    },
+    {
+      "bytes": 394,
+      "path": "mac/attempt1/cache-invalidation/clean-23-lamp-name-process.json",
+      "sha256": "75fa680cb827a3250358123312a3060e9ed3931db53d2a641710559be9eb1d77"
+    },
+    {
+      "bytes": 435,
+      "path": "mac/attempt1/cache-invalidation/clean-23-lamp-name.log",
+      "sha256": "8391fa4b5b6be9138aa531e14a572963569d221d802e7a9852c2f2b269ea749c"
+    },
+    {
+      "bytes": 404,
+      "path": "mac/attempt1/cache-invalidation/clean-24-lamp-near-call-process.json",
+      "sha256": "1ffb4b305b0dac1df46f0b463b9245f44d130cbefdd2b3fad53c780ad5e55f19"
+    },
+    {
+      "bytes": 463,
+      "path": "mac/attempt1/cache-invalidation/clean-24-lamp-near-call.log",
+      "sha256": "86e0237998fe321b52b9d16472ee327dfac4c35e13ee7d466d3476d31b36e317"
+    },
+    {
+      "bytes": 401,
+      "path": "mac/attempt1/cache-invalidation/clean-25-lamp-observer-process.json",
+      "sha256": "781518872315f6c411303143d358368696b004422d228f79f8cc5d75c9066d52"
+    },
+    {
+      "bytes": 458,
+      "path": "mac/attempt1/cache-invalidation/clean-25-lamp-observer.log",
+      "sha256": "ee3054315476a6841b8f75726a9f78eaac4e5cb533302463ee0cede15723c570"
+    },
+    {
+      "bytes": 393,
+      "path": "mac/attempt1/cache-invalidation/clean-26-lamp-peek-process.json",
+      "sha256": "e6e0ac38f969154ac201871e751e8571ec11ee1044ab30040297110388a53148"
+    },
+    {
+      "bytes": 434,
+      "path": "mac/attempt1/cache-invalidation/clean-26-lamp-peek.log",
+      "sha256": "a765dfb85f5b1d92ef6c1459857b9d69812c8650e97e3ad9e17c1f692dcac255"
+    },
+    {
+      "bytes": 395,
+      "path": "mac/attempt1/cache-invalidation/clean-27-lamp-policy-process.json",
+      "sha256": "37cefff89d1d56ea376e722faaa81364422cce899bfb32921793f15a425297f1"
+    },
+    {
+      "bytes": 448,
+      "path": "mac/attempt1/cache-invalidation/clean-27-lamp-policy.log",
+      "sha256": "fde5a7383d0346be12c72c4aa98346c0dc4a0fe65c6bf117b8bbfc3734fef605"
+    },
+    {
+      "bytes": 399,
+      "path": "mac/attempt1/cache-invalidation/clean-28-lamp-records-process.json",
+      "sha256": "2e9c395723f5ecf51b4ea3ca89615e05dc7ff021ebe07b098844b4dee6666919"
+    },
+    {
+      "bytes": 452,
+      "path": "mac/attempt1/cache-invalidation/clean-28-lamp-records.log",
+      "sha256": "dff36818dbb8153f287027d7ce7d424a41e85edb4cb8390259b83fd6aeb5e8f0"
+    },
+    {
+      "bytes": 392,
+      "path": "mac/attempt1/cache-invalidation/clean-29-lamp-ring-process.json",
+      "sha256": "a77201a72c9b5823afeca1f98905a10cfd6bf01095c2568da7f10dfc7dff8993"
+    },
+    {
+      "bytes": 433,
+      "path": "mac/attempt1/cache-invalidation/clean-29-lamp-ring.log",
+      "sha256": "02653845a10d0cf97fdb132ab3cf62c8056c491488b57728864b270b28fa0dba"
+    },
+    {
+      "bytes": 406,
+      "path": "mac/attempt1/cache-invalidation/clean-30-lamp-same-voice-process.json",
+      "sha256": "dc8142ab4f5d8f774a9065ca20cb1215d29b70e5d44b9d9552cb86e900635a6d"
+    },
+    {
+      "bytes": 471,
+      "path": "mac/attempt1/cache-invalidation/clean-30-lamp-same-voice.log",
+      "sha256": "ae3bbc31804faf901036c32b4365168420baafbf0dea2b0d1c8080e85144556d"
+    },
+    {
+      "bytes": 401,
+      "path": "mac/attempt1/cache-invalidation/clean-31-lamp-schedule-process.json",
+      "sha256": "b9f864ec8b742b694bcf5e8da37984ccb1c42313ce6399bb369510c560c8c846"
+    },
+    {
+      "bytes": 459,
+      "path": "mac/attempt1/cache-invalidation/clean-31-lamp-schedule.log",
+      "sha256": "1adf6fa77e905de1acc2edf0d45e57835a044f4d41dc5193ab8a1f8d0e986fd9"
+    },
+    {
+      "bytes": 401,
+      "path": "mac/attempt1/cache-invalidation/clean-32-lamp-selftest-process.json",
+      "sha256": "6cc08f321616890d84ffd3098e69f64f9bd3accfd3a6ba98faa820303824534a"
+    },
+    {
+      "bytes": 458,
+      "path": "mac/attempt1/cache-invalidation/clean-32-lamp-selftest.log",
+      "sha256": "7d1ba8e0b7faab4ac5b469c3387109d432103efe452a7df80c31e58b4916f120"
+    },
+    {
+      "bytes": 401,
+      "path": "mac/attempt1/cache-invalidation/clean-33-lamp-settings-process.json",
+      "sha256": "d6a948220fe2e502f2e930da3d955aa5b0b570183cf3f7c24b0be5d157b699b9"
+    },
+    {
+      "bytes": 458,
+      "path": "mac/attempt1/cache-invalidation/clean-33-lamp-settings.log",
+      "sha256": "709d5db3ea543b798b5168451cf374cca3c6b41a3d35de4f03c32c3a1c8ed4a3"
+    },
+    {
+      "bytes": 396,
+      "path": "mac/attempt1/cache-invalidation/clean-34-lamp-setup-process.json",
+      "sha256": "8113822f8bf76263074cb97099758c9441c4607d092d0abdd250f980aa32937d"
+    },
+    {
+      "bytes": 440,
+      "path": "mac/attempt1/cache-invalidation/clean-34-lamp-setup.log",
+      "sha256": "4ad7fdd5084a8ea37d687e9483699b9952569f06fb0503e4ccfd6aed3ec79195"
+    },
+    {
+      "bytes": 397,
+      "path": "mac/attempt1/cache-invalidation/clean-35-lamp-skills-process.json",
+      "sha256": "71c83bdcc0b0a97fb90169f0c988bc978e7b0c6742db57ce4eeadb0f785ef8bf"
+    },
+    {
+      "bytes": 448,
+      "path": "mac/attempt1/cache-invalidation/clean-35-lamp-skills.log",
+      "sha256": "7217ff6f31271b7b38fdcb889483170b0f55f07c47c5f5974eb0fe6bb76b32cf"
+    },
+    {
+      "bytes": 414,
+      "path": "mac/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures-process.json",
+      "sha256": "ee4f27b3cbd7461f28f92e9c791e8c5573dadf83d83d05b5e6e022fd18984cfb"
+    },
+    {
+      "bytes": 494,
+      "path": "mac/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures.log",
+      "sha256": "6a65d501dc2e01febc52f5a4d8ee4d23ac80a1e31882a56fe7328ce2e317af60"
+    },
+    {
+      "bytes": 400,
+      "path": "mac/attempt1/cache-invalidation/clean-37-lamp-station-process.json",
+      "sha256": "e90ddade71b937d2d7d2c00a234bc2f7f93fe4f747e0257c8e049cd8d2fde1df"
+    },
+    {
+      "bytes": 452,
+      "path": "mac/attempt1/cache-invalidation/clean-37-lamp-station.log",
+      "sha256": "d570439d0593a39fef3ed1aeb6968693e5e2e228d89f9fd9673779cac7113a92"
+    },
+    {
+      "bytes": 401,
+      "path": "mac/attempt1/cache-invalidation/clean-38-lamp-surround-process.json",
+      "sha256": "fb2d4e27c9cbffd64c04c8fa4fcef3707b4d49dbd4f4a155c4e4dc113752f495"
+    },
+    {
+      "bytes": 459,
+      "path": "mac/attempt1/cache-invalidation/clean-38-lamp-surround.log",
+      "sha256": "e889bfad82a270ebe1a6a68bc22da195b0180966cc008796560de87dffb2aaa4"
+    },
+    {
+      "bytes": 395,
+      "path": "mac/attempt1/cache-invalidation/clean-39-lamp-tasks-process.json",
+      "sha256": "31273542ca97dcbfbca01a84915166b108fc55387c891907f0e4fc7e56791600"
+    },
+    {
+      "bytes": 442,
+      "path": "mac/attempt1/cache-invalidation/clean-39-lamp-tasks.log",
+      "sha256": "ae7bb450820081435863e5bd345b8a1b0fd32c22f68e22b05f0eeae4cfaa9757"
+    },
+    {
+      "bytes": 401,
+      "path": "mac/attempt1/cache-invalidation/clean-40-lamp-turn-end-process.json",
+      "sha256": "524f27d4bce9759041ed86fb1172fbc63844744a010cdbdf6e99f48a787979bb"
+    },
+    {
+      "bytes": 459,
+      "path": "mac/attempt1/cache-invalidation/clean-40-lamp-turn-end.log",
+      "sha256": "0d2847a9cba164f2e3976d52c075825cee6e2529a38f7290fdc50146477764e6"
+    },
+    {
+      "bytes": 412,
+      "path": "mac/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire-process.json",
+      "sha256": "8615134bf13990638961b5c77b344555f229744c69e46f0817e29c35d2aafaa5"
+    },
+    {
+      "bytes": 487,
+      "path": "mac/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire.log",
+      "sha256": "882f22210f8c25c350128ccef27a535d79f50187b4e94b0d235b4202731ed32a"
+    },
+    {
+      "bytes": 406,
+      "path": "mac/attempt1/cache-invalidation/clean-42-lamp-turn-owner-process.json",
+      "sha256": "dcc3d4bc7ebfd6c85b444384d6900cff7ddc55a39fb46515878c840c3828524f"
+    },
+    {
+      "bytes": 469,
+      "path": "mac/attempt1/cache-invalidation/clean-42-lamp-turn-owner.log",
+      "sha256": "543b1dd404946f07d9e2b9b8e254a241c0df9a6a79f9c6ca7d123f6b03ccda57"
+    },
+    {
+      "bytes": 398,
+      "path": "mac/attempt1/cache-invalidation/clean-43-lamp-update-process.json",
+      "sha256": "01f2e78cde5d431d23fd4fc23363c58d973e80d5e5b7833ba3fb1fb6c3e8139c"
+    },
+    {
+      "bytes": 448,
+      "path": "mac/attempt1/cache-invalidation/clean-43-lamp-update.log",
+      "sha256": "b8965c74d3f719d2f208b6b3d6f46986854237f7947dd4bf4e6ff4ac4718d888"
+    },
+    {
+      "bytes": 395,
+      "path": "mac/attempt1/cache-invalidation/clean-44-lamp-voice-process.json",
+      "sha256": "ebe7a59da44e26c7a042b9592232fc0156ae1645f841787d486dfbd5c8d81f0a"
+    },
+    {
+      "bytes": 440,
+      "path": "mac/attempt1/cache-invalidation/clean-44-lamp-voice.log",
+      "sha256": "02a08bb2af22160f011dde635418ce98b75d365dcb07d8f43366e39655d83727"
+    },
+    {
+      "bytes": 405,
+      "path": "mac/attempt1/cache-invalidation/clean-45-lamp-voice-eval-process.json",
+      "sha256": "a7c74be8bd7dd6e1595755e808248b8d17e0855cc1d05a0304f39c88777066db"
+    },
+    {
+      "bytes": 471,
+      "path": "mac/attempt1/cache-invalidation/clean-45-lamp-voice-eval.log",
+      "sha256": "72ba266932692a4f6b433559447525ab33891103765e321684e02ef95b48496f"
+    },
+    {
+      "bytes": 416,
+      "path": "mac/attempt1/cache-invalidation/clean-46-lamp-voice-processes-process.json",
+      "sha256": "fd107078c942f628b08e63c1d60f5252b8d6516f97eb1b8b9342b01fd87756ea"
+    },
+    {
+      "bytes": 501,
+      "path": "mac/attempt1/cache-invalidation/clean-46-lamp-voice-processes.log",
+      "sha256": "cefe79e0660dcb33419fecfc1bea1b50af0615eea1ef1d593098680e9de59d10"
+    },
+    {
+      "bytes": 2,
+      "path": "mac/attempt1/cache-invalidation/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 345,
+      "path": "mac/attempt1/cache-invalidation/metadata-process.json",
+      "sha256": "74102de237aa2a50c63dd1d4d872589583b72472d8e92c1cbbc8648282b692f9"
+    },
+    {
+      "bytes": 491,
+      "path": "mac/attempt1/cache-invalidation/metadata-validation.json",
+      "sha256": "c9958e7edf7ccdde140921d5c108b65d224626a45b69544b27577ac8c62d5dc2"
+    },
+    {
+      "bytes": 309446,
+      "path": "mac/attempt1/cache-invalidation/metadata.json",
+      "sha256": "aff0cf0e5b0651d99865f7804fc5abd0323aef5f6f50c0fe8912f52e8f73379e"
+    },
+    {
+      "bytes": 195632,
+      "path": "mac/attempt1/cache-invalidation/metadata.log",
+      "sha256": "08e0807188378cb45ed6112f976aa0d56a23d429666945a8b3d4143091423381"
+    },
+    {
+      "bytes": 0,
+      "path": "mac/attempt1/cache-invalidation/metadata.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 43710,
+      "path": "mac/attempt1/cache-invalidation/operations.json",
+      "sha256": "9b5cbccdfbd4676ed6b2b9aaa9b434b51236462dc0a79ae8e2ce9939b21ca783"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/cache-invalidation/source-after-metadata.json",
+      "sha256": "9bc06cc0f7b5e50fa37a94f774c52d14dabf7537ef5aac30cb25e9e1a938e6d9"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/cache-invalidation/source-after.json",
+      "sha256": "14e678e2bb844c28b37f6d52b11618d4a0266e28265f62fd28159922418b5a22"
+    },
+    {
+      "bytes": 224,
+      "path": "mac/attempt1/cache-invalidation/source-before.json",
+      "sha256": "6eb6c5bd600fe9d6593d97da5c2978cc3546dc666f2118520e855553a6a10309"
+    },
+    {
+      "bytes": 632,
+      "path": "mac/attempt1/cache-invalidation/terminal.json",
+      "sha256": "88dfedfdf7b853cf62fa3214b571d9338d5e32e9d88f72fe00a9a857240624e3"
+    },
+    {
+      "bytes": 129596,
+      "path": "mac/attempt1/cache-invalidation/validated-packages.json",
+      "sha256": "0596e35e26398c48a66bb702f8513c0db0f01ff9cb38178181bad06c82e9e2bb"
+    },
+    {
+      "bytes": 400,
+      "path": "mac/attempt1/clippy-process.json",
+      "sha256": "fc3a101eaa7ee6ae802262f1c5cbfae302b02065cd8aa88ab175a97be593e1cf"
+    },
+    {
+      "bytes": 1191,
+      "path": "mac/attempt1/clippy-result.json",
+      "sha256": "bf20e883a17a4c736eed0c441d9d01feaa0d87a7d3e7652513da759bf2404579"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/clippy-source-after.json",
+      "sha256": "a1a98ccf5d199ac27861c9588084586dc30eaa081aa56bf919ef5de99ef1a6cd"
+    },
+    {
+      "bytes": 224,
+      "path": "mac/attempt1/clippy-source-before.json",
+      "sha256": "6b25cf7b1fb2411ffec3549171f828dc01221b9cbe9df98740c163487df6de8c"
+    },
+    {
+      "bytes": 555312,
+      "path": "mac/attempt1/clippy.log",
+      "sha256": "d5c72f31dede37aaa342b879a22c27051e0b8564ac5c179de525c6440b4ecd03"
+    },
+    {
+      "bytes": 568345,
+      "path": "mac/attempt1/compiler-clippy.json",
+      "sha256": "c3d432ec33a70b49745631219158d3e45b08c4417f4554e084226a901d0d8c35"
+    },
+    {
+      "bytes": 198242,
+      "path": "mac/attempt1/compiler-workspace-build.json",
+      "sha256": "e21070f1d5389037be135ff7e3fb5def85ef09669544d435a06e29f58a9a5e52"
+    },
+    {
+      "bytes": 257,
+      "path": "mac/attempt1/fmt-process.json",
+      "sha256": "2ef1dc4a5b004d97ee49812e7017dbc851ffbca15cf2277d900082648302f747"
+    },
+    {
+      "bytes": 1030,
+      "path": "mac/attempt1/fmt-result.json",
+      "sha256": "e78ec8125f3f8fe9e6092d61fb09e3cb7f9d18d62630e947196203032ee7567e"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/fmt-source-after.json",
+      "sha256": "63542e2680590b3b972bdad3ce60b4a8e9871a50be049b67f5245a9d08dab9b4"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/fmt-source-before.json",
+      "sha256": "93ece616e4ceb1b51c007916fdf2eb0f3885f537f61bb9673f30617489a48cd4"
+    },
+    {
+      "bytes": 0,
+      "path": "mac/attempt1/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 378,
+      "path": "mac/attempt1/full-voice-process.json",
+      "sha256": "6043d5477e99126902dd6f908324977eb2f22107e58cec8c2c40219db1fa25e2"
+    },
+    {
+      "bytes": 812705,
+      "path": "mac/attempt1/full-voice-result.json",
+      "sha256": "28d689aa3cd5c29a54f761e275f32f803574c6a11b8baecdb9aed8066139624d"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/full-voice-source-after.json",
+      "sha256": "2da9c77cc80cd6bbc6596a10af84ca0f6e1379c942ceaec9416b911c71e54d19"
+    },
+    {
+      "bytes": 221,
+      "path": "mac/attempt1/full-voice-source-before.json",
+      "sha256": "d2bd6adb2722b66c36d0a54c63c5e8083c2b63275423a8cdaac0defca14ffc44"
+    },
+    {
+      "bytes": 416458,
+      "path": "mac/attempt1/full-voice.log",
+      "sha256": "dbf4f6be3e5084c57e9689287d412f1aaf0c607b38f7c94c0c78256c4a3ab279"
+    },
+    {
+      "bytes": 2,
+      "path": "mac/attempt1/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 951,
+      "path": "mac/attempt1/grant.json",
+      "sha256": "5befbc3f46fa55a6b0e793d274c49f8b1717ce1c84ea96d8a1e9d3e6baea06c9"
+    },
+    {
+      "bytes": 224,
+      "path": "mac/attempt1/initial-source-guard.json",
+      "sha256": "a937a8634f6e72d601301290ebc0b9e8fcad82586be3dfa788fb078a8fc59c40"
+    },
+    {
+      "bytes": 858460,
+      "path": "mac/attempt1/stages.json",
+      "sha256": "c3e57e61d6dba3b22a927dc33dafd11501f53b6c3275152915562deb1255e915"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/terminal-source-guard.json",
+      "sha256": "12c67b3085a7d250803801b9358f20f923851e17cf55a6d1fb832b4f64d0a416"
+    },
+    {
+      "bytes": 149915,
+      "path": "mac/attempt1/terminal.json",
+      "sha256": "17dba7e03de0fd3e7017dc9aafc88ddf030afc219f074853f8598c840e35b474"
+    },
+    {
+      "bytes": 341,
+      "path": "mac/attempt1/workspace-build-process.json",
+      "sha256": "fed1d6f7857e5fa04c8e379f84d5af5e7d96c3e83541cd80572c269e020e7385"
+    },
+    {
+      "bytes": 1133,
+      "path": "mac/attempt1/workspace-build-result.json",
+      "sha256": "eaa08c6796c75618a089c4243274110ce4f6a98eaccebf883505be7e07f28d75"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/workspace-build-source-after.json",
+      "sha256": "98406a8affa739faa4ec18a2e38f18e8ca8653b0a40d58ba08983b96637577f5"
+    },
+    {
+      "bytes": 223,
+      "path": "mac/attempt1/workspace-build-source-before.json",
+      "sha256": "79d3302a5e42f82e442bd488d433e01f4c7e848c69aa57d280ff90b1e7cdc626"
+    },
+    {
+      "bytes": 403061,
+      "path": "mac/attempt1/workspace-build.log",
+      "sha256": "c02f36a856b7087c00181e4b74f2ff08cfedcbc97e399c9aa7e44fa21a88c838"
+    },
+    {
+      "bytes": 139823,
+      "path": "mac/attempt1/workspace-compilation-freshness.json",
+      "sha256": "2a6d39278d2c5560ba99b2d9c49f4a7c2a37ee917943854e0fbd6120ae5cd181"
+    },
+    {
+      "bytes": 2,
+      "path": "mac/previous-owner/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 149233,
+      "path": "mac/previous-owner/terminal.json",
+      "sha256": "9be8913dbcf77117dfc0002c5f28c35929fd7b4416bedf2271ec55f9912f1a9b"
+    },
+    {
+      "bytes": 12482,
+      "path": "qualification.json",
+      "sha256": "e7ef6a43aa8955ac816458e1b93b800482d56e9e7998abe41eb33cd7a19adba1"
+    },
+    {
+      "bytes": 1737,
+      "path": "source-binding.json",
+      "sha256": "f6477c377e5a05504b8772909db41eb6b1780734c9e712b6aa2acd42aba19ff8"
+    },
+    {
+      "bytes": 65912,
+      "path": "tested-fixtures/kept_name_callback_tests.rs.txt",
+      "sha256": "5223aed53bc95643a66d50dd7034b752dd2bc741fd7e507a38443f01a70a2ca6"
+    },
+    {
+      "bytes": 39533,
+      "path": "tested-fixtures/kept_name_privacy_tests.rs.txt",
+      "sha256": "127ec2743f70acd81584ad9da04fabd4c82f535ea0123da99ded83d4347a8bf9"
+    }
+  ],
+  "format": "fourth-combined-callback-evidence/1",
+  "manifest_self_excluded": true,
+  "tested_tree": "be860815986f43c8a1b37a8ac50a210216977039"
+}

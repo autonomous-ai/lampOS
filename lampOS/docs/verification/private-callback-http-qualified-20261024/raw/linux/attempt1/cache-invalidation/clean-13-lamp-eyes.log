@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/eyes#lamp-eyes@0.1.0` is ignored, cleaning all versions of `lamp-eyes` found
+warning: url qualifier in `-p path+file:///src-fourth-combined-private-callback/crates/eyes#lamp-eyes@0.1.0` ignored, cleaning all versions of `lamp-eyes` found
+     Removed 154 files, 993.0MiB total
