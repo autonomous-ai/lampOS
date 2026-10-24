@@ -201,6 +201,9 @@ pub struct RoomTold {
     /// The request let out only as the same speaker's conversation carried
     /// on ([`Self::carried`]), until it is closed.
     carried: Option<u64>,
+    /// The request held as someone else's while a carry stood, its first
+    /// in a row ([`Self::colleague_held`]).
+    colleague_held: Option<u64>,
     room: Room,
     /// The session last told, and what it was told.
     told: Option<(u64, Room)>,
@@ -236,6 +239,7 @@ impl RoomTold {
             talking_seen: None,
             not_speaking: None,
             carried: None,
+            colleague_held: None,
             room: Room::Unknown,
             told: None,
         }
@@ -444,6 +448,25 @@ impl RoomTold {
     pub fn carried(&mut self, request: u64) {
         self.carried = Some(request);
     }
+
+    /// The room is known quiet, for a test.
+    #[cfg(test)]
+    pub fn set_quiet(&mut self) {
+        self.room = Room::Quiet;
+    }
+
+    /// `request`, a line while the same speaker's conversation was carried,
+    /// was held and left the carry standing (`LAMP_SAME_SPEAKER_CARRIES`,
+    /// the first builder at 09:34 on #3296): a colleague's one
+    /// interjection, or a line in a voice not surely the owner's.
+    /// It is no talk and no second person: its verdict does not make the
+    /// room busy by its voice ([`Self::judged`]), and left unanswered it
+    /// neither ends the conversation nor joins the busy room's run
+    /// ([`Self::left_unanswered`]). A second line in a row ends the carry in
+    /// the worker, and is counted as before.
+    pub fn colleague_held(&mut self, request: u64) {
+        self.colleague_held = Some(request);
+    }
     /// What the rule's verdict on `request` tells the room, as the worker
     /// gives it: a request whose answer is held is not talk between people
     /// ([`Self::held`]); one held as another voice is, and ends the
@@ -475,6 +498,11 @@ impl RoomTold {
         verdict: Option<crate::attention::Verdict>,
         other_voice: bool,
     ) {
+        // `LAMP_SAME_SPEAKER_CARRIES`: a colleague's one line held under a
+        // carry is no second person and no talk.
+        if self.colleague_held == Some(request) {
+            return;
+        }
         // `LAMP_NAME_OR_FOLLOW_UP`: another voice is a second person.
         if other_voice {
             self.two_people(self.last_sound_us);
@@ -653,6 +681,10 @@ impl RoomTold {
         }
         if self.carried == Some(request) {
             self.carried = None;
+            return Left::Held;
+        }
+        if self.colleague_held == Some(request) {
+            self.colleague_held = None;
             return Left::Held;
         }
         if self.held_by_policy == Some(request) {
