@@ -1,0 +1,54 @@
+{
+  "complete": true,
+  "assets": [
+    {
+      "release": 6408,
+      "part": "lampos-manifest.json",
+      "asset_id": 668607996,
+      "size": 13563,
+      "sha256": "696c6ae70a5cdf164c4a319bdc0887e5d1286519c36157a9c0c8db2cc0d80734",
+      "signature_trust_verified": false
+    },
+    {
+      "release": 6408,
+      "part": "lamp-records",
+      "asset_id": 668607851,
+      "size": 1393272,
+      "sha256": "a1839349ca730d0051033bf37a43238dfc0deb2a32184e600893424724722031",
+      "signature_trust_verified": false
+    },
+    {
+      "release": 6408,
+      "part": "lamp-voice",
+      "asset_id": 668607984,
+      "size": 28375944,
+      "sha256": "af7cd0d1e384ebddcca2b58eea94176c80aba573a5f47f4cd95cc8ce1a7ad084",
+      "signature_trust_verified": false
+    },
+    {
+      "release": 6449,
+      "part": "lampos-manifest.json",
+      "asset_id": 669531073,
+      "size": 13563,
+      "sha256": "2f8f218c41b74576b52451248f0df2f9251634bfc68658b42062282bc0c68a6a",
+      "signature_trust_verified": false
+    },
+    {
+      "release": 6449,
+      "part": "lamp-records",
+      "asset_id": 669530983,
+      "size": 1406976,
+      "sha256": "b18095bc74064e9949d9ed16c8f3c9a4c8c46e35892d3922800cf4aea8bb668f",
+      "signature_trust_verified": false
+    },
+    {
+      "release": 6449,
+      "part": "lamp-voice",
+      "asset_id": 669531071,
+      "size": 28372464,
+      "sha256": "21783ba5fd6654d96164f7426dc27f2c72f06a074ce91fe06b256feec697c6da",
+      "signature_trust_verified": false
+    }
+  ],
+  "signature_trust_verified": false
+}

@@ -1,0 +1,7 @@
+{
+  "path": "/home/runner/work/lampOS/lampOS/lampOS/target/debug/deps/release_pair_systemd-a92c7207a4e6b245",
+  "sha256": "50a3d322019b8ea1279e5c3990b80dd3f06dc5ad57d7c1c60607c8c433f2bf5f",
+  "bytes": 13825896,
+  "source": "/home/runner/work/lampOS/lampOS/lampOS/crates/records/tests/release_pair_systemd.rs",
+  "cargo_build_log_sha256": "b5d374869480f36b035a47bdd57242d5e071e5c9a4cd0909f1d58bbf0321e570"
+}

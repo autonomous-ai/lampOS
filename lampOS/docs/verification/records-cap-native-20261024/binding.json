@@ -1,0 +1,28 @@
+{
+  "head": "0d057ef4be25107e203d8ccdef246360b2357ab0",
+  "preview": "e52cd65f6fb5789a266b5bbfa78a7518b2f53428",
+  "both_complete_git_trees": "c2e7857fc8b1f2a8dcb83378028e36397f7e321f",
+  "preview_parents": [
+    "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+    "0d057ef4be25107e203d8ccdef246360b2357ab0"
+  ],
+  "ordinary_arm64_run": 40094999252,
+  "ordinary_summary": {
+    "passed": 1448,
+    "failed": 0,
+    "skipped": 16,
+    "process_passed": 12
+  },
+  "clippy_run": 40094999249,
+  "dedicated_run": 40094999273,
+  "dedicated_summary": {
+    "passed": 3,
+    "failed": 0,
+    "elapsed_seconds": 45,
+    "external_owned_units_cleaned": 6
+  },
+  "reader": "Third READ-OK6384510943",
+  "landed": "train90/#3383 lamp-voice a1b323bd8",
+  "signature_trust_claimed": false,
+  "device_or_power_loss_claimed": false
+}
