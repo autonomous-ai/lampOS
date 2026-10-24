@@ -30,6 +30,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+mod carry_window;
 #[cfg(test)]
 mod memory_note_retries;
 
@@ -2970,7 +2971,7 @@ pub fn serve(
             .is_ok_and(|value| value == "on")
         {
             eprintln!(
-                "lamp-voice second: in a busy room, the one the lamp answered goes on for {} s after each answer by their own voice or face, and another voice or face ends it (LAMP_SAME_SPEAKER_CARRIES)",
+                "lamp-voice second: in a busy room, the one the lamp answered goes on for {} s after each answer by their own voice or face, and another voice or face is held, ending it at the second in a row (LAMP_SAME_SPEAKER_CARRIES)",
                 SAME_SPEAKER_CARRIES_FOR.as_secs()
             );
             if let Ok(mut heeding) = heeding.lock() {
@@ -4125,15 +4126,24 @@ pub(crate) struct Heeding {
     going_on_same_one: bool,
     /// `LAMP_SAME_SPEAKER_CARRIES` ([`Self::carrying_the_same_speaker`]):
     /// whether it is on; whether a conversation is open for it, from the
-    /// lamp's last answer until a stop, a privacy change, or another voice
-    /// or face ends it; and the request begun while it stands, for its check
+    /// lamp's last answer until a stop, a privacy change, or two lines in a
+    /// row from someone else end it; and the request begun while it stands, for its check
     /// at the verdict, with whether it began within a follow-up's 8 s.
     carries: bool,
     carrying: bool,
+    carry_window: carry_window::CarryWindow,
     carried: Option<(u64, bool)>,
     /// The newest line carried by a sure sign of the same speaker: a print
     /// come late of a line before it ends nothing (reviewer-two at 03:07).
     carried_last: Option<u64>,
+    /// Lines in a row from someone else held while the carry stands, each
+    /// request once ([`Self::colleague_held`]): the second ends it.
+    carry_others: Vec<u64>,
+    /// Whether a line was held as someone else's in this carry, until a
+    /// new carry begins, with the newest such print known: after it the
+    /// owner's voice alone carries only when nearer theirs than that print
+    /// ([`CARRY_NEARER_BY`]).
+    held_colleague: Option<Option<Vec<f32>>>,
     /// How much speech a print under `same_voice::DIFFERENT_BELOW` needs to
     /// be a sure other voice under a carry: [`CARRY_SURE_OTHER_SPEECH_SAMPLES`],
     /// lowered only by tests for a synthetic classification control.
@@ -4570,7 +4580,9 @@ pub(crate) const CALL_CARRIES_FOR: Duration = Duration::from_secs(15);
 
 /// With `LAMP_SAME_SPEAKER_CARRIES`, in a busy room, how long after the end
 /// of the lamp's last words a line begun by the one it answered goes on
-/// ([`Heeding::carrying_the_same_speaker`]). Each answer renews it. Past the
+/// ([`Heeding::carrying_the_same_speaker`]). Each answer renews it; one
+/// held colleague line extends from its audio end, at most forty seconds
+/// from the answer. Past the
 /// 8 s a follow-up has (`crate::name_or_follow_up::FOLLOW_UP_FOR`): on
 /// lamp-4ace on 23 Oct at 18:51 the owner's third line, in a room kept busy
 /// by their own held lines, was held, and every line after it.
@@ -4594,9 +4606,36 @@ pub(crate) const SAME_SPEAKER_CARRIES_FOR: Duration = Duration::from_secs(20);
 /// voices are measured, and this is set from that measurement.
 pub(crate) const CARRY_SURE_OTHER_SPEECH_SAMPLES: usize = crate::same_voice::RATE * 5 / 2;
 
+/// With `LAMP_SAME_SPEAKER_CARRIES`, once a line has been held as someone
+/// else's in a carry, how much nearer the conversation's voice a line's
+/// print must be than to that held line's, beside `same_voice::SAME_FROM`,
+/// to be carried by voice alone (reviewer-three's P2 on #3331: two voices
+/// have read 0.69 on 18 Oct's set, so owner and colleague lines could
+/// alternate, a colleague's at 0.70 carried as the owner's).
+// ponytail: provisional margin, not calibrated; set it from CAM++ pairs of
+// two real voices at a desk.
+pub(crate) const CARRY_NEARER_BY: f32 = 0.10;
+
+/// `LAMP_SAME_SPEAKER_CARRIES`: `request` was someone else's while the
+/// carry stood: counted once among `others`, the lines in a row from
+/// someone else; at [`crate::room_told::TALK_ENDS_CONVERSATION`] of them
+/// the carry ends. Whether it still stands.
+fn count_colleague(others: &mut Vec<u64>, carrying: &mut bool, request: u64) -> bool {
+    if !others.contains(&request) {
+        others.push(request);
+    }
+    if others.len() >= crate::room_told::TALK_ENDS_CONVERSATION {
+        *carrying = false;
+    }
+    *carrying
+}
+
 /// What [`Heeding::carried_by_the_same_speaker`] found of a line begun
 /// while a carry stands.
 struct Carried {
+    /// Someone else's line: another face seen speaking it, or a sure other
+    /// voice ([`Heeding::colleague_held`] counts it).
+    other: bool,
     /// A sure sign: the same speaker to the lamp (carried, it goes on as the
     /// conversation), or not (held). `None`: no sure sign either way.
     goes_on: Option<bool>,
@@ -4779,8 +4818,11 @@ impl Heeding {
             going_on_same_one: false,
             carries: false,
             carrying: false,
+            carry_window: carry_window::CarryWindow::default(),
             carried: None,
             carried_last: None,
+            carry_others: Vec::new(),
+            held_colleague: None,
             sure_other_samples: CARRY_SURE_OTHER_SPEECH_SAMPLES,
             began_over: None,
             voices: None,
@@ -5443,16 +5485,31 @@ impl Heeding {
             );
             at.late_other = None;
         }
-        if at.late_other.is_some() {
-            // Someone else's after all: no conversation is carried on.
-            self.carrying = false;
-        }
         if let Some(late) = at.late_other {
-            eprintln!(
-                "lamp-voice second: request {request}: no conversation is going on for it: request {late}'s voice, known after its answer, was another's"
-            );
-            if let Ok(mut told) = crate::room_told::room().lock() {
-                told.another_voice_held(late);
+            // Someone else's after all: a line from someone else, as
+            // [`Self::colleague_held`] counts them (its fields: `voices` is
+            // borrowed). With the carry standing after it, it ends nothing.
+            if self.carries {
+                let print = voices.print_of(late);
+                let kept = self.held_colleague.take().flatten();
+                self.held_colleague = Some(print.or(kept));
+            }
+            let stands =
+                self.carries && count_colleague(&mut self.carry_others, &mut self.carrying, late);
+            if stands {
+                self.carry_window.held(late);
+                eprintln!(
+                    "lamp-voice second: request {request}: request {late}'s voice, known after its answer, was another's: one line from someone else, the carry stands (LAMP_SAME_SPEAKER_CARRIES)"
+                );
+            } else {
+                self.carrying = false;
+                self.carry_window.clear();
+                eprintln!(
+                    "lamp-voice second: request {request}: no conversation is going on for it: request {late}'s voice, known after its answer, was another's"
+                );
+                if let Ok(mut told) = crate::room_told::room().lock() {
+                    told.another_voice_held(late);
+                }
             }
         }
         if let Some(why) = at
@@ -5577,8 +5634,11 @@ impl Heeding {
     /// looks go, so no passing id outlives a privacy change.
     pub(crate) fn privacy_changed(&mut self) {
         self.caller_faces.clear();
-        // No conversation is carried across it (`LAMP_SAME_SPEAKER_CARRIES`).
+        // No conversation is carried across it (`LAMP_SAME_SPEAKER_CARRIES`),
+        // and no colleague's print is kept past it.
         self.carrying = false;
+        self.carry_window.clear();
+        self.held_colleague = None;
         // The lines' speaking faces too, for a join (`Self::same_speaker`),
         // and how the room was.
         self.spoke.clear();
@@ -5601,8 +5661,8 @@ impl Heeding {
     /// The contract (the first builder at 04:33 on #3296): the first 8 s
     /// after the lamp's words are not identity-gated. Within them an
     /// uncertain, short or missing print is no evidence either way, and the
-    /// line goes as an ordinary follow-up; from 8 to 20 s only a sure sign of
-    /// the same speaker carries it. Always held, inside the 8 s too: another
+    /// line goes as an ordinary follow-up; past 8 s only a sure sign of
+    /// the same speaker carries it within the bounded window. Always held, inside the 8 s too: another
     /// face seen speaking it, the caller turned away, or a sure other voice,
     /// which today is not reachable: prints carry at most 1.5 s of speech,
     /// under the provisional 2.5 s. A print that was no evidence never
@@ -5611,12 +5671,13 @@ impl Heeding {
     /// - A sure other voice (under `same_voice::DIFFERENT_BELOW` from
     ///   [`CARRY_SURE_OTHER_SPEECH_SAMPLES`] of speech or more, which no
     ///   print reaches today), or a face seen speaking it that is not the
-    ///   caller's: someone else, and the carry is over until the lamp
-    ///   answers again; their identity is not reused after.
+    ///   caller's: someone else, held; the second such line in a row ends
+    ///   the carry until the lamp answers again ([`Self::colleague_held`]),
+    ///   and their identity is not reused after.
     /// - The caller's face seen speaking it, turned away from the lamp: the
     ///   same speaker talking to someone else (reviewer-two at 03:01 on
     ///   Queue #3126: the same speaker tells who spoke, not to whom). Held;
-    ///   the carry stands for their turn back.
+    ///   the carry ends, so turning back needs a fresh call or answer.
     /// - The caller's face alone seen speaking it turned to the lamp, or the
     ///   conversation's voice at `same_voice::SAME_FROM` or over: carried.
     ///   With short lines the sign is mostly the face: one speaker's short
@@ -5668,22 +5729,29 @@ impl Heeding {
             speech.map_or(0, |speech| speech * 1_000 / crate::same_voice::RATE),
             self.caller_faces
         );
-        let goes_on = if voice == Some(false) || other_face {
-            self.carrying = false;
+        let other = voice == Some(false) || other_face;
+        let goes_on = if other {
             eprintln!(
-                "lamp-voice second: request {request}: someone else ({heard}): not carried, and the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)"
+                "lamp-voice second: request {request}: someone else ({heard}): held, not answered (LAMP_SAME_SPEAKER_CARRIES)"
             );
             Some(false)
         } else if own_face_away {
+            // The first builder at 09:34 on #3296: turned away, the owner
+            // has left the conversation, their voice sure or not.
+            self.carrying = false;
+            self.carry_window.clear();
             eprintln!(
-                "lamp-voice second: request {request}: the one the lamp answered, turned away from it, talking to someone else ({heard}): not carried (LAMP_SAME_SPEAKER_CARRIES)"
+                "lamp-voice second: request {request}: the one the lamp answered, turned away from it, talking to someone else ({heard}): not carried, and the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)"
             );
             Some(false)
-        } else if own_face || voice == Some(true) {
+        } else if own_face
+            || voice == Some(true) && self.nearer_than_the_colleague(request, likeness)
+        {
             eprintln!(
                 "lamp-voice second: request {request}: the one the lamp answered ({heard}): their conversation goes on (LAMP_SAME_SPEAKER_CARRIES)"
             );
             self.carried_last = Some(request);
+            self.carry_others.clear();
             if let Ok(mut room) = crate::room_told::room().lock() {
                 room.carried(request);
             }
@@ -5694,18 +5762,90 @@ impl Heeding {
             );
             None
         };
-        Carried { goes_on, voice }
+        Carried {
+            other,
+            goes_on,
+            voice,
+        }
+    }
+
+    /// `LAMP_SAME_SPEAKER_CARRIES`: whether `request`'s print, at
+    /// `likeness` to the conversation's voice, is nearer it by
+    /// [`CARRY_NEARER_BY`] than to the line held as someone else's in this
+    /// carry, if one was (reviewer-three on #3331). With none held, yes;
+    /// with no held print known, no: the owner's face carries them.
+    fn nearer_than_the_colleague(&mut self, request: u64, likeness: Option<f32>) -> bool {
+        let Some(colleague) = self.held_colleague.clone() else {
+            return true;
+        };
+        let other = self
+            .voices
+            .as_mut()
+            .and_then(|voices| voices.print_of(request))
+            .zip(colleague)
+            .and_then(|(print, colleague)| crate::same_voice::cosine(&print, &colleague));
+        let nearer = likeness
+            .zip(other)
+            .is_some_and(|(own, other)| own >= other + CARRY_NEARER_BY);
+        if !nearer {
+            eprintln!(
+                "lamp-voice second: request {request}: its voice ({likeness:?}) is not nearer the conversation's than the voice held as someone else's in this carry ({other:?}), by {CARRY_NEARER_BY}: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)"
+            );
+        }
+        nearer
+    }
+
+    /// A line held as someone else's in this carry: its print, if known,
+    /// else the one kept before ([`Self::nearer_than_the_colleague`]).
+    fn hold_the_colleagues_print(&mut self, request: u64) {
+        let print = self
+            .voices
+            .as_mut()
+            .and_then(|voices| voices.print_of(request));
+        let kept = self.held_colleague.take().flatten();
+        self.held_colleague = Some(print.or(kept));
+    }
+
+    /// `LAMP_SAME_SPEAKER_CARRIES`: `request`, begun while the carry
+    /// stands, was someone else's, held (the first builder at 09:34 on
+    /// #3296): one such line ends nothing, and the owner goes on; a second
+    /// in a row is people talking between them, as two lines left alone
+    /// end a conversation (`room_told::TALK_ENDS_CONVERSATION`), and ends
+    /// the carry until the lamp answers again. Whether it still stands.
+    /// The line, held with the carry standing, is no talk for the room
+    /// either (`room_told::RoomTold::colleague_held`).
+    fn colleague_held(&mut self, request: u64) -> bool {
+        let stands = count_colleague(&mut self.carry_others, &mut self.carrying, request);
+        self.hold_the_colleagues_print(request);
+        if stands {
+            self.carry_window.held(request);
+            eprintln!(
+                "lamp-voice second: request {request}: one line from someone else: the conversation's carry stands, and the line makes the room neither busy nor talked past (LAMP_SAME_SPEAKER_CARRIES)"
+            );
+            if let Ok(mut room) = crate::room_told::room().lock() {
+                room.colleague_held(request);
+            }
+        } else {
+            self.carry_window.clear();
+            eprintln!(
+                "lamp-voice second: request {request}: {} lines in a row from someone else: the conversation is carried no further until the lamp answers again (LAMP_SAME_SPEAKER_CARRIES)",
+                self.carry_others.len()
+            );
+        }
+        stands
     }
 
     /// In a busy room, the one the lamp answered goes on talking with it
     /// for [`SAME_SPEAKER_CARRIES_FOR`] after each of its answers, by the
-    /// line's start, past the follow-up's 8 s and people talking past it,
+    /// line's start, extended once from a held line's actual audio end,
+    /// at most forty seconds after the answer; past the follow-up's 8 s
+    /// and people talking past it,
     /// by their face, the caller's alone, seen speaking the line turned to
     /// the lamp, or their voice at `same_voice::SAME_FROM` or over
     /// (`LAMP_SAME_SPEAKER_CARRIES=on`, the owner's P1 on Queue #3126;
     /// [`Self::carried_by_the_same_speaker`]). Another face seen speaking a
-    /// line, or a sure other voice, ends the carry, as a stop and a privacy
-    /// change do; a line with no sure sign is held and ends nothing. Such a
+    /// line, or a sure other voice, is held; two such lines in a row end the
+    /// carry, as a stop and a privacy change do ([`Self::colleague_held`]); a line with no sure sign is held and ends nothing. Such a
     /// line the model leaves unanswered is no talk
     /// (`room_told::RoomTold::carried`).
     pub(crate) fn carrying_the_same_speaker(&mut self) {
@@ -5754,6 +5894,9 @@ impl Heeding {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
             crate::second_provider::Did::Said(request, until_us) => {
+                if self.carries && self.carrying && !self.chain.contains(&request) {
+                    self.carry_window.answered(request, until_us);
+                }
                 self.said_until_us = self.said_until_us.max(Some(until_us));
                 if !self.chain.contains(&request) {
                     self.said_until_free_us = self.said_until_free_us.max(Some(until_us));
@@ -5761,7 +5904,11 @@ impl Heeding {
             }
             // `LAMP_SAME_SPEAKER_CARRIES`: a stop ends the conversation
             // carried.
-            crate::second_provider::Did::Stopped => self.carrying = false,
+            crate::second_provider::Did::Stopped => {
+                self.carrying = false;
+                self.carry_window.clear();
+                self.held_colleague = None;
+            }
         }
     }
 
@@ -6118,18 +6265,29 @@ impl Heeding {
         let switch = self.name_or_follow_up;
         // `LAMP_SAME_SPEAKER_CARRIES`: in a busy room the one the lamp
         // answered goes on for `SAME_SPEAKER_CARRIES_FOR` after the end of
-        // its words, by the line's start, past the follow-up's 8 s and
+        // its words, or once from a held colleague line's audio end,
+        // capped at forty seconds after the answer; by the line's start,
+        // past the follow-up's 8 s and
         // people talking past the lamp, if the verdict then finds their
         // voice or face in it ([`Self::judge`]).
         let goes = followed_up && !talked_past;
+        // Forgetting removes the thread's words, including any extension.
+        // A delayed output receipt must not revive that forgotten scope.
+        if self.carries && said_ago.is_none() {
+            self.carry_window.clear();
+        }
         let carry = self.carries
             && self.carrying
-            && said_ago
-                .is_some_and(|ago| ago.saturating_sub(began_ago) <= SAME_SPEAKER_CARRIES_FOR);
+            && (said_ago
+                .is_some_and(|ago| ago.saturating_sub(began_ago) <= SAME_SPEAKER_CARRIES_FOR)
+                || self.carry_window.extra_allows(began));
+        if carry {
+            self.carry_window.remember(request, ended, monotonic_us());
+        }
         // Every line begun while it stands is read for its signs, within
         // the 8 s too: an unsure print and a sure sign count the same either
-        // side of them, and another face there ends the carry (reviewer-two
-        // at 03:46 on #3296).
+        // side of them, and another face there is held too. Two such
+        // lines in a row end the carry (the later #3331 contract).
         self.carried = carry.then_some((request, goes));
         let ended = |mut signs: Signs| {
             // `LAMP_NAME_OR_FOLLOW_UP`, in a busy room: a line is in the
@@ -6147,7 +6305,7 @@ impl Heeding {
                     // in the window may be judged after it.
                     let ms = |ago: Duration| ago.as_millis();
                     eprintln!(
-                        "lamp-voice second: request {request}: in a busy room, begun {} ms after the lamp's words ended and judged {} ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within {} s of their end by its start, if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)",
+                        "lamp-voice second: request {request}: in a busy room, begun {} ms after the lamp's words ended and judged {} ms after, past a follow-up's window or after talk past the lamp: it goes on only as the same speaker's conversation, within the bounded carry window by its start (ordinary {} s), if its voice or face is the one the lamp answered (LAMP_SAME_SPEAKER_CARRIES)",
                         said_ago.map_or(0, |ago| ms(ago.saturating_sub(began_ago))),
                         said_ago.map_or(0, ms),
                         SAME_SPEAKER_CARRIES_FOR.as_secs()
@@ -6358,31 +6516,83 @@ impl Heeding {
         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
         // Whether a carry still stands for the caller after this line.
         let mut carry_stands = false;
-        if busy
-            && let Some((carried_request, follow_up)) = self.carried.take()
-            && carried_request == request
-        {
+        // `LAMP_SAME_SPEAKER_CARRIES`: someone else's line held while the
+        // carry stands, its first: it does not make the room busy by voice.
+        let mut colleague_held = false;
+        let carried_now = self
+            .carried
+            .take()
+            .filter(|(carried, _)| *carried == request);
+        // In a room not busy, a line held under the carry is held for its
+        // own verdict as in a busy room, the room itself unchanged.
+        let mut held_here = false;
+        // A print come late at this verdict, of a second line in a row from
+        // someone else, ended the carry: this line is judged as with none.
+        let carried_now = match carried_now {
+            Some((_, follow_up)) if !self.carrying => {
+                going_on &= follow_up;
+                signs.going_on = going_on;
+                None
+            }
+            carried_now => carried_now,
+        };
+        if carried_now.is_some() {
+            carry_stands = self.carrying;
+        }
+        // In any room (reviewer-two at 10:35 on #3331): the same speaker's
+        // identity, another face, the caller turned away.
+        if let Some((_, follow_up)) = carried_now {
             let carried =
                 self.carried_by_the_same_speaker(request, likeness, &speakers, &turned_speakers);
+            // Held past a still turned face (`LAMP_TURNED_FACE_SPEAKS`), and
+            // not carried by a sure sign after all (the reviewer-lead's P3).
+            let still_face =
+                self.face_not_speaking == Some(request) && carried.goes_on != Some(true);
+            if carried.other || still_face {
+                colleague_held = self.colleague_held(request);
+            }
             // An unsure print is no sign either way: the voice check's own
             // "another voice" from it is undone, so the line is judged as if
             // no print had come, as when it comes late or never (reviewer-two
-            // at 04:11 on #3296).
+            // at 04:11 on #3296). In a room not busy such a line is still
+            // held, as another voice is there without the carry, but it is
+            // counted as no one's and changes nothing in the room (the
+            // reviewer-lead's P3 on #3331).
             if other_voice && carried.voice.is_none() {
                 other_voice = false;
                 going_on = going_on_unheard;
+                if !busy && carried.goes_on != Some(true) {
+                    going_on = false;
+                    held_here = true;
+                    if let Ok(mut room) = crate::room_told::room().lock() {
+                        room.colleague_held(request);
+                    }
+                }
             }
-            // No sure sign: past the 8 s held; within them the ordinary
-            // follow-up rule, the legacy exception, whenever the print comes.
-            going_on = carried.goes_on.unwrap_or(follow_up && going_on);
+            if busy {
+                // No sure sign: past the 8 s held; within them the ordinary
+                // follow-up rule, the legacy exception, whenever the print
+                // comes.
+                going_on = carried.goes_on.unwrap_or(follow_up && going_on);
+            } else if carried.goes_on == Some(false) {
+                going_on = false;
+                held_here = true;
+            }
             signs.going_on = going_on;
+            if carried.goes_on == Some(true) {
+                self.attention.carried_past_a_question();
+            }
             carry_stands = self.carrying;
         }
         // `LAMP_NAME_OR_FOLLOW_UP`: a line in another voice than the
         // conversation's is a second person at the lamp, so the room is busy
         // now, for this line's verdict as well as the next ones'.
         let room = if self.name_or_follow_up && other_voice {
-            if self.keeps_room
+            if colleague_held {
+                eprintln!(
+                    "lamp-voice second: request {request}: another voice than the conversation's, held under the carry: the room is not made busy by it (LAMP_SAME_SPEAKER_CARRIES)"
+                );
+            } else if self.keeps_room
                 && let Ok(mut told) = crate::room_told::room().lock()
                 && told.two_people(monotonic_us())
             {
@@ -6390,6 +6600,11 @@ impl Heeding {
                     "lamp-voice second: request {request}: another voice than the conversation's: the room is busy (LAMP_NAME_OR_FOLLOW_UP)"
                 );
             }
+            crate::room_told::Room::Busy
+        } else if held_here {
+            eprintln!(
+                "lamp-voice second: request {request}: held under the carry, judged as in a busy room, the room unchanged (LAMP_SAME_SPEAKER_CARRIES)"
+            );
             crate::room_told::Room::Busy
         } else {
             signs.room
@@ -6689,14 +6904,26 @@ impl Heeding {
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
         // `LAMP_SAME_SPEAKER_CARRIES`: the lamp answers someone, whose
         // conversation may carry on ([`Self::carrying_the_same_speaker`]).
-        if played {
-            self.carrying = true;
-        }
         // A face alone is no call with `LAMP_NAME_OR_FOLLOW_UP`.
         let called = played
             && (attention.called_for_itself()
                 || attention.face_shows(seen.room, turned)
                 || seen.named_faced);
+        if played {
+            // Admission alone does not renew the once-per-answer window.
+            // A new call changes its owner; only actual words renew it.
+            let new_caller = called
+                && (attention.called_for_itself()
+                    || !spoken_by_the_caller_alone(&seen.speakers, &self.caller_faces));
+            if self.carries && (!self.carrying || new_caller) {
+                self.carry_window.begin(request);
+            }
+            if !self.carrying {
+                self.held_colleague = None;
+            }
+            self.carrying = true;
+            self.carry_others.clear();
+        }
         // Let out as the conversation going on, or for itself: a line that
         // called the lamp begins a conversation of its own (Eighth on #829).
         // With the caller's voice only, the same call as the caller's face
@@ -9817,6 +10044,8 @@ mod tests {
                 1 => vec![1.0, 0.0],
                 2 => vec![0.27, 0.962_8],
                 3 => vec![0.5, 0.866],
+                // A colleague's voice reading 0.75 against the owner's.
+                4 => vec![0.75, 0.661_4],
                 -1 => vec![0.0, 1.0],
                 _ => return true,
             };
@@ -9856,6 +10085,11 @@ mod tests {
 
     impl CarryDesk {
         fn new(carries: bool) -> Self {
+            Self::new_in(carries, true)
+        }
+
+        /// [`Self::new`], the room made busy after the call only when `busy`.
+        fn new_in(carries: bool, busy: bool) -> Self {
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -9895,12 +10129,14 @@ mod tests {
                 "the call"
             );
             desk.called_long_ago();
-            assert!(
-                crate::room_told::room()
-                    .lock()
-                    .unwrap()
-                    .two_people(monotonic_us())
-            );
+            if busy {
+                assert!(
+                    crate::room_told::room()
+                        .lock()
+                        .unwrap()
+                        .two_people(monotonic_us())
+                );
+            }
             desk
         }
 
@@ -10048,6 +10284,111 @@ mod tests {
         }
     }
 
+    /// A two-second colleague line begun at +3 s ends at +5 s. First's
+    /// bounded-window contract admits an owner's +25 s start, not +45 s.
+    #[test]
+    fn a_held_colleague_extends_the_carry_window_but_not_past_its_cap() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for (after_s, expected) in [(25, true), (45, false)] {
+            let mut desk = CarryDesk::new(true);
+            desk.answered(60);
+            let answer_end = desk.heeding.said_until_us.unwrap();
+            let colleague = (answer_end + 3_000_000, answer_end + 5_000_000);
+            desk.heeding.signs_begun(2, colleague, colleague.0);
+            assert!(
+                desk.heeding.carried.is_some(),
+                "colleague began in the carry"
+            );
+            assert!(desk.heeding.colleague_held(2));
+            let began = answer_end + after_s * 1_000_000;
+            desk.heeding
+                .signs_begun(3, (began, began + 2_000_000), began);
+            assert_eq!(desk.heeding.carried.is_some(), expected, "+{after_s} s");
+        }
+    }
+
+    #[test]
+    fn the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for end in ["none", "stop", "privacy", "forget", "two colleagues"] {
+            let mut desk = CarryDesk::new(true);
+            desk.answered(60);
+            let answer = desk.heeding.said_until_us.unwrap();
+            let began = answer + 3_000_000;
+            desk.heeding
+                .signs_begun(2, (began, began + 2_000_000), began);
+            assert!(desk.heeding.colleague_held(2));
+            match end {
+                "stop" => desk.heeding.lamp_did(crate::second_provider::Did::Stopped),
+                "privacy" => desk.heeding.privacy_changed(),
+                "forget" => crate::thread::THREAD.lock().unwrap().forget(),
+                "two colleagues" => assert!(!desk.heeding.colleague_held(3)),
+                _ => {}
+            }
+            let began = answer + 25_000_000;
+            desk.heeding
+                .signs_begun(4, (began, began + 2_000_000), began);
+            assert_eq!(desk.heeding.carried.is_some(), end == "none", "{end}");
+            if end == "none" {
+                let owner = desk.heeding.caller_faces.clone();
+                let colleague = vec!["f2".to_owned()];
+                assert_eq!(
+                    desk.heeding
+                        .carried_by_the_same_speaker(4, None, &owner, &owner)
+                        .goes_on,
+                    Some(true)
+                );
+                assert_eq!(
+                    desk.heeding
+                        .carried_by_the_same_speaker(4, None, &colleague, &colleague)
+                        .goes_on,
+                    Some(false)
+                );
+                desk.heeding
+                    .carried_by_the_same_speaker(4, None, &owner, &Vec::new());
+                assert!(!desk.heeding.carrying, "owner turned away");
+                assert!(!desk.heeding.carry_window.extra_allows(began));
+            } else {
+                assert!(!desk.heeding.carry_window.extra_allows(began), "{end}");
+            }
+        }
+        let mut off = CarryDesk::new(false);
+        off.answered(60);
+        let answer = off.heeding.said_until_us.unwrap();
+        let began = answer + 3_000_000;
+        off.heeding
+            .signs_begun(2, (began, began + 2_000_000), began);
+        assert!(off.heeding.carried.is_none());
+        assert!(!off.heeding.carry_window.extra_allows(answer + 25_000_000));
+    }
+
+    #[test]
+    fn a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut desk = CarryDesk::new(true);
+        desk.answered(60);
+        crate::thread::THREAD.lock().unwrap().forget();
+        crate::room_told::room().lock().unwrap().set_quiet();
+        assert_eq!(
+            desk.line(1, "f1", "Lamp, will it rain in the afternoon?"),
+            None
+        );
+        desk.answered(30);
+        let answer = desk.heeding.said_until_us.unwrap();
+        let request = desk.request + 1;
+        let began = answer + 3_000_000;
+        desk.heeding
+            .signs_begun(request, (began, began + 2_000_000), began);
+        assert!(desk.heeding.colleague_held(request));
+        let began = answer + 25_000_000;
+        desk.heeding
+            .signs_begun(request + 1, (began, began + 2_000_000), began);
+        assert!(
+            desk.heeding.carried.is_some(),
+            "fresh actual answer reopens the allowance"
+        );
+    }
+
     /// The owner's P1 on Queue #3126 (lamp-4ace, 23 Oct 18:51): in a busy
     /// room, each line begun 12 s after the lamp's words, past the 8 s a
     /// follow-up has, five turns of the owner are all answered with
@@ -10084,17 +10425,28 @@ mod tests {
         );
     }
 
-    /// `LAMP_SAME_SPEAKER_CARRIES`: a colleague's line between the owner's,
-    /// with their own face seen speaking it, in their voice or not, or in
-    /// the owner's voice beside it, is held, and ends the carry: the owner's
-    /// return is held until the lamp answers them again, here by its name,
-    /// after which the carry goes on from that answer.
+    /// `LAMP_SAME_SPEAKER_CARRIES`, the first builder's contract at 09:34
+    /// on #3296 (it replaces 03:46's, where one colleague line ended the
+    /// carry): a colleague's line between the owner's, their own face seen
+    /// speaking it, in their voice or not, or in the owner's voice beside
+    /// it, is held and ends nothing, so the owner goes on. Two lines in a
+    /// row from someone else are people talking between them: the carry is
+    /// over, the owner's return is held until the lamp answers them again,
+    /// here by its name, and the carry goes on from that answer.
     #[test]
-    fn a_colleagues_face_ends_the_carry_and_the_owner_comes_back_only_by_a_new_answer() {
+    fn a_colleagues_line_is_held_and_two_in_a_row_end_the_carry() {
         let _one = crate::provider_worker::tests::one_thread();
         let owner = "Will it rain in the afternoon?";
-        let colleague = "Did you send the slides to the client?";
-        for (voice, face) in [(-1, "f2"), (0, "f2"), (1, "f2")] {
+        // A statement, and a question (the reviewer-lead on #3331): held
+        // just before the owner's carried line, it makes that line no reply
+        // to it (`attention::AFTER_QUESTION`).
+        for (colleague, (voice, face)) in [
+            "I sent the slides to the client this morning.",
+            "Did you send the slides to the client?",
+        ]
+        .into_iter()
+        .flat_map(|colleague| [(-1, "f2"), (0, "f2"), (1, "f2")].map(|line| (colleague, line)))
+        {
             let mut desk = CarryDesk::new(true);
             desk.answered(12);
             assert_eq!(desk.line(1, "f1", owner), None);
@@ -10103,9 +10455,20 @@ mod tests {
                 desk.line(voice, face, colleague).is_some(),
                 "voice {voice}, face {face:?}: held"
             );
+            assert_eq!(
+                desk.line(1, "f1", owner),
+                None,
+                "voice {voice}, face {face:?}: one line ends nothing"
+            );
+            desk.answered(12);
+            assert!(desk.line(voice, face, colleague).is_some());
+            assert!(
+                desk.line(voice, face, "The client liked the second draft.")
+                    .is_some()
+            );
             assert!(
                 desk.line(1, "f1", owner).is_some(),
-                "voice {voice}, face {face:?}: the carry is over"
+                "voice {voice}, face {face:?}: two in a row end the carry"
             );
             assert_eq!(
                 desk.line(1, "f1", "Lamp, will it rain tomorrow?"),
@@ -10120,6 +10483,183 @@ mod tests {
                 "voice {voice}, face {face:?}: carried from the new answer"
             );
         }
+    }
+
+    /// The first builder at 09:34 on #3296: the owner's five turns, each
+    /// begun 12 s after the lamp's words, with one colleague line between
+    /// turns 2 and 3, are all answered, the colleague's held. In a busy
+    /// room the colleague's face is seen speaking it; in a quiet one it is
+    /// a voice off camera, another than the conversation's, which with the
+    /// carry standing does not make the room busy. Without the switch the
+    /// same voice makes the quiet room busy, as on lamp-52e6 at 09:18.
+    #[test]
+    fn the_owners_five_turns_go_on_past_one_colleague_line() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let turns = [
+            "And what about tomorrow?",
+            "Will it rain in the afternoon?",
+            "Should I take an umbrella then?",
+            "What time does the sun set?",
+            "Can you remind me at five?",
+        ];
+        let colleague = "I sent the slides to the client this morning.";
+        for (busy, face) in [(true, "f2"), (false, "")] {
+            let mut desk = CarryDesk::new_in(true, busy);
+            for (turn, words) in turns.iter().enumerate() {
+                desk.answered(12);
+                if turn == 2 {
+                    assert!(
+                        desk.line(-1, face, colleague).is_some(),
+                        "busy {busy}: the colleague held"
+                    );
+                    let mut room = crate::room_told::room().lock().unwrap();
+                    assert_eq!(
+                        room.at(monotonic_us()) == crate::room_told::Room::Busy,
+                        busy,
+                        "busy {busy}: not made busy by the colleague's voice"
+                    );
+                }
+                assert_eq!(
+                    desk.line(1, "f1", words),
+                    None,
+                    "busy {busy}: turn {}",
+                    turn + 1
+                );
+            }
+        }
+        // Reviewer-two at 09:52: quiet through the verdict and the line's
+        // completion: its voice makes no second person (the worker's
+        // other-voice branch, `RoomTold::judged`) and no talk
+        // (`RoomTold::left_unanswered`); the owner then goes on.
+        let mut desk = CarryDesk::new_in(true, false);
+        desk.answered(12);
+        assert!(desk.line(-1, "", colleague).is_some(), "held");
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            assert_eq!(
+                room.left_unanswered(desk.request, monotonic_us()),
+                crate::room_told::Left::Held,
+                "no talk"
+            );
+            assert_ne!(room.at(monotonic_us()), crate::room_told::Room::Busy);
+            assert!(!room.talked_past_the_lamp());
+            assert_eq!(room.left_alone_since_spoke(), 0);
+        }
+        assert_eq!(desk.line(1, "f1", turns[0]), None, "the owner goes on");
+        let mut off = CarryDesk::new_in(false, false);
+        off.answered(3);
+        assert!(off.line(-1, "", colleague).is_some(), "off: held");
+        assert_eq!(
+            crate::room_told::room().lock().unwrap().at(monotonic_us()),
+            crate::room_told::Room::Busy,
+            "off: the colleague's voice makes the room busy, as today"
+        );
+    }
+
+    /// Reviewer-two at 09:52: the late path is under the same rule. A
+    /// colleague's line at 3 s, no face, its print back only after its
+    /// verdict, is let out by the ordinary follow-up (the legacy
+    /// exception); its print, sure as another voice (the sure bar lowered
+    /// to 1.5 s, a synthetic control), is known at the next line's verdict
+    /// as one line from someone else: the owner goes on. Such a line and
+    /// the colleague's next, seen speaking, are two in a row: the carry
+    /// ends, and the owner past the 8 s is held.
+    #[test]
+    fn a_late_sure_other_voice_is_one_colleague_line() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let owner = "Will it rain in the afternoon?";
+        let late = |desk: &mut CarryDesk, words: &str| {
+            desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
+            assert_eq!(desk.line(-1, "", words), None, "let out at {words:?}");
+            desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
+        };
+        let mut desk = CarryDesk::new(true);
+        desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
+        desk.answered(3);
+        late(&mut desk, "I sent the slides to the client this morning.");
+        desk.later(12);
+        assert_eq!(
+            desk.line(1, "f1", owner),
+            None,
+            "one line: the owner goes on"
+        );
+        desk.answered(3);
+        late(&mut desk, "I sent the slides to the client this morning.");
+        // Known at the verdict of the colleague's next line, seen speaking
+        // it: two in a row.
+        assert!(
+            desk.line(0, "f2", "The client liked the second draft.")
+                .is_some()
+        );
+        desk.later(12);
+        assert!(desk.line(1, "f1", owner).is_some(), "two in a row");
+    }
+
+    /// Reviewer-three's P2 on #3331: owner and colleague lines alternate,
+    /// the owner by voice alone. The colleague, whose voice reads 0.75
+    /// against the owner's (over `same_voice::SAME_FROM`), is held once by
+    /// their face; off camera their next line is not carried by that voice,
+    /// which is no nearer the owner's than their own held line's, so it is
+    /// held; the owner's own voice, nearer theirs by `CARRY_NEARER_BY`,
+    /// still goes on each time.
+    #[test]
+    fn after_a_held_colleague_the_owners_voice_alone_must_be_nearer_theirs() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut desk = CarryDesk::new(true);
+        desk.answered(12);
+        assert_eq!(desk.line(1, "", "Will it rain in the afternoon?"), None);
+        desk.answered(12);
+        assert!(
+            desk.line(4, "f2", "The client liked the second draft.")
+                .is_some()
+        );
+        for (turn, words) in [
+            "Should I take an umbrella then?",
+            "What time does the sun set?",
+            "Can you remind me at five?",
+        ]
+        .iter()
+        .enumerate()
+        {
+            assert_eq!(desk.line(1, "", words), None, "the owner's turn {turn}");
+            desk.answered(12);
+            assert!(
+                desk.line(4, "", "I sent the slides to the client this morning.")
+                    .is_some(),
+                "the colleague off camera, turn {turn}: held"
+            );
+        }
+    }
+
+    /// The first builder at 09:34 on #3296: a colleague who calls the lamp
+    /// by its name while the owner's carry stands is answered, and is the
+    /// caller from then on: their own next line goes on by their face, and
+    /// the owner's is someone else's, held.
+    #[test]
+    fn a_colleague_calling_the_lamp_becomes_the_caller() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let mut desk = CarryDesk::new(true);
+        desk.answered(12);
+        assert_eq!(desk.line(1, "f1", "Will it rain in the afternoon?"), None);
+        desk.answered(12);
+        assert_eq!(
+            desk.line(0, "f2", "Lamp, what is on my calendar today?"),
+            None,
+            "the colleague's call"
+        );
+        desk.called_long_ago();
+        desk.answered(12);
+        assert_eq!(
+            desk.line(0, "f2", "And what about tomorrow afternoon?"),
+            None,
+            "the new caller goes on"
+        );
+        desk.answered(12);
+        assert!(
+            desk.line(0, "f1", "Should I take an umbrella then?")
+                .is_some(),
+            "the owner is someone else now"
+        );
     }
 
     /// `LAMP_SAME_SPEAKER_CARRIES`: a line with no face seen speaking it and
@@ -10164,25 +10704,86 @@ mod tests {
     }
 
     /// Reviewer-two at 03:01 on Queue #3126: the same speaker tells who
-    /// spoke, not to whom. The owner, in their own voice, seen speaking
-    /// turned away from the lamp to a colleague within the 20 s, is held;
-    /// the carry stands, and turned back to the lamp they go on.
+    /// spoke, not to whom. The owner, in their own sure voice, seen speaking
+    /// turned away from the lamp to a colleague within the 20 s, is held,
+    /// and the carry ends (the first builder at 09:34 on #3296; reviewer-two
+    /// at 10:32 on #3331): turned back they are held until a fresh call,
+    /// and the carry goes on from its answer. In a room not busy (unknown or
+    /// quiet) the line turned away is held too, and ends the carry.
     #[test]
-    fn the_owner_turned_to_a_colleague_is_held_and_goes_on_turned_back() {
+    fn the_owner_turned_to_a_colleague_is_held_and_ends_the_carry() {
         let _one = crate::provider_worker::tests::one_thread();
+        let away = "Send me the deck after lunch, please.";
         let mut desk = CarryDesk::new(true);
         desk.answered(12);
         desk.away = true;
+        assert!(desk.line(1, "f1", away).is_some(), "turned away: held");
         assert!(
-            desk.line(1, "f1", "Send me the deck after lunch, please.")
-                .is_some(),
-            "turned away: held"
+            desk.line(1, "f1", "And what about tomorrow?").is_some(),
+            "turned back: the carry is over"
         );
         assert_eq!(
-            desk.line(1, "f1", "And what about tomorrow?"),
+            desk.line(1, "f1", "Lamp, will it rain tomorrow?"),
             None,
-            "turned back"
+            "a fresh call"
         );
+        desk.called_long_ago();
+        desk.answered(12);
+        assert_eq!(
+            desk.line(1, "f1", "And what about the weekend?"),
+            None,
+            "carried from the new answer"
+        );
+        for quiet in [false, true] {
+            let mut desk = CarryDesk::new_in(true, false);
+            if quiet {
+                crate::room_told::room().lock().unwrap().set_quiet();
+            }
+            desk.answered(12);
+            desk.away = true;
+            assert!(desk.line(1, "f1", away).is_some(), "quiet {quiet}: held");
+            assert!(!desk.heeding.carrying, "quiet {quiet}: the carry ended");
+        }
+    }
+
+    /// Reviewer-two at 10:35 on #3331: in a room not busy, unknown or
+    /// quiet, a colleague's line, their own face seen speaking it, in their
+    /// voice, none, or the owner's, is held under the carry, as in a busy
+    /// room; the room stays as it was, and the owner goes on.
+    #[test]
+    fn a_colleagues_face_is_held_in_a_room_not_busy() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for quiet in [false, true] {
+            for voice in [-1, 0, 1] {
+                let mut desk = CarryDesk::new_in(true, false);
+                let was = if quiet {
+                    crate::room_told::room().lock().unwrap().set_quiet();
+                    crate::room_told::Room::Quiet
+                } else {
+                    crate::room_told::Room::Unknown
+                };
+                desk.answered(12);
+                assert!(
+                    desk.line(voice, "f2", "The client liked the second draft.")
+                        .is_some(),
+                    "quiet {quiet}, voice {voice}: held"
+                );
+                {
+                    let mut room = crate::room_told::room().lock().unwrap();
+                    assert_eq!(
+                        room.left_unanswered(desk.request, monotonic_us()),
+                        crate::room_told::Left::Held,
+                        "quiet {quiet}, voice {voice}: no talk"
+                    );
+                    assert_eq!(room.at(monotonic_us()), was, "quiet {quiet}, voice {voice}");
+                }
+                assert_eq!(
+                    desk.line(1, "f1", "Will it rain in the afternoon?"),
+                    None,
+                    "quiet {quiet}, voice {voice}: the owner goes on"
+                );
+            }
+        }
     }
 
     /// `LAMP_SAME_SPEAKER_CARRIES`: the carry lasts
@@ -10307,24 +10908,38 @@ mod tests {
 
     /// Reviewer-two's second P2 at 03:46 on #3296: within a follow-up's 8 s
     /// a line's signs are read as past them. After the owner's answer, a
-    /// colleague at 3 s, their own face seen speaking, held, ends the carry,
-    /// whatever their print: the owner back at 12 s by face and voice, with
-    /// no new answer, is held, until a fresh call. The controls at 3 s: a
+    /// colleague at 3 s, their own face seen speaking, is held whatever
+    /// their print; one such line ends nothing (the first builder at 09:34,
+    /// replacing 03:46's contract), so the owner back at 12 s by face and
+    /// voice, with no new answer, goes on; two in a row end the carry, and
+    /// the owner is held until a fresh call. The controls at 3 s: a
     /// colleague's short print with no face is no sign either way, so the
     /// ordinary follow-up rule lets it go on (the legacy exception) and it
     /// ends nothing, so the owner at 12 s goes on; the owner's own voice
     /// with no face goes on as a follow-up.
     #[test]
-    fn a_colleague_within_the_eight_seconds_ends_the_carry_until_a_fresh_call() {
+    fn a_colleague_within_the_eight_seconds_is_held_and_two_end_the_carry() {
         let _one = crate::provider_worker::tests::one_thread();
         let owner = "Will it rain in the afternoon?";
-        let colleague = "Did you send the slides to the client?";
+        let colleague = "The client liked the second draft.";
         for voice in [-1, 0, 1] {
             let mut desk = CarryDesk::new(true);
             desk.answered(3);
             assert!(
                 desk.line(voice, "f2", colleague).is_some(),
                 "voice {voice}, face f2 at 3 s: held"
+            );
+            desk.later(12);
+            assert_eq!(
+                desk.line(1, "f1", owner),
+                None,
+                "voice {voice}: the owner at 12 s, the carry standing"
+            );
+            desk.answered(3);
+            assert!(desk.line(voice, "f2", colleague).is_some());
+            assert!(
+                desk.line(voice, "f2", "I sent them this morning.")
+                    .is_some()
             );
             desk.later(12);
             assert!(

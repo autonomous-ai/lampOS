@@ -3091,7 +3091,7 @@ after a take-over, but now for every turn:
   but outside the 8 s window each carried turn needs its own sure sign (the
   reviewer-lead at 03:40). A line begun within the 8 s while a carry
   stands is read the same way (reviewer-two at 03:46 on #3296): its sure
-  sign lets it go on and another face seen speaking it ends the carry; but
+  sign lets it go on and another face seen speaking it is held; but
   a line with no sure sign either way follows the ordinary follow-up rule,
   whatever the print's arrival (reviewer-two at 04:11): an unsure print
   (under `SAME_FROM` and no confident other) or a missing one is no
@@ -3102,13 +3102,57 @@ after a take-over, but now for every turn:
   before `busy_bar`, so a short line that is no question is still held
   (`BUSY_SHORT`). Another face seen speaking it, or a sure other voice
   (under 0.30 from `CARRY_SURE_OTHER_SPEECH_SAMPLES`, 2.5 s of speech, the
-  0.3 s pre-roll not counted, `Voices::usable_speech`), ends the carry until
-  the lamp answers again, and the caller's identity is not reused without a
-  new answer; a stop (`Did::Stopped`, from the next line's `after_stop`) and
+  0.3 s pre-roll not counted, `Voices::usable_speech`), is someone else's
+  line, held and not answered. One such line ends nothing (the first
+  builder at 09:34 on #3296, replacing 03:46's "a colleague inside the
+  window ends it"): the owner's own next line goes on by their face or
+  voice, and in a room not yet busy that one line in another voice, or a
+  line held past a still turned face (`LAMP_TURNED_FACE_SPEAKS`), does not
+  make the room busy by voice alone, nor is it talk: the worker's
+  other-voice branch and `RoomTold::judged` skip `RoomTold::two_people`,
+  and `RoomTold::left_unanswered` closes it as held
+  (`RoomTold::colleague_held`); the line itself is still judged as in a
+  busy room, so held. A print known late as a sure other voice is such a
+  line too, each request counted once, and ends the carry only as the
+  second in a row; a line judged after that end is judged as with no
+  carry. Two lines in a
+  row from someone else (`Heeding::colleague_held`, counted to
+  `room_told::TALK_ENDS_CONVERSATION`, reset by a carried line of the
+  owner's or an answer) are people talking between them, as two lines
+  left alone end a conversation: the carry ends until the lamp answers
+  again, and the caller's identity is not reused without a new answer. A
+  colleague who calls the lamp by its name is answered and is the caller
+  from then on. Following First's decision on Queue #3126 at 12:57 on
+  24 October, the 20 s run from the later of the lamp's last words and
+  one held colleague line's actual audio end, once per actual answer,
+  capped at 40 s from the lamp's last words. A colleague line begun at
+  +3 s and lasting 2 s admits the owner's +25 s start, not +45 s.
+  Late classification uses the recorded audio end, not the time the
+  print becomes known; duplicates or another held line after an owner's
+  admitted but unanswered line cannot buy a second extension. A new
+  actual answer renews the allowance; admitting a line does not. At most
+  four recent eligible line ends are kept, and missing, future or evicted
+  ends give no extension. Identity checks and the switch-off path remain
+  unchanged. A stop (`Did::Stopped`, from the next line's `after_stop`) and
   a privacy change end it, and a forgetting leaves no words to carry from.
   The caller's own face seen speaking turned away from the lamp is someone
-  talking to a colleague: held, the carry standing, not ended (reviewer-two
-  at 03:01). The faces read are those seen *speaking* the line.
+  talking to a colleague (reviewer-two at 03:01): held, and it ends the
+  carry, their voice sure or not, so turning back needs a fresh call or
+  answer (the first builder at 09:34; reviewer-two at 10:32 on #3331).
+  These signs are read in any room while a carry stands (reviewer-two at
+  10:35): in a room not busy, unknown or quiet, a line held by them, or
+  in a voice not surely the owner's, is judged as in a busy room for its
+  own verdict, the room itself unchanged. While the carry stands, the
+  owner's carried line is no reply to a colleague's question held just
+  before it (`Attention::carried_past_a_question`, no `AFTER_QUESTION`
+  hold; the reviewer-lead on #3331). Once a line has been held as someone
+  else's in a carry, the owner's voice alone carries only when its print
+  is nearer the conversation's than the held line's print by
+  `worker::CARRY_NEARER_BY` (0.10, provisional), with no held print known
+  only their face does (reviewer-three on #3331: two voices have read 0.69,
+  so owner and colleague lines could alternate, a colleague at 0.70
+  carried as the owner); the held print is kept until a new carry, a stop
+  or a privacy change. The faces read are those seen *speaking* the line.
   A line with no sure sign either way, a print not back, a short print
   under 0.70, no face seen speaking or only before the line, is held past
   the 8 s, goes on within them as any follow-up, and ends nothing. The existing score rows of
@@ -3130,7 +3174,9 @@ after a take-over, but now for every turn:
   are not identity-gated, an uncertain, short or missing print there being
   no evidence either way; from 8 to 20 s only a sure same-speaker sign
   carries; and three cases are always held, inside the 8 s too: another
-  face seen speaking, the caller turned away, and a sure other voice, the
+  face seen speaking and a sure other voice, ending the carry only at the
+  second in a row from someone else, and the caller turned away, which
+  ends it at once; the
   last not reachable today (prints carry at most 1.5 s of speech, under
   the provisional 2.5 s; its test is a synthetic classification control).
   A print that was no evidence never becomes evidence (reviewer-two's P2 at

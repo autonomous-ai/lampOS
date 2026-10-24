@@ -2041,6 +2041,14 @@ impl Attention {
     /// stand-in ("Man, that meeting ran long.", "Mom, can you pick me up?")
     /// or "Lamp is broken, …" alone is office talk (#1712, the first
     /// builder on #1722 at 16:11).
+    /// The request in hand was carried as the same speaker's conversation
+    /// (`LAMP_SAME_SPEAKER_CARRIES`): a colleague's question held just
+    /// before it was no question to them (the reviewer-lead on #3331).
+    /// [`AFTER_QUESTION`] does not hold it.
+    pub fn carried_past_a_question(&mut self) {
+        self.after_question = false;
+    }
+
     pub fn narrow_the_call(&mut self, narrowed: bool) {
         self.call_narrowed = narrowed;
     }
