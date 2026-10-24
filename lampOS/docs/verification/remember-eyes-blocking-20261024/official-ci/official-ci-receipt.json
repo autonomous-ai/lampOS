@@ -1,0 +1,151 @@
+{
+  "head": "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3",
+  "authored_base": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "latest_base_at_collection": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "actual_preview": "a69ec96fd3ed7cae06cbed165d1e898f94570caa",
+  "complete_trees": {
+    "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3": "8d8c615acf16f1dd865f64e957012220b0bb13c8",
+    "a69ec96fd3ed7cae06cbed165d1e898f94570caa": "8d8c615acf16f1dd865f64e957012220b0bb13c8"
+  },
+  "complete_trees_equal": true,
+  "arm64_run": 40130968164,
+  "linux_run": 40130968163,
+  "census": {
+    "PASS": 7409,
+    "LEAK": 1,
+    "selected_terminal": 7410,
+    "failed": 0,
+    "unrun": 0,
+    "skipped": 53,
+    "primary_terminal_lines": 7444,
+    "identical_echoes_collapsed": 34
+  },
+  "required_cases": {
+    "remember_speaker::tests::remember_speaker_expiry_and_forget_remove_stored_and_in_flight_evidence": {
+      "status": "PASS",
+      "index": 4908,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_expiry_and_forget_remove_stored_and_in_flight_evidence"
+    },
+    "remember_speaker::tests::remember_speaker_is_an_exact_opt_in_and_is_passed_to_tool_routing": {
+      "status": "PASS",
+      "index": 4909,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_is_an_exact_opt_in_and_is_passed_to_tool_routing"
+    },
+    "remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation": {
+      "status": "PASS",
+      "index": 4910,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation"
+    },
+    "remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire": {
+      "status": "PASS",
+      "index": 4911,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire"
+    },
+    "remember_speaker::tests::remember_speaker_own_name_accepts_direct_names_and_exact_spelling": {
+      "status": "PASS",
+      "index": 4912,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_own_name_accepts_direct_names_and_exact_spelling"
+    },
+    "remember_speaker::tests::remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming": {
+      "status": "PASS",
+      "index": 4913,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming"
+    },
+    "remember_speaker::tests::remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement": {
+      "status": "PASS",
+      "index": 4914,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement"
+    },
+    "remember_speaker::tests::remember_speaker_own_name_off_keeps_other_names_and_replacement_response": {
+      "status": "PASS",
+      "index": 4915,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_own_name_off_keeps_other_names_and_replacement_response"
+    },
+    "remember_speaker::tests::remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments": {
+      "status": "PASS",
+      "index": 4916,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments"
+    },
+    "remember_speaker::tests::remember_speaker_own_name_refuses_other_people_before_connect": {
+      "status": "PASS",
+      "index": 4917,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_own_name_refuses_other_people_before_connect"
+    },
+    "remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines": {
+      "status": "PASS",
+      "index": 4918,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines"
+    },
+    "remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating": {
+      "status": "PASS",
+      "index": 4919,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating"
+    },
+    "remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect": {
+      "status": "PASS",
+      "index": 4920,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect"
+    },
+    "remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence": {
+      "status": "PASS",
+      "index": 4921,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence"
+    },
+    "remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket": {
+      "status": "PASS",
+      "index": 4922,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket"
+    },
+    "remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry": {
+      "status": "PASS",
+      "index": 4923,
+      "total": 7410,
+      "test": "lamp-voice remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry"
+    },
+    "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it": {
+      "status": "PASS",
+      "index": 5548,
+      "total": 7410,
+      "test": "lamp-voice second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it"
+    }
+  },
+  "leaky_cases": [
+    {
+      "status": "LEAK",
+      "index": 5208,
+      "total": 7410,
+      "test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "primary_renderings": {
+    "arm64": {
+      "sha256": "991bb1f8304e183daf278ec46ff7507c5a6a2345854f63dcabafc6412b110a6a",
+      "bytes": 1835051,
+      "representation": "gh run view --log rendering, not raw Actions ZIP"
+    },
+    "linux": {
+      "sha256": "9c98ae4a64572130874f486a795f03a2ecea26b29d9564f9731e6171f475e99d",
+      "bytes": 73106,
+      "representation": "gh run view --log rendering, not raw Actions ZIP"
+    }
+  },
+  "limits": [
+    "Original Mac full run remains FAILED and separately qualified through accepted three-alone route.",
+    "No local Linux ARM build/test or physical test."
+  ]
+}
