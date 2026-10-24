@@ -1,0 +1,9 @@
+# Current phone carry after docs-only train 101
+
+Current fa07f53015a17984c058f50a39f9e83b75d10a78 contains latest f9780cb2a. Its sole file difference from full-run a9d8928ff is docs/duplex-listening.md, the qualified non-consumed Markdown correction from #3406. Every other tracked source/Cargo/vendor/fixture file is identical. Whole trees are not equal. Three carried patches remain equal. Full a9 source is public at second/phone-fixed-update-mac-20261024.
+
+Fresh current Mac fmt, strict Voice+Update all-target Clippy and combined no-run compilation pass. Exact current phone 1/0 and original cut plus ten event controls 11/0 pass: 12/0 total. All 7,027 tracked source hashes remain unchanged. Exact-source offline Linux fmt passes with 7,027 unchanged files and removed container. Full Voice 4,032/0/21 and Update 395/0/6 are explicitly earlier a9 executions, not current full reruns.
+
+Compiler profile/freshness records describe Clippy and the combined no-run stage only. Actual selected runners have post-run SHA-256/size bindings; the separate Update invocation visibly recompiles 19 crates without per-target compiler JSON, so its actual profile/freshness is not inferred from combined records. The same limitation is corrected in the full packet at 8d05729ac. All raw records and outcomes remain unchanged.
+
+The resulting-head fixed-in-PR table preserves the original false/2-of-3 table. It records the consumed qualified repair, the actual earlier full runs and current focused tests, with named input comparison. Original a9 ARM/Linux are green on their own authored-equal tree; new current ARM64 40126238187 and Linux 40126238179 are separate required gates. The table remains false pending current native checks and Reviewer-two's disposition; no historical cause or retrospective 3/3. No full local workspace/ARM build-test, device or physical acceptance.

@@ -1,0 +1,37 @@
+   Compiling lamp-bus v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/turn-owner)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/near-call)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/gemini)
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/camera)
+   Compiling lamp-ring v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/ring)
+   Compiling lamp-audio v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/audio)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/msgs)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/lean)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/schedule)
+   Compiling lamp-health v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/health)
+   Compiling lamp-update v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/update)
+   Compiling lamp-controls v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/controls)
+   Compiling lamp-body v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/body)
+   Compiling lamp-actions v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/actions)
+   Compiling lamp-voice v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/expression)
+   Compiling lamp-skills v0.1.0 (/private/tmp/second-phone-news-start-20261024/lampOS/crates/skills)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 25.56s
+     Running tests/round.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/round-f8d7f0920c4648fb)
+
+running 11 tests
+test self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back ... ok
+test self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog ... ok
+test self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog ... ok
+test self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned ... ok
+test self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete ... ok
+test self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog ... ok
+test self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog ... ok
+test self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline ... ok
+test self_cuts::runnable_events::controls::no_output_is_not_readiness ... ok
+test self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly ... ok
+test self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 24.20s
+

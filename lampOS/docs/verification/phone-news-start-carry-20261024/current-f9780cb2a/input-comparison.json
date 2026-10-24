@@ -1,0 +1,14 @@
+{
+  "full_mac_head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+  "current_head": "fa07f53015a17984c058f50a39f9e83b75d10a78",
+  "current_base": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "changed_source_files": [
+    "lampOS/docs/duplex-listening.md"
+  ],
+  "ordinary_code_and_cargo_vendor_fixture_files_unchanged": true,
+  "excluded_file": "lampOS/docs/duplex-listening.md",
+  "excluded_file_reason": "qualified docs-only #3406, references are code comments; both workflows exclude this non-consumed Markdown path",
+  "whole_trees_equal": false,
+  "full_mac_results_keep_a9_head": true,
+  "preserved_source_ref": "second/phone-fixed-update-mac-20261024"
+}

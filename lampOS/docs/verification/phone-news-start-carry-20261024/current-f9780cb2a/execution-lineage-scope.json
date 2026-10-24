@@ -1,0 +1,70 @@
+{
+  "head": "fa07f53015a17984c058f50a39f9e83b75d10a78",
+  "json_profile_freshness_stages": [
+    "clippy",
+    "test-compile"
+  ],
+  "actual_scoped_results": {
+    "voice-test": [
+      [
+        1,
+        0,
+        0
+      ]
+    ],
+    "update-test": [
+      [
+        11,
+        0,
+        0
+      ]
+    ]
+  },
+  "actual_running_bindings": [
+    {
+      "stage": "voice-test",
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+      "bytes": 141198488,
+      "sha256": "01f5dde7c68f7c22799db548657ec7f2bce12dea3bc692a36c89a4469ac184dc",
+      "binding_scope": "post-run actual Running-path hash/size",
+      "path_found_in_combined_no_run_json": true,
+      "separate_actual_compile_json": false
+    },
+    {
+      "stage": "update-test",
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/round-f8d7f0920c4648fb",
+      "bytes": 20239432,
+      "sha256": "07de823b7bada61c58fe97453f4213b3385d503759201a618bf80cad7dab4a9c",
+      "binding_scope": "post-run actual Running-path hash/size",
+      "path_found_in_combined_no_run_json": false,
+      "separate_actual_compile_json": false
+    }
+  ],
+  "plain_recompilations": {
+    "voice-test": [],
+    "update-test": [
+      "lamp-bus",
+      "lamp-turn-owner",
+      "lamp-near-call",
+      "lamp-gemini",
+      "lamp-camera",
+      "lamp-ring",
+      "lamp-audio",
+      "lamp-msgs",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-schedule",
+      "lamp-health",
+      "lamp-update",
+      "lamp-controls",
+      "lamp-body",
+      "lamp-actions",
+      "lamp-voice",
+      "lamp-expression",
+      "lamp-skills"
+    ]
+  },
+  "separate_update_profile_or_freshness_claim": false,
+  "full_mac_runs_keep_a9_head": true,
+  "scope_correction_for_full_a9": "8d05729ac072c09dd6aa9b2bd9174915c438581c"
+}

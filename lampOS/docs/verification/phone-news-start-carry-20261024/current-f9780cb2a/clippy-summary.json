@@ -1,0 +1,1253 @@
+{
+  "artifacts": [
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/third_party/sonora#0.2.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/third_party/sonora/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "sonora",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/third_party/sonora/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": true,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libsonora-74497a7e8cab7b79.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice-processes/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_processes",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice-processes/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice_processes-b9ec2e4aa26ca6fd.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/ipc/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ipc",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/ipc/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ipc-a27d262a75789032.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/local-time/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_local_time",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/local-time/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_local_time-06bd4a6ce51f0042.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/near-call#lamp-near-call@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/near-call/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_near_call",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/near-call/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_near_call-26a921b5905b6f96.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/camera#lamp-camera@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/camera/Cargo.toml",
+      "target": {
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "build-script-build",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/camera/build.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/build/lamp-camera-7be2f8b5a776a9cb/build-script-build"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/turn-end-wire/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_end_wire",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/turn-end-wire/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_end_wire-6f8ef5473bcecd4d.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/turn-owner/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_owner",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/turn-owner/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_owner-dea9ef4a714a4840.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/bus#lamp-bus@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/bus/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_bus",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/bus/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_bus-9f872c810b3b97eb.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/ring#lamp-ring@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/ring/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ring",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/ring/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ring-4dc97455f75f7c29.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/gemini#lamp-gemini@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/gemini/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_gemini",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/gemini/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_gemini-b330b6a8d07cdbd0.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/audio#lamp-audio@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/audio/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_audio",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/audio/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_audio-da90c7263c4b9945.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/camera#lamp-camera@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/camera/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_camera",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/camera/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_camera-af09a395624f6c84.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/msgs/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_msgs",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/msgs/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_msgs-29c766c1c9d714aa.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/lean#lamp-lean@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/lean/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_lean",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/lean/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_lean-b75174c544d59022.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/keeper/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_keeper",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/keeper/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_keeper-247c384d733b3cb0.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/ears#lamp-ears@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/ears/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ears",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/ears/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ears-5fc06ab6c061f966.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/health#lamp-health@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/health/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_health",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/health/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_health-c4c255934866e5e4.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/policy/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_policy",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/policy/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_policy-66a84739a86829bd.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/controls#lamp-controls@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/controls/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_controls",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/controls/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_controls-214843f3553a3b1f.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/schedule#lamp-schedule@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/schedule/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_schedule",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/schedule/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_schedule-aa8293917c5fea21.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/tasks/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_tasks",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/tasks/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_tasks-65e86789d71ee5be.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_update-bf040eb210056b1f.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_body-89308e62d767dedb.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_update-7ea43027095cfbb9.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/actions#lamp-actions@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/actions/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_actions",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/actions/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_actions-1bf290f47cc3ce8a.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/expression/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_expression-ee93d9bbdb883801.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-c0a5f88f9fed34f4.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "probe_handover",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/probe_handover.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libprobe_handover-36340e12d55ab55a.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "admission_latency",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/admission_latency.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libadmission_latency-35c02df29440c90f.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "reference_pace",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/reference_pace.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libreference_pace-66ec9e4854594f1f.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "head_qualification_operator",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/head_qualification_operator.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libhead_qualification_operator-c2352b15055b6135.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "hearing_replay",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/hearing_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libhearing_replay-033064d857deb63d.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/librelease_pair-3ff0dc441446c97b.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/librender_line_second-5494c7a9785939fd.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "ring_process_probe",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/ring_process_probe.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libring_process_probe-3cfc7ea6f45b8822.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "duplex_lab",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/duplex_lab.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libduplex_lab-d15e5df56b037b8b.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libstop_words_stt_replay-4716eae2cc1d4d7c.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-8588edc3f8c02170.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-50ee08a4682f0e73.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/libstop_words_stt_replay-18e5e1319f79954c.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/librender_line_second-630cb0fc66c1a35f.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libit-511cf06ed10645f9.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_skills-3c9cb88e32431c53.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "self-process-cuts",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/tests/self_process_cuts.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libself_process_cuts-f5765688c419f53f.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "self-cli-exec",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/tests/self_cli_exec.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libself_cli_exec-997d3d95839e5c08.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libit-a78d344e2a8a06c2.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/librelease_pair-6b148523b10335e7.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_update-1c717094967904eb.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "functions",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/tests/functions.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libfunctions-3437c3256c872a4b.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "install",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/tests/install.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libinstall-fa46f9a00fa67586.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libround-a56635118c3c8bad.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/update/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_update-4787c5a3e45ba7e3.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-phone-news-start-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/second-phone-news-start-20261024/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-71f8150d68781cee.rmeta"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "reason": "build-finished",
+      "success": true
+    }
+  ],
+  "full_private_log_sha256": "adb0bc6692b4ed00a3a1a59fcbed454d9dd62de233a8d84b666fcf519c4a064b"
+}
