@@ -1,3 +1,23 @@
+## Current checkpoint: 2026-10-24 20:49 +07, current-base unrelated test observation
+
+#3380 local29cbcd69f on22b753df5 has fmt/strict Voice Clippy and exact Linux
+formatting passed. [Complete current-phase receipt](verification/busy-room-real-call-20261024/current-22b753df5/README.md)
+retains library3724/1/15: unchanged idle-connection test expected2, saw3.
+All skipped targets then ran once and passed; full completed coverage is
+4005/1/21. The failed executable was frozen; exactly3 standalone observations
+pass. One exact clean-base standalone also passes, with matching profile/
+features. No reproduced base failure, matched full-base run or causal waiver.
+All3 call/busy regressions pass once. Draft push proceeds with this explicit
+classification for reader disposition; no unrelated network-policy edit.
+
+#3382 local6cd08d29c on22b is running its fresh scoped gate after the bounded
+baseline control; no terminal count yet. Its two P3 fixes and intentional
+negative controls are published. The historical Update2/3 HOLD stays with
+Tests/#1569 and Reviewer-two. No full workspace rerun or retry-until-green.
+Physical/key/restoration blockers for#2809/#1812 stay with their holders.
+
+---
+
 ## Current checkpoint: 2026-10-24 20:28 +07, current-base carry qualification
 
 Both carries are equally rebased onto latest22b753df5 (#3190 now landed):

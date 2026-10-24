@@ -1,0 +1,109 @@
+[
+  {
+    "tag": "main",
+    "command": [
+      "<private-home>/.cargo/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--bin",
+      "lamp-voice",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 1.303
+  },
+  {
+    "tag": "it",
+    "command": [
+      "<private-home>/.cargo/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--test",
+      "it",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 26.481
+  },
+  {
+    "tag": "release-pair",
+    "command": [
+      "<private-home>/.cargo/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--test",
+      "release_pair",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.836
+  },
+  {
+    "tag": "render-line-example",
+    "command": [
+      "<private-home>/.cargo/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "render_line_second",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 0.762
+  },
+  {
+    "tag": "stop-words-example",
+    "command": [
+      "<private-home>/.cargo/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "stop_words_stt_replay",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 1.221
+  },
+  {
+    "tag": "doc",
+    "command": [
+      "<private-home>/.cargo/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--doc",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit": 0,
+    "seconds": 2.392
+  }
+]

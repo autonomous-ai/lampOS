@@ -1,0 +1,41 @@
+{
+  "head": "29cbcd69fce7c0ff9e415e6f7ab32a1aec477db1",
+  "frozen_executable_sha256": "1930677d70761a42318023fb92b947b652b6f4f06c0667d664f908a7dac15204",
+  "fixed_observations": 3,
+  "results": [
+    {
+      "number": 1,
+      "exit": 0,
+      "seconds": 4.142,
+      "command": [
+        "/private/tmp/second-busy-current-22b753df5-20261024/failed-voice-test-executable",
+        "--exact",
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "number": 2,
+      "exit": 0,
+      "seconds": 2.484,
+      "command": [
+        "/private/tmp/second-busy-current-22b753df5-20261024/failed-voice-test-executable",
+        "--exact",
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "number": 3,
+      "exit": 0,
+      "seconds": 2.497,
+      "command": [
+        "/private/tmp/second-busy-current-22b753df5-20261024/failed-voice-test-executable",
+        "--exact",
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+        "--test-threads=1"
+      ]
+    }
+  ],
+  "limits": "Bounded standalone observations of the captured failed executable; not a full-suite retry or historical-cause proof."
+}

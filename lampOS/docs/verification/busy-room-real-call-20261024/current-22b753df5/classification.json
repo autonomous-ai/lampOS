@@ -1,0 +1,22 @@
+{
+  "head": "29cbcd69fce7c0ff9e415e6f7ab32a1aec477db1",
+  "base": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "full_command_exit": 101,
+  "original_library": {
+    "passed": 3724,
+    "failed": 1,
+    "ignored": 15
+  },
+  "all_remaining_targets_once_complete": true,
+  "completed_crate_counts": {
+    "passed": 4005,
+    "failed": 1,
+    "ignored": 21
+  },
+  "required_controls_once_pass": true,
+  "captured_artifact_standalone_passes": 3,
+  "clean_base_single_case": "passed",
+  "network_file_unchanged_from_base": true,
+  "source_unchanged_after_remaining_targets": true,
+  "classification": "Numerical 3-of-3 standalone pattern recorded for reader disposition under the existing local rule. No reproduced base failure, full matched-base comparison or historical cause is claimed. Raw full failure is retained; no whole-suite retry."
+}

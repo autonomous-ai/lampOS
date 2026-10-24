@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/release_pair.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-92b41c10fde060fb)
+
+running 6 tests
+test release_6408_reads_6498_completed_delivery_without_another_offer ... ignored, requires pinned published executables on isolated native Linux ARM64
+test release_6408_reads_6498_unfinished_delivery_and_completes_it ... ignored, requires pinned published executables on isolated native Linux ARM64
+test release_6408_replays_6498_exact_ack_intent_without_another_offer ... ignored, requires pinned published executables on isolated native Linux ARM64
+test release_6498_reads_6408_completed_delivery_without_another_offer ... ignored, requires pinned published executables on isolated native Linux ARM64
+test release_6498_reads_6408_unfinished_delivery_and_completes_it ... ignored, requires pinned published executables on isolated native Linux ARM64
+test release_6498_replays_6408_exact_ack_intent_without_another_offer ... ignored, requires pinned published executables on isolated native Linux ARM64
+
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

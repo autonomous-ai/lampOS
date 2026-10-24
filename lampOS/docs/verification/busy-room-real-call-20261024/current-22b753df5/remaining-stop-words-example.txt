@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running unittests examples/stop_words_stt_replay.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/stop_words_stt_replay-b4b5bc69dcd2f200)
+
+running 6 tests
+test tests::blocks_are_dated_and_scored_as_the_lamp_read_them ... ok
+test tests::only_cut_lines_are_stop_lines_in_a_mixed_plays_file ... ok
+test tests::only_the_lamps_sounding_is_sent_and_raw_is_asked_on_the_cadence ... ok
+test tests::options_are_read ... ok
+test tests::the_lamps_own_words_stop_nothing ... ok
+test tests::the_voices_stop_words_are_counted_against_the_played_lines ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
