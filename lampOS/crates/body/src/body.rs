@@ -519,10 +519,15 @@ impl Standing {
     pub const STUCK_STEPS: u8 = 100;
     /// As warm as this for `Limits::temperature_steps`, likewise sent down.
     pub const TEMPERATURE: u8 = 62;
-    /// Sent back down, it stays down this long, and after the third time
-    /// for the rest of the run.
+    /// Sent back down, it stays down this long; after the third time inside
+    /// [`Self::RETREAT_WINDOW`] it stays down [`Self::LONG_REST`], and then
+    /// it may rise again. Until 24 Oct the third time was for the rest of
+    /// the run: lamp-4ace sat down for three strains of the elbow in half an
+    /// hour on 20 Oct and never stood again in a five-day run.
     pub const TIRED: Duration = Duration::from_secs(60);
     pub const RETREATS_ALLOWED: u8 = 3;
+    pub const RETREAT_WINDOW: Duration = Duration::from_secs(30 * 60);
+    pub const LONG_REST: Duration = Duration::from_secs(30 * 60);
     /// To start, each of the two must be found within this of the way
     /// between folded and stood up.
     pub const FOUND_SLACK: u16 = 80;
@@ -4347,6 +4352,8 @@ fn run_on<P: PortIo, R: Runtime>(
     let mut awake_until: Option<Duration> = None;
     let mut tired_until: Option<Duration> = None;
     let mut retreats = 0u8;
+    // When each retreat inside the last `Standing::RETREAT_WINDOW` was.
+    let mut retreated_at: std::collections::VecDeque<Duration> = std::collections::VecDeque::new();
     let mut arm_over = [0u8; 2];
     let mut arm_off = [0u8; 2];
     let mut arm_hot = [0u8; 2];
@@ -4880,8 +4887,7 @@ fn run_on<P: PortIo, R: Runtime>(
                 awake_until = Some(now + up.awake);
                 woke_for_gesture = true;
             }
-            let tired = retreats >= Standing::RETREATS_ALLOWED
-                || tired_until.is_some_and(|until| now < until);
+            let tired = tired_until.is_some_and(|until| now < until);
             let awake = awake_until.is_some_and(|until| now < until);
             let wanted = if leaving.is_none() && awake && !tired && !unplug_latched {
                 up.share
@@ -6055,17 +6061,25 @@ fn run_on<P: PortIo, R: Runtime>(
                 // A living thing that cannot hold itself up sits down. It
                 // goes back the way it came and rests there. Only an arm
                 // still strained or astray two seconds on ends the run.
-                let tired = retreats >= Standing::RETREATS_ALLOWED
-                    || tired_until.is_some_and(|until| now < until);
+                let tired = tired_until.is_some_and(|until| now < until);
                 if !tired && stand > 0.0 {
-                    retreats += 1;
+                    retreats = retreats.saturating_add(1);
+                    retreated_at.retain(|at| now.saturating_sub(*at) < Standing::RETREAT_WINDOW);
+                    retreated_at.push_back(now);
                     if report.retreats.len() < 16 {
                         report
                             .retreats
                             .push(format!("step {}: {why}", report.steps));
                     }
                 }
-                tired_until = Some(now + Standing::TIRED);
+                // A third retreat inside the window rests it long, and while
+                // still strained the rest is never shortened.
+                let rest = if retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED) {
+                    Standing::LONG_REST
+                } else {
+                    Standing::TIRED
+                };
+                tired_until = Some(tired_until.map_or(now + rest, |until| until.max(now + rest)));
                 if arm_over[index] >= Standing::STUCK_STEPS {
                     surprise.get_or_insert(Stop::Load {
                         joint: joint.id(),
