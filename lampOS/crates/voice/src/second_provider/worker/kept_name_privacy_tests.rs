@@ -668,3 +668,336 @@ fn missing_private_source_is_reported_once_without_granting_context() {
     assert!(owner.lease().private_speaker().is_none());
     assert_eq!(memory.count("session_open"), 0);
 }
+
+/// The two optional private additions share the actual admitted line's proof,
+/// even when a silent visible person supplied its inherited memory scope.
+#[test]
+fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+    if !child(
+        "privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch",
+        "privacy-defaults",
+        0,
+    ) {
+        return;
+    }
+    use crate::second_provider::{
+        ChatFunctions, ChatPermission, Engine, Listener, Net, Services,
+        net::{self, ChatEvent, Message},
+        services::tests::{answered, config_at},
+    };
+    use crate::{provider_worker::ProviderInput, speaking_faces::SpeakingFaces};
+    use futures_util::{future::BoxFuture, stream::BoxStream};
+    use std::sync::atomic::AtomicUsize;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    const BOOT: &str = "0123456789abcdef";
+    const FACE: &str = "0123456789abcdef/f7";
+    const QUERY: &str = "Lamp, what is my synthetic name?";
+    const PUBLIC: &str = "PUBLIC DEFAULTS CONTEXT";
+    const MAX_HEAD: usize = 8_192;
+    const MAX_BODY: usize = 65_536;
+
+    struct Heard {
+        samples: Arc<AtomicUsize>,
+    }
+    impl Listener for Heard {
+        fn send(&self, samples: &[i16]) -> net::Result<()> {
+            self.samples.fetch_add(samples.len(), Ordering::Relaxed);
+            Ok(())
+        }
+        fn finish(self: Box<Self>, _: u64) -> BoxFuture<'static, net::Result<String>> {
+            Box::pin(async { Ok(QUERY.to_owned()) })
+        }
+    }
+    struct HttpChat {
+        net: Net,
+        samples: Arc<AtomicUsize>,
+        chats: AtomicUsize,
+    }
+    impl Services for HttpChat {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            let listener = Heard {
+                samples: self.samples.clone(),
+            };
+            Box::pin(async { Ok(Box::new(listener) as Box<dyn Listener>) })
+        }
+        fn chat(&self, _: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
+            panic!("the combined fixture must retain the guarded HTTP path")
+        }
+        fn chat_guarded(
+            &self,
+            messages: Vec<Message>,
+            functions: ChatFunctions,
+            permitted: ChatPermission,
+        ) -> BoxStream<'static, net::Result<ChatEvent>> {
+            self.chats.fetch_add(1, Ordering::Relaxed);
+            self.net.chat_guarded(messages, functions, permitted)
+        }
+        fn speak(&self, _: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+            panic!("the Done-only HTTP reply contains no sentence")
+        }
+    }
+    struct Capture(Option<tokio::task::JoinHandle<(Value, Instant)>>);
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            if let Some(task) = &self.0 {
+                task.abort();
+            }
+        }
+    }
+    struct ConfigFolder(PathBuf);
+    impl Drop for ConfigFolder {
+        fn drop(&mut self) {
+            if self.0.exists()
+                && let Err(error) = std::fs::remove_dir_all(&self.0)
+            {
+                eprintln!("combined fixture config cleanup failed: {error}");
+            }
+        }
+    }
+
+    assert!(crate::remember::days_from_environment());
+    assert!(crate::remember::hits_on());
+    assert!(crate::second_provider::worker::scoped_context_from_environment());
+    assert!(crate::speaking_faces::eyes_from_environment());
+    let face_name = std::env::var(crate::second_provider::FACE_NAME_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    assert!(face_name);
+    let _one = crate::provider_worker::tests::one_thread();
+    let person = crate::remember::person_id(OWNER);
+    let memory = Memory::new(Some(person.clone()));
+    crate::remember::start(memory.socket.clone(), None);
+
+    runtime().block_on(async {
+        for (case, positive, request) in [("silent", false, 1), ("speaking", true, 2)] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let until = tokio::time::Instant::now() + WAIT;
+            let key = format!("fixture-private-defaults-{case}-{}", std::process::id());
+            let capture_key = key.clone();
+            let mut capture = Capture(Some(tokio::spawn(async move {
+                tokio::time::timeout_at(until, async move {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let mut raw = Vec::new();
+                    let end = loop {
+                        if let Some(end) = raw.windows(4).position(|part| part == b"\r\n\r\n") {
+                            break end + 4;
+                        }
+                        assert!(raw.len() < MAX_HEAD, "bounded HTTP head");
+                        let mut chunk = [0; 1024];
+                        let n = socket.read(&mut chunk).await.unwrap();
+                        assert!(n > 0, "complete HTTP head");
+                        raw.extend_from_slice(&chunk[..n]);
+                    };
+                    assert!(end <= MAX_HEAD);
+                    let head = std::str::from_utf8(&raw[..end]).unwrap();
+                    assert!(head.starts_with("POST "));
+                    assert!(head.contains(&capture_key), "only this fixture's request counts");
+                    let mut lengths = head.lines().filter_map(|line| {
+                        let (key, value) = line.split_once(':')?;
+                        key.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse::<usize>().unwrap())
+                    });
+                    let length = lengths.next().expect("HTTP body length");
+                    assert!(length <= MAX_BODY);
+                    assert!(lengths.next().is_none(), "one HTTP body length");
+                    while raw.len() - end < length {
+                        let mut chunk = [0; 4096];
+                        let n = socket.read(&mut chunk).await.unwrap();
+                        assert!(n > 0, "complete HTTP body");
+                        raw.extend_from_slice(&chunk[..n]);
+                        assert!(raw.len() <= MAX_HEAD + MAX_BODY);
+                    }
+                    let sent: Value = serde_json::from_slice(&raw[end..end + length]).unwrap();
+                    let body_parsed_at = Instant::now();
+                    let (head, body) = answered("").unwrap();
+                    socket.write_all(head.as_bytes()).await.unwrap();
+                    socket.write_all(&body).await.unwrap();
+                    (sent, body_parsed_at)
+                })
+                .await
+                .expect("the combined fixture receives a complete HTTP request")
+            })));
+            let config_name = format!("combined-private-{case}");
+            let config_folder = std::env::temp_dir().join(format!(
+                "lamp-voice-routes-{config_name}-{}",
+                std::process::id()
+            ));
+            assert!(!config_folder.exists(), "fresh owned config directory");
+            let config_dir = ConfigFolder(config_folder);
+            let services = Arc::new(HttpChat {
+                net: Net::new(config_at(&config_name, &key, &url, &url), Arc::new(Vec::new))
+                    .unwrap(),
+                samples: Arc::default(),
+                chats: AtomicUsize::new(0),
+            });
+            let known = memory.directory.join("known");
+            let context_known = known.clone();
+            let dispatch_known = known.clone();
+            let cache = Arc::new(FaceCache::default());
+            let eyes = Arc::new(SpeakingFaces::default());
+            let hits = super::super::memory_hits(
+                Arc::new(Mutex::new(Sessions::default())),
+                memory.socket.clone(),
+                Some(known.clone()),
+            );
+            let mut engine = Engine::new(
+                services.clone(),
+                Told::default,
+                Arc::new(|_, _, _, _| Box::pin(async { panic!("no tools in fixture") })),
+            )
+            .with_memory_scope(
+                lamp_turn_owner::BootId::new([47; 16]).unwrap(),
+                cache.clone(),
+                Arc::new(|_, _, _, _, _| Box::pin(async { panic!("no scoped tools") })),
+                Some(Arc::new(move |lease| {
+                    let name = known_name_told(face_name, Some(&context_known), Some(lease));
+                    Told {
+                        requires_speaker: !name.is_empty(),
+                        text: format!("{PUBLIC}{name}"),
+                        ..Told::default()
+                    }
+                })),
+            )
+            .guarding_private_context(Arc::new(move |lease| {
+                super::super::private_context_state(Some(&dispatch_known), lease)
+            }))
+            .seeing_who_speaks(eyes.clone(), known.clone())
+            .remembering(hits)
+            .announcing(false);
+            engine.memory_camera(true, 1);
+            // Both cases have the same genuinely fresh visible-person scope.
+            // The negative differs only in the absence of positive speech.
+            write_known(&memory.directory, OWNER, BOOT, "f7");
+            std::fs::write(crate::speaking_faces::known_face_of(&known), "f7").unwrap();
+            assert!(cache.replace_seen(
+                cache.begin_refresh(),
+                crate::known_faces::FaceObservation::read(&known),
+                Some(1)
+            ));
+            engine.submit(ProviderInput::Start {
+                request,
+                session: 1,
+                privacy_generation: 1,
+                continues: false,
+                continues_cut_off: false,
+                over_the_lamp: false,
+                after_stop: false,
+                follows_on: false,
+                over_the_lamps_voice: false,
+                heard_of_cut: None,
+            });
+            let lease = engine.memory_lease().unwrap();
+            assert_eq!(lease.scope().unwrap().person(), Some(person.as_str()));
+            assert!(lease.speaker().is_none());
+            // As in the current-piece controls, observations and microphone
+            // read stamps share one host-clock anchor, wholly before now.
+            let at = Instant::now() - Duration::from_secs(1);
+            let at_us = lamp_ipc::monotonic_us().checked_sub(1_000_000).unwrap();
+            for (index, millis) in [100, 250, 400].into_iter().enumerate() {
+                let faces = lamp_msgs::Faces {
+                    faces: vec![lamp_msgs::Face {
+                        id: "f7".into(),
+                        xmin: 0.1,
+                        ymin: 0.1,
+                        xmax: 0.3,
+                        ymax: 0.4,
+                        confidence: 1.0,
+                        yaw: None,
+                        facing: Some(true),
+                        speaking: Some(lamp_msgs::Speaking {
+                            state: if positive {
+                                lamp_msgs::SpeakingState::Yes
+                            } else {
+                                lamp_msgs::SpeakingState::No
+                            },
+                            score: 0.9,
+                            from: None,
+                        }),
+                    }],
+                };
+                eyes.look(
+                    at + Duration::from_millis(millis),
+                    Some(((BOOT, index as u64 + 1), &faces)),
+                );
+            }
+            for sequence in 1..=50 {
+                engine.submit(ProviderInput::Audio {
+                    request,
+                    privacy_generation: 1,
+                    sequence,
+                    read_completed_at_us: at_us + sequence * 10_000,
+                    samples: vec![1; lamp_audio::CAPTURE_SAMPLES],
+                });
+            }
+            let before = memory.count("kept");
+            let began = Instant::now();
+            engine.submit(ProviderInput::End {
+                request,
+                privacy_generation: 1,
+                sound: false,
+                cut_in: false,
+            });
+            tokio::time::timeout_at(until, async {
+                loop {
+                    match engine.next().await {
+                        crate::provider_worker::ProviderOutput::TurnComplete {
+                            request: ended,
+                            idle,
+                        } => {
+                            assert_eq!(ended, request);
+                            assert!(idle);
+                            break;
+                        }
+                        crate::provider_worker::ProviderOutput::TurnFailed { .. } => {
+                            panic!("the admitted request must still complete")
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .await
+            .expect("the combined request completes within the fixture bound");
+            assert_eq!(
+                memory.count("kept") - before,
+                usize::from(positive),
+                "private I/O is checked even if final HTTP dispatch was denied: {case}"
+            );
+            let (sent, body_parsed_at) =
+                tokio::time::timeout_at(until, capture.0.as_mut().unwrap())
+                .await
+                .expect("HTTP capture finishes")
+                .unwrap();
+            drop(capture.0.take());
+            let messages = sent["messages"].as_array().expect("actual HTTP messages");
+            let payload = serde_json::to_string(messages).unwrap();
+            assert!(payload.contains(PUBLIC) && payload.contains(QUERY), "{case}");
+            assert_eq!(payload.contains(OWNER), positive, "name: {case}");
+            assert_eq!(payload.contains(OLD), positive, "hits: {case}");
+            assert_eq!(services.chats.load(Ordering::Relaxed), 1, "{case}");
+            assert_eq!(
+                services.samples.load(Ordering::Relaxed),
+                50 * lamp_audio::CAPTURE_SAMPLES,
+                "current synthetic microphone packets: {case}"
+            );
+            assert_eq!(lease.scope().unwrap().person(), Some(person.as_str()));
+            assert_eq!(lease.speaker(), positive.then_some(FACE), "{case}");
+            let requests = memory.state.lock().unwrap().requests.clone();
+            let reads: Vec<_> = requests.iter().filter(|read| read["op"] == "kept").collect();
+            assert_eq!(reads.len() - before, usize::from(positive), "{case}");
+            assert!(reads.iter().all(|read| read["person"] == person));
+            assert_eq!(memory.count("session_open"), 0, "no other note path");
+            eprintln!(
+                "callback check: combined_private_defaults case={case} end_to_http_us={} kept_reads={}",
+                body_parsed_at.saturating_duration_since(began).as_micros(),
+                reads.len() - before
+            );
+            drop(engine);
+            drop(services);
+            std::fs::remove_dir_all(&config_dir.0).unwrap();
+            assert!(!config_dir.0.exists());
+        }
+    });
+}

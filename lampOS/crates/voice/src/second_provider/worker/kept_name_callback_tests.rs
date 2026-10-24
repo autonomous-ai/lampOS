@@ -45,6 +45,17 @@ fn child(name: &str, mode: &str, markers: usize) -> bool {
         "days" | "days-room" | "privacy" => {
             command.env(crate::remember::DAYS_ENVIRONMENT, "on");
         }
+        "privacy-defaults" => {
+            command
+                .env(crate::remember::DAYS_ENVIRONMENT, "on")
+                .env(crate::remember::HITS_ENVIRONMENT, "on")
+                .env(crate::second_provider::FACE_NAME_ENVIRONMENT, "on")
+                .env(
+                    crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+                    "on",
+                )
+                .env(crate::speaking_faces::EYES_ENVIRONMENT, "on");
+        }
         "days-resumes" => {
             command
                 .env(crate::remember::DAYS_ENVIRONMENT, "on")
