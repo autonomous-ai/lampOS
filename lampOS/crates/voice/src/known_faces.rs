@@ -304,6 +304,50 @@ pub fn said_by_them(name: &str, said: &str) -> bool {
                 .all(|word| theirs.contains(word) || spelled.iter().any(|letters| letters == word)))
 }
 
+/// Whether `name` is said in `said` only as the word that called the lamp:
+/// the lamp's name or a word written for it
+/// ([`crate::attention::written_for_the_name`]), opening the line past any
+/// greeting, set off by a comma or a stop, with more said after it, and the
+/// name nowhere else. On lamp-4ace on 24 October the owner's "Lamp, remember
+/// my face, and I'm …" was heard as "Man. Remember my face and do", and
+/// their face was kept as "Man" and greeted by it. A line that is only the
+/// name ("Helen.") still gives it, as does the name said again ("Helen,
+/// remember my face. I'm Helen.").
+fn only_the_call(name: &str, said: &str) -> bool {
+    let name = folded_words(name);
+    let [name] = name.as_slice() else {
+        return false;
+    };
+    let mut rest = said;
+    let opening = loop {
+        let Some(start) = rest.find(char::is_alphanumeric) else {
+            return false;
+        };
+        rest = &rest[start..];
+        let end = rest
+            .find(|c: char| !(c.is_alphanumeric() || c == '\'' || c == '\u{2019}'))
+            .unwrap_or(rest.len());
+        let (word, after) = rest.split_at(end);
+        rest = after;
+        if !crate::attention::is_greeting(word) {
+            break word;
+        }
+    };
+    let set_off = rest
+        .trim_start()
+        .starts_with([',', '.', '!', '?', ';', ':']);
+    let more_after = rest.chars().any(char::is_alphanumeric);
+    folded_words(opening).as_slice() == [name.clone()]
+        && crate::attention::written_for_the_name(opening)
+        && set_off
+        && more_after
+        && folded_words(said)
+            .iter()
+            .filter(|word| *word == name)
+            .count()
+            == 1
+}
+
 /// Whether each of `name`'s words is spelled letter by letter in `said`
 /// ("L I N H."), not only said ("Linh."): what `apart` needs (both
 /// reviewers' P2 on #2269: a name said again can be misheard again, as
@@ -983,6 +1027,9 @@ pub const NAME_TOLD_NOTE: &str = "If they have just told you their own name, cal
 
 /// What the model is told when the name is not in what they said.
 const NOT_HEARD: &str = "You did not hear that name in what they said. Say the name back to them and ask them to spell it, then call this again with the name as they said or spelled it.";
+/// What the model is told when the name was only the word that called the
+/// lamp ([`only_the_call`]).
+const ONLY_THE_CALL: &str = "That word was them calling you, not their name, so I have not remembered anyone. Ask them what their name is, then call this again with the name they give.";
 const NOT_OWN_NAME: &str = "I could not confirm that this was their own name, so I have not remembered anyone. Ask them to look at me and state their own name directly, or spell their name by itself, then try again.";
 const NAME_UNCHANGED: &str = "I cannot safely replace a saved name from this request, so I have not changed anyone's saved face.";
 /// What the model is told when it would replace a name before the person
@@ -1362,6 +1409,9 @@ fn run_switched(
     };
     if checked && call.name == REMEMBER && !name_heard(name, said) {
         return (json!({"error": NOT_HEARD}), true);
+    }
+    if checked && call.name == REMEMBER && only_the_call(name, &said.this) {
+        return (json!({"error": ONLY_THE_CALL}), true);
     }
     let replace = call.args.get("replace").and_then(Value::as_bool) == Some(true);
     // A name replaces another only once the lamp said it back and they
@@ -2694,6 +2744,73 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
     }
+    /// On lamp-4ace on 24 October the owner's "Lamp, remember my face, and
+    /// I'm …" was heard as "Man. Remember my face and do", and their face was
+    /// kept as "Man": the word that called the lamp, opening the line, is no
+    /// name, and the model is told to ask for theirs. Said alone, or again
+    /// as theirs, it is still a name.
+    #[test]
+    fn the_word_that_called_the_lamp_is_not_their_name() {
+        for (name, said) in [
+            ("Man", "Man. Remember my face and do"),
+            ("Helen", "Helen, remember my face."),
+            ("Lynn", "Hey, Lynn. Remember me."),
+            ("Louvre", "Louvre, remember my face, please."),
+            ("Lamp", "Lamp, remember my face."),
+        ] {
+            assert!(only_the_call(name, said), "{name}: {said}");
+        }
+        for (name, said) in [
+            ("Helen", "Helen."),
+            ("Helen", "Helen, remember my face. I'm Helen."),
+            ("Kess", "Kess, remember my face."),
+            ("Man", "Lamp, remember my face. My name is Man."),
+            ("Mary Ann", "Mary Ann, remember me."),
+            ("Lynn", "Remember my face, Lynn."),
+            ("Man", "Man"),
+        ] {
+            assert!(!only_the_call(name, said), "{name}: {said}");
+        }
+        let call = |name: &str| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args: json!({ "name": name }),
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"remembered": "Kess"}),
+            json!({"remembered": "Man"}),
+        ]);
+        let (words, answered) = run_with(
+            &socket,
+            &call("Man"),
+            true,
+            &Said::now("Man. Remember my face and do"),
+        );
+        assert!(answered && words["error"] == ONLY_THE_CALL, "{words}");
+        let (words, _) = run_with(
+            &socket,
+            &call("Kess"),
+            true,
+            &Said::now("Lamp, remember my face. I'm Kess."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Kess"}));
+        // Without names checked, as before.
+        let (words, _) = run_with(
+            &socket,
+            &call("Man"),
+            false,
+            &Said::now("Man. Remember my face and do"),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Man"}));
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Kess", "one_face": true, "replace": false}),
+                json!({"remember": "Man"}),
+            ]
+        );
+    }
+
     /// #2176 row 4, lamp-4ace 20 Oct: a person known by their face was
     /// saved again under their name misheard. A near face with a near name
     /// gets a spelling asked, with no known name said back; a yes to a known

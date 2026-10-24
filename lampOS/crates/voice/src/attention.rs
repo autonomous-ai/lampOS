@@ -601,6 +601,24 @@ fn stand_alone(counted: bool) -> &'static [&'static str] {
 /// Greetings that may come before the name of a call ("Hey Lamp,").
 const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
 
+/// Whether `word` is a greeting a call may open with ([`GREETINGS`]).
+pub(crate) fn is_greeting(word: &str) -> bool {
+    GREETINGS
+        .iter()
+        .any(|greeting| word.eq_ignore_ascii_case(greeting))
+}
+
+/// Whether `word` is the lamp's name or a word the service has written for
+/// it ([`STAND_INS`], [`STAND_ALONE_INS`]): for a name a person gives, where
+/// such a word opening the line called the lamp (`known_faces`).
+pub(crate) fn written_for_the_name(word: &str) -> bool {
+    ["lamp", "lamb"]
+        .iter()
+        .chain(STAND_INS)
+        .chain(STAND_ALONE_INS)
+        .any(|known| word.eq_ignore_ascii_case(known))
+}
+
 /// [`called`], with the name counted only where it is said to the lamp
 /// (`LAMP_NAME_IN_PASSING=ignored`, #829): opening a sentence, after any
 /// greeting ("Lamp, ...", "Hey Lamp, ...", "Okay. Lamp, ..."), or right
