@@ -1166,10 +1166,16 @@ on #3126).
     most.
   - It never reaches past a block heard while the lamp was sounding, or kept
     quiet for a busy answer. The coordinator gives the detector a block's
-    score before the floor only while the lamp is silent, so a start never
-    reaches into the lamp's own voice.
-  - A pause of 100 ms or more ends the run. A name said before the pause
-    isn't taken with the question.
+    score before the floor only while the lamp is silent and no reply is
+    playing (`unfloored_score`), so a start never reaches into the lamp's
+    own voice.
+  - It never begins later than the usual start. A line begun while a reply's
+    playback is still held but its sound has gone quiet has every block
+    marked so, its onset's among them, and starts as without the switch
+    (the reviewer's P2: it had started with no audio, which admission
+    refuses and which ended the conversation).
+  - A pause of 100 ms or more ends the run, and neither lead crosses it: a
+    name said before the pause isn't taken with the question.
 - `input_candidate`'s `first_read_at_us` shows where each line's sound began.
   With `mic2/audio` recorded off the bus, which is on the voice's clock, the
   line's onset can be set against it.

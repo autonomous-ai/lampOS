@@ -2,9 +2,10 @@
 //! with `LAMP_FIRST_WORDS=kept`): an ordinary start keeps 200 ms more than the
 //! usual 300 ms, or begins 200 ms before the earliest block of the
 //! speech-like run it starts on, by its score before the faint floor, if that
-//! is earlier; at most 500 ms more, only through gaps under 100 ms, and never
-//! past a block heard while the lamp was sounding. A yield's start and a start
-//! without the switch are unchanged.
+//! is earlier; at most 500 ms more, only through gaps under 100 ms, never
+//! into speech before such a pause, never past a block heard while the lamp
+//! was sounding, and never later than the usual start. A yield's start and a
+//! start without the switch are unchanged.
 use lamp_voice::activity::{
     Activity, ObservedAudio, PRE_ROLL_BLOCKS, REACH_LEAD_BLOCKS, SOFT_START_BLOCKS,
     SOFT_START_LEAD_BLOCKS, START_BLOCKS, TurnDetector,
@@ -90,23 +91,22 @@ fn a_soft_start_reaches_at_most_half_a_second_before_the_usual_one() {
 #[test]
 fn a_pause_of_a_tenth_of_a_second_ends_what_a_soft_start_reaches() {
     // "Lamp," 20 blocks, a 120 ms pause scored quiet, then the soft word of
-    // 30 blocks: the name, inside the half second, is not reached.
+    // 30 blocks: the name, inside the half second, is not reached, and the
+    // 200 ms lead stops at the pause's first block, short of the name (the
+    // reviewer's P3 on #3392).
     let mut before = vec![Some(0.9); 20];
     before.extend(std::iter::repeat_n(Some(0.1), 12));
     before.extend(vec![Some(0.5); 30]);
     let (begins, onset) = start(true, true, &before, false);
-    assert_eq!(begins, onset - 30 - REACH_LEAD_BLOCKS as u64);
-    // A gap of 9 quiet blocks inside the word is gone through; 10 is a pause.
-    for (gap, reached) in [(9, 49), (10, 30)] {
+    assert_eq!(begins, onset - 30 - 12);
+    // A gap of 9 quiet blocks inside the word is gone through, with the full
+    // lead before it; 10 is a pause, and the lead stops at it.
+    for (gap, begins_before) in [(9, 49 + REACH_LEAD_BLOCKS as u64), (10, 30 + 10)] {
         let mut before = vec![Some(0.5); 10];
         before.extend(std::iter::repeat_n(Some(0.1), gap));
         before.extend(vec![Some(0.5); 30]);
         let (begins, onset) = start(true, true, &before, false);
-        assert_eq!(
-            begins,
-            onset - reached - REACH_LEAD_BLOCKS as u64,
-            "gap {gap}"
-        );
+        assert_eq!(begins, onset - begins_before, "gap {gap}");
     }
 }
 
@@ -130,6 +130,35 @@ fn a_soft_start_never_reaches_into_the_lamps_own_sound() {
     before[10] = None;
     let (begins, onset) = start(true, true, &before, false);
     assert_eq!(begins, onset - 29);
+}
+
+/// The reviewer's P2 on #3392: every block, the onset's own among them, heard
+/// while the lamp's reply was playing (`None`): the usual start, with its
+/// audio, never one with none.
+#[test]
+fn a_start_heard_all_under_the_lamps_reply_begins_as_usual() {
+    let mut detector = TurnDetector::v1_baseline();
+    detector.keep_first_words(true);
+    detector.keep_soft_starts(true);
+    let mut sequence = 0;
+    for _ in 0..120 {
+        sequence += 1;
+        detector.unfloored(None);
+        assert!(matches!(
+            detector.push_heard(frame(sequence), 0.0, Some(0.0)),
+            Activity::Quiet
+        ));
+    }
+    for _ in 1..=START_BLOCKS {
+        sequence += 1;
+        detector.unfloored(None);
+        if let Activity::Start(audio) = detector.push_heard(frame(sequence), 0.95, Some(0.95)) {
+            assert_eq!(audio.len(), PRE_ROLL_BLOCKS);
+            assert_eq!(audio.last().unwrap().sequence, sequence);
+            return;
+        }
+    }
+    panic!("the onset did not start an utterance");
 }
 
 /// A word the detector's scores are slow on: nothing speech-like before the

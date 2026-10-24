@@ -771,6 +771,24 @@ fn while_answer_waits(
     }
 }
 
+/// A block's score before the faint floor, for a soft start
+/// (`LAMP_SOFT_START`, `TurnDetector::unfloored`): only while the lamp is
+/// silent, its sound not reaching the microphone (`sounding`), no busy answer
+/// kept, and no reply playing, so that a start never reaches back into the
+/// lamp's own voice. `None` otherwise, which a soft start never reaches past.
+fn unfloored_score(
+    sounding: bool,
+    keeping_answer: bool,
+    reply: Option<&Reply>,
+    probability: f32,
+) -> Option<f32> {
+    (!sounding
+        && !keeping_answer
+        && probability.is_finite()
+        && reply.is_none_or(|current| current.playback.is_none()))
+    .then_some(probability)
+}
+
 /// Whether `current` is an answer to someone's request that has ended, none
 /// of which has arrived or sounded: what a new sound may wait for.
 fn answer_unheard(current: &Reply) -> bool {
@@ -8109,18 +8127,12 @@ fn conversation_with_gate_inner(
             let sounding = frame.echo.as_ref().is_some_and(|echo| {
                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
             });
-            // The block's score before the faint floor, for a soft start
-            // (`LAMP_SOFT_START`): only while the lamp is silent, so that a
-            // start never reaches back into its own voice.
-            detector.unfloored(
-                (!sounding
-                    && !keeping_answer
-                    && frame.probability.is_finite()
-                    && reply
-                        .as_ref()
-                        .is_none_or(|current| current.playback.is_none()))
-                .then_some(frame.probability),
-            );
+            detector.unfloored(unfloored_score(
+                sounding,
+                keeping_answer,
+                reply.as_ref(),
+                frame.probability,
+            ));
             let (update, input_ended) = observe_prospective_heard(
                 &mut playback_mask,
                 &mut detector,
