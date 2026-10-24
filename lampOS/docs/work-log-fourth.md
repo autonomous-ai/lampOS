@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 05:15: Linux Skills failure reproduced; next Name gate active
+
+- [Selected failed Linux results](verification/common-9df-skills-failed-selected-20261025/README.md): Common 9df all eight stages observed, only Skills failed 518/1/9; other seven pass, with Voice 4214/0/24 and Update 398/0/4. First three prescribed Skills observations all fail 101 at the same unchanged 8 s assertion; procedure 0 means three observed, never three passed. Local/full conditions remain false and original 101 stays HOLD. Tests owns #1806; source-only event-drain mechanism is handed on without a cause claim or Fourth fixture code.
+- Mac 9df Voice 4153/0/21 passes; its remaining suites continue. Name d60 on Common d89/pinned fc31 has 259 Root preparation checks and its separate five-stage Linux gate starts after corrected grant; initial setup refusal ran zero Cargo stages and remains recorded. Name/callback stay draft until parent 3064 lands and carried parent commits are removed/patch-checked/cleared.
+- Published bounded earlier f5d disposition 802 remains local-only/full rule false; raw evidence/binaries/private tables stay private. No result transfers across source epochs, no device action or activation.
+
 ## 2026-10-25 04:14: bounded Mac observations complete; current host gates active
 
 - [Selected baseline and observation results](verification/common-mac-bounded-disposition-selected-20261025/README.md): clean 427 full Voice 4018/0/21 and all twelve containing cases PASS; first three frozen f5d observations each produce 36/0/0, 74 source guards and verified exact Voice cleanup. Original full 4127/12/21 and exit 101 remain. The local condition is satisfied; full rule remains false/current native UNRUN, with launch hash and environment gaps explicit and no historical cause or waiver.

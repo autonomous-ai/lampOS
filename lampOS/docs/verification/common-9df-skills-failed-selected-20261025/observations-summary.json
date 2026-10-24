@@ -1,0 +1,60 @@
+{
+  "format": "9df-linux-skills-first3-failed-count-sourcehash-boolean/1",
+  "head": "9df96e1151c8f2d1b0ed9323c096da04cb80d402",
+  "tree": "dde5fd2106a01a882649121568c6135f8018c415",
+  "procedure_exit": 0,
+  "standard_diagnostic_stages_required": 3,
+  "standard_diagnostic_stages_observed": 3,
+  "procedure_completion_is_not_test_success": true,
+  "harness_exits": [
+    101,
+    101,
+    101
+  ],
+  "observation_counts": {
+    "passed": 0,
+    "failed": 3,
+    "unrun": 0
+  },
+  "each_harness_counts": {
+    "passed": 0,
+    "failed": 1,
+    "ignored": 0,
+    "filtered": 306
+  },
+  "top_level_tests_per_invocation": 1,
+  "configured_inner_cases_per_test": 2,
+  "inner_cases_not_independent_observations": true,
+  "all3_same_original_completion_assertion": true,
+  "received_Done_each": 3,
+  "journal_Done_each": 4,
+  "journal_is_not_cause_proof": true,
+  "child_None_each": true,
+  "original_full_gate_exit": 101,
+  "original_Skills_counts": {
+    "passed": 518,
+    "failed": 1,
+    "ignored": 9
+  },
+  "local_failure_condition_satisfied": false,
+  "full_rule_satisfied": false,
+  "HOLD_preserved": true,
+  "matched_base_observation_claim": false,
+  "source_and_both_ELF_guard_metadata_verified": true,
+  "cleanup_release_recorded_verified": true,
+  "preparation_controls": 37,
+  "handoff_controls": 22,
+  "Root_grant_and_text_seal_verified": true,
+  "original_launch_hashes_observed": false,
+  "original_Cargo_loader_environment_observed": false,
+  "captured_child_workspace_build_hash_mismatch_retained": true,
+  "current_fc31_frozen_preparation_mutated": false,
+  "activeMac_or_reservedLinux_or_binaries_read": false,
+  "cause_waiver_READ_OK_fix_push_post_publication": false,
+  "terminal_sha256": "8f7e86285ca0b68d63303375d72eb16134c199e2e922dd602000900bbf37cb9f",
+  "source_map_sha256": "8e8f18bdc56d8a7fc573e4c16ea4a2e48fe5b0de8b5e923a72659b6119321064",
+  "qualification_sha256": "a3d46238bfbd6f1295fa243228a4f0efb93f4faa516d5c134443cc7e070c2e62",
+  "local_disposition_sha256": "e7f3544b6b99150b32d955f99c8e7092c5df8475118b25128245322db549c20d",
+  "source_binding_sha256": "2f7e83fc4ece0b6fd150f7b07bb8777497f2106a4026dfc7adf31adc653d6981",
+  "raw_binary_or_helper_code_publication_authorized": false
+}

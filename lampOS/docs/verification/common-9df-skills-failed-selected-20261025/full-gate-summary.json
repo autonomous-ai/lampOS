@@ -1,0 +1,56 @@
+{
+  "format": "common9df-linux-failed8-count-sourcehash-boolean/1",
+  "head": "9df96e1151c8f2d1b0ed9323c096da04cb80d402",
+  "tree": "dde5fd2106a01a882649121568c6135f8018c415",
+  "parent": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "original_gate_exit": 101,
+  "original_failure_preserved": true,
+  "required_stages": 8,
+  "observed_stages": 8,
+  "passed_stages": 7,
+  "failed_stages": 1,
+  "required_controls": 6,
+  "controls_once_passed": 6,
+  "fresh_local_members": 46,
+  "counts": {
+    "full-eyes": {
+      "passed": 360,
+      "failed": 0,
+      "ignored": 5
+    },
+    "full-voice": {
+      "passed": 4214,
+      "failed": 0,
+      "ignored": 24
+    },
+    "full-update": {
+      "passed": 398,
+      "failed": 0,
+      "ignored": 4
+    },
+    "full-skills": {
+      "passed": 518,
+      "failed": 1,
+      "ignored": 9
+    },
+    "full-memory": {
+      "passed": 324,
+      "failed": 0,
+      "ignored": 8
+    }
+  },
+  "source_cleanup_release_recorded_verified": true,
+  "source_map_sha256": "8e8f18bdc56d8a7fc573e4c16ea4a2e48fe5b0de8b5e923a72659b6119321064",
+  "terminal_sha256": "3af54cb8acc96c111339234b62bf8239e570f376ed7339d4e90175c904e8e520",
+  "qualification_sha256": "855c5e59e80521fef51cd4e6222778fce6d3d8b1d2949ad1c06ff780034aa94b",
+  "source_binding_sha256": "5afd3b47e11e7f9735f81f57b8aec7707e5f71790bac14d534d357463f47bd70",
+  "original_failed_fixture_bound_unchanged": true,
+  "three_pass_observation_claim": false,
+  "local_failure_condition_satisfied": false,
+  "full_rule_satisfied": false,
+  "Mac_current_active_not_read": true,
+  "new_head_transfer_or_readiness_or_READ_OK": false,
+  "cause_or_waiver_claim": false,
+  "binary_target_cache_VM_active_stream_read": false,
+  "raw_publication_authorized": false
+}
