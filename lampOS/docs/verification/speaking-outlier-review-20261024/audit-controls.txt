@@ -1,0 +1,28 @@
+
+running 6 tests
+...third_review corners: off=Speaking { state: No, score: 0.018, from: Some(Corners) } on=Speaking { state: Yes, score: 0.021514114, from: Some(Corners) }
+
+thread 'speaking::third_review_outlier::dropping_a_look_does_not_accelerate_a_subthreshold_corner_change' (238064385) panicked at crates/eyes/src/speaking.rs:1130:9:
+assertion `left == right` failed: dropping a middle sample must not treat a 500 ms change as one 250 ms step: Speaking { state: Yes, score: 0.021514114, from: Some(Corners) }
+  left: Yes
+ right: No
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ 3/6
+speaking::third_review_outlier::dropping_a_look_does_not_accelerate_a_subthreshold_corner_change --- FAILED
+third_review mesh: off=Speaking { state: No, score: 0.0101, from: Some(Mesh) } on=Speaking { state: Yes, score: 0.012071809, from: Some(Mesh) }
+
+thread 'speaking::third_review_outlier::dropping_a_look_does_not_accelerate_a_subthreshold_mesh_change' (238064388) panicked at crates/eyes/src/speaking.rs:1102:9:
+assertion `left == right` failed: dropping a middle sample must not treat a 500 ms change as one 250 ms step: Speaking { state: Yes, score: 0.012071809, from: Some(Mesh) }
+  left: Yes
+ right: No
+speaking::third_review_outlier::dropping_a_look_does_not_accelerate_a_subthreshold_mesh_change --- FAILED
+.
+failures:
+
+failures:
+    speaking::third_review_outlier::dropping_a_look_does_not_accelerate_a_subthreshold_corner_change
+    speaking::third_review_outlier::dropping_a_look_does_not_accelerate_a_subthreshold_mesh_change
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 306 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p lamp-eyes --lib`

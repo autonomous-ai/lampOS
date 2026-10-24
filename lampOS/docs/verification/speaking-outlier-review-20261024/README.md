@@ -22,7 +22,7 @@ This is a synthetic classifier regression, not an observed wrong-person
 incident on a lamp.
 
 `audit-tests.patch` adds only review tests to the exact authored head.
-`audit-controls.log` and its result receipt retain **4 passed / 2 failed**.
+`audit-controls.txt` and its result receipt retain **4 passed / 2 failed**.
 The other controls cover mesh/corners, high/low outliers, an angular-only
 outlier, two outliers and their diagnostic, and a sustained real scale change.
 The original exact-head fmt/strict Clippy and full Eyes suite pass:
