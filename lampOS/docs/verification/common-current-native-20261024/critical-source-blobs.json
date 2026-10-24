@@ -1,0 +1,65 @@
+[
+  {
+    "path": "lampOS/crates/voice/src/memory_scope.rs",
+    "authored_blob": "ef7180203778d45009950dd7a1ae4c5727546520",
+    "preview_blob": "ef7180203778d45009950dd7a1ae4c5727546520",
+    "equal": true,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/voice/src/speaking_faces.rs",
+    "authored_blob": "8123d9e2a6acd80f61904eb2035c403d28d608b7",
+    "preview_blob": "8123d9e2a6acd80f61904eb2035c403d28d608b7",
+    "equal": true,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/voice/src/second_provider.rs",
+    "authored_blob": "8dd25a583279ae80748681c4b140d7be39697249",
+    "preview_blob": "8dd25a583279ae80748681c4b140d7be39697249",
+    "equal": true,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+    "authored_blob": "07668eac84b3a1fde769fa3b985dd83100d4c36e",
+    "preview_blob": "fea489d63dfdfcf2da94c645d1af542175730315",
+    "equal": false,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/voice/src/remember.rs",
+    "authored_blob": "95d1cd52ea9a20fc43da50a71615065a0e99496e",
+    "preview_blob": "95d1cd52ea9a20fc43da50a71615065a0e99496e",
+    "equal": true,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/voice/src/remember_speaker.rs",
+    "authored_blob": "b9a44e36d7856d5b6821fc0e70d68527d4898039",
+    "preview_blob": "b9a44e36d7856d5b6821fc0e70d68527d4898039",
+    "equal": true,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/eyes/src/main.rs",
+    "authored_blob": "8bc48fcb94653bc00df069a2599fba8b16c3b26a",
+    "preview_blob": "8bc48fcb94653bc00df069a2599fba8b16c3b26a",
+    "equal": true,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/eyes/src/who.rs",
+    "authored_blob": "502c367940f566cd143baf42d5b493a5bbe6346d",
+    "preview_blob": "502c367940f566cd143baf42d5b493a5bbe6346d",
+    "equal": true,
+    "mode": "100644"
+  },
+  {
+    "path": "lampOS/crates/voice/src/second_provider/services.rs",
+    "authored_blob": "841444d7c3c2148cc6c8536cce5aeb57d3bedfb0",
+    "preview_blob": "841444d7c3c2148cc6c8536cce5aeb57d3bedfb0",
+    "equal": true,
+    "mode": "100644"
+  }
+]

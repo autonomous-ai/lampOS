@@ -1,0 +1,224 @@
+{
+  "owned_paths": 36,
+  "equal_paths": 35,
+  "source_paths": 22,
+  "source_equal_paths": 21,
+  "rows": [
+    {
+      "path": "lampOS/Cargo.lock",
+      "authored_blob": "4008b53ec190f461b273c4664a9c70cdc320dfe1",
+      "preview_blob": "4008b53ec190f461b273c4664a9c70cdc320dfe1",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/eyes/Cargo.toml",
+      "authored_blob": "9349ed2d3141a03e9892332cc7150b1f27f6a203",
+      "preview_blob": "9349ed2d3141a03e9892332cc7150b1f27f6a203",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/bus_out.rs",
+      "authored_blob": "c7a2be3841052ea10a49d587d972e5649e01cc87",
+      "preview_blob": "c7a2be3841052ea10a49d587d972e5649e01cc87",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/main.rs",
+      "authored_blob": "8bc48fcb94653bc00df069a2599fba8b16c3b26a",
+      "preview_blob": "8bc48fcb94653bc00df069a2599fba8b16c3b26a",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/who.rs",
+      "authored_blob": "502c367940f566cd143baf42d5b493a5bbe6346d",
+      "preview_blob": "502c367940f566cd143baf42d5b493a5bbe6346d",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/src/unit.rs",
+      "authored_blob": "1d50a9db4bb6cc21d13f9598c55cbaa29021ebc8",
+      "preview_blob": "1d50a9db4bb6cc21d13f9598c55cbaa29021ebc8",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/memory_scope.rs",
+      "authored_blob": "ef7180203778d45009950dd7a1ae4c5727546520",
+      "preview_blob": "ef7180203778d45009950dd7a1ae4c5727546520",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "authored_blob": "95d1cd52ea9a20fc43da50a71615065a0e99496e",
+      "preview_blob": "95d1cd52ea9a20fc43da50a71615065a0e99496e",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "authored_blob": "8dd25a583279ae80748681c4b140d7be39697249",
+      "preview_blob": "8dd25a583279ae80748681c4b140d7be39697249",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/services.rs",
+      "authored_blob": "841444d7c3c2148cc6c8536cce5aeb57d3bedfb0",
+      "preview_blob": "841444d7c3c2148cc6c8536cce5aeb57d3bedfb0",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "authored_blob": "b6d227045e58911686d4a55e720627bd5b4b37b5",
+      "preview_blob": "b6d227045e58911686d4a55e720627bd5b4b37b5",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/music_scope.rs",
+      "authored_blob": "20ba0c2f0e8f8687bc85ec9e2925114fd103661f",
+      "preview_blob": "20ba0c2f0e8f8687bc85ec9e2925114fd103661f",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+      "authored_blob": "607c9afd49883a865772ff233ae969248ac16a5d",
+      "preview_blob": "607c9afd49883a865772ff233ae969248ac16a5d",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+      "authored_blob": "1c2f73339d6378df5f579257d7d109bb0bbbd13b",
+      "preview_blob": "1c2f73339d6378df5f579257d7d109bb0bbbd13b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+      "authored_blob": "f1846afc9832b7d24b207fcda15f6ab44b12f09b",
+      "preview_blob": "f1846afc9832b7d24b207fcda15f6ab44b12f09b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/unplayed_join.rs",
+      "authored_blob": "6610e8937a06f1655290151863e38a4bb1b2ef6d",
+      "preview_blob": "6610e8937a06f1655290151863e38a4bb1b2ef6d",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "authored_blob": "07668eac84b3a1fde769fa3b985dd83100d4c36e",
+      "preview_blob": "fea489d63dfdfcf2da94c645d1af542175730315",
+      "equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "authored_blob": "ef0cb308364de3a9a5391b642195f2aa7d59938e",
+      "preview_blob": "ef0cb308364de3a9a5391b642195f2aa7d59938e",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "authored_blob": "1a9245906df6eb104362098a590cbda2ae02ff76",
+      "preview_blob": "1a9245906df6eb104362098a590cbda2ae02ff76",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+      "authored_blob": "540c5456c4c9448f2c206480c85a9a5a2b0b1051",
+      "preview_blob": "540c5456c4c9448f2c206480c85a9a5a2b0b1051",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "authored_blob": "fac7f14db6b01aec75c962168a9789574e641e9d",
+      "preview_blob": "fac7f14db6b01aec75c962168a9789574e641e9d",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+      "authored_blob": "705208db1c563b044055e396deac998c3b67c822",
+      "preview_blob": "705208db1c563b044055e396deac998c3b67c822",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/private_output_tests.rs",
+      "authored_blob": "47dd033566c56b15bd1f993d9283fe17ef34c9e2",
+      "preview_blob": "47dd033566c56b15bd1f993d9283fe17ef34c9e2",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/speaking_faces.rs",
+      "authored_blob": "8123d9e2a6acd80f61904eb2035c403d28d608b7",
+      "preview_blob": "8123d9e2a6acd80f61904eb2035c403d28d608b7",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/lamp-4ace/RUNBOOK.md",
+      "authored_blob": "9dc3893d5e47d583b9451127dd0ce261f41ab319",
+      "preview_blob": "9dc3893d5e47d583b9451127dd0ce261f41ab319",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/lamp-4ace/lamp-eyes.service",
+      "authored_blob": "f64fcb7d4e5a870c8b9b49fd84499446e7d5b520",
+      "preview_blob": "f64fcb7d4e5a870c8b9b49fd84499446e7d5b520",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/lamp-4ace/lamp-voice.service",
+      "authored_blob": "6597d5761868aa9b813b265b8a79c929febb9acf",
+      "preview_blob": "6597d5761868aa9b813b265b8a79c929febb9acf",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/eyes.md",
+      "authored_blob": "b845303def08f665a4329a9fa9a0cd6129d7bf70",
+      "preview_blob": "b845303def08f665a4329a9fa9a0cd6129d7bf70",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/memory.md",
+      "authored_blob": "ae179030bdca0711951eecd5b43b43fd64279930",
+      "preview_blob": "ae179030bdca0711951eecd5b43b43fd64279930",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "authored_blob": "3dab6ea5081a1e9e2333b7948d021aa3d1cff5ae",
+      "preview_blob": "3dab6ea5081a1e9e2333b7948d021aa3d1cff5ae",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/second-voice.md",
+      "authored_blob": "106ca6b36a735e82f17adc5e71cca62a4420a561",
+      "preview_blob": "106ca6b36a735e82f17adc5e71cca62a4420a561",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/switches.md",
+      "authored_blob": "85a2502b8ef452b5f222da15382a110a517583ff",
+      "preview_blob": "85a2502b8ef452b5f222da15382a110a517583ff",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/verification/common-checking-20261023/README.md",
+      "authored_blob": "423f418ab8fef6b5bf6908f08917fef43339b8c2",
+      "preview_blob": "423f418ab8fef6b5bf6908f08917fef43339b8c2",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/verification/common-checking-20261023/eyes-pin-flags.json",
+      "authored_blob": "06c40dba5d3d871a1dd1fdcd3ba50f216515f682",
+      "preview_blob": "06c40dba5d3d871a1dd1fdcd3ba50f216515f682",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/verification/common-checking-20261023/eyes-pin-help.txt",
+      "authored_blob": "7308c4f6ae61519d3060c9ff3082d9719229b4c3",
+      "preview_blob": "7308c4f6ae61519d3060c9ff3082d9719229b4c3",
+      "equal": true
+    },
+    {
+      "path": "lampOS/docs/vi/memory-speaking-frames_vi.md",
+      "authored_blob": "d11d8cc49f5e6807b6655f338dc989d48186045d",
+      "preview_blob": "d11d8cc49f5e6807b6655f338dc989d48186045d",
+      "equal": true
+    }
+  ]
+}

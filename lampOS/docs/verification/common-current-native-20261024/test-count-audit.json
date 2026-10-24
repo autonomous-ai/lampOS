@@ -1,0 +1,88 @@
+{
+  "raw_log_path": "/private/tmp/fourth-common-current-final-head-20261024/arm64-40101806082.log",
+  "raw_log_sha256": "986636ea20a2bf93343e790f8f301d8eb44412afc3a205fdfbef93a63844b805",
+  "top_level_selected_count": 11371,
+  "unique_position_count": 11371,
+  "unique_identity_count": 11371,
+  "status_counts": {
+    "PASS": 11370,
+    "LEAK": 1
+  },
+  "raw_status_line_count": 11406,
+  "identical_summary_stdout_reprints": 35,
+  "skipped_summary": 106,
+  "leaks": [
+    {
+      "status": "LEAK",
+      "duration": "0.234s",
+      "position": 9093,
+      "total": 11371,
+      "identity": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "summary_lines": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T14:38:41.4617834Z      Summary [ 206.295s] 11371 tests run: 11371 passed (1 leaky), 106 skipped"
+  ],
+  "separate_process_summary_lines": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T14:38:55.4115732Z test result: 12 passed; 0 failed"
+  ],
+  "nested_cargo_summaries_not_added": true,
+  "selected_controls": {
+    "memory_scope::tests::": {
+      "count": 34,
+      "status_counts": {
+        "PASS": 34
+      }
+    },
+    "speaking_faces::tests::": {
+      "count": 20,
+      "status_counts": {
+        "PASS": 20
+      }
+    },
+    "second_provider::worker::kept_name_callback::privacy::": {
+      "count": 9,
+      "status_counts": {
+        "PASS": 9
+      }
+    },
+    "second_provider::worker::lookaway_authority_tests::": {
+      "count": 19,
+      "status_counts": {
+        "PASS": 19
+      }
+    },
+    "second_provider::worker::pending_context::": {
+      "count": 2,
+      "status_counts": {
+        "PASS": 2
+      }
+    },
+    "second_provider::worker::private_output_tests::": {
+      "count": 1,
+      "status_counts": {
+        "PASS": 1
+      }
+    },
+    "second_provider::tests::private_context::": {
+      "count": 31,
+      "status_counts": {
+        "PASS": 31
+      }
+    },
+    "second_provider::tests::remember_speaker::": {
+      "count": 7,
+      "status_counts": {
+        "PASS": 7
+      }
+    },
+    "remember_speaker::tests::": {
+      "count": 16,
+      "status_counts": {
+        "PASS": 16
+      }
+    }
+  },
+  "selected_control_distinct_count": 139,
+  "parser_correction": "Initial rawstatus assertion rejected11406lines;35identical result lines repeat in finalstdout sections. Counted exact11371unique positions/identities and verified every duplicate identical; no test rerun."
+}

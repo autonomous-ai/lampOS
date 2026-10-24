@@ -1,0 +1,62 @@
+{
+  "id": 40101806082,
+  "name": "lampOS on ARM64",
+  "node_id": "WFR_kwLOSxRYh88AAAAJVkEAAg",
+  "head_branch": "fourth/speaker-foundation-20261022",
+  "head_sha": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "path": ".github/workflows/lampos-arm64.yml",
+  "display_title": "lampOS: bind private context to current speaker evidence",
+  "run_number": 6649,
+  "event": "pull_request",
+  "status": "completed",
+  "conclusion": "success",
+  "workflow_id": 384179159,
+  "check_suite_id": 108696218243,
+  "check_suite_node_id": "CS_kwDOSxRYh88AAAAZTsyqgw",
+  "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40101806082",
+  "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40101806082",
+  "pull_requests": [
+    {
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/pulls/3064",
+      "id": 4970020399,
+      "number": 3064,
+      "head": {
+        "ref": "fourth/speaker-foundation-20261022",
+        "sha": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+        "repo": {
+          "id": 1259624583,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+          "name": "lampOS"
+        }
+      },
+      "base": {
+        "ref": "lamp-voice",
+        "sha": "22b753df5db6434d21455f40f67926e0ecee9d91",
+        "repo": {
+          "id": 1259624583,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+          "name": "lampOS"
+        }
+      }
+    }
+  ],
+  "created_at": "2026-10-24T14:17:07Z",
+  "updated_at": "2026-10-24T14:39:05Z",
+  "run_attempt": 1,
+  "referenced_workflows": [],
+  "run_started_at": "2026-10-24T14:17:07Z",
+  "jobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40101806082/jobs",
+  "logs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40101806082/logs",
+  "check_suite_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-suites/108696218243",
+  "artifacts_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40101806082/artifacts",
+  "cancel_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40101806082/cancel",
+  "rerun_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40101806082/rerun",
+  "previous_attempt_url": null,
+  "workflow_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/workflows/384179159",
+  "head_commit": {
+    "id": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+    "tree_id": "9c78587ee3e8bcd3cb865e6ed5c564a71f36cc5f",
+    "message": "lampOS: bind private context to current speaker evidence",
+    "timestamp": "2026-10-24T14:16:58Z"
+  }
+}

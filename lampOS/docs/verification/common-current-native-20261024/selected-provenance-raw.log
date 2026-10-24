@@ -1,0 +1,45 @@
+243: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:17:51.8365351Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=2 origin +d06dd68881511d598968672746c3ebe979fa5c58:refs/remotes/pull/3064/merge
+245: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:17:55.9097661Z  * [new ref]         d06dd68881511d598968672746c3ebe979fa5c58 -> pull/3064/merge
+289: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:17:58.1967601Z HEAD is now at d06dd68 Merge e9d00f935029a6d5054ddf35b0203fb8546f7995 into 22b753df5db6434d21455f40f67926e0ecee9d91
+292: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:17:58.2576298Z d06dd68881511d598968672746c3ebe979fa5c58
+413: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:18:06.6399682Z   key: lampos-arm64-u2204-540fc2dc3e46981bbb0a4dbb8d76a233f4f46d1488ec309b3f88203af541b231-d06dd68881511d598968672746c3ebe979fa5c58
+698: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:35:15.1674435Z     Starting 11371 tests across 179 binaries (106 tests and 2 binaries skipped)
+9791: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:08.8232407Z         LEAK [   0.234s] ( 9093/11371) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+12071: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:41.4617834Z      Summary [ 206.295s] 11371 tests run: 11371 passed (1 leaky), 106 skipped
+12789: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:50.8541297Z relay_signals: ok
+12790: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:50.9860277Z     Finished `release` profile [optimized] target(s) in 0.10s
+12791: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:50.9882772Z      Running tests/process.rs (target/release/deps/process-b3e70ad8a722a93b)
+12792: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:52.9990594Z     idle 2 s without a restart
+12793: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:52.9990984Z test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2009 ms)
+12794: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:53.0011593Z test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)
+12795: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:53.0058713Z test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)
+12796: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:53.0620498Z test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)
+12797: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:53.2248477Z test missing_model_is_final_and_never_restarted ... ok (162 ms)
+12798: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:53.2268836Z test missing_executable_fails_at_once ... ok (2 ms)
+12799: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:53.6382449Z test startup_failures_are_final ... ok (411 ms)
+12800: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:54.1523257Z test serving_failures_are_replaced_within_budget ... ok (514 ms)
+12801: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:54.3294504Z test protocol_violations_are_replaced ... ok (177 ms)
+12802: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:54.4849905Z test cancelled_answers_are_never_delivered ... ok (155 ms)
+12803: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:54.7187878Z test close_during_inference_never_waits ... ok (233 ms)
+12804: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4114785Z     full-window submit worst case 301.439µs
+12805: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4115424Z test sustained_requests_stay_bounded ... ok (692 ms)
+12806: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4115732Z test result: 12 passed; 0 failed
+12807: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4226532Z ##[group]Run python3 -B -I .github/scripts/lampos-publish-artifact.py --workspace lampOS --build-log lampOS/arm64-build.jsonl --build-log lampOS/arm64-schedule-example.jsonl --build-log lampOS/arm64-expression-example.jsonl --out lampOS/arm64-out
+12808: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4228247Z [36;1mpython3 -B -I .github/scripts/lampos-publish-artifact.py --workspace lampOS --build-log lampOS/arm64-build.jsonl --build-log lampOS/arm64-schedule-example.jsonl --build-log lampOS/arm64-expression-example.jsonl --out lampOS/arm64-out[0m
+12809: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4246466Z shell: /usr/bin/bash -e {0}
+12810: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4246691Z ##[endgroup]
+12811: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0567914Z Packaged 47 current workspace binaries and 2 selected examples with complete SHA256SUMS
+12812: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0676243Z ##[group]Run actions/upload-artifact@v4
+12813: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0676541Z with:
+12814: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0676786Z   name: lampos-arm64-e9d00f935029a6d5054ddf35b0203fb8546f7995
+12815: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0677104Z   path: lampOS/arm64-out/
+12816: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0677313Z   retention-days: 7
+12817: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0677511Z   if-no-files-found: warn
+12818: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0677721Z   compression-level: 6
+12819: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0677916Z   overwrite: false
+12820: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0678113Z   include-hidden-files: false
+12821: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.0678336Z ##[endgroup]
+12822: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.2114491Z (node:58358) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+12823: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:56.2115151Z (Use `node --trace-deprecation ...` to show where the warning was created)
+12844: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:39:02.9085221Z SHA256 digest of uploaded artifact zip is 9bbcb2cf219d0c23078c8d2be84d6cbd64313dc0680d68c4c977355faaba35d1
+12847: lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:39:03.3528202Z Artifact lampos-arm64-e9d00f935029a6d5054ddf35b0203fb8546f7995 has been successfully uploaded! Final size is 116072333 bytes. Artifact ID is 12563657556

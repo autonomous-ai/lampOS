@@ -1,0 +1,18 @@
+{
+  "sha": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "node_id": "C_kwDOSxRYh9oAKGU5ZDAwZjkzNTAyOWE2ZDUwNTRkZGYzNWIwMjAzZmI4NTQ2Zjc5OTU",
+  "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/commits/e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "html_url": "https://github.com/autonomous-ai/lampOS/commit/e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "tree": {
+    "sha": "9c78587ee3e8bcd3cb865e6ed5c564a71f36cc5f",
+    "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees/9c78587ee3e8bcd3cb865e6ed5c564a71f36cc5f"
+  },
+  "message": "lampOS: bind private context to current speaker evidence",
+  "parents": [
+    {
+      "sha": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/commits/2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "html_url": "https://github.com/autonomous-ai/lampOS/commit/2e2eee360c47f352dfe94f3d2bfe3d69db7048bd"
+    }
+  ]
+}

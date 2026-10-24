@@ -1,0 +1,3 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:41.4617834Z      Summary [ 206.295s] 11371 tests run: 11371 passed (1 leaky), 106 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:55.4115732Z test result: 12 passed; 0 failed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:38:08.8232407Z         LEAK [   0.234s] ( 9093/11371) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal

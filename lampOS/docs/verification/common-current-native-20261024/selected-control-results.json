@@ -1,0 +1,1034 @@
+{
+  "groups": {
+    "memory_scope::tests::": {
+      "count": 34,
+      "status_counts": {
+        "PASS": 34
+      }
+    },
+    "speaking_faces::tests::": {
+      "count": 20,
+      "status_counts": {
+        "PASS": 20
+      }
+    },
+    "second_provider::worker::kept_name_callback::privacy::": {
+      "count": 9,
+      "status_counts": {
+        "PASS": 9
+      }
+    },
+    "second_provider::worker::lookaway_authority_tests::": {
+      "count": 19,
+      "status_counts": {
+        "PASS": 19
+      }
+    },
+    "second_provider::worker::pending_context::": {
+      "count": 2,
+      "status_counts": {
+        "PASS": 2
+      }
+    },
+    "second_provider::worker::private_output_tests::": {
+      "count": 1,
+      "status_counts": {
+        "PASS": 1
+      }
+    },
+    "second_provider::tests::private_context::": {
+      "count": 31,
+      "status_counts": {
+        "PASS": 31
+      }
+    },
+    "second_provider::tests::remember_speaker::": {
+      "count": 7,
+      "status_counts": {
+        "PASS": 7
+      }
+    },
+    "remember_speaker::tests::": {
+      "count": 16,
+      "status_counts": {
+        "PASS": 16
+      }
+    }
+  },
+  "distinct_controls": 139,
+  "results": [
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7845,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_change_in_the_eyes_known_file_makes_the_cache_cold"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 7847,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_face_in_view_or_no_look_or_the_switch_off_holds_nothing"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7848,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_gap_is_held_only_for_someone_the_lamp_was_just_talking_with"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.106s",
+      "position": 7849,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.306s",
+      "position": 7850,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_face_first_named_after_the_lines_end_and_the_wait_is_not_the_keeper"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7851,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_known_face_lost_with_no_face_in_view_keeps_its_scope_through_the_gap"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7852,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_late_look_is_armed_only_while_the_cache_is_cold"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7854,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_narrowed_lease_reads_the_room_at_every_later_boundary"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7855,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_new_request_has_fresh_private_read_state_after_the_previous_lost_it"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7856,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::an_unproved_private_read_check_does_not_poison_a_later_actual_proof"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7857,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::cache_uses_latest_face_never_sticky_session_owner_and_expires"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 7858,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::checking_can_only_pause_a_pinned_grant_and_never_wins_over_loss"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 7859,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::concurrent_true_and_false_after_private_proof_always_finish_lost"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7860,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::contention_is_unknown_instead_of_waiting_or_reusing_an_old_person"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7861,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::dropping_the_request_owner_revokes_unsealed_and_sealed_speaker_proofs"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7862,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::held_narrowed_and_revoked_requests_never_expose_speaker_proof"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7863,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::invalidation_never_waits_for_a_refresh_lock_and_retires_inflight_reads"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7864,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::lamp_c0a4s_question_9_s_after_the_answer_is_held_past_a_sound_of_no_words"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7865,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::lamp_c0a4s_timeline_a_line_decided_4_to_6_s_after_the_answer_is_held"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7866,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::looking_later_keeps_one_recorder_and_never_upgrades_room_disclosure"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7867,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::original_admission_distinguishes_room_from_narrowed_private_and_revocation"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7868,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::owner_drop_revokes_every_task_lease_without_revoking_a_new_request"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7869,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::private_read_loss_does_not_revoke_narrow_or_destroy_the_original_speaker"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7870,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::private_read_loss_is_shared_by_clones_and_cannot_be_reproved"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7871,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::refreshed_observation_is_hashed_off_path_and_uses_its_original_expiry"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7872,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::revocation_after_borrow_requires_a_fresh_boundary_check"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7873,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::room_speaker_proof_keeps_old_and_new_boots_distinct_for_pending_photos"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 7874,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::speaker_expiry_stays_anchored_to_audio_end_and_has_strict_bounds"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7875,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::speaker_proof_rejects_wrong_worker_session_and_request_without_transfer"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7876,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::speaker_proof_requires_exactly_one_well_formed_boot_qualified_face"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 7877,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::speaker_recorder_is_issued_once_and_seals_only_its_request"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.427s",
+      "position": 7884,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet"
+    },
+    {
+      "status": "PASS",
+      "duration": "1.608s",
+      "position": 7885,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_cache_gone_cold_during_the_line_arms_its_late_look_at_the_end"
+    },
+    {
+      "status": "PASS",
+      "duration": "1.657s",
+      "position": 7934,
+      "total": 11371,
+      "identity": "lamp-voice memory_scope::tests::a_line_begun_cold_keeps_only_for_a_face_seen_or_named_at_its_start"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 10128,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::a_face_speaking_turned_to_the_lamp_is_told_apart_from_the_room"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 10129,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::a_known_face_was_in_view_at_a_lines_start_only_if_its_id_was_tracked_then"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10130,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::a_line_is_someone_elses_when_any_other_face_spoke_it"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10131,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::a_turned_face_never_read_is_not_spoken_for_by_a_still_one"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 10132,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::atomic_publication_between_reader_entry_and_open_is_fresh_not_future"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 10133,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::each_of_the_eyes_frames_counts_once"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "position": 10134,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::explicit_known_speaker_is_atomic_bounded_fresh_and_never_guesses_a_boot"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10135,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::ids_keep_their_boot_and_a_privacy_change_forgets_them"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10136,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10137,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::only_silent_faces_turned_to_the_lamp_are_told_apart"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10138,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::only_the_lines_own_looks_count_and_old_ones_go"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 10139,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::positive_speaker_never_hides_a_minority_speaker_or_an_eyes_restart"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10140,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10141,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::remember_speaker_rejects_a_competitor_seen_once"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 10142,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::remember_speaker_requires_positive_evidence_in_one_boot_and_the_whole_window"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10143,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 10144,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::the_face_that_spoke_through_the_line_is_the_one_seen_speaking"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 10145,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::the_known_face_is_read_with_the_name_and_only_as_an_id"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 10146,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::the_known_face_takes_the_boot_it_was_written_under"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "position": 10147,
+      "total": 11371,
+      "identity": "lamp-voice speaking_faces::tests::two_short_looks_require_the_same_single_positive_face"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9785,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::by_presence_context_never_adopts_a_different_sticky_person"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.012s",
+      "position": 9786,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::genuine_room_context_keeps_room_notes_and_history_without_speaker_proof"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.011s",
+      "position": 9787,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::identity_changed_during_history_composition_discards_the_private_told"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "position": 9788,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::missing_private_source_is_reported_once_without_granting_context"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.014s",
+      "position": 9789,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::prepared_private_context_is_neutral_and_final_proof_discloses_both_layouts"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.036s",
+      "position": 9790,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::actual_hits_rpc_requires_positive_current_matching_proof_and_rechecks_its_reply"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.012s",
+      "position": 9791,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::unproved_mismatched_expired_and_legacy_private_requests_never_read_memory_or_history"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.112s",
+      "position": 9807,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::typed_setup_name_uses_final_speaker_proof_and_marks_disclosure"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.126s",
+      "position": 9811,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::kept_name_callback::privacy::slow_note_read_rechecks_revocation_expiry_and_fresh_known_identity"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "position": 9802,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::actual_engine_sealed_microphone_request_finishes_through_explicit_lookaway"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9803,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::actual_http_fallback_retains_only_explicit_same_epoch_lookaway"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "position": 9804,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::checking_return_holds_real_credited_ipc_until_completed_recognition"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9805,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::checking_return_never_arms_and_only_same_subject_can_finish_the_wait"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.014s",
+      "position": 9806,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::checking_wait_never_hides_terminal_source_or_identity_loss"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9808,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::event_selection_keeps_checking_distinct_from_room_and_lost"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9809,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.012s",
+      "position": 9810,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::explicit_absence_never_heals_loss_or_downgrades_errors_and_legacy_sources"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 9812,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::explicit_lookaway_retains_credited_output_only_for_same_request_epoch"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9813,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::explicit_source_envelopes_reject_malformed_or_mixed_continuation_tokens"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 9814,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9815,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9816,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_credited_ipc"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.098s",
+      "position": 9817,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 9818,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::returning_track_same_name_never_erases_changed_stable_identity"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9819,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::returning_track_unbound_and_legacy_requests_still_need_the_original_audio_face"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.259s",
+      "position": 9821,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::repeated_explicit_absence_does_not_extend_the_original_audio_deadline"
+    },
+    {
+      "status": "PASS",
+      "duration": "2.009s",
+      "position": 9829,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::checking_wait_ends_at_the_original_audio_deadline"
+    },
+    {
+      "status": "PASS",
+      "duration": "2.008s",
+      "position": 9832,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_never_extends_original_audio_deadline"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.073s",
+      "position": 9854,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::pending_context::pending_composition_rebuilds_cached_note_history_and_name_before_one_final_chat"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9855,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::pending_context::pending_prepared_composition_never_freezes_reduced_messages"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.259s",
+      "position": 9868,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::worker::private_output_tests::private_output_credit_stall_rechecks_proof_without_changing_microphone_owner"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9673,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::authority_lost_while_chat_waits_sends_no_private_speech"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9674,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::buffered_private_output_expires_at_both_receiver_boundaries_without_blocking_public_output"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9675,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::cached_private_hit_cannot_be_downgraded_by_neutral_final_system"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.016s",
+      "position": 9676,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::carried_speaker::carried_old_speech_requires_positive_evidence_on_the_actual_current_piece"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9677,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.055s",
+      "position": 9678,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::days_event_lock_pending_is_retried_without_replaying_its_decision"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9679,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::empty_packets_preserve_legacy_current_and_carried_read_bounds"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9680,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::event_note_private_provenance_survives_neutral_told_and_async_expiry"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9681,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::expired_prepared_private_events_never_reach_speech"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9682,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::expired_private_system_never_calls_chat_or_speech"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9683,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::lost_private_authority_cannot_complete_a_revoked_or_different_request"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9684,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::lost_private_authority_cannot_resume_on_a_later_positive_read"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "position": 9685,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::lost_request_before_told_keeps_public_completion_without_private_services"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "position": 9686,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::positive_private_and_public_room_contexts_still_dispatch"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9687,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_authority_loss_completes_the_live_engine_turn_once"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9688,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_held_forget_policy_expiry_sends_no_chat_or_tool"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9690,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_held_forget_tool_completion_expiry_sends_no_first_chat"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9691,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_hits_are_guarded_even_with_neutral_system"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9692,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_output_rechecks_authority_after_queue_backpressure"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9693,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9694,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_speech_packet_returning_after_expiry_is_not_enqueued"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9695,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_speech_piece_initialisation_preserves_queue_call_order"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9696,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_speech_rechecks_before_first_poll_with_positive_room_and_public_controls"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9697,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_words_expiring_between_announcement_check_and_retained_words_lock_are_not_kept"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9698,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_tool_completion_expiry_cannot_start_another_round"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 9699,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::private_words_waiting_for_announcement_capacity_are_never_retained_or_sent_to_tts"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 9700,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::queued_private_event_callback_rechecks_proof_before_read"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 9701,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::returned_private_event_pending_obeys_the_original_response_ceiling"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "position": 9702,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::short_done_after_a_private_tool_keeps_fresh_speaker_permission"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.050s",
+      "position": 9703,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::returned_private_event_waits_without_rereading_then_resumes_or_ends"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.041s",
+      "position": 9704,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::private_context::short_line::a_short_current_piece_requires_two_unambiguous_positive_frames"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.057s",
+      "position": 9705,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::remember_speaker::remember_speaker_count_only_never_records_enrollment_words_or_identity"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.057s",
+      "position": 9706,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::remember_speaker::remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enrollment"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.058s",
+      "position": 9707,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::remember_speaker::remember_speaker_records_an_ordinary_request_from_its_microphone_clock"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.057s",
+      "position": 9708,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_after_forget_cannot_revive_its_original_proof"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.057s",
+      "position": 9710,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_after_privacy_reopen_cannot_revive_its_original_proof"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.057s",
+      "position": 9711,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::remember_speaker::remember_speaker_room_publish_keeps_only_its_live_request_proof"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.039s",
+      "position": 9718,
+      "total": 11371,
+      "identity": "lamp-voice second_provider::tests::remember_speaker::remember_speaker_without_a_live_request_scope_never_records_evidence"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8793,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_expiry_and_forget_remove_stored_and_in_flight_evidence"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8794,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_is_an_exact_opt_in_and_is_passed_to_tool_routing"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8795,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8796,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.051s",
+      "position": 8797,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_own_name_accepts_direct_names_and_exact_spelling"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 8798,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "position": 8799,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8800,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_own_name_off_keeps_other_names_and_replacement_response"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 8801,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 8802,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_own_name_refuses_other_people_before_connect"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.013s",
+      "position": 8803,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8804,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8805,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "position": 8806,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.047s",
+      "position": 8807,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "position": 8808,
+      "total": 11371,
+      "identity": "lamp-voice remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry"
+    }
+  ]
+}

@@ -8561,3 +8561,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: current Mac raw qualification published
 
 [Current778e Mac full raw packet](verification/common-current-mac-20261024/README.md) independently reparses all eight successful stages, four controls,46 fresh members and stable source/index/cleanup/release. Original159-payload manifest6590611c is retained; matching Linux08cd manifest remains unchanged. Final #3064 head e9d runtime/test binding is already public. Current native/review/physical holds remain separate; no stage-time artifact observation is promoted to a current-cache or lamp claim.
+
+## 2026-10-24: current Common native artifact qualified
+
+[Native packet](verification/common-current-native-20261024/README.md) binds #3064 e9d to preview d06dd6888 on 22b: 11,371 passed / 0 failed / 106 skipped with one retained leaky pass, separate process 12 / 0, and 139 selected controls PASS. All 49 payload checksums and AArch64 headers match; the source comparison preserves the production private guards. Clippy, Cloud and Surround are green. The ZIP digest is API/upload-bound, not independently recomputed; no signed attestation or binary execution is claimed. Matching Voice/Eyes candidate hashes are published for First; pin, installation, physical and freeze holds remain. Reviewer-three's scoped read6385370467 is clear; the full read remains Reviewer-lead's. Separate test-only be860 builds pass on both hosts and full Voice runs. Name's five-file current carry is prepared; Photo's five conflicts are audited.
