@@ -1,0 +1,30 @@
+{
+  "exact_binary_sha256": "bee4cb54e005008073cbcb1bd575e63674d6286120e55368f3aa0fd917d69658",
+  "binary_bytes": 25173000,
+  "help_exit": 0,
+  "help_sha256": "53918b521ce682c82928c845ddcdda5367a2e4cde580b4e14a0d33c09abc5283",
+  "help_bytes": 3809,
+  "help_environment": "read-only network-none emulated Linux ARM64, nofile6 causes graceful log relay refusal; no device/runtime qualification",
+  "unit": "deploy/lamp-4ace/lamp-eyes.service",
+  "unit_sha256": "06fe0c8d903335acdd402117f537ee4c5e2870fbd673cd51a8ef396b91a307a7",
+  "flags": {
+    "--body-socket": true,
+    "--device": true,
+    "--full-look": true,
+    "--full-look-file": true,
+    "--known-file": true,
+    "--leave-still-faces": true,
+    "--lock-directory": true,
+    "--model": true,
+    "--people": true,
+    "--permit-socket": true,
+    "--presence-file": true,
+    "--recogniser": true,
+    "--sight-file": true,
+    "--steady-rate": true,
+    "--usb": true,
+    "--who-socket": true
+  },
+  "steady_rate_accepts_on_off": true,
+  "source_unit_after_sha256": "9699b06a7c4adbd6f85582b24177dc1b7e1d1ae82a06f4aed857c6b3fa1b4fdd"
+}
