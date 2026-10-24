@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests examples/render_line_second.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/render_line_second-64bf83bb8828a9bd)
+
+running 4 tests
+test tests::silence_is_cut_at_either_end_with_50_ms_kept ... ok
+test tests::the_arguments_are_checked_as_render_lines_are ... ok
+test tests::the_manifest_names_the_configured_voice_and_model ... ok
+test tests::the_wav_is_mono_16_bit_at_the_routes_rate ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
