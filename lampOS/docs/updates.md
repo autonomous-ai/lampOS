@@ -933,6 +933,15 @@ cold boot, lost kernel caches or flash durability. A named case only counts
 as passed when its explicit run and cleanup succeed; the ordinary CI skip is
 not release-pair qualification.
 
+**Published reminder and task readers** (#2809). Schedule, Tasks and Voice
+have separate ignored `release_pair` targets using the published 6408 and
+6498 executables. A dedicated ARM64 PR job runs those explicit cases and
+retains their exits, protocol exchanges and stopped-state snapshots. Schedule's
+payload is byte-identical in the pair; Tasks and Voice have distinct hashes.
+The fixtures distinguish reminder continuity, task restart fencing and delivery
+ledger recovery from real speech, external task completion and physical reboot
+acceptance. See the [pair's artifacts, scope and commands](verification/reminder-task-release-pair-20261024/README.md).
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
