@@ -773,20 +773,25 @@ fn while_answer_waits(
 
 /// A block's score before the faint floor, for a soft start
 /// (`LAMP_SOFT_START`, `TurnDetector::unfloored`): only while the lamp is
-/// silent, its sound not reaching the microphone (`sounding`), no busy answer
-/// kept, and no reply playing, so that a start never reaches back into the
-/// lamp's own voice. `None` otherwise, which a soft start never reaches past.
+/// silent, its sound not reaching the microphone by the echo evidence
+/// (`sounding`) and nothing of a reply to yield as the duplex mask hears the
+/// block ([`reply_sounding`]: audio still to hand over, or the lamp's sound
+/// accepted, queued or within its tail), and no busy answer kept, so that a
+/// start never reaches back into the lamp's own voice. `None` otherwise,
+/// which a soft start never reaches past.
+///
+/// Not the reply's playback token: it is held from a reply's start until
+/// its audio is retired, so on lamp-4ace on 25 October the lines begun after
+/// an answer, or after a bare "Lamp." whose answer waited, kept no soft start
+/// at all, and two lost their "what" as before.
 fn unfloored_score(
     sounding: bool,
     keeping_answer: bool,
-    reply: Option<&Reply>,
+    reply_sounding: bool,
     probability: f32,
 ) -> Option<f32> {
-    (!sounding
-        && !keeping_answer
-        && probability.is_finite()
-        && reply.is_none_or(|current| current.playback.is_none()))
-    .then_some(probability)
+    (!sounding && !reply_sounding && !keeping_answer && probability.is_finite())
+        .then_some(probability)
 }
 
 /// Whether `current` is an answer to someone's request that has ended, none
@@ -8130,7 +8135,7 @@ fn conversation_with_gate_inner(
             detector.unfloored(unfloored_score(
                 sounding,
                 keeping_answer,
-                reply.as_ref(),
+                reply_sounding(&playback_mask, reply, frame.read_completed_at_us),
                 frame.probability,
             ));
             let (update, input_ended) = observe_prospective_heard(
