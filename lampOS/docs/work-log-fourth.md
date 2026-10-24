@@ -5,6 +5,14 @@ Fourth writes `lamp-fourth` and works on `fourth/<task>`. The task list is
 results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
+
+## 2026-10-25 00:25: direct callback control and current gates
+
+- Published only the selected [name callback count/hash/Boolean receipt](verification/name-direct-callback-control-20261025/README.md): old selector rejected at the exact silent callback assertion, raw Cargo 101 and expected-experiment 0. Earlier timeout stays inconclusive; no HTTP leakage or actual words inferred. Raw evidence stays private.
+- Corrected #3391 source a4ac passes all five Linux stages and six controls; its Mac full Voice gate continues. Photo source 8ad5 passes Linux fmt, strict workspace/all-target Clippy and workspace build; full Voice is active. Neither pending suite receives a pass claim.
+- Additional #3396 own-delta source/helper read on 6864c6bf3 has five exact extracted helper controls passed, no new P1/P2 identified; this is not a full coordinator/worker/native or formal full-stack READ-OK. Existing alias and timing-boundary P3 limits remain.
+- Current builder protocol read from origin/lamp-voice; clean tracked root fast-forwarded to 419d6f64b. No lamp access. Common/Name parent, full privacy, pin/person and physical acceptance holds remain.
+
 ## 2026-10-14: task 13, memory-days — taken
 
 - Taken from `origin/lamp-voice` at
