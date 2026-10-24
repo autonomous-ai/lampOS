@@ -1,0 +1,493 @@
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	﻿2026-10-24T17:14:39.9720454Z Current runner version: '2.338.0'
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9744716Z ##[group]Runner Image Provisioner
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9745783Z Hosted Compute Agent
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9746439Z Version: 20261012.601
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9747201Z Commit: f3dc54e1fb89da6852db922499a0233137369e1d
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9748011Z Build Date: 2026-10-12T17:48:21Z
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9748780Z Worker ID: {94b042b0-bbe4-46fc-a339-d76f8a6c8714}
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9749671Z Region: westus3
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9750311Z Cloud: Azure
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9750948Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9752750Z ##[group]Operating System
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9753483Z Ubuntu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9754201Z 22.04.5
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9754798Z LTS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9755354Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9756043Z ##[group]Runner Image
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9756729Z Image: ubuntu-22.04
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9757479Z Version: 20261012.322.1
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9758780Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261012.322/images/ubuntu/Ubuntu2204-Readme.md
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9760519Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261012.322
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9761817Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9763209Z ##[group]GITHUB_TOKEN Permissions
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9765391Z Contents: read
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9766169Z Metadata: read
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9766837Z Packages: read
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9767451Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9769573Z Secret source: Actions
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9770642Z Cache mode: write
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:39.9771753Z Prepare workflow directory
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.0117122Z Prepare all required actions
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.0164322Z Getting action download info
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.3548249Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.4605466Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.6671600Z Complete job name: lampOS — clippy, every crate and target (x86 Linux)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.7470960Z ##[group]Run sudo apt-get update
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.7471875Z [36;1msudo apt-get update[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.7472761Z [36;1msudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.7473974Z [36;1m  ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.8084445Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:40.8085302Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.0594588Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.1114479Z Hit:2 http://azure.archive.ubuntu.com/ubuntu jammy InRelease
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.1117858Z Get:6 https://packages.microsoft.com/ubuntu/22.04/prod jammy InRelease [3632 B]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.1192702Z Get:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.1221442Z Get:4 http://azure.archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.1223954Z Get:5 http://azure.archive.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.3976158Z Get:7 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main arm64 Packages [679 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.4223444Z Get:8 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main amd64 Packages [941 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.4225997Z Get:9 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main armhf Packages [23.5 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.4924469Z Get:10 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [3909 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.5098002Z Get:11 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main Translation-en [576 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.5131729Z Get:12 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1289 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.5206199Z Get:13 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe Translation-en [326 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.6690017Z Get:14 http://azure.archive.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3643 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.6869923Z Get:15 http://azure.archive.ubuntu.com/ubuntu jammy-security/main Translation-en [510 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.6898033Z Get:16 http://azure.archive.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1055 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:41.6954570Z Get:17 http://azure.archive.ubuntu.com/ubuntu jammy-security/universe Translation-en [237 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:52.1703893Z Fetched 13.6 MB in 2s (7941 kB/s)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:53.6476226Z Reading package lists...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:53.7184580Z Reading package lists...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:53.9806440Z Building dependency tree...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:53.9818094Z Reading state information...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.1663152Z build-essential is already the newest version (12.9ubuntu3).
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.1663773Z build-essential set to manually installed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.1664197Z git is already the newest version (1:2.55.0-0ppa1~ubuntu22.04.2).
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.1664622Z Suggested packages:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.1664918Z   libasound2-doc
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2471841Z The following packages will be REMOVED:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2473300Z   pkgconf r-base-dev
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2474019Z The following NEW packages will be installed:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2483973Z   clang libasound2-dev libclang-14-dev libclang-dev pkg-config
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2487684Z The following packages will be upgraded:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2495749Z   ca-certificates curl libcurl4
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2674706Z 3 upgraded, 5 newly installed, 2 to remove and 84 not upgraded.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2675542Z Need to get 26.0 MB of archives.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2676739Z After this operation, 246 MB of additional disk space will be used.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.2677669Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.3514608Z Get:2 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 pkg-config amd64 0.29.2-1ubuntu3 [48.2 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.4185462Z Get:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 ca-certificates all 20260816ubuntu0.22.04.1 [140 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.4862452Z Get:4 http://azure.archive.ubuntu.com/ubuntu jammy/universe amd64 clang amd64 1:14.0-55~exp2 [3558 B]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.5512401Z Get:5 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 curl amd64 7.81.0-1ubuntu1.30 [194 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.6215373Z Get:6 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcurl4 amd64 7.81.0-1ubuntu1.30 [293 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.6914210Z Get:7 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasound2-dev amd64 1.2.6.1-1ubuntu1.2 [110 kB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:54.7592502Z Get:8 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-14-dev amd64 1:14.0.0-1ubuntu1.1 [25.2 MB]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:55.3695135Z Get:9 http://azure.archive.ubuntu.com/ubuntu jammy/universe amd64 libclang-dev amd64 1:14.0-55~exp2 [3138 B]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:55.6582994Z Preconfiguring packages ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.2115683Z Fetched 26.0 MB in 1s (23.3 MB/s)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4083361Z (Reading database ... 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4083969Z (Reading database ... 5%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4084398Z (Reading database ... 10%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4084713Z (Reading database ... 15%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4085078Z (Reading database ... 20%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4085485Z (Reading database ... 25%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4085896Z (Reading database ... 30%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4086154Z (Reading database ... 35%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4086383Z (Reading database ... 40%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4086614Z (Reading database ... 45%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.4086844Z (Reading database ... 50%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:56.8844220Z (Reading database ... 55%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:57.4971652Z (Reading database ... 60%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:58.0309810Z (Reading database ... 65%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:58.3296664Z (Reading database ... 70%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:14:59.6746893Z (Reading database ... 75%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:00.6458763Z (Reading database ... 80%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:02.0827070Z (Reading database ... 85%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:03.2383486Z (Reading database ... 90%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.1531875Z (Reading database ... 95%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.1532816Z (Reading database ... 100%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.1533640Z (Reading database ... 261641 files and directories currently installed.)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.1587335Z Removing r-base-dev (4.6.1-6.2204.0) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2486250Z dpkg: pkgconf: dependency problems, but removing anyway as you requested:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2487205Z  php8.1-dev depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2487949Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2488670Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2489437Z  mono-devel depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2490073Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2490788Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2491825Z  libmagickwand-6.q16-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2492306Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2492751Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2493284Z  libmagickcore-6.q16-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2493726Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2494139Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2494599Z  libglib2.0-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2494987Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2495377Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2495843Z  libfontconfig-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2496246Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2496634Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2496937Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.2576185Z Removing pkgconf (1.8.0-1) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.4321070Z Removing 'diversion of /usr/bin/pkg-config to /usr/bin/pkg-config.real by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.4459469Z Removing 'diversion of /usr/share/aclocal/pkg.m4 to /usr/share/aclocal/pkg.real.m4 by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.4592578Z Removing 'diversion of /usr/share/man/man1/pkg-config.1.gz to /usr/share/man/man1/pkg-config.real.1.gz by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.4729351Z Removing 'diversion of /usr/share/pkg-config-crosswrapper to /usr/share/pkg-config-crosswrapper.real by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5479398Z Selecting previously unselected package pkg-config.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5565024Z (Reading database ... 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5565488Z (Reading database ... 5%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5565960Z (Reading database ... 10%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5566377Z (Reading database ... 15%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5566652Z (Reading database ... 20%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5566917Z (Reading database ... 25%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5567211Z (Reading database ... 30%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5567472Z (Reading database ... 35%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5567735Z (Reading database ... 40%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5567997Z (Reading database ... 45%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5568419Z (Reading database ... 50%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5600639Z (Reading database ... 55%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5629592Z (Reading database ... 60%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5654259Z (Reading database ... 65%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5680401Z (Reading database ... 70%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5830212Z (Reading database ... 75%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.5997461Z (Reading database ... 80%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.6213477Z (Reading database ... 85%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.6460618Z (Reading database ... 90%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.6549130Z (Reading database ... 95%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.6549731Z (Reading database ... 100%
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.6550466Z (Reading database ... 261619 files and directories currently installed.)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.6596766Z Preparing to unpack .../0-pkg-config_0.29.2-1ubuntu3_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.6607542Z Unpacking pkg-config (0.29.2-1ubuntu3) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.7111396Z Preparing to unpack .../1-ca-certificates_20260816ubuntu0.22.04.1_all.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.7185961Z Unpacking ca-certificates (20260816ubuntu0.22.04.1) over (20260601~22.04.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.8023431Z Selecting previously unselected package clang.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.8222405Z Preparing to unpack .../2-clang_1%3a14.0-55~exp2_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.8230750Z Unpacking clang (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.8757099Z Preparing to unpack .../3-curl_7.81.0-1ubuntu1.30_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.8779744Z Unpacking curl (7.81.0-1ubuntu1.30) over (7.81.0-1ubuntu1.29) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.9350543Z Preparing to unpack .../4-libcurl4_7.81.0-1ubuntu1.30_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.9433162Z Unpacking libcurl4:amd64 (7.81.0-1ubuntu1.30) over (7.81.0-1ubuntu1.29) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.9709030Z Selecting previously unselected package libasound2-dev:amd64.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.9904162Z Preparing to unpack .../5-libasound2-dev_1.2.6.1-1ubuntu1.2_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:04.9939595Z Unpacking libasound2-dev:amd64 (1.2.6.1-1ubuntu1.2) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:05.0445664Z Selecting previously unselected package libclang-14-dev.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:05.0643829Z Preparing to unpack .../6-libclang-14-dev_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:05.0654185Z Unpacking libclang-14-dev (1:14.0.0-1ubuntu1.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:05.9657759Z Selecting previously unselected package libclang-dev.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:05.9864398Z Preparing to unpack .../7-libclang-dev_1%3a14.0-55~exp2_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:05.9872523Z Unpacking libclang-dev (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:06.0438079Z Setting up ca-certificates (20260816ubuntu0.22.04.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:07.8526785Z Updating certificates in /etc/ssl/certs...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.6793449Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.6929720Z 4 added, 5 removed; done.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.7202208Z Setting up clang (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.7606397Z Setting up pkg-config (0.29.2-1ubuntu3) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.7954745Z Setting up libclang-14-dev (1:14.0.0-1ubuntu1.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.7976044Z Setting up libcurl4:amd64 (7.81.0-1ubuntu1.30) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.7997636Z Setting up curl (7.81.0-1ubuntu1.30) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.8018625Z Setting up libasound2-dev:amd64 (1.2.6.1-1ubuntu1.2) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.8038698Z Setting up libclang-dev (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.8066246Z Processing triggers for man-db (2.10.2-1) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.8088249Z Not building database; man-db/auto-update is not 'true'.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.8103096Z Processing triggers for libc-bin (2.35-0ubuntu3.15) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.9818391Z Processing triggers for ca-certificates (20260816ubuntu0.22.04.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:08.9865114Z Updating certificates in /etc/ssl/certs...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.5325366Z 0 added, 0 removed; done.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.5325935Z Running hooks in /etc/ca-certificates/update.d...
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.6365942Z /etc/ssl/certs/adoptium/cacerts successfully populated.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.6378121Z Updating Mono key store
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.6635989Z Mono Certificate Store Sync - version 6.12.0.200
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.6636616Z Populate Mono certificate store from a concatenated list of certificates.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.6637289Z Copyright 2002, 2003 Motus Technologies. Copyright 2004-2008 Novell. BSD licensed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.6637694Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.7122773Z Importing into legacy system store:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8736545Z I already trust 121, your new list has 120
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8801889Z Certificate added: C=JP, O="SECOM Trust Systems Co., Ltd.", CN=SECOM TLS RSA Root CA 2024
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8804932Z Certificate added: C=SE, O=Telia Company AB, CN=Telia EC TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8807061Z Certificate added: C=SE, O=Telia Company AB, CN=Telia RSA TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8808023Z 3 new root certificates were added to your trust store.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8808733Z Import process completed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8822476Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:09.8822852Z Importing into BTLS system store:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.0521560Z I already trust 121, your new list has 120
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.1475597Z Certificate added: C=JP, O="SECOM Trust Systems Co., Ltd.", CN=SECOM TLS RSA Root CA 2024
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.1479956Z Certificate added: C=SE, O=Telia Company AB, CN=Telia EC TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.1492225Z Certificate added: C=SE, O=Telia Company AB, CN=Telia RSA TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.1492985Z 3 new root certificates were added to your trust store.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.1493431Z Import process completed.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.1642077Z Done
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:10.1645083Z done.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4407575Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4408427Z Running kernel seems to be up-to-date.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4408801Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4408967Z Services to be restarted:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4480680Z  systemctl restart php8.1-fpm.service
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4481066Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4482909Z No containers need to be restarted.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4483238Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4501990Z No user sessions are running outdated binaries.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4502453Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:11.4502846Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0100518Z ##[group]Run actions/checkout@v4
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0100808Z with:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0101023Z   repository: autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0103609Z   token: ***
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0103818Z   ssh-strict: true
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0104016Z   ssh-user: git
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0104222Z   persist-credentials: true
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0104451Z   clean: true
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0104655Z   sparse-checkout-cone-mode: true
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0104903Z   fetch-depth: 1
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0105094Z   fetch-tags: false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0105296Z   show-progress: true
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0105500Z   lfs: false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0105685Z   submodules: false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0105891Z   set-safe-directory: true
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0106138Z   allow-unsafe-pr-checkout: false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.0106387Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1160212Z Syncing repository: autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1162496Z ##[group]Getting Git version info
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1163128Z Working directory is '/home/runner/work/lampOS/lampOS'
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1163997Z [command]/usr/bin/git version
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1409730Z git version 2.55.0
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1447274Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1462736Z Temporarily overriding HOME='/home/runner/work/_temp/e4c2c819-d0e2-4006-9ec5-82a0568dc1e5' before making global git config changes
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1464180Z Adding repository directory to the temporary git global config as a safe directory
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1465340Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lampOS/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1501967Z Deleting the contents of '/home/runner/work/lampOS/lampOS'
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1506368Z ##[group]Initializing the repository
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1511910Z [command]/usr/bin/git init /home/runner/work/lampOS/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1643710Z hint: Using 'master' as the name for the initial branch. This default branch name
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1645138Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1646685Z hint: to use in all of your new repositories, which will suppress this warning,
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1647595Z hint: call:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1647933Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1648421Z hint: 	git config --global init.defaultBranch <name>
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1648988Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1649523Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1650472Z hint: 'development'. The just-created branch can be renamed via this command:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1651468Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1651832Z hint: 	git branch -m <name>
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1652243Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1652665Z hint: Disable this message with "git config set advice.defaultBranchName false"
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1653643Z Initialized empty Git repository in /home/runner/work/lampOS/lampOS/.git/
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1662596Z [command]/usr/bin/git remote add origin https://github.com/autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1702064Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1702717Z ##[group]Disabling automatic garbage collection
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1706975Z [command]/usr/bin/git config --local gc.auto 0
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1754666Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1755434Z ##[group]Setting up auth
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1756281Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.1793465Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2193215Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2236547Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2546962Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2587360Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2848282Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2894215Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2894848Z ##[group]Fetching the repository
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:13.2903714Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +6fe1e060826f2c8a7c1ca0a48fe8bd029f2d04b9:refs/remotes/pull/3399/merge
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6489706Z From https://github.com/autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6490699Z  * [new ref]         6fe1e060826f2c8a7c1ca0a48fe8bd029f2d04b9 -> pull/3399/merge
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6496045Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6496648Z ##[group]Determining the checkout info
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6498673Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6504467Z [command]/usr/bin/git sparse-checkout disable
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6573905Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6612169Z ##[group]Checking out the ref
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:17.6622407Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/3399/merge
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.6794866Z Updating files:  75% (7923/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.6925715Z Updating files:  76% (7936/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.7037629Z Updating files:  77% (8041/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.7143298Z Updating files:  78% (8145/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.7243559Z Updating files:  79% (8250/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.7328827Z Updating files:  80% (8354/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.7411716Z Updating files:  81% (8459/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:18.7515834Z Updating files:  82% (8563/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4195480Z Updating files:  83% (8667/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4534709Z Updating files:  84% (8772/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4629768Z Updating files:  85% (8876/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4700012Z Updating files:  86% (8981/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4761078Z Updating files:  87% (9085/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4817192Z Updating files:  88% (9189/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4894751Z Updating files:  89% (9294/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.4975026Z Updating files:  90% (9398/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5047816Z Updating files:  91% (9503/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5109058Z Updating files:  92% (9607/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5174004Z Updating files:  93% (9712/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5242279Z Updating files:  94% (9816/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5305365Z Updating files:  95% (9920/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5368525Z Updating files:  96% (10025/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5436784Z Updating files:  97% (10129/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5515638Z Updating files:  98% (10234/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5585663Z Updating files:  99% (10338/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5586150Z Updating files: 100% (10442/10442)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5586923Z Updating files: 100% (10442/10442), done.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5715824Z Note: switching to 'refs/remotes/pull/3399/merge'.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5716390Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5716937Z You are in 'detached HEAD' state. You can look around, make experimental
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5717800Z changes and commit them, and you can discard any commits you make in this
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5718616Z state without impacting any branches by switching back to a branch.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5719076Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5719357Z If you want to create a new branch to retain commits you create, you may
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5720098Z do so (now or later) by using -c with the switch command. Example:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5720539Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5720708Z   git switch -c <new-branch-name>
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5721061Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5721451Z Or undo this operation with:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5721722Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5721860Z   git switch -
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5722047Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5722416Z Turn off this advice by setting config variable advice.detachedHead to false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5723211Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.5723800Z HEAD is now at 6fe1e06 Merge ca10ba515783d3d1e927747df8533e00d5b7522b into 419d6f64b0244ed62547f7f697f808bc994a79e5
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6634986Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6686132Z [command]/usr/bin/git log -1 --format=%H
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6718929Z 6fe1e060826f2c8a7c1ca0a48fe8bd029f2d04b9
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6873304Z ##[group]Run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6874315Z [36;1mcurl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6874942Z [36;1mecho "$HOME/.cargo/bin" >> "$GITHUB_PATH"[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6948604Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:19.6948861Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.0899945Z info: downloading installer
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.7090432Z warn: it looks like you have an existing rustup settings file at:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.7090915Z warn: /home/runner/.rustup/settings.toml
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.7439669Z info: profile set to minimal
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.7440072Z info: default host tuple is x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.7448557Z info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.9043784Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:20.9044278Z info: downloading 5 components
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1406999Z info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1407496Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1507402Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1507983Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1508526Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1508746Z Rust is installed now. Great!
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1509139Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1509509Z To get started you may need to restart your current shell.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1510274Z This would reload your PATH environment variable to include
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1510956Z Cargo's bin directory ($HOME/.cargo/bin).
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1511597Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1512877Z To configure your current shell, you need to source the
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1513462Z corresponding env file under $HOME/.cargo.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1513796Z 
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1514144Z Consider running the right command for your shell (note the leading DOT):
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1514878Z . "$HOME/.cargo/env"     # For sh/ash/dash/pdksh/bash
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1515408Z . "$HOME/.cargo/env.ps1" # For pwsh
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1515958Z cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1516508Z CC_x86_64-unknown-linux-gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1517026Z cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1517565Z CC_x86_64_unknown_linux_gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1518004Z cargo:rerun-if-env-changed=HOST_CC
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1518692Z HOST_CC = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1519032Z cargo:rerun-if-env-changed=CC
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1519418Z CC = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.1519921Z cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5375531Z cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5376093Z CRATE_CC_NO_DEFAULTS = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5376459Z cargo:rerun-if-env-changed=CFLAGS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5376871Z CFLAGS = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5377269Z cargo:rerun-if-env-changed=HOST_CFLAGS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5377721Z HOST_CFLAGS = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5378187Z cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5378720Z CFLAGS_x86_64_unknown_linux_gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5379128Z cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5379493Z CFLAGS_x86_64-unknown-linux-gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5734764Z ##[group]Run cargo +1.96.0 fmt --all --check
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5735121Z [36;1mcargo +1.96.0 fmt --all --check[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5811685Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:29.5811947Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2400721Z ##[group]Run actions/cache/restore@v4
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2401026Z with:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2401928Z   path: ~/.cargo/registry
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	~/.cargo/git
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	lampOS/target
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2402462Z   key: lampos-clippy-u2204-f9bfc350c121d9eb0325c2f09ae44f74e7af15c72cdc61bc5f76462535ff6dae
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2402970Z   restore-keys: lampos-clippy-u2204-
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2403255Z   enableCrossOsArchive: false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2403517Z   fail-on-cache-miss: false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2403748Z   lookup-only: false
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.2403953Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.3540061Z (node:8411) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.3540876Z (Use `node --trace-deprecation ...` to show where the warning was created)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.5587151Z Cache hit for: lampos-clippy-u2204-f9bfc350c121d9eb0325c2f09ae44f74e7af15c72cdc61bc5f76462535ff6dae
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:40.5687782Z (node:8411) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:46.7743895Z Received 50331648 of 3216413698 (1.6%), 47.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:47.7747620Z Received 180355072 of 3216413698 (5.6%), 85.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:48.7812160Z Received 306184192 of 3216413698 (9.5%), 97.2 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:49.7763872Z Received 448790528 of 3216413698 (14.0%), 106.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:50.7764404Z Received 570425344 of 3216413698 (17.7%), 108.7 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:51.7767697Z Received 696254464 of 3216413698 (21.6%), 110.6 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:52.7778427Z Received 826277888 of 3216413698 (25.7%), 112.5 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:53.7823206Z Received 943718400 of 3216413698 (29.3%), 112.4 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:54.7801978Z Received 1073741824 of 3216413698 (33.4%), 113.7 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:55.7832220Z Received 1203765248 of 3216413698 (37.4%), 114.7 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:56.7815347Z Received 1312817152 of 3216413698 (40.8%), 113.7 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:57.7821535Z Received 1421869056 of 3216413698 (44.2%), 112.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:58.7821410Z Received 1526726656 of 3216413698 (47.5%), 111.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:15:59.7822394Z Received 1635778560 of 3216413698 (50.9%), 111.3 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:00.8285660Z Received 1744830464 of 3216413698 (54.2%), 110.5 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:01.8302347Z Received 1858076672 of 3216413698 (57.8%), 110.4 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:02.8294616Z Received 1946157056 of 3216413698 (60.5%), 108.8 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:03.8355137Z Received 2063597568 of 3216413698 (64.2%), 108.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:04.8365845Z Received 2147483648 of 3216413698 (66.8%), 107.4 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:05.9410951Z Received 2281701376 of 3216413698 (70.9%), 107.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:06.9408514Z Received 2399141888 of 3216413698 (74.6%), 108.1 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:07.9492357Z Received 2495610880 of 3216413698 (77.6%), 107.3 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:08.9439447Z Received 2587885568 of 3216413698 (80.5%), 106.5 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:09.9450330Z Received 2684354560 of 3216413698 (83.5%), 105.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:10.9446570Z Received 2793406464 of 3216413698 (86.8%), 105.8 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:11.9489875Z Received 2877292544 of 3216413698 (89.5%), 104.8 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:12.9486204Z Received 2982150144 of 3216413698 (92.7%), 104.6 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:13.9492156Z Received 3082813440 of 3216413698 (95.8%), 104.3 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:14.9502923Z Received 3179282432 of 3216413698 (98.8%), 103.9 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:15.4436486Z Received 3216413698 of 3216413698 (100.0%), 103.4 MBs/sec
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:15.4439653Z Cache Size: ~3067 MB (3216413698 B)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:15.4555772Z [command]/usr/bin/tar -xf /home/runner/work/_temp/e7b69c51-a8ce-4765-83aa-5f4e18ff3a14/cache.tzst -P -C /home/runner/work/lampOS/lampOS --use-compress-program unzstd
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:33.9110191Z Cache restored successfully
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:34.6096362Z Cache restored from key: lampos-clippy-u2204-f9bfc350c121d9eb0325c2f09ae44f74e7af15c72cdc61bc5f76462535ff6dae
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:34.7533994Z ##[group]Run python3 -I .github/scripts/lampos-source-times.py
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:34.7534933Z [36;1mpython3 -I .github/scripts/lampos-source-times.py[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:34.8989678Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:34.8990091Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:37.7383891Z 6954 of 7023 source files are as the cached build had them and get its times back; 69 changed or new keep the checkout's time.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:37.7458115Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:37.7458693Z [36;1mcargo clippy --locked --workspace --all-targets -- -D warnings[0m
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:37.7529144Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:37.7529405Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:38.2483451Z     Checking lamp-update v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/update)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:38.2650761Z     Checking lamp-health v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/health)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:38.2757504Z     Checking lamp-settings v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/settings)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:38.2783548Z     Checking lamp-surround v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/surround)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:38.6275975Z     Checking lamp-records v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/records)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:39.0393478Z     Checking lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:39.9891665Z     Checking lamp-keeper v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/keeper)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:39.9892924Z     Checking lamp-setup v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/setup)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:40.3032180Z     Checking lamp-body v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/body)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:40.6462579Z     Checking lamp-peek v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/peek)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:43.8798596Z     Checking lamp-voice v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:43.8803072Z     Checking lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:16:47.4982636Z     Checking lamp-lean v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/lean)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:06.6717752Z     Checking lamp-skills v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/skills)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:06.6719063Z     Checking lamp-voice-eval v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice-eval)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:06.6725385Z     Checking lamp-memory v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/memory)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:11.1362550Z     Checking lamp-cloud v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/cloud)
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.2914796Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 17s
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.4555753Z Post job cleanup.
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5522501Z [command]/usr/bin/git version
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5565977Z git version 2.55.0
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5607801Z Temporarily overriding HOME='/home/runner/work/_temp/223fc105-76a8-4008-81e2-e8c27e27923f' before making global git config changes
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5609336Z Adding repository directory to the temporary git global config as a safe directory
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5613841Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lampOS/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5656834Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5695771Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.5995708Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.6024460Z http.https://github.com/.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.6037173Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.6073740Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.6383809Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.6444820Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.6980821Z Cleaning up orphan processes
+lampOS — clippy, every crate and target (x86 Linux)	UNKNOWN STEP	2026-10-24T17:17:55.7425582Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

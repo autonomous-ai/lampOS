@@ -1,0 +1,24 @@
+{
+  "commits": {
+    "feature": "9456d86349b028c28db7efb933c5626920d6327e",
+    "train": "ca10ba515783d3d1e927747df8533e00d5b7522b",
+    "tested_preview": "6fe1e060826f2c8a7c1ca0a48fe8bd029f2d04b9",
+    "landed": "e10ffd8953713d2856aa2e27bbeb12b55568568b"
+  },
+  "trees": {
+    "feature": "cad6eb12c6e1680b0101adcafadd432fabdd7946",
+    "train": "cad6eb12c6e1680b0101adcafadd432fabdd7946",
+    "tested_preview": "cad6eb12c6e1680b0101adcafadd432fabdd7946",
+    "landed": "cad6eb12c6e1680b0101adcafadd432fabdd7946"
+  },
+  "all_complete_trees_equal": true,
+  "arm64": 40115221103,
+  "pass": 7374,
+  "leak": 1,
+  "skipped": 53,
+  "failed": 0,
+  "unrun": 0,
+  "linux": 40115221164,
+  "merged_by": "train bot",
+  "physical_2793_remains_open": true
+}
