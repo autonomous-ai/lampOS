@@ -1,0 +1,10 @@
+{
+  "yaml_parsed": true,
+  "shell_blocks_passed": 8,
+  "fixture_inputs_match": [
+    "LAMP_COMPAT_OUTPUT",
+    "LAMP_COMPAT_SETTINGS_6408",
+    "LAMP_COMPAT_SETTINGS_6498"
+  ],
+  "workflow_sha256": "5e56a9b8e600bea8c513c8cbd9f5ba3cf27974d47c20a4d07b8ce7dc24934d15"
+}

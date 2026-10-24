@@ -1,0 +1,8 @@
+{
+  "current_head": "8f5c600c1562d7e2459ddd03ccb999206fdf48ad",
+  "previous_head": "990919c8d4508887ec8e8930bf8a721714591693",
+  "change": "workflow only: required fixture input environment names",
+  "all_6994_captured_lampOS_files_match": true,
+  "lampOS_tree": "0c89a7320f87c96eba77b8afcd07a6b79805e4d3",
+  "workflow_sha256": "5e56a9b8e600bea8c513c8cbd9f5ba3cf27974d47c20a4d07b8ce7dc24934d15"
+}

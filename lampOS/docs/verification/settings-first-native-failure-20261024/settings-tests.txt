@@ -1,0 +1,98 @@
+info: syncing channel updates for 1.96.0-aarch64-unknown-linux-gnu
+info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+info: downloading component clippy
+    Updating crates.io index
+    Updating git repository `https://github.com/RustAudio/cpal.git`
+ Downloading crates ...
+  Downloaded cpufeatures v0.2.17
+  Downloaded crypto-common v0.1.7
+  Downloaded block-buffer v0.10.4
+  Downloaded serde_json v1.0.151
+  Downloaded version_check v0.9.5
+  Downloaded zmij v1.0.23
+  Downloaded unicode-ident v1.0.26
+  Downloaded serde_core v1.0.229
+  Downloaded serde_derive v1.0.229
+  Downloaded typenum v1.20.1
+  Downloaded memchr v2.8.3
+  Downloaded serde v1.0.229
+  Downloaded getrandom v0.4.3
+  Downloaded once_cell v1.21.4
+  Downloaded signal-hook v0.4.4
+  Downloaded proc-macro2 v1.0.107
+  Downloaded tempfile v3.27.0
+  Downloaded signal-hook-registry v1.4.8
+  Downloaded sha2 v0.10.9
+  Downloaded quote v1.0.47
+  Downloaded itoa v1.0.18
+  Downloaded syn v3.0.7
+  Downloaded fastrand v2.5.0
+  Downloaded errno v0.3.14
+  Downloaded digest v0.10.7
+  Downloaded generic-array v0.14.7
+  Downloaded rustix v1.1.5
+  Downloaded cfg-if v1.0.5
+  Downloaded bitflags v2.13.2
+  Downloaded libc v0.2.190
+  Downloaded linux-raw-sys v0.12.1
+   Compiling libc v0.2.190
+   Compiling proc-macro2 v1.0.107
+   Compiling version_check v0.9.5
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling typenum v1.20.1
+   Compiling generic-array v0.14.7
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling syn v3.0.7
+   Compiling cfg-if v1.0.5
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling rustix v1.1.5
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling bitflags v2.13.2
+   Compiling linux-raw-sys v0.12.1
+   Compiling getrandom v0.4.3
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.229
+   Compiling errno v0.3.14
+   Compiling signal-hook v0.4.4
+   Compiling signal-hook-registry v1.4.8
+   Compiling lamp-voice-processes v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/voice-processes)
+   Compiling once_cell v1.21.4
+   Compiling fastrand v2.5.0
+   Compiling lamp-bus v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/bus)
+   Compiling tempfile v3.27.0
+   Compiling lamp-msgs v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/msgs)
+   Compiling lamp-records v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/records)
+   Compiling lamp-settings v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/settings)
+    Finished `release` profile [optimized] target(s) in 19.33s
+     Running tests/release_pair.rs (target/release/deps/release_pair-66ab41dc56d771d7)
+
+running 2 tests
+test release_6408_settings_reads_6498_and_6498_reads_return ... Settings pair evidence: /tmp/settings-pair-output/sr-zaPMsB
+
+thread 'release_6408_settings_reads_6498_and_6498_reads_return' (16587) panicked at crates/settings/tests/release_pair/fixture.rs:121:22:
+released Settings input required
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test release_6498_settings_reads_6408_and_6408_reads_return ... Settings pair evidence: /tmp/settings-pair-output/sr-pLZTAH
+
+thread 'release_6498_settings_reads_6408_and_6408_reads_return' (16588) panicked at crates/settings/tests/release_pair/fixture.rs:121:22:
+released Settings input required
+FAILED
+
+failures:
+
+failures:
+    release_6408_settings_reads_6498_and_6498_reads_return
+    release_6498_settings_reads_6408_and_6408_reads_return
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p lamp-settings --test release_pair`
