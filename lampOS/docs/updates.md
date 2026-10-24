@@ -1653,6 +1653,16 @@ a start and by lamp-cloud for the app); and lamp-records (a voice session
 folder, taken as a session with nothing refused). The other parts follow, by
 harm.
 
+**Published Controls calibration readers** (#2809): the Controls
+`release_pair` target uses pinned 6408/6498 `calibrate-touch --replay` writers
+and opposite `replay --touch` readers, both directions and back to the
+original reader. Its dedicated native ARM64 gate and independent review are
+pending when introduced. Both released Controls payloads are identical.
+This qualifies only synthetic calibration/pins files, not physical touch,
+real acquisition latency or whole-lamp update/rollback. The ordinary current
+CLI test checks the fixture only; the two ignored cases are the actual pair.
+[Scope and execution record](verification/controls-release-pair-20261024/README.md).
+
 **Published routine-state readers** (#2809): the manual Skills `release_pair`
 target covers daily claims and on/off preferences with the actual pinned 6408
 and 6498 ARM64 executables, both directions and back to the original reader.
