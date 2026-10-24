@@ -1,0 +1,8 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T09:57:59.3225388Z HEAD is now at 1afef87 Merge e14e3c51b64dcd03dcbf8a3374dac45c6f467960 into 51767ec057b9407b43690fa4e130353d1e22291f
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:08:58.4704460Z         PASS [   0.005s] ( 5861/11214) lamp-surround::release_pair http_complete_reply_is_framed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:08:58.6167216Z         PASS [   0.146s] ( 5863/11214) lamp-surround::release_pair http_dribbling_reply_cannot_renew_deadline
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:08:59.8384472Z         PASS [   1.380s] ( 5993/11214) lamp-surround::release_pair current_cli_candidate_smoke
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:10:04.6262581Z         LEAK [   0.219s] ( 9033/11214) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:10:36.1538725Z      Summary [ 206.754s] 11214 tests run: 11214 passed (1 leaky), 106 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:10:45.9569592Z relay_signals: ok
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T10:10:50.5127481Z test result: 12 passed; 0 failed
