@@ -8854,7 +8854,7 @@ mod tests {
             super::busy_bar(TURNED, "Man, that's crazy.", false),
             Some(BUSY_TURNED)
         );
-        // Four words already satisfy the separate GOING_ON policy.
+        // Three words meet the existing GOING_ON threshold.
         assert_eq!(super::busy_bar(GOING_ON, "Man, that's crazy.", false), None);
         assert_eq!(
             super::busy_bar(GOING_ON, "The lamp.", false),
