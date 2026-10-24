@@ -1,0 +1,7 @@
+
+running 2 tests
+test second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner ... ok
+test second_provider::worker::tests::a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3758 filtered out; finished in 0.06s
+

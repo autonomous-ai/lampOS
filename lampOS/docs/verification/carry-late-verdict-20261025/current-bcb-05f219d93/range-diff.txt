@@ -1,0 +1,14 @@
+1:  1d8384591b ! 1:  05f219d933 lampOS: preserve owner evidence when applying late carry verdicts
+    @@ lampOS/docs/second-voice.md: after a take-over, but now for every turn:
+     -  unchanged. A stop (`Did::Stopped`, from the next line's `after_stop`) and
+     +  unchanged. When that colleague print is first learned at the current
+     +  owner's verdict, the worker rechecks the current line's captured start
+    -+  against the newly available window. It retains that line's own voice
+    -+  evidence if the first lookup consumed its one judgement; otherwise it
+    -+  reads the cached reply again. Neither lookup waits for a print.
+    ++  against the newly available window. It always reads the cached reply
+    ++  again and retains any own-voice likeness consumed by the first lookup
+    ++  in preference to the second result. Neither lookup waits for a print.
+     +  In Busy, Unknown and Quiet, that new eligibility still needs the owner's
+     +  positive face or sufficiently nearer voice; missing, uncertain or
+     +  confusable voice evidence is held for this verdict without turning a

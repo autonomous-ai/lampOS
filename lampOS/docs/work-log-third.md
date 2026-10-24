@@ -5,6 +5,23 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 04:07 — current bcb carry qualified
+
+Ready for lamp-voice: no (#3408 remains draft for new native/current reads).
+
+- Current bcb head 05f219d93 has the same worker/tests and switch row as
+  read 1d838; one doc paragraph now says the second lookup always occurs.
+  Exact three files, one-line commit, source-bound clean tree.
+- New exclusive-target Mac fmt/strict Voice/Eval Clippy/workspace build
+  and full tests pass **4,657/0/21 ignored**, 11 summaries, all 7,027
+  source records independently matched to committed Git blobs/modes.
+- [Current proof](verification/carry-late-verdict-20261025/current-bcb-05f219d93/README.md)
+  records fresh-target debug0 profiles, exact argv, raw output, final
+  controls, compiler bindings and range-diff; older epochs stay separate.
+- Child current-bcb source gates run concurrently on unchanged owned
+  blobs. Final parent attachment needs full tree equality after those
+  gates. No code/activation/device result is transferred across sources.
+
 ## 2026-10-25 04:00 — held-print prior-base full gate complete
 
 Ready for lamp-voice: no (current-parent composition is next).

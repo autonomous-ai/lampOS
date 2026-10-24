@@ -1,0 +1,16 @@
+{
+  "head": "05f219d9338567a82740835f5cdcc636f55736d0",
+  "tree": "e392ec87b0148d21e5098a2c3a108ef6f20bf4a6",
+  "base": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "all_frozen_sources_match_committed_bytes_modes": true,
+  "source_count": 7027,
+  "summary": {
+    "summaries": 11,
+    "passed": 4657,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "private worker verdict ordering only; no public API, dependency, schema or default change; full affected Voice and Voice-eval tests plus workspace build; parent full reverse closure not relabelled current"
+}
