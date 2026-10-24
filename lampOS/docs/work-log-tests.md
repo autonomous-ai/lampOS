@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 13:27 +0700 — carried gate complete; bounded standalone checks
+
+Ready for lamp-voice: no; current standalone classification and native ARM64/Linux Clippy remain.
+
+The completed #3190 carry at 414b2df34 has **7,249 passed / 3 failed / 34 ignored** on native x86 Mac: full Voice **3,976/1/15**, including library **3,696/0/15**, and eleven readers **3,273/2/19**. Every target has a complete actual census. Formatting, strict twelve-package Clippy, workspace build and diff checks passed; all source guards match. The light-call strict 25 ms failure remains retained. Two Memory follow-up-forget cases receive exactly three standalone observations each before classification; no result from those observations is claimed yet.
+
+All three carries passed exact-source Linux x86 formatting. The new Queue base rule delegates testing against the latest integration base to the train: the completed source is kept while its exact-head gates finish. #3218 takes the next local gate slot after #3190's bound executable checks, then #3273. The #3315 privacy repair is a separate six-tracked-file draft plus Bus clock tests: explicitly owned fixture clocks, normal constructors on system time, original privacy limits and assertions preserved. It has no compilation or test result yet. Sign-in and same-voice controls remain unexecuted. No local ARM build or lamp action ran.
+
 ## 2026-10-24 10:59 +0700 — matched qualification complete; latest carries underway
 
 Ready for lamp-voice: no; fresh carried-head gates and native checks remain.
