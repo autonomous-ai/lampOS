@@ -1,0 +1,9 @@
+
+running 2 tests
+test release_6408_surround_candidates_cross_6498_and_return ... Surround candidate release-pair evidence: /tmp/pair-output/sr-49-0
+ok
+test release_6498_surround_candidates_cross_6408_and_return ... Surround candidate release-pair evidence: /tmp/pair-output/sr-49-1
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 3.01s
+

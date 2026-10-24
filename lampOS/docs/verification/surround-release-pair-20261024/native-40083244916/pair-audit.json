@@ -1,0 +1,56 @@
+{
+  "run": 40083244916,
+  "authored_head": "806e4006c0af067ef8d66854ab4d45d86d74f984",
+  "tested_merge": "9d655727e1fb597aff3819d35b3f2d556f69dc2e",
+  "tree": "68360f9ec39263d19580a4209e71103b6a9ebdd1",
+  "parents": [
+    "7e82733e0823eef4d480b90e5336cd138a304f2e",
+    "806e4006c0af067ef8d66854ab4d45d86d74f984"
+  ],
+  "source_files_matched": 10375,
+  "tracked_symlinks_followed_to_matching_git_target": {
+    "robots/lamp/rootfs/etc/systemd/system/sysinit.target.wants/led-boot.service": "../led-boot.service"
+  },
+  "source_unchanged": true,
+  "network_none": true,
+  "readonly_root": true,
+  "host_binds_or_devices": false,
+  "private_tmpfs": [
+    "/tmp",
+    "/run",
+    "/var/lib"
+  ],
+  "owned_container_removed": true,
+  "cases": [
+    {
+      "test": "release_6408_surround_candidates_cross_6498_and_return",
+      "children_reaped": 7,
+      "groups_absent": 7,
+      "exchanges": 25,
+      "candidate_writes": 3,
+      "request_refusals": 3,
+      "stored_refusals": 2,
+      "restart_readbacks": 4
+    },
+    {
+      "test": "release_6498_surround_candidates_cross_6408_and_return",
+      "children_reaped": 7,
+      "groups_absent": 7,
+      "exchanges": 25,
+      "candidate_writes": 3,
+      "request_refusals": 3,
+      "stored_refusals": 2,
+      "restart_readbacks": 4
+    }
+  ],
+  "totals": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 3,
+    "children_reaped": 14,
+    "groups_absent": 14,
+    "exchanges": 50
+  },
+  "native_archive_sha256": "c2b0a06591e8a362f0e4a44d7e3789b89716f459f78c07b0aa4c92073119caf2"
+}
