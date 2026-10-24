@@ -1,4 +1,28 @@
-## Current checkpoint: 2026-10-24 19:26 +07, busy-room carry gate passed
+## Current checkpoint: 2026-10-24 19:42 +07, carry CI green and next fixture gated
+
+#3380 `b33ade247` has [official ARM64 and Linux receipts](verification/busy-room-real-call-20261024/official-ci/README.md):
+7,373 PASS + 1 LEAK, 53 skipped, zero failed/unrun, all three controls pass
+once. The tested merge's complete tree equals the authored tree. Lead
+READ-OK clears the original P2; Reviewer-two's current read is active.
+First retains played acceptance; no self-merge or lamp action.
+
+Took stalled #3218 at 19:28. Original commit/authorship is retained as
+`c185843f7` on current `2e2eee360`, equal range-diff, original branch
+untouched. [Fresh scoped proof](verification/phone-news-start-carry-20261024/README.md):
+Mac **4,004/0/21 ignored**, fmt/strict Voice Clippy pass; changed phone case
+passes once, all five assertions and timer tail unchanged. Exact Linux fmt
+passes with 7,023 unchanged files and owned container removed. Historical
+failed observations/HOLDs remain explicit; Tests keeps #1569 diagnostics,
+Third keeps Expression and #3190 remains separate. Next: push this draft
+carry and seek current qualification/read disposition plus official CI.
+
+The preceding carry-gate checkpoint's timestamp is corrected to its actual
+19:24 commit minute. #2809/#1812 still wait on trusted public half, holder
+and isolated restoration inputs. No new device/key/release action.
+
+---
+
+## Current checkpoint: 2026-10-24 19:24 +07, busy-room carry gate passed
 
 Literal-name carry `b33ade247` retains the original #3356 commit and fixes
 its stand-in P2. [Exact source and gate proof](verification/busy-room-real-call-20261024/README.md):
