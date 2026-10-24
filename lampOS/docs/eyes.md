@@ -1429,10 +1429,11 @@ With the switch:
   spelled name after it called nothing, and the lamp said it knew the
   face while the eyes held no one. With the switch, names checked and the
   eyes' who socket, a line whose own words plainly ask the lamp to
-  remember the speaker's face or who they are ("remember my face",
-  "remember me", "remember who I am", "remember what I look like", "learn
-  my face", "save my face", "remember my name";
-  `known_faces::asks_to_remember`) and give their name
+  remember the speaker's face or who they are, at a sentence's start
+  after a greeting or the lamp's name and an optional "please" or "can,
+  could, would or will you" ("remember my face", "remember me", "remember
+  who I am", "remember what I look like", "learn my face", "save my face",
+  "remember my name"; `known_faces::asks_to_remember`) and give their name
   (`known_faces::gives_a_name`) has its first round sent with
   `tool_choice` naming `remember_my_face`. The name is still checked, so
   one not in their words is refused, and the model asks them to spell it.
@@ -1441,9 +1442,13 @@ With the switch:
   - a name in the line after an ask, since the thread doesn't say the two
     lines were the same person's;
   - a line with a refusal anywhere in it ("I don't want you to remember my
-    face", "I'd rather you didn't", any word ending in "n't");
-  - a sentence asking whether the lamp knows them ("Do you still remember
-    me?");
+    face", "I'd rather you didn't", "You cannot remember my face", any word
+    ending in "n't", and the same written without the apostrophe);
+  - the phrase further into a sentence: reported speech ("She said remember
+    my face"), a question whether the lamp knows them ("Do you still
+    remember me?"), "Help me remember my name tag", or an ask said another
+    way ("I want you to remember my face");
+  - a bare question ("Remember me?");
   - someone else's face, and a round after a call;
   - Vietnamese, which `gives_a_name` doesn't read (reviewer-three's P2s on
     #3298).
