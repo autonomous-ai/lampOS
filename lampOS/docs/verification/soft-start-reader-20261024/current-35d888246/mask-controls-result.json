@@ -1,0 +1,19 @@
+{
+  "command": [
+    "<private-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--",
+    "turn_taking::tests",
+    "--test-threads=1"
+  ],
+  "exit": 0,
+  "seconds": 0.455,
+  "head": "35d88824689408f2c5d024aac6325d133c66785e",
+  "source_unchanged": true
+}

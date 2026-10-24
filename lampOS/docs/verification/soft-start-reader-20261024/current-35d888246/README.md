@@ -1,0 +1,9 @@
+# Current soft-start duplex-mask read
+
+Exact 35d88824689408f2c5d024aac6325d133c66785e is based on current 8219e711a. Mac fmt, strict Voice all-target Clippy and fresh compilation pass. Literal tests: eight soft-start integration, 89 activity/duplex/census library, then 30 existing playback-mask unit cases; all pass once per selected group. There are 127 executions and 125 distinct cases because two mask cases overlap. All 7,025 tracked source hashes remain unchanged. No retry or full Voice/workspace run.
+
+No source P1/P2 found. Production soft-start remains gated by duplex plus kept first words. The new guard uses actual mask acceptance/pending/drain semantics and remaining PCM instead of the lifetime of a playback token; echo/busy/finite-score guards and the begin<=usual clamp remain. Existing mask tests cover receipt ownership, partial writes/drain and the exact 100 ms fallback boundary. They are not new coordinator-level negative controls.
+
+Original ARM64 run 40120182534: **7,399 PASS plus one LEAK / 53 skipped**, all 7,400 selected terminal, zero failed/unrun; all 125 distinct local cases literal PASS. Actual Linux pinned whole-workspace formatting and strict Clippy 40120182533 pass. Both test preview 63f8a0072001955f5687bfc9df8e2d4064233a33, complete tree 1149ccf1c2c5dc1046f426ad0c0c660a69c074e1 equal to authored. Primary excerpts, metadata, exact-case census and frozen gh-run-view rendering hashes are included; echoed duplicate terminal lines are not added observations.
+
+P3s remain: the docs still promise universal 300 ms despite the 100 ms no-echo fallback, and the quiet/unretired paragraph/test comment still describe the old token rule without the pending-PCM qualification. New coordinator-level accepted/queued/no-echo boundary controls remain a coverage limit. Earlier A/Bs and failed full IT/producer runs retain their own heads/statuses; no historical cause or new physical acceptance is inferred. No source edits or device action.

@@ -1,0 +1,29 @@
+{
+  "head": "35d88824689408f2c5d024aac6325d133c66785e",
+  "base": "8219e711ad6de24a63f124ba86b985b2fcb3e8a3",
+  "source_p1_p2": "none demonstrated",
+  "production_guards": [
+    "soft-start requires duplex plus kept first words",
+    "own echo evidence and kept busy answer still refuse unfloored samples",
+    "reply_sounding uses pending/accepted playback-mask intervals plus unhanded reply PCM",
+    "existing prefix clamp keeps begin<=usual, preserving nonempty ordinary starts"
+  ],
+  "tests": {
+    "main_integration": 8,
+    "main_library": 89,
+    "additional_mask_module": 30,
+    "executions": 127,
+    "distinct_cases": 125,
+    "distinct_cases_literal_native_pass": 125
+  },
+  "p3": [
+    "duplex-listening.md still claims a universal 300ms post-sound exclusion; echo clear_after_blocks=30 at 10ms gives300ms, but mask TAIL_US=100000 gives100ms without echo.",
+    "The next docs paragraph and old test comment still attribute every quiet/unretired block to the playback token, while the repaired positive explicitly clears PCM and extends the lead.",
+    "New positive covers cleared PCM with a retained token; existing mask unit tests exercise acceptance/drain/tail behavior, but do not supply new coordinator-level accepted/queued/no-echo boundary regressions."
+  ],
+  "limits": [
+    "Earlier physical A/B changed two switches and ran the earlier build; not new-head physical acceptance.",
+    "Old full-IT failures and all other producer failures remain failed; no load or cause inference.",
+    "No source edits, full Voice/workspace test, local ARM build/test or device action."
+  ]
+}

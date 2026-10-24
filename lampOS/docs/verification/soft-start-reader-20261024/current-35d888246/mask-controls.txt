@@ -1,0 +1,37 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837)
+
+running 30 tests
+test turn_taking::tests::a_candidate_over_the_lamp_is_dropped_when_nobody_goes_on ... ok
+test turn_taking::tests::a_candidate_that_began_over_the_lamp_waits_and_passes_when_the_person_goes_on ... ok
+test turn_taking::tests::a_fruitless_yield_is_forgiven_after_twenty_seconds_with_no_yield ... ok
+test turn_taking::tests::a_gap_in_capture_forgets_what_was_heard_and_any_yield ... ok
+test turn_taking::tests::a_person_over_a_sound_that_is_no_reply_is_an_ordinary_candidate ... ok
+test turn_taking::tests::a_reply_that_closes_during_a_yield_leaves_its_candidate_to_be_settled ... ok
+test turn_taking::tests::a_reply_that_twice_yields_to_nothing_stops_yielding_until_it_closes ... ok
+test turn_taking::tests::a_second_into_a_reply_the_shorter_run_stops_it_and_the_detector_starts_on_the_yield ... ok
+test turn_taking::tests::a_short_word_heard_plainly_passes_though_nobody_goes_on ... ok
+test turn_taking::tests::a_yield_whose_hearing_has_stopped_withholds_nothing ... ok
+test turn_taking::tests::a_yield_window_tie_or_a_clear_block_is_not_the_lamps_own_voice ... ok
+test turn_taking::tests::another_capture_stream_forgets_what_was_heard_and_any_yield ... ok
+test turn_taking::tests::arbitrary_or_future_reset_cannot_authorize_new_epoch ... ok
+test turn_taking::tests::cache_retirement_does_not_label_unknown_or_new_lineage_reads_as_expired ... ok
+test turn_taking::tests::delayed_retirement_uses_source_time_and_preserves_closed_history ... ok
+test turn_taking::tests::explicit_reset_allows_only_exact_next_epoch_and_keeps_pending_rejection ... ok
+test turn_taking::tests::heard_evidence_cannot_hide_a_cached_retained_timestamp_mismatch ... ok
+test turn_taking::tests::invalid_receipts_do_not_certify_mask_or_acceptance ... ok
+test turn_taking::tests::late_original_write_settles_without_borrowing_successor_identity ... ok
+test turn_taking::tests::late_rejection_cannot_erase_the_original_dispatch_deadline ... ok
+test turn_taking::tests::nothing_is_a_person_over_the_lamp_until_its_own_sound_has_been_found_in_this_reply ... ok
+test turn_taking::tests::only_internally_aged_matching_retained_reads_have_the_expiry_type ... ok
+test turn_taking::tests::original_read_start_is_preserved_and_clock_regression_is_rejected ... ok
+test turn_taking::tests::overlapping_read_intervals_and_sequence_overflow_are_invalid ... ok
+test turn_taking::tests::partial_writes_and_nonfinal_gap_preserve_exact_cursors_and_tail ... ok
+test turn_taking::tests::retained_prefix_requires_matching_unexpired_original_read_evidence ... ok
+test turn_taking::tests::speech_in_a_listening_gap_yields_only_with_the_switch ... ok
+test turn_taking::tests::the_detector_hears_a_person_over_a_reply_so_that_its_start_ends_on_the_yield ... ok
+test turn_taking::tests::the_duplex_mask_scores_the_lamp_as_silence_and_a_person_as_speech ... ok
+test turn_taking::tests::without_evidence_the_duplex_mask_is_the_conservative_mask ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 3728 filtered out; finished in 0.00s
+
