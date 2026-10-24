@@ -1,0 +1,202 @@
+[
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-update",
+    "bytes": 13461280,
+    "sha256": "71414928e42ef4c55b1a527d3a6dd37e89a6f7dc421facd90739a147a8d22e49"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-process-cuts",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/tests/self_process_cuts.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/self_process_cuts-8ce1b6350e2ac329",
+    "bytes": 566176,
+    "sha256": "a0dbcc14ab0181d72d2fc9292b27a9ab89cae55d78b39e718c53b8e17b612070"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-cli-exec",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/tests/self_cli_exec.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/self_cli_exec-25113342c679f525",
+    "bytes": 565616,
+    "sha256": "200c9c12cee1e35ea0b7bbebb783d9e6d3617258e4991f04ab30925d3d7b0295"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-1c2005188bf8e5ab",
+    "bytes": 1004832,
+    "sha256": "a12b931f74f18582620b227b58af7cc2e5b8394adb12b8a1ee1c0f9aa7c367e9"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-2447bcdc916504d4",
+    "bytes": 3350336,
+    "sha256": "6ad59d2f92d072e15e3f1fb00d503c3297147bf61f03d8450061326b9bac2a59"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-ae5bcab57f15def3",
+    "bytes": 2008880,
+    "sha256": "8f45f0ae83a5bfbadc92842e2e67c3bd485a11a33a1ac5271d7ba621513fb39d"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "functions",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/tests/functions.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/functions-9e56cee2cd1d1695",
+    "bytes": 23033912,
+    "sha256": "17d9375602766f236fea27d28638a832321d22999773d7268323c40cc4b1d62f"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "install",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/tests/install.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/install-7739a60369055fbf",
+    "bytes": 16161928,
+    "sha256": "b03de9cf28da383a6c10f25faf80d25f9dab6bcda17cf70f6c48db323bae46e7"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "round",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/tests/round.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/round-f8d7f0920c4648fb",
+    "bytes": 20246568,
+    "sha256": "745078acf3937df76f692b75f1b56e7cdca6b999fb869a341798da4e5901025a"
+  },
+  {
+    "package_id": "path+file:///private/tmp/second-review-update-events-20261024/lampOS/crates/update#lamp-update@0.1.0",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "/private/tmp/second-review-update-events-20261024/lampOS/crates/update/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-2fc2e5180de6bc32",
+    "bytes": 14034528,
+    "sha256": "d62c83136b377338f619dd99f1896c84dfbb56d04642d01a2c971fed5642fcda"
+  }
+]

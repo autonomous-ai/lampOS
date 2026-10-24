@@ -1,0 +1,91 @@
+{
+  "head": "fb8d2f71b836266df07bf1b658e40c0aa13804f3",
+  "authored_base": "4270083a2",
+  "latest_base_at_start": "8219e711a",
+  "changed_paths": [
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+    "lampOS/crates/update/tests/round/runnable_events.rs",
+    "lampOS/crates/update/tests/round/self_cuts.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "source_hashes": {
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs": "a6fbd54021a7e89acd0b0b012a3d6b9df21035554ebf00792303b4f48ed5c0ac",
+    "lampOS/crates/update/tests/round/runnable_events.rs": "c9c7efcb0e758eae4d8f6c6f6ab36b80de57419dd0bc5719b2f9faf46d3a1fee",
+    "lampOS/crates/update/tests/round/self_cuts.rs": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06",
+    "lampOS/docs/updates.md": "f84388e4c5b9df8305ef5c6ae687e05919359728945cd86bf3d0de12b9dae514"
+  },
+  "observations": [
+    "Test-only collector requires both child exit and stdout EOF before completion.",
+    "One five-second startup watchdog becomes one absolute two-second finish watchdog after the first observed byte; later bytes cannot renew it.",
+    "Each completion rechecks its deadline; final status after timeout remains diagnostic.",
+    "Nonblocking reads have an explicit 128-byte limit; errors and invalid UTF-8 cannot satisfy output assertions.",
+    "Original child guard retains kill/reap ownership; the collector starts no reader thread.",
+    "Controller cancellation releases its channel before joining; the nonblocking three-byte write is bounded.",
+    "Exact OLD/NEW script bytes, mode 0755, regular-file check, successful exit and complete expected output remain asserted.",
+    "The changed observation boundary is explicit in the code and documentation; this is not a product deadline change."
+  ],
+  "limits": [
+    "No independent historical cause attribution or full failed-suite clearance.",
+    "This read is exact fb8, not a latest-821 carry/native gate.",
+    "No device, physical power-loss or signature-trust qualification."
+  ],
+  "source_read_p1_p2": "none demonstrated",
+  "execution_status": "passed exact-head changed-crate gate",
+  "mac_tests": {
+    "passed": 395,
+    "failed": 0,
+    "ignored": 6,
+    "groups": [
+      [
+        120,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        5,
+        0,
+        0
+      ],
+      [
+        90,
+        0,
+        0
+      ],
+      [
+        13,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2
+      ],
+      [
+        167,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ]
+  }
+}
