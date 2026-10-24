@@ -9580,9 +9580,12 @@ fn conversation_with_gate_inner(
         }
         outage.note_delivery(reply);
         select_failure_notice_in(notices, reply, &speaker_pending, &mut outage, trace)?;
-        if reply.as_ref().is_some_and(|current| {
-            current.requested_audio_invalid(rig.provider.boot, snapshot, monotonic_us())
+        if let Some((request, why)) = reply.as_ref().and_then(|current| {
+            current
+                .requested_audio_invalidity(rig.provider.boot, snapshot, monotonic_us())
+                .map(|why| (current.owner.turn(), why))
         }) {
+            eprintln!("lamp-voice: request {request}: requested audio revoked: {why}");
             cancel_reply(owner, reply, trace, "requested_audio_revoked")?;
             provider_queue.clear();
             speaker_pending = None;

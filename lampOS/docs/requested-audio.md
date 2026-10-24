@@ -208,6 +208,14 @@ coordinator's authority by the coordinator's boot (`WorkerBoots`, #3319).
 The Live worker stamps the same way, and
 is left for its own change, since the product's voice is the second route.
 
+A recording accepted and then ended early says why, once, in the journal.
+`request N: requested audio cancelled: <why>` comes from the recording's
+own checks: the service stopped, it wasn't ready, the speaker's state was
+being read, was stale, changed or unknown, its Skills lease lapsed, it was
+past its time, Skills refused its start or a renewal, or its recording
+couldn't be read or wasn't the one offered. `request N: requested audio
+revoked: <why>` comes from the coordinator, when the turn is revoked.
+
 The same socket accepts two private operations:
 
 - `audio_authorize`, with the complete `offer` and `phase` of `start` or
