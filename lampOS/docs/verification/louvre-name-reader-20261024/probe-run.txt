@@ -1,0 +1,12 @@
+second_route_call=true
+live_not_call=true
+second_route_not_other_name=true
+live_keeps_other_name=true
+lone_second_route_name=true
+lone_live_not_call=true
+museum_not_call=true
+museum_not_name_only=true
+unseparated_word_not_call=true
+greeted_name_call=true
+ordinary_literal_call=true
+ordinary_noun_not_call=true

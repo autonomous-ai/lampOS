@@ -1,0 +1,38 @@
+{
+  "head": "1743d6a23de697d5e97d71b51430ced5ad88d026",
+  "compile_command": [
+    "<private-home>/.cargo/bin/rustc",
+    "+1.96.0",
+    "--edition=2024",
+    "/private/tmp/second-review-louvre-name-gates-20261024/route_boundary_probe.rs",
+    "--extern",
+    "lamp_voice=<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-c00ddfe05c8f80a2.rlib",
+    "-L",
+    "dependency=<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps",
+    "-o",
+    "/private/tmp/second-review-louvre-name-gates-20261024/route-boundary-probe"
+  ],
+  "compile_exit": 0,
+  "probe_exit": 0,
+  "assertions": 12,
+  "library_source": "Exact library artifact from captured no-run compiler JSON, linked by standalone host rustc; not an additional Cargo build/profile claim.",
+  "bindings": {
+    "source": {
+      "sha256": "d437201c1163be66ee8f7fc5c17d0512c4c6862bcf8b6c262028ae20c4fed827",
+      "bytes": 1270
+    },
+    "executable": {
+      "sha256": "3f795ada1b8710ba5c70ab7fb99b8852a4c28d0fb3506e2c14116c7ee20a7196",
+      "bytes": 711096
+    },
+    "library": {
+      "sha256": "ec5f26936039edfc289dfd3778219b2e764b6eabb6cef8e090d61e43b0614ae8",
+      "bytes": 232797488
+    }
+  },
+  "not_shown": [
+    "Full Voice suite",
+    "Physical/provider behavior",
+    "Production activation"
+  ]
+}

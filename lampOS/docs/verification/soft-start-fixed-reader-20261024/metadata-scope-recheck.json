@@ -1,0 +1,27 @@
+{
+  "metadata_command": [
+    "<private-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "metadata",
+    "--offline",
+    "--locked",
+    "--no-deps",
+    "--format-version",
+    "1"
+  ],
+  "exit": 0,
+  "head": "0b41ef8250711cec5c27e7b260fb5be28281821d",
+  "note": "Initial workspace metadata was reused from the earlier read worktree for dependency-name selection. This actual current-worktree metadata separately checks workspace identities against captured compiler rows. No build/test was rerun.",
+  "stages": [
+    {
+      "stage": "clippy",
+      "matching_current_workspace_records": 41,
+      "all_fresh_false": true
+    },
+    {
+      "stage": "test-compile",
+      "matching_current_workspace_records": 39,
+      "all_fresh_false": true
+    }
+  ]
+}
