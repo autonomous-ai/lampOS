@@ -69,3 +69,14 @@ The PR is held for two public privacy reads. Native ARM64/Clippy and exact
 Linux formatting are requested. Those results are distinct from this local
 pass. The source-only internal reread closed the final vocative finding;
 no old test was rewritten to make the new guard pass.
+
+## First public read and context-dependent bare names
+
+Reviewer-three posted READ-OK `390532a53`: both original findings close,
+with **63/0** focused tests including its 17-negative/8-positive probe and
+strict Clippy reported. The independent whole-library run remains pending.
+Its nonholding P3 is preserved: a bare name after a question about a friend
+can be interpreted as the speaker’s name. The line-only guard cannot know
+that preceding conversational context. The physical sheet now contrasts
+self-name and friend-name prompts; no activation or general semantic
+ownership guarantee is inferred from these host checks.

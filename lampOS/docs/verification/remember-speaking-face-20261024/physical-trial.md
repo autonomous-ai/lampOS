@@ -23,6 +23,7 @@ publish their names, face images, embeddings or full transcripts.
 | Camera privacy closes/reopens, stop, or forget occurs while STT/capture is pending | No delayed save survives; a fresh request is required. |
 | Already-known face introduces a different name | Saved name stays unchanged; reply neither speaks the stored name nor requests unsupported replacement confirmation. |
 | Ordinary short bare-name and spelling reply, including a multiword name | Same current-line and speaker proof applies; old history cannot supply a name. |
+| Bare name after “What is your name?” versus after a question about the speaker’s friend | Record both contexts separately. A bare reply about the friend must not be saved on the speaker; the current line-only guard cannot distinguish these contexts itself, so this remains a physical/model qualification limit. |
 
 For each attempt retain build, switches, recognition phase if observable,
 actual speaker, actual face saved or refusal category, and whether any spoken
