@@ -5,6 +5,44 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 06:36 — latest-base Controls pushed; forget correction qualified
+
+Ready for lamp-voice: no (current native gates and reader dispositions remain).
+
+- Controls #3419 is pushed as ea4580c36 on efbf42a02 with equal range-diff.
+  New fmt, strict Controls Clippy, workspace build and full tests pass
+  **510 passed, 0 failed, 3 ignored**; all 7,041 frozen source records match
+  committed blobs and modes. [Current proof](verification/controls-recording-stop-20261025/latest-efbf-ea4580c36/README.md).
+  Original new ARM/Linux gates 40143134033 / 40143134071 are pending.
+  Recorder production prefix and its 100 ms deadline remain unchanged.
+- Parent #3408's a0b original ARM passes **11,264 PASS plus one LEAK**,
+  all 11,265 selected terminal, 106 skipped, process 12/0; Linux is green.
+  Actual preview is da570 plus a0b, with 18 inherited unit/docs/evidence
+  differences from authored 42f. [Original evidence](verification/carry-late-verdict-20261025/original-native-40141234140/README.md).
+  Controls db16 original native has exact authored/tested tree identity,
+  **8,000 PASS plus one LEAK**, 56 skipped, process 12/0 and green Linux.
+  [Separate evidence](verification/controls-recording-stop-20261025/original-native-40140199993/README.md).
+- The source-traced child forget HOLD was withdrawn after reader fixtures
+  passed; those fixtures retained an old three-second answer through the
+  max-kept Did::Said clock and did not exercise the intended boundary.
+  Our distinct correctly aged old-30/new-12 chronology fails **0/1** on
+  unchanged production. [Exact patch/raw observations](verification/held-colleague-constraints-20261025/recent-forget-diagnostic/README.md).
+- Closing the active carry with its forgotten scope passes focused 227/0
+  and the new full gate **4,664 passed, 0 failed, 21 ignored**, including
+  Busy/Unknown/Quiet and an old-call callback. All 7,028 frozen source
+  records bind to committed 348697e74 on parent a0b.
+  [Full corrected proof](verification/held-colleague-constraints-20261025/forget-fixed-42f-348697e74/README.md).
+- Latest equal carries parent b05b1cd77 and child 106aecd95 on efbf are
+  qualifying before push; fmt/strict Clippy/workspace builds pass, tests
+  remain active. Same-owner explicit re-call reset and generic personal-
+  scope acceptance limits stay separate before activation. Public child
+  58a remains held and parent-first. All three PRs have builder labels.
+- Original 05 native failure and separate reader failures remain failed;
+  no cause, threshold, acoustic latency, isolated-host, local ARM64 or
+  device claim. These gates overlap on the development host; no performance
+  conclusion follows. Next: push each qualified current carry, request
+  exact current reads, then ready only after its own native gates qualify.
+
 ## 2026-10-25 06:07 — latest carries and held-print P2
 
 Ready for lamp-voice: no (current native/reader dispositions remain).
