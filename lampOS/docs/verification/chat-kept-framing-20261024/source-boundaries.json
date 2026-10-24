@@ -1,0 +1,7 @@
+{
+  "all_seven_original_assertion_expressions_byte_exact": true,
+  "idle_200ms_and_between_request_600ms_preserved": true,
+  "pool_idle_10s_and_between_round_100ms_preserved": true,
+  "overlap_50ms_preserved": true,
+  "runtime_source_before_cfg_test_unchanged": true
+}

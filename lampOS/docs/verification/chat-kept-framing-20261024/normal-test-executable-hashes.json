@@ -1,0 +1,100 @@
+[
+  {
+    "target": "lamp-voice",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-3ab8ef644bb4cec9",
+    "bytes": 1157928,
+    "sha256": "b2f59da728935a242a9b2dfd2e66f8ca6a170e6aee1e9a413f532bb005f9d53b",
+    "fresh": false
+  },
+  {
+    "target": "duplex_lab",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/duplex_lab",
+    "bytes": 3643848,
+    "sha256": "6574b85b1af0b9e2828574404c62ae0d075ebfa29be61ac408786a927db5542f",
+    "fresh": false
+  },
+  {
+    "target": "admission_latency",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/admission_latency",
+    "bytes": 1015296,
+    "sha256": "5803bddf3a8cfe47aad3dfd88d5cd8a1c888d659d6e3e8afd251cb84ab6c0ef2",
+    "fresh": false
+  },
+  {
+    "target": "reference_pace",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/reference_pace",
+    "bytes": 4929408,
+    "sha256": "0d11d5f4c8cb0fcbc09b101db9474db8a45c0b604511d1eaf00fa74631eaf653",
+    "fresh": false
+  },
+  {
+    "target": "hearing_replay",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/hearing_replay",
+    "bytes": 1885072,
+    "sha256": "66e2ac6bc845fe6ab421868f757a36a7a996097c44e8d6dd48a8319a98934b35",
+    "fresh": false
+  },
+  {
+    "target": "head_qualification_operator",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/head_qualification_operator",
+    "bytes": 1745568,
+    "sha256": "ab9d483a0203dc07ecbab1e2d256c2d714aef6316e4cba7352276fb62805e82a",
+    "fresh": false
+  },
+  {
+    "target": "probe_handover",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/probe_handover",
+    "bytes": 16407728,
+    "sha256": "ddcc9611fedf95fe6dc569188d71767b4a3f6c76ddddc577ca07b68171fed78a",
+    "fresh": false
+  },
+  {
+    "target": "ring_process_probe",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/ring_process_probe",
+    "bytes": 7239424,
+    "sha256": "a991723722991e17a074a8592e4676efe95f56440eb5761c425e17dd9ee5d5eb",
+    "fresh": false
+  },
+  {
+    "target": "release_pair",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-92b41c10fde060fb",
+    "bytes": 6110608,
+    "sha256": "b55df35da8490f878dfc9fdd8984e429e6b584b94dc388adf7406f046b4471c2",
+    "fresh": false
+  },
+  {
+    "target": "stop_words_stt_replay",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/stop_words_stt_replay-b4b5bc69dcd2f200",
+    "bytes": 3399864,
+    "sha256": "0b7ff355c72fb8d0c2da76300134214d04dc4d18d74c85876d926c1606b31023",
+    "fresh": false
+  },
+  {
+    "target": "render_line_second",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/render_line_second-64bf83bb8828a9bd",
+    "bytes": 1587728,
+    "sha256": "fe03bcb75b59fcf29d13336b7428cfbb0d3a820f1d4a83f08379175591f78303",
+    "fresh": false
+  },
+  {
+    "target": "lamp-voice",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-voice",
+    "bytes": 51784744,
+    "sha256": "09250d6e3cf035f2005271c16957c95c9e71ce1ae2428f21cb381e86100d4d3e",
+    "fresh": false
+  },
+  {
+    "target": "it",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c75c87452d24a363",
+    "bytes": 102216496,
+    "sha256": "8fc3f43df710f2b40ebeff120e529ebb25ffa604f3b50130ac7b4836056c2b1f",
+    "fresh": false
+  },
+  {
+    "target": "lamp_voice",
+    "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+    "bytes": 141054104,
+    "sha256": "2c45a18e3ce9a263b78accda76710fa81be38a1aa955e3d6bde66fca1c383021",
+    "fresh": false
+  }
+]
