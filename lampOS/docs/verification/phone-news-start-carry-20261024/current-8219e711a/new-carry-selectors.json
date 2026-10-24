@@ -1,0 +1,18 @@
+[
+  "a_held_colleague_extends_the_carry_window_but_not_past_its_cap",
+  "the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget",
+  "a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window",
+  "a_colleagues_line_is_held_and_two_in_a_row_end_the_carry",
+  "the_owners_five_turns_go_on_past_one_colleague_line",
+  "a_late_sure_other_voice_is_one_colleague_line",
+  "after_a_held_colleague_the_owners_voice_alone_must_be_nearer_theirs",
+  "a_colleague_calling_the_lamp_becomes_the_caller",
+  "the_owner_turned_to_a_colleague_is_held_and_ends_the_carry",
+  "a_colleagues_face_is_held_in_a_room_not_busy",
+  "a_colleague_within_the_eight_seconds_is_held_and_two_end_the_carry",
+  "actual_end_sets_an_inclusive_deadline_and_forty_second_cap",
+  "repeated_or_late_classification_cannot_renew_the_allowance",
+  "missing_future_and_stale_ends_do_not_create_an_extension",
+  "clearing_cannot_be_undone_by_an_old_answer_or_print",
+  "delayed_evidence_storage_is_bounded_and_older_ends_expire"
+]
