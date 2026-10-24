@@ -8396,3 +8396,7 @@ Assigned #3277 read complete on 1806a691d, P1/P2 none. [Source/evidence review](
 ## 2026-10-24: current Common carry and next rollback row
 
 Resumed under the continuous-work order. #3277 is landed. Common is resolved on 1d915d44c with the crop/hold and newer Voice/Update behavior preserved; [source audits](verification/common-current-carry-audit-20261024/README.md) are complete. Both host gates are running on frozen tree7b5df82fd. Claimed #2809's SQLite rollback floor and cleanup/session reader pair; actual Memory binary tests are being authored independently. No lamp action or new qualified result yet.
+
+## 2026-10-24: close the historical Third formatting request
+
+Exact #3275 head ff99df288 Linux source-only formatting passes once, 20.50 seconds. All 6,963 archived blobs/modes match and bytes/modes/mtimes stay unchanged; container removed, no shared target or compilation. [Receipt](verification/third-linux-fmt-ff99df288-20261024/README.md). This closes the old request only, not current Common qualification.
