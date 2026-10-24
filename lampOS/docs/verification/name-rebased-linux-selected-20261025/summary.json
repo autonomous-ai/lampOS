@@ -1,0 +1,48 @@
+{
+  "format": "name-rebased-linux-count-sourcehash-bool-review/1",
+  "provisional": true,
+  "tested_head": "85346c4b0c5c008f551005b2a87d46771095f679",
+  "tested_tree": "37b822b7a20bd3e85d46def0c3519bbec6953b45",
+  "parent": "f5d92567ef89f7a7aeebee1d591038bb586c7b20",
+  "terminal_sha256": "6d1cc08dbbe9770f50e354741d5a317ebd09c7fd611f5a66f4cd3bc83525f933",
+  "source_map_sha256": "bcdc0c54ba3f9e9ec352f6bdfb3a48feb7911bc34d7d8bb3269916956edfc6e4",
+  "semantic_index_sha256": "a7229156ff0bfe094f3f1d09cb301f04f82c677ee438726a0e07cb171e683b1e",
+  "qualification_sha256": "63278f2932ec6273f905d7c15c1429e1ae7aeab19ea97c57146fdc52e856c047",
+  "source_binding_sha256": "190d11d9b586b0e10df4fe2e266c8e9ca7688b1bb5d9ef0da070236310dddd68",
+  "source_file_count": 10455,
+  "owned_source_file_count": 5,
+  "immutable_payloads_independently_verified": 264,
+  "gate_exit": 0,
+  "required_stage_count": 5,
+  "observed_stage_count": 5,
+  "required_controls": 6,
+  "once_passed_controls": 6,
+  "counts": {
+    "full-voice": {
+      "passed": 4200,
+      "failed": 0,
+      "ignored": 24
+    },
+    "full-update": {
+      "passed": 388,
+      "failed": 0,
+      "ignored": 4
+    }
+  },
+  "fresh_local_member_count": 46,
+  "source_stable_recorded": true,
+  "cleanup_proved_recorded": true,
+  "canonical_clean_ids_verified": true,
+  "raw_compiler_source_bindings_verified": true,
+  "parent_common_mac_failed12": true,
+  "final_parent_binding_open": true,
+  "Name_Mac_unrun": true,
+  "both_hosts_qualified": false,
+  "current_native_acceptance": false,
+  "physical_qualified": false,
+  "readiness_or_activation_claim": false,
+  "formal_read_ok_issued": false,
+  "public_raw_upload_authorized": false,
+  "recorded_named_inventory_missing_should_panic_labels": 3,
+  "aggregate_counts_include_these_correctly": true
+}

@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 03:27: provisional Name Linux receipt and current parent preparation
+
+- [Selected Name Linux receipt](verification/name-rebased-linux-selected-20261025/README.md): local 853 on f5d passes five stages/six controls/fresh 46, Voice 4200/0/24 and Update 388/0/4. Independent source/compiler/raw-output verification confirms counts; three omitted should-panic labels affect only the recorded named inventory, not aggregates or controls. Raw stays private, Mac unrun and final parent binding open.
+- Common's one clean427 Mac comparison is active after 115 preparation checks; fmt passes and strict Clippy runs. The failed f5d source/executable remain preserved with initial launch hash unobserved. Separately preparing a current f978 Common carry for Linux; no old result credit transfers.
+- Callback's source-only f5d snapshot 649 preserves both reviewed Rust blobs and exact patches, with only README provisional labels added. Its gates wait for the current parent composition. Native isolated-observation tooling remains ungranted pending review; no lamp action.
+
 ## 2026-10-25 03:18: Common failed Mac gate preserved, Name Linux complete
 
 - [Selected Common host receipt](verification/common-rebased-selected-20261025/README.md) preserves Mac full Voice 4127/12/21 and gate 101; the other seven stages pass. Linux all eight stages pass, Voice 4200/0/24. Required controls, fresh 46 and source/cleanup verify separately, with no failure waived. Raw evidence remains private.
