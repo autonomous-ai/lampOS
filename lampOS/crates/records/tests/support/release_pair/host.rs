@@ -694,5 +694,18 @@ mod cgroup_tests {
         fs::write(group.join("cgroup.events"), "populated 0\n").unwrap();
         fs::write(group.join("cgroup.procs"), " ".repeat(65_537)).unwrap();
         assert!(!tree.empty());
+
+        // Check byte limits directly, independently of cgroup.events parsing.
+        for (name, limit) in [("cgroup.events", 4096), ("cgroup.procs", 65_536)] {
+            let path = group.join(name);
+            let at_limit = " ".repeat(limit);
+            fs::write(&path, &at_limit).unwrap();
+            assert_eq!(
+                group_text(&path, limit as u64).as_deref(),
+                Some(at_limit.as_str())
+            );
+            fs::write(&path, format!("{at_limit} ")).unwrap();
+            assert!(group_text(&path, limit as u64).is_none());
+        }
     }
 }

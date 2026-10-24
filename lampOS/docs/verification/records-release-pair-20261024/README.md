@@ -66,3 +66,28 @@ Run [40058378617](https://github.com/autonomous-ai/lampOS/actions/runs/400583786
 The first correction candidate `ec1b3fbf2` passed Mac formatting, strict Records Clippy and ordinary tests **182/0/1 ignored**, with unchanged source and confirmed cleanup. Linux formatting passed, but strict Clippy rejected `valid_id` appearing after the new test module; its full Records tests and workspace build did not run. That failed attempt is retained. The function is now moved before the test module without changing its body or any assertion; fresh corrected-source gates follow.
 
 The corrected source tree `b839e645d480a40fac2d9c9e53b76864c943c779` passed fresh formatting and strict Records all-target Clippy on Mac and Linux, Mac ordinary Records **182/0/1 ignored**, Linux ordinary Records **193/0/5 ignored**, and the Linux workspace build. All six new cgroup controls passed exactly once; the three actual artifact cases remained ignored in the ordinary Linux run. Every one of the 10,323 tracked files retained bytes, modes and mtimes through both gates, and all owned process/container cleanup was confirmed. This result-only README update leaves executable sources unchanged. Fresh exact-head ARM64, Clippy and the dedicated native three-case job remain required; the cancelled historical native pass does not qualify this correction.
+
+## Cap-specific ordinary control follow-up
+
+The existing `oversized_evidence_refuses_cleanup` control now also calls the
+bounded text reader directly: exactly 4,096 and 65,536 bytes must be returned,
+and each limit plus one byte must refuse. These assertions isolate the byte
+limit from cgroup event parsing, so malformed event content cannot satisfy the
+cap check. All six existing controls and every runtime cleanup guard remain.
+This is a test-only strengthening. Frozen tree
+`198e6784abb22eb0377606388ccd76cdcc4e8d07` on `2e2eee360` passes fresh
+Mac and offline Linux AMD64 formatting, strict Records all-target Clippy,
+full Records tests and workspace build: Mac **182 / 0 / 1 ignored**, Linux
+**193 / 0 / 5 ignored**. All six Linux cleanup controls pass exactly once,
+including the strengthened bound control; all three actual-release cases
+remain ignored in the ordinary Linux suite and are absent on Mac.
+Each host invalidates exactly the 46 validated local workspace packages,
+then proves all 46 freshly compiled across Clippy/build, with unchanged source
+and confirmed process/container cleanup and target release. The two carried
+feature blobs remain byte-exact to the original `5328b0dce` proposal after
+rebasing. This final README-only result update changes no executable source.
+Raw checks are in
+`/private/tmp/fourth-records-cap-gates-20261024/revision3/{mac,linux}/attempt1/`.
+Current PR ARM64/Clippy and its dedicated native three-case artifact run
+remain required. No new artifact execution, systemd, physical-lamp or
+power-loss result is claimed by these ordinary local counts.
