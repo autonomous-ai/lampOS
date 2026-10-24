@@ -1,0 +1,17 @@
+{
+  "head": "ae9cf505d28bb4927a101429b0c2870559a733a0",
+  "base": "419d6f64b0244ed62547f7f697f808bc994a79e5",
+  "preview": "6304249262bb892f19a877b0ce60bc33f7130d88",
+  "complete_tree": "660601daedcd33f9e714d45f405da68bfbf6cb86",
+  "complete_trees_equal": true,
+  "arm64": 40113548612,
+  "pass": 7374,
+  "leak": 1,
+  "skipped": 53,
+  "failed": 0,
+  "unrun": 0,
+  "linux": 40113548620,
+  "actual_formatting_and_strict_clippy_verified": true,
+  "initial_run_view_step_metadata_incomplete": true,
+  "final_step_metadata_source": "linux-jobs-final.json"
+}
