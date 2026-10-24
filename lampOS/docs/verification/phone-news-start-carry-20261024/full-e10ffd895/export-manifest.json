@@ -1,0 +1,46 @@
+{
+  "gate-result.json": {
+    "original_sha256": "b5c23d368ec60faed6472ca6c05f74031e7ede21b3f6c0eded540cf469539f3b",
+    "published_sha256": "523f039c905fcd126ee020a8dff04511d4174cff0c7660c3f6137b4d58250a56"
+  },
+  "fmt.txt": {
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clean-selected.txt": {
+    "original_sha256": "8311a3d68782e4a7f29444baed0f2682d184d83091bb63336070a45fddf08761",
+    "published_sha256": "8311a3d68782e4a7f29444baed0f2682d184d83091bb63336070a45fddf08761"
+  },
+  "clippy-summary.json": {
+    "original_sha256": "6641963b41070cfe105beadff089f0c4527a527de10c27263e1189a1c68e21af",
+    "published_sha256": "ea71ca124d70908d21b5daff6f7612792279602f63b3e44b7f3822c777aca8bf"
+  },
+  "test-compile-summary.json": {
+    "original_sha256": "e07f2fdfb509ccb08d724412add0cc6fbdecc6258e7dc5c667ac7226bb13e2ed",
+    "published_sha256": "08d00ccba6dbb481b5038b396e7ad01bbe708ab94af891083dda2a83c425cff6"
+  },
+  "test.txt": {
+    "original_sha256": "d117991359a2f960de5bd9c955ff742feffd86298a49294f7fbbd749e97be3a8",
+    "published_sha256": "dc07fd98630b41100be9679e0da2f39349c14abc716f7d34d90174833ca223a7"
+  },
+  "source-before.json": {
+    "original_sha256": "6ded310f54b4317cb8c95b6a61beb03cdd6e8a490ab1217d28aed9dc2155ab5e",
+    "published_sha256": "6ded310f54b4317cb8c95b6a61beb03cdd6e8a490ab1217d28aed9dc2155ab5e"
+  },
+  "source-after.json": {
+    "original_sha256": "6ded310f54b4317cb8c95b6a61beb03cdd6e8a490ab1217d28aed9dc2155ab5e",
+    "published_sha256": "6ded310f54b4317cb8c95b6a61beb03cdd6e8a490ab1217d28aed9dc2155ab5e"
+  },
+  "linux-fmt-current.json": {
+    "original_sha256": "5575e6d12898039e6af30d10dcb518215281af9f7eee27ae725d448e06dab96f",
+    "published_sha256": "5575e6d12898039e6af30d10dcb518215281af9f7eee27ae725d448e06dab96f"
+  },
+  "linux-fmt-current.txt": {
+    "original_sha256": "5b65414f003d22a98211dad400073b9278c4e3471607b553f04de9a85652f81a",
+    "published_sha256": "5b65414f003d22a98211dad400073b9278c4e3471607b553f04de9a85652f81a"
+  },
+  "linux-fmt-current-cleanup.json": {
+    "original_sha256": "4c07c6899d29e96cfe6b2fa296f0a9db5a6970a13ded04726cf7c853540ccd33",
+    "published_sha256": "4c07c6899d29e96cfe6b2fa296f0a9db5a6970a13ded04726cf7c853540ccd33"
+  }
+}
