@@ -1,0 +1,56 @@
+{
+  "actual_failures": [
+    {
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "samples_raw": "23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms",
+      "milliseconds": [
+        23.075348,
+        27.16757,
+        43.833614,
+        44.032555,
+        46.669106,
+        59.052675,
+        63.048043,
+        87.220159,
+        102.111023,
+        105.964428,
+        106.352192,
+        108.157489,
+        108.403002,
+        109.60175,
+        120.718382,
+        125.785744,
+        127.273197,
+        140.786342,
+        161.497947,
+        185.122805
+      ],
+      "checked_index": 10,
+      "checked_upper_median_ms": 106.352192,
+      "strict_bound_ms": 25,
+      "maximum_ms_descriptive_only": 185.122805,
+      "all_20_Outcome_Done_assertions_preceded_this_assertion": true,
+      "source_predicate": "middle < Duration::from_millis(25); middle = took[took.len() / 2]",
+      "limit": "This is a retained timing failure on the named source, not an inherited-cause classification or waiver."
+    }
+  ],
+  "source": {
+    "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "path": "lampOS/crates/voice/tests/it/light_call.rs",
+    "full_source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+    "same_as_tested_source_map": true,
+    "line_81_through_91": "    stop.store(true, Ordering::Release);\n    ring.join().unwrap();\n    std::fs::remove_dir_all(&root).unwrap();\n    took.sort();\n    eprintln!(\"light calls, fastest to slowest: {took:?}\");\n    // A few of the ring's passes, not a 50 ms look and a 15 ms read: the\n    // middle call took about 55 ms before #1806 on the Intel Mac, and 3 ms\n    // after.\n    let middle = took[took.len() / 2];\n    assert!(middle < Duration::from_millis(25), \"{took:?}\");\n}\n",
+    "predicate": "middle < Duration::from_millis(25)",
+    "definition": "let middle = took[took.len() / 2];",
+    "all_20_done_assertions_and_cleanup_precede_this_assertion": true,
+    "causality_limit": "Source and assertion boundary only; no historical-cause classification."
+  },
+  "current_tested_source_binding": {
+    "path": "lampOS/crates/voice/tests/it/light_call.rs",
+    "git_mode": "100644",
+    "base_blob": "2827452b9b6336d505c82219f036424858626ee5",
+    "bytes": 3214,
+    "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+  },
+  "historical_source_record_byte_equal_to_current": true
+}

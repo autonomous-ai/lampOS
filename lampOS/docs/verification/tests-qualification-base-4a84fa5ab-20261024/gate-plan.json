@@ -1,0 +1,239 @@
+{
+  "status": "Frozen matched qualification; one full attempt, no retries",
+  "source_identity": {
+    "worktree": "/private/tmp/tests-3190-qualification-base-20261024",
+    "head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+    "base_tree": "ed86f52528cf34b784bd592bdd88d8d3f9ec777a",
+    "qualification_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+    "branch": "",
+    "tracked_paths": 10309,
+    "lampos_paths": 6963,
+    "source_aggregate_sha256": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+    "owned_paths": [],
+    "combined_authored_paths": [],
+    "source_map_sha256": "42f4afafb2848be4fa05596cd2ff4f911922838b819315109a5f3d089efa863f",
+    "clean_committed_source": true
+  },
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "dependency_proof": "gate-dependencies.json",
+  "joining_scope": "Every touched crate and reverse dependent represented; cfg(test) unit fixtures plus integration fixture and docs. No inherited failure waiver or shared qualification.",
+  "packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "readers": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice-eval"
+  ],
+  "steps": [
+    {
+      "id": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "id": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "voice-default-parallel",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 5400
+    },
+    {
+      "id": "readers-default-parallel",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice-eval",
+        "--no-fail-fast",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 5400
+    },
+    {
+      "id": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "id": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "4a84fa5ab6a9133aeec555ec4bc0636dd953f660"
+      ],
+      "cwd": "/private/tmp/tests-3190-qualification-base-20261024",
+      "timeout_seconds": 60
+    }
+  ],
+  "execution_requirements": [
+    "No RUST_TEST_THREADS or --test-threads override.",
+    "Full human stdout/stderr retained; compiler inventories are not executed tests.",
+    "Bind each actual test executable/case census; preserve should-panic display annotation only when uniquely mapped to its compiled identity.",
+    "Well-formed ordinary test failure may permit remaining independent reader/build gates, but final qualification remains FAILED. Stop on timeout, compile/source/infrastructure or census failure; never retry a full gate until green.",
+    "No current-head native Linux/ARM64 claim from local execution; native jobs and exact-source Linux formatting remain separately required."
+  ],
+  "doctest_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "custom_harness_targets": [
+    {
+      "package": "lamp-update",
+      "kind": "test",
+      "name": "self-process-cuts",
+      "path": "lampOS/crates/update/tests/self_process_cuts.rs",
+      "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3"
+    },
+    {
+      "package": "lamp-update",
+      "kind": "test",
+      "name": "self-cli-exec",
+      "path": "lampOS/crates/update/tests/self_cli_exec.rs",
+      "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd"
+    }
+  ],
+  "selected_case": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+  "candidate_source_sha256": "b50767957067efee6a502e372605a7bcc2b16e23097da1ddca85153cf966993a",
+  "candidate_doc_sha256": "6f96999c5c3dd5182c7c7c958b47f831c25cadd6bb1697a255cc9ea376cbfe14",
+  "candidate_commit": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "fixed_target": "/private/tmp/tests-codex-1569-target",
+  "clear_environment_prefixes": [
+    "CARGO_TARGET_AARCH64_",
+    "CARGO_TARGET_ARM_"
+  ],
+  "gate_attempt_sentinel": "execution-start.json",
+  "qualification_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "selected_cases": "selected-cases.json",
+  "selected_case_count": 0,
+  "historical_scope": "This is a new matched qualification on the two named commits. Original nine failures and all earlier evidence stay bound to their original sources. No historical causal conclusion."
+}

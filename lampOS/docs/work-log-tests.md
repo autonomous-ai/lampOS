@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-24 10:11 +0700 — fixed baseline complete; matched candidate running
+
+Ready for lamp-voice: no; candidate qualification is active.
+
+The [completed 4a84fa5ab baseline](verification/tests-qualification-base-4a84fa5ab-20261024/) has **7,219 passed, 17 failed and 34 ignored**, with Voice 3,950/11/15 and eleven readers 3,269/6/19. Every actual target is bound; no gate remains unrun. Formatting, strict twelve-package Clippy, workspace build and diff checks passed. The single split Voice-eval output row was recovered from its retained exact bytes, and only previously unrun build/diff gates followed. No test command was repeated and all failures remain.
+
+The frozen matched candidate 93c995a6b started at 03:10:17 UTC, followed by the prescribed standalone observations. Its outcome is pending. The two additional Memory baseline phases are routed to #1569/Tests; neither is yet a candidate failure or historical-cause finding. The latest-source carry and full applicable gates follow the fixed pair.
+
+Second's #3312 is now one folded commit 4ba9d959f on current 9ed44f88c. Its source read is being renewed and fresh dedicated/ordinary native ARM and Linux Clippy are active; old green results remain bound to cec3372b7. #3327 remains held on its directory collision with Second's correction in progress. No local ARM build or lamp action ran.
+
 ## 2026-10-24 10:08 +0700 — current-source audit and rested-reader fixture finding
 
 Ready for lamp-voice: no; matched qualification and native checks remain.
