@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 14:58 +0700 — #3190 native qualified; scratch recovery
+
+Ready for lamp-voice: yes for #3190 at 414b2df34; reviewer-two READ-OK and all native gates pass.
+
+[Native before/after](verification/tests-3190-native-414b2df34-20261024/) is **11,163 PASS + 1 LEAK**, zero failed/unrun, 71 skipped on both integration baseline 9ed44f88c and the authored candidate. Every identity/status matches. The newer-base PR preview separately passes **7,348 PASS + 1 LEAK**, 45 skipped; Linux Clippy passes. Local matched and carried failures remain retained. No local ARM build or lamp action ran.
+
+The unpublished #3218 attempt hit ENOSPC and had an incomplete census; a later attempt has no recoverable terminal result. All `/private/tmp/tests-*` directories subsequently disappeared, including unpublished raw evidence and uncommitted drafts. Committed source and published #3190 receipts are intact. Owned worktrees are restored inside ignored workspace storage; the seven-file privacy draft and both controls were recovered from exact historical edit commands with every recorded hash matching. Remaining drafts and gate plans are being recovered before further local execution. No erased attempt is claimed complete, and no raw evidence is claimed available when it was lost.
+
 ## 2026-10-24 13:29 +0700 — carried qualification classified and published
 
 Ready for lamp-voice: no; native ARM64 and Linux Clippy remain pending push.

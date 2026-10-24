@@ -1,0 +1,30 @@
+{
+  "files": [
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/native3190/9ed-baseline-fresh.log",
+      "bytes": 2787740,
+      "sha256": "eca321f872dc36dca64f22f8d236db67e22e151120ae1ece1f912908ebfbf97a",
+      "retention": "Fresh complete download retained in ignored workspace; remote workflow log is the public original. Local external availability is not promised forever."
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/native3190/40070418423-log.txt",
+      "bytes": 1820684,
+      "sha256": "75a89e219775c3aa8f7605342189bf42daa8289c777d1487edb614e7eff2de7f",
+      "retention": "Fresh complete download retained in ignored workspace; remote workflow log is the public original. Local external availability is not promised forever."
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/native3190/40070418452-log.txt",
+      "bytes": 75136,
+      "sha256": "63245740618ccd02c6de446bdb1f2f4d4222590163eb41316a315b693b1db767",
+      "retention": "Fresh complete download retained in ignored workspace; remote workflow log is the public original. Local external availability is not promised forever."
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/native3190/40070482584-log.txt",
+      "bytes": 2751902,
+      "sha256": "89213b96883549e81cd3e3844e104db9ea5264dbd9408253c522226cb5039be0",
+      "retention": "Fresh complete download retained in ignored workspace; remote workflow log is the public original. Local external availability is not promised forever."
+    }
+  ],
+  "nextest_config_equal": true,
+  "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+}
