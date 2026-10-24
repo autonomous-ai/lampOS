@@ -1165,6 +1165,22 @@ order is kept. A written turn is the same from the chat on.
     a short one may be let go, and a line admitted after the 2.5 s is not
     carried. A short line that doesn't begin with the name ("So I") waits
     only with `Called`.
+  - **With `LAMP_CALL_TAKES_NEXT_LINE=on` as well** (the coordinator; off
+    unless set; the first builder, 24 Oct): once the second route's final
+    words for the turn in hand are only the name
+    (`attention::only_the_name`: "Lamp.", "Hey Lamp,", "Lamb."), its
+    answer unheard, a sound begun within 2.5 s of its end is decided at
+    once (`open_name::called`). The answer wait, with its words, and the
+    body's motors don't let it go. It isn't marked as going on from the
+    name's line, because the second route joins the two itself. On lamp-4ace on 24
+    October "Lamp, {2 s} tell me a joke." was let go so ("quiet") in 2 of
+    10 pause lines with `LAMP_WAIT_KEEPS_ANSWER=on`, and the name answered
+    as a call ("Yes?"); with `words`, 1 of 10, its words not back in time.
+    A short line begun with the name ("Lamp, can") is still not known to
+    the coordinator. The journal says `request N: only the lamp's name: a
+    sound begun within 2.5 s of its end takes the turn at once
+    (LAMP_CALL_TAKES_NEXT_LINE)`, and `request M: the line after the bare
+    name, taken at once`.
   - **Tests:** `second_provider::tests::name_carries` (a line 1.2 s, 2 s
     and 2.4 s after "Lamp." or a misheard name with `Called`; "Lamp. So"
     and the rest 1.0 s later, asked as one line; "So I" held as before; a
