@@ -26,3 +26,17 @@ No Mac ARM64 link or device action. The combined-switches physical row is
 on the enrollment trial sheet, routed to the holder/First for the 15:00 hands
 batch. Switch remains off. Immediate publication adds no I/O/inference; its
 under-1-ms target and actual acoustic/device latency remain unverified.
+
+## Completed local gate and pushed source
+
+Authored head `f653bc5bdcdaecb661f27aa076f395dea38474c7`. The unchanged source passed the full serial Voice
+command: **3,993 passed / 0 failed / 21 ignored**, including library
+**3,712/0/15** and all **270** integration cases. Six extra ignored cases
+are manual release-pair controls, not executed here. Workspace build passed
+afterward. Source hashes match across formatting/strict Clippy, both whole
+test attempts and build, and every bound file matches its authored git blob.
+
+`final-gates.json`, `voice-serial.txt` and `workspace-build.txt` retain the
+terminal checks. The initial failed library and all isolated reruns stay
+above. Official ARM64/Linux Clippy, two public privacy reads and Linux fmt
+remain distinct pending gates.
