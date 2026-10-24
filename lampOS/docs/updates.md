@@ -1868,3 +1868,19 @@ test does (#1512):
   switch: everything changed is put back together, but a part that stores
   data in a new form (memory, schedule) before being put back is not
   undone.
+
+### Released Cloud readers of installed package provenance
+
+The [Cloud provenance release-pair record](verification/cloud-provenance-release-pair-20261024/README.md)
+covers the `skills.list` consumer separately from package installation.
+Actual released Skills writers and Cloud readers meet through installed
+package metadata and a private MQTT peer, both directions. Fixed install
+paths require a fresh network-disabled native container with private tmpfs;
+no host lamp state or real account is used. The two explicit native cases
+passed in official ARM64
+[run 40070585559](https://github.com/autonomous-ai/lampOS/actions/runs/40070585559)
+on `2ad786f91`, with 14 matching child exits and verified container removal.
+The linked qualification record retains the exact head, proof and limits.
+Different Cloud payloads contain the same provenance parser; this is not
+proof of distinct parser versions,
+Store signature trust or physical update durability.
