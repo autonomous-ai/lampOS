@@ -185,6 +185,290 @@ mod tests {
         known_faces::run_scoped(socket, call, switches(), None, proof, REQUEST, lease)
     }
 
+    /// A real Eyes socket that records even an unwanted connection. The
+    /// response makes a broken refusal finish promptly rather than timing out.
+    fn own_name_exchange(
+        words: &str,
+        name: &str,
+        apart: bool,
+        guarded: bool,
+        reply: Value,
+    ) -> (Value, Vec<Value>) {
+        let home = crate::process::SessionDirectory::create().unwrap();
+        let socket = home.path.join("eyes.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let (done, finished) = mpsc::channel();
+        let peer = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            loop {
+                match listener.accept() {
+                    Ok((mut stream, _)) => {
+                        stream
+                            .set_read_timeout(Some(Duration::from_secs(2)))
+                            .unwrap();
+                        let mut line = String::new();
+                        BufReader::new(stream.try_clone().unwrap())
+                            .read_line(&mut line)
+                            .unwrap();
+                        requests.push(serde_json::from_str(&line).unwrap());
+                        writeln!(stream, "{reply}").unwrap();
+                    }
+                    Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock),
+                }
+                match finished.recv_timeout(Duration::from_millis(1)) {
+                    Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => return requests,
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                }
+            }
+        });
+        let owner = owner();
+        let line = seen(proof(words));
+        let answer = known_faces::run_scoped(
+            &socket,
+            &call(json!({"name": name, "apart": apart})),
+            if guarded {
+                switches()
+            } else {
+                known_faces::FaceSwitches::default()
+            },
+            None,
+            Some(&line),
+            REQUEST,
+            Some(&owner.lease()),
+        )
+        .0;
+        done.send(()).unwrap();
+        (answer, peer.join().unwrap())
+    }
+
+    #[test]
+    fn remember_speaker_own_name_refuses_other_people_before_connect() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut sent = Vec::new();
+        for words in [
+            "Remember her face, she's Kess.",
+            "This is my friend Kess, remember her face.",
+            "Remember my son's face, his name is Kess.",
+            "I'm Alex. Remember her face, she's Kess.",
+            "My name is Alex and her name is Kess.",
+            "My name is Mary. Her name is Ann. Remember her face.",
+        ] {
+            let name = if words.contains("Mary") {
+                "Mary Ann"
+            } else {
+                "Kess"
+            };
+            let (answer, requests) =
+                own_name_exchange(words, name, false, true, json!({"remembered": name}));
+            if !requests.is_empty() || answer.get("error").is_none() {
+                sent.push((words, requests, answer));
+            }
+        }
+        assert!(
+            sent.is_empty(),
+            "Other people's names reached Eyes: {sent:?}"
+        );
+    }
+
+    #[test]
+    fn remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let mut sent = Vec::new();
+        for words in [
+            "She said I'm Kess.",
+            "She told me my name is Kess.",
+            "He said: My name is Kess.",
+            "\"My name is Kess.\"",
+            "'I'm Kess.'",
+            "She said “call me Kess.”",
+            "I'm not Kess.",
+            "My name is not Kess.",
+            "Don't call me Kess.",
+            "Never call me Kess.",
+            "My name is Kess, no, that's wrong.",
+            "If I say my name is Kess, will you remember it?",
+            "Pretend I'm Kess.",
+            "I'm Kess?",
+            "Do you know what my name is, Kess?",
+            "It's Kess.",
+            "This is Kess.",
+            "Hi Kess.",
+            "Hello, Kess!",
+            "Hey Kess.",
+            "Okay, Kess.",
+            "Yes, Kess.",
+            "Please, Kess.",
+            "Kess, please.",
+            "My name is Kesh, hers is spelled K E S S.",
+            "My name is Kess. Her name is Kess too.",
+            "Remember my face, Kess.",
+            "Kess, please remember my face.",
+            "Remember my face, K E S S.",
+            "Remember my face. I'm Kess?",
+            "I'm Kess? Remember my face.",
+            "Can you remember my face? I'm Kess?",
+            "K E S S, three letters.",
+        ] {
+            let (answer, requests) =
+                own_name_exchange(words, "Kess", true, true, json!({"remembered": "Kess"}));
+            if !requests.is_empty() || answer.get("error").is_none() {
+                sent.push((words, requests, answer));
+            }
+        }
+        assert!(
+            sent.is_empty(),
+            "Unproven declarations reached Eyes: {sent:?}"
+        );
+    }
+
+    #[test]
+    fn remember_speaker_own_name_accepts_direct_names_and_exact_spelling() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        for (name, words, spelled) in [
+            ("Kesh", "My name is Kesh, remember my face.", false),
+            ("Kesh", "Lamp, remember my face, I’m Kesh.", false),
+            ("Kesh", "Please remember my face. My name is Kesh.", false),
+            ("Kesh", "Can you remember my face? I'm Kesh.", false),
+            (
+                "Kesh",
+                "Could you remember my face? My name is Kesh.",
+                false,
+            ),
+            ("Kesh", "I'm Kesh, can you remember my face?", false),
+            ("Kesh", "My name is Kesh, please remember my name.", false),
+            (
+                "Kesh",
+                "My name is Kesh and remember my face, please.",
+                false,
+            ),
+            ("Kesh", "I'm Kesh.", false),
+            ("Kesh", "I am Kesh.", false),
+            ("Kesh", "I am called Kesh.", false),
+            ("Kesh", "I'm called Kesh.", false),
+            ("Kesh", "Call me Kesh.", false),
+            ("Kesh", "You can call me Kesh.", false),
+            ("Kesh", "Can you call me Kesh?", false),
+            ("Kesh", "Could you remember that my name is Kesh?", false),
+            ("Kesh", "Yes, my name is Kesh.", false),
+            ("Kesh", "Hey Lamp, my name's Kesh.", false),
+            ("Kesh", "Kesh.", false),
+            ("Mary Ann", "My name is Mary Ann.", false),
+            ("May", "My name is May.", false),
+            ("Will", "Will.", false),
+            ("O'Neill", "Hi, I'm O’Neill.", false),
+            ("Minh", "Tên tôi là Minh.", false),
+            ("Phương", "Tôi là Phuong.", false),
+            ("Đức", "I'm Đu\u{31b}\u{301}c.", false),
+            ("Kesh", "K E S H.", true),
+            ("Kesh", "My name is K, E, S, H.", true),
+            ("Kesh", "K E S H, four letters.", true),
+            ("Kesh", "My name is Kesh. K E S H. Four letters.", true),
+            ("Kesh", "My name is Kesh, spelled K E S H.", true),
+            ("Mary Ann", "M A R Y A N N.", true),
+            ("Minh", "M I N H.", true),
+            ("Said", "S A I D.", true),
+            ("Ann", "A, double N.", true),
+            ("Wu", "Double U, U.", true),
+        ] {
+            let (answer, requests) =
+                own_name_exchange(words, name, true, true, json!({"remembered": name}));
+            assert_eq!(answer, json!({"ok": true, "remembered": name}), "{words}");
+            assert_eq!(requests.len(), 1, "{words}");
+            assert_eq!(requests[0]["remember_speaker"]["name"], name, "{words}");
+            assert_eq!(requests[0]["remember_speaker"]["apart"], spelled, "{words}");
+        }
+    }
+
+    #[test]
+    fn remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        for (name, words) in [
+            ("Kess", "「I'm Kess.」"),
+            ("Kess", "‹My name is Kess.›"),
+            ("Kess", "I'm Kess？"),
+            ("Kess", "Call me Kess??"),
+            ("Not Kess", "I'm not Kess."),
+            ("Maybe Kess", "My name is maybe Kess."),
+            ("Her Name Is Kess", "Her name is Kess."),
+            ("Kess She Said", "Kess, she said."),
+        ] {
+            let (answer, requests) =
+                own_name_exchange(words, name, false, true, json!({"remembered": name}));
+            assert!(requests.is_empty(), "{name}: {words}: {requests:?}");
+            assert!(answer.get("error").is_some(), "{name}: {words}: {answer}");
+        }
+    }
+
+    #[test]
+    fn remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        for name in [
+            format!("{}Kesh", " ".repeat(HEARD_BYTES)),
+            format!("{}Kesh", "\u{2003}".repeat(HEARD_BYTES / 3 + 1)),
+        ] {
+            let (answer, requests) = own_name_exchange(
+                "My name is Kesh.",
+                &name,
+                false,
+                true,
+                json!({"remembered": "Kesh"}),
+            );
+            assert!(requests.is_empty());
+            assert!(answer.get("error").is_some(), "{answer}");
+        }
+        let name = format!("{}Kesh", " ".repeat(HEARD_BYTES - "Kesh".len()));
+        let (answer, requests) = own_name_exchange(
+            "My name is Kesh.",
+            &name,
+            false,
+            true,
+            json!({"remembered": "Kesh"}),
+        );
+        assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}));
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0]["remember_speaker"]["name"], "Kesh");
+    }
+
+    #[test]
+    fn remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let (answer, requests) = own_name_exchange(
+            "My name is Kesh.",
+            "Kesh",
+            false,
+            true,
+            json!({"error": "known_as", "known_as": "Stored-Private-Name"}),
+        );
+        assert_eq!(requests.len(), 1);
+        let words = answer["error"].as_str().unwrap();
+        assert!(!words.contains("Stored-Private-Name"), "{answer}");
+        assert!(!words.contains("replace true"), "{answer}");
+        assert!(
+            !words.contains("ask whether") && !words.contains("say yes"),
+            "{answer}"
+        );
+        assert!(words.contains("not changed"), "{answer}");
+        assert!(answer.get("ok").is_none(), "{answer}");
+    }
+
+    #[test]
+    fn remember_speaker_own_name_off_keeps_other_names_and_replacement_response() {
+        let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
+        let (answer, requests) = own_name_exchange(
+            "Remember her face, she's Kess.",
+            "Kess",
+            false,
+            false,
+            json!({"error": "known_as", "known_as": "Stored-Private-Name"}),
+        );
+        assert_eq!(requests, [json!({"remember": "Kess"})]);
+        assert_eq!(
+            answer,
+            json!({"error": "You already know this face as Stored-Private-Name. Say the new name back and ask whether they want to be known by it instead. Only if they say yes, call this again with the new name and replace true."})
+        );
+    }
+
     #[test]
     fn remember_speaker_is_an_exact_opt_in_and_is_passed_to_tool_routing() {
         assert!(switched_on(Some("on")));
