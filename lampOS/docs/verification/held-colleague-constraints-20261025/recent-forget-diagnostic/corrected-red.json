@@ -1,0 +1,22 @@
+{
+  "head": "aab1344e33a41b5831e5483866680596ee0cc406",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+  "exit": 101,
+  "seconds": 97.329,
+  "scope": "real recent explicit call; actual answer clock must advance from old30 to new12; unchanged-production candidate"
+}

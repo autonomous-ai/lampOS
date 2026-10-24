@@ -1,0 +1,42 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 5d5b240ff8..52a1b6e4c6 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -10892,6 +10892,37 @@ mod tests {
+         assert_eq!(desk.line(1, "", "And what about tomorrow afternoon?"), None);
+     }
+ 
++    #[test]
++    fn a_recent_call_can_resume_after_forget_without_a_stale_closed_scope() {
++        let _one = crate::provider_worker::tests::one_thread();
++        let mut desk = CarryDesk::new_in(true, false);
++        crate::room_told::room().lock().unwrap().set_quiet();
++        desk.answered(30);
++        let old_answer_end = desk.heeding.said_until_us.unwrap();
++        assert_eq!(
++            desk.line(1, "f1", "Lamp, will it rain this afternoon?"),
++            None
++        );
++        crate::thread::THREAD.lock().unwrap().forget();
++        assert_eq!(
++            desk.line(1, "f1", "Will it rain in the afternoon?"),
++            None,
++            "the recent caller's faced line is legitimately admitted"
++        );
++        assert!(desk.heeding.by_name.is_none(), "no new explicit name call");
++        desk.answered(12);
++        assert!(
++            desk.heeding.said_until_us.unwrap() > old_answer_end,
++            "the new answer advances the max-kept physical answer clock"
++        );
++        desk.called_long_ago();
++        assert_eq!(
++            desk.line(1, "", "Should I take an umbrella then?"),
++            None,
++            "the actual post-forget answer reopens owner carry at +12 s"
++        );
++    }
++
+     #[test]
+     fn a_fresh_call_clears_the_previous_callers_held_voice_constraints() {
+         let _one = crate::provider_worker::tests::one_thread();

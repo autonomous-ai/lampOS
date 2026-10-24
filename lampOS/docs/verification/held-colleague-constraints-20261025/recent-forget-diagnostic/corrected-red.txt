@@ -1,0 +1,31 @@
+
+running 1 test
+second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope --- FAILED
+
+failures:
+
+---- second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope stdout ----
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: the conversation's voice (cosine 1.00)
+lamp-voice second: request 2: its answer is played: the text shows it was called
+lamp-voice second: request 3: the conversation's voice (cosine 1.00)
+lamp-voice second: request 3: its answer is played: a conversation with the lamp is going on, only as the conversation going on: the model is told so
+lamp-voice second: request 4: the conversation's voice (cosine 1.00)
+lamp-voice second: request 4: its voice (Some(1.0)) is not nearer the conversation's than every held colleague's known print, by 0.1, or a held print is missing or the bound exhausted: the voice alone carries nothing (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: no sure sign who said it (voice 1.00, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+lamp-voice second: request 4: held under the carry, judged as in a busy room, the room unchanged (LAMP_SAME_SPEAKER_CARRIES)
+
+thread 'second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope' (254315162) panicked at crates/voice/src/second_provider/worker.rs:10919:9:
+assertion `left == right` failed: the actual post-forget answer reopens owner carry at +12 s
+  left: Some("a busy room, and nothing shows it was called or that anyone is turned to the lamp")
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3769 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
