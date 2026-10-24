@@ -1,0 +1,7 @@
+{
+  "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/range-diff.txt",
+  "original_bytes": 90,
+  "original_sha256": "47fd692ddcb166229ac508a18ce69ef7b3dccbec4abc3422e74bb47ba2d462c2",
+  "encoding": "Exact UTF-8 decoded bytes; no normalization",
+  "utf8": "1:  224e0bd767 = 1:  93c995a6b1 lampOS: bind fixture clocks and wait for cue peer closure\n"
+}

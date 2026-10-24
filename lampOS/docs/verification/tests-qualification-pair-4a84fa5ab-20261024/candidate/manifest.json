@@ -1,0 +1,86 @@
+{
+  "scope": "Every payload except this manifest.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3732,
+      "sha256": "b0f59b9bc2ec878502c2054b9b1604f432c10aa8a5d8935d4582c3d225751b94"
+    },
+    {
+      "path": "affected-cases.json",
+      "bytes": 76255,
+      "sha256": "281af07d2bea7dd59e230e813f0b475c828b51430e178129f240ca3f4993f268"
+    },
+    {
+      "path": "artifact-bindings.json",
+      "bytes": 80474,
+      "sha256": "ace662fa63bba166c272c59acd97bdd046b2908d1dfc5e3e802435fc0dab9cfe"
+    },
+    {
+      "path": "authored.patch.json",
+      "bytes": 36437,
+      "sha256": "48b4e832e8eff0e19e4e9d7ebf1bb20a655759fa03d5e0340c142f8d492ee2a4"
+    },
+    {
+      "path": "census-and-outcomes.json",
+      "bytes": 1258046,
+      "sha256": "0763394b6b0cbb88f78640beb6a1246833b4ea17674fe276c1ff0c44eba459b8"
+    },
+    {
+      "path": "command-results.json",
+      "bytes": 9383,
+      "sha256": "2524372830f96c659d4946c474b823dabc516c54bda1aa5f8be54d7a766d51ae"
+    },
+    {
+      "path": "dependency-closure.json",
+      "bytes": 29570,
+      "sha256": "30d91be9afeb513d48a90040622a0397d906ec8f4c9e77a2875b14742c4d2e49"
+    },
+    {
+      "path": "external-raw-index.json",
+      "bytes": 92316,
+      "sha256": "497f80e8a82b3a4f637e0c5f1d9dfac49f3970335a32d89aad74ecc83f2bf6aa"
+    },
+    {
+      "path": "failures.json",
+      "bytes": 4250,
+      "sha256": "5d0488473ae29c5824f7f5d5ce550840df849a70a3e3bfec7447950ecb3e03d7"
+    },
+    {
+      "path": "gate-plan.json",
+      "bytes": 8295,
+      "sha256": "e38657e7b7d1dcfa0675eb824aa42b944188f910f749882f1da8b40cc7bff476"
+    },
+    {
+      "path": "light-call-boundary.json",
+      "bytes": 2652,
+      "sha256": "81c2b186c38bc2348d543cf0e41061b827100cd78bd3be7e40d2b7d735601d99"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 793395,
+      "sha256": "bc998a4e9d42ffed2783fa00a469af99bd03cd5b593651280aa325e77ae4c119"
+    },
+    {
+      "path": "range-diff.json",
+      "bytes": 373,
+      "sha256": "38ea34ee81f1d4932ac739159b893d6432cef6dd3bf635eccca3de5fa48383fc"
+    },
+    {
+      "path": "source-and-environment.json",
+      "bytes": 4707,
+      "sha256": "988ed00a0da350f7805f1dd7cc8248cfc615753917b2432da700cd2115b19867"
+    },
+    {
+      "path": "source-self-review.json",
+      "bytes": 3309,
+      "sha256": "a2d18744b8bcd318ef6de00ff43821ab422df5c4185e52f63bf8fb53178999e8"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 1250,
+      "sha256": "2ec4380b40ab1d3eb0fd4d417d759a16fec9127430b4cf73b6b3eea7051f2893"
+    }
+  ],
+  "total_payload_bytes": 2404444
+}

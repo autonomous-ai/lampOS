@@ -1,0 +1,477 @@
+{
+  "plan": {
+    "runner_sha256": "66f999d3b474c4734b7cd9f4b83daf118f1eeec09cdcdd0a3c827d33f66bc398",
+    "environment": {
+      "PATH": "/Users/autonomous/.cargo/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0TYuE1D:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+      "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_TARGET_TMPDIR": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "LAMP_RELAY_PID_CONTROL_DIR": null
+    },
+    "runtime_environment_limit": "Cargo-injected child environment (including dynamic-loader path additions) was not captured during the full run. Byte-for-byte complete runtime environment equality is not claimed. Compile-time Cargo macro values remain embedded in the exact executable. Any new candidate failure family must be checked before standalone execution.",
+    "base_full": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z",
+    "candidate_full": "/private/tmp/tests-3190-qualification-4a84-20261024/candidate/run-2026-10-24T031017.138397Z",
+    "source": {
+      "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023",
+      "head": "93c995a6b1757af77d5d2a25f1567f314ad5f72d",
+      "base_tree": "00435faf86c34147fd870f08a7b53c5d3df0a8b4",
+      "qualification_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+      "branch": "tests/1569-boot-clock-current",
+      "tracked_paths": 10309,
+      "lampos_paths": 6963,
+      "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "owned_paths": [],
+      "combined_authored_paths": [
+        "lampOS/crates/voice/src/coordinator/second.rs",
+        "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+        "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+        "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+        "lampOS/crates/voice/src/scenario_clock.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs",
+        "lampOS/crates/voice/src/stop_words.rs",
+        "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "lampOS/docs/voice-test-fixtures.md"
+      ],
+      "source_map_sha256": "4d86fdfafd1c8926769374270784a31364550a93fa66f8dc956e12837b3dea18",
+      "clean_committed_source": true
+    },
+    "repetitions": 3,
+    "cases": [
+      {
+        "package": "lamp-body",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_body",
+          "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "status": "ok",
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b",
+        "sha256": "53d55d5283493ace327ccab476c217c17551234e04f93a2a93c0934e1d55c5b2"
+      },
+      {
+        "package": "lamp-memory",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+        "status": "ok",
+        "executable": "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+        "sha256": "cf8a340bc7882113f364b3dff5e6f75a6ee4ed8dec604e4c2d7cae029d84a3cc"
+      }
+    ],
+    "rule": "Every original or new candidate failure absent on matched full base gets exactly three standalone observations; no retries; category is not historical cause."
+  },
+  "status": "complete; all actual outcomes retained",
+  "unrun": 0,
+  "observations": [
+    {
+      "package": "lamp-body",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b",
+          "--exact",
+          "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body",
+        "started_at": "2026-10-24T03:54:20.416824+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 59038,
+        "owned_process_group": 59038,
+        "exit_code": 0,
+        "wall_seconds": 0.064223,
+        "finished_at": "2026-10-24T03:54:20.482065+00:00",
+        "stdout_sha256": "35aa9400d1f7cc0a794e33243b17f74b7f74d2071d35fff8bf76eb45982d296e",
+        "stdout_bytes": 223,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-1",
+      "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "sha256": "53d55d5283493ace327ccab476c217c17551234e04f93a2a93c0934e1d55c5b2",
+      "outcome": "ok",
+      "streams": {
+        "stdout": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-1/exact.stdout.txt",
+          "original_bytes": 223,
+          "original_sha256": "35aa9400d1f7cc0a794e33243b17f74b7f74d2071d35fff8bf76eb45982d296e",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": "\nrunning 1 test\ntest runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 430 filtered out; finished in 0.03s\n\n"
+        },
+        "stderr": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-1/exact.stderr.txt",
+          "original_bytes": 0,
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": ""
+        }
+      }
+    },
+    {
+      "package": "lamp-body",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b",
+          "--exact",
+          "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body",
+        "started_at": "2026-10-24T03:54:25.817360+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 59273,
+        "owned_process_group": 59273,
+        "exit_code": 0,
+        "wall_seconds": 0.06928,
+        "finished_at": "2026-10-24T03:54:25.887273+00:00",
+        "stdout_sha256": "35aa9400d1f7cc0a794e33243b17f74b7f74d2071d35fff8bf76eb45982d296e",
+        "stdout_bytes": 223,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-2",
+      "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "sha256": "53d55d5283493ace327ccab476c217c17551234e04f93a2a93c0934e1d55c5b2",
+      "outcome": "ok",
+      "streams": {
+        "stdout": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-2/exact.stdout.txt",
+          "original_bytes": 223,
+          "original_sha256": "35aa9400d1f7cc0a794e33243b17f74b7f74d2071d35fff8bf76eb45982d296e",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": "\nrunning 1 test\ntest runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 430 filtered out; finished in 0.03s\n\n"
+        },
+        "stderr": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-2/exact.stderr.txt",
+          "original_bytes": 0,
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": ""
+        }
+      }
+    },
+    {
+      "package": "lamp-body",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/lamp_body-3bda0a619327d99b",
+          "--exact",
+          "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body",
+        "started_at": "2026-10-24T03:54:30.946906+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 59533,
+        "owned_process_group": 59533,
+        "exit_code": 0,
+        "wall_seconds": 0.070305,
+        "finished_at": "2026-10-24T03:54:31.017796+00:00",
+        "stdout_sha256": "35aa9400d1f7cc0a794e33243b17f74b7f74d2071d35fff8bf76eb45982d296e",
+        "stdout_bytes": 223,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-3",
+      "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "sha256": "53d55d5283493ace327ccab476c217c17551234e04f93a2a93c0934e1d55c5b2",
+      "outcome": "ok",
+      "streams": {
+        "stdout": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-3/exact.stdout.txt",
+          "original_bytes": 223,
+          "original_sha256": "35aa9400d1f7cc0a794e33243b17f74b7f74d2071d35fff8bf76eb45982d296e",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": "\nrunning 1 test\ntest runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 430 filtered out; finished in 0.03s\n\n"
+        },
+        "stderr": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/01-3/exact.stderr.txt",
+          "original_bytes": 0,
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": ""
+        }
+      }
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T03:54:35.852705+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 59651,
+        "owned_process_group": 59651,
+        "exit_code": 0,
+        "wall_seconds": 1.775678,
+        "finished_at": "2026-10-24T03:54:37.628934+00:00",
+        "stdout_sha256": "42e83a8b86286db86df29929a2efdac8662dcf502a35471297d047780129ebd8",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-1",
+      "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "sha256": "cf8a340bc7882113f364b3dff5e6f75a6ee4ed8dec604e4c2d7cae029d84a3cc",
+      "outcome": "ok",
+      "streams": {
+        "stdout": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-1/exact.stdout.txt",
+          "original_bytes": 196,
+          "original_sha256": "42e83a8b86286db86df29929a2efdac8662dcf502a35471297d047780129ebd8",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 1.74s\n\n"
+        },
+        "stderr": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-1/exact.stderr.txt",
+          "original_bytes": 0,
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": ""
+        }
+      }
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T03:54:42.457935+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 59806,
+        "owned_process_group": 59806,
+        "exit_code": 0,
+        "wall_seconds": 1.925435,
+        "finished_at": "2026-10-24T03:54:44.383979+00:00",
+        "stdout_sha256": "0a84854a6a8688cb33b503ba685c033ae702f0491a490f6b8b78984c24c4a0ff",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-2",
+      "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "sha256": "cf8a340bc7882113f364b3dff5e6f75a6ee4ed8dec604e4c2d7cae029d84a3cc",
+      "outcome": "ok",
+      "streams": {
+        "stdout": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-2/exact.stdout.txt",
+          "original_bytes": 196,
+          "original_sha256": "0a84854a6a8688cb33b503ba685c033ae702f0491a490f6b8b78984c24c4a0ff",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 1.87s\n\n"
+        },
+        "stderr": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-2/exact.stderr.txt",
+          "original_bytes": 0,
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": ""
+        }
+      }
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/private/tmp/tests-codex-1569-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory",
+        "started_at": "2026-10-24T03:54:50.071069+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timed_out": false,
+        "timeout_cleanup": [],
+        "owned_pid": 60122,
+        "owned_process_group": 60122,
+        "exit_code": 0,
+        "wall_seconds": 1.99791,
+        "finished_at": "2026-10-24T03:54:52.069650+00:00",
+        "stdout_sha256": "0715e7c653b90d12731f485f774c4d51e25cfa07ac8297bcf202a2f61b016332",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-3",
+      "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "sha256": "cf8a340bc7882113f364b3dff5e6f75a6ee4ed8dec604e4c2d7cae029d84a3cc",
+      "outcome": "ok",
+      "streams": {
+        "stdout": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-3/exact.stdout.txt",
+          "original_bytes": 196,
+          "original_sha256": "0715e7c653b90d12731f485f774c4d51e25cfa07ac8297bcf202a2f61b016332",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 1.90s\n\n"
+        },
+        "stderr": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/standalone/02-3/exact.stderr.txt",
+          "original_bytes": 0,
+          "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "encoding": "Exact UTF-8 decoded bytes; no normalization",
+          "utf8": ""
+        }
+      }
+    }
+  ],
+  "commands": "Direct exact full-candidate executables, package working directory, recorded gate environment; no Cargo recompile or feature-union change. Every executable hash checked before and after.",
+  "retries": 0,
+  "native_checks_replaced": false
+}

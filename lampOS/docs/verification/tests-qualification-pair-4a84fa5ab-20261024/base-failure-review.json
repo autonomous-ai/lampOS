@@ -1,0 +1,341 @@
+{
+  "base_head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "candidate_head": "93c995a6b1757af77d5d2a25f1567f314ad5f72d",
+  "scope": "Both full test phases have complete actual execution censuses; final independent-gate closure and standalone observations are separate prerequisites. Matching phases are reviewed from actual diagnostics, not just names.",
+  "matched_failures": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "base": "FAILED",
+      "candidate": {
+        "status": "ok",
+        "target": "lamp-voice:lib:lamp_voice",
+        "phase": "voice-default-parallel",
+        "executable_sha256": "9b968daf0b84f07193211cebe398e3452fb6195cc07fef203263fff55a2b8a16"
+      },
+      "reviewed_assertion_phase": "second_route.rs:384 assert_clean; scenario host watchdog with five child exit-observation timeout occurrences. Candidate full observation passed.",
+      "identical_assertion_file": {
+        "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+        "sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 627692,
+        "bytes": 3274,
+        "sha256": "3c7cdf744815a24ac1e498a3cfbcaee6642ba08ed7d24697bd877deaa1ecd299",
+        "utf8": "---- coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its look's picture is dropped; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture' (717862251) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture\n   5: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "candidate_failure_phase_review": null,
+      "disposition": "Matched frozen-base failure for the qualification rule; no historical cause inference or failure waiver."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "base": "FAILED",
+      "candidate": {
+        "status": "FAILED",
+        "target": "lamp-voice:lib:lamp_voice",
+        "phase": "voice-default-parallel",
+        "executable_sha256": "9b968daf0b84f07193211cebe398e3452fb6195cc07fef203263fff55a2b8a16"
+      },
+      "reviewed_assertion_phase": "privacy_bus.rs:1313; ten fixture-classified host-stalled attempts, only the final reported reason is publisher unavailable. Both base and candidate reached this assertion.",
+      "identical_assertion_file": {
+        "path": "lampOS/crates/voice/src/privacy_bus.rs",
+        "sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 639949,
+        "bytes": 871,
+        "sha256": "ab6a43cc86c3b66e8710d8f522997589edd6e6ab63fcca785ac6b2dd69509b6b",
+        "utf8": "---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----\n\nthread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (717900248) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "candidate_failure_phase_review": {
+        "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+        "assertion_phase": "privacy_bus.rs:1313, ten attempts classified as host-stalled by the fixture; only the final reported reason is privacy publisher unavailable",
+        "same_test_source_sha256": "0c5187d595c326fda96aed34ca1c8faeb387bc946c34a23900c95480973c0674",
+        "test_source": "lampOS/crates/voice/src/privacy_bus.rs",
+        "base_diagnostic": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+          "original_stream_bytes": 671494,
+          "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+          "byte_offset": 639949,
+          "bytes": 871,
+          "sha256": "ab6a43cc86c3b66e8710d8f522997589edd6e6ab63fcca785ac6b2dd69509b6b",
+          "utf8": "---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----\n\nthread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (717900248) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+        },
+        "candidate_diagnostic": {
+          "source": "/private/tmp/tests-3190-qualification-4a84-20261024/candidate/run-2026-10-24T031017.138397Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+          "offset": 626136,
+          "bytes": 872,
+          "utf8": "---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----\n\nthread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (718499371) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+        },
+        "decision": "Same observed assertion phase on frozen base and candidate; no cause or historical counterfactual claim."
+      },
+      "disposition": "Matched frozen-base failure for the qualification rule; no historical cause inference or failure waiver."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "base": "FAILED",
+      "candidate": {
+        "status": "FAILED",
+        "target": "lamp-voice:test:it",
+        "phase": "voice-default-parallel",
+        "executable_sha256": "423c0b0c48550779778c2af427a6afee3b51a21980bb3bc87c36abf47061778e"
+      },
+      "reviewed_assertion_phase": "light_call.rs:90 unchanged strict25ms predicate at sorted index10, after twenty Outcome::Done checks. Base106.352192ms and candidate75.013172ms both failed. These observed timings are not an improvement claim.",
+      "identical_assertion_file": {
+        "path": "lampOS/crates/voice/tests/it/light_call.rs",
+        "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 668892,
+        "bytes": 1247,
+        "sha256": "2b08efaa680ec373732818af7c6787191d0085eb9aa42afff20057c9d7daea85",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (717937690) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "candidate_failure_phase_review": {
+        "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+        "assertion_phase": "light_call.rs:90, strict 25 ms index-10 predicate after 20 Outcome::Done assertions",
+        "same_test_source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+        "test_source": "lampOS/crates/voice/tests/it/light_call.rs",
+        "base_diagnostic": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+          "original_stream_bytes": 671494,
+          "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+          "byte_offset": 668892,
+          "bytes": 1247,
+          "sha256": "2b08efaa680ec373732818af7c6787191d0085eb9aa42afff20057c9d7daea85",
+          "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (717937690) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+        },
+        "candidate_diagnostic": {
+          "source": "/private/tmp/tests-3190-qualification-4a84-20261024/candidate/run-2026-10-24T031017.138397Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+          "offset": 651909,
+          "bytes": 1217,
+          "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [3.545838ms, 3.549682ms, 3.65621ms, 3.73459ms, 5.069006ms, 5.449541ms, 36.764792ms, 39.889684ms, 60.122086ms, 60.829681ms, 75.013172ms, 88.718823ms, 89.098304ms, 92.218659ms, 92.708554ms, 93.057084ms, 99.276082ms, 102.776101ms, 110.487753ms, 113.400119ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (718542452) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[3.545838ms, 3.549682ms, 3.65621ms, 3.73459ms, 5.069006ms, 5.449541ms, 36.764792ms, 39.889684ms, 60.122086ms, 60.829681ms, 75.013172ms, 88.718823ms, 89.098304ms, 92.218659ms, 92.708554ms, 93.057084ms, 99.276082ms, 102.776101ms, 110.487753ms, 113.400119ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+        },
+        "decision": "Same observed assertion phase on frozen base and candidate; no cause or historical counterfactual claim."
+      },
+      "disposition": "Matched frozen-base failure for the qualification rule; no historical cause inference or failure waiver."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "base": "FAILED",
+      "candidate": {
+        "status": "ok",
+        "target": "lamp-expression:test:runtime",
+        "phase": "readers-default-parallel",
+        "executable_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6"
+      },
+      "reviewed_assertion_phase": "runtime.rs:127 fresh voice and joints. Candidate full observation passed.",
+      "identical_assertion_file": {
+        "path": "lampOS/crates/expression/tests/runtime.rs",
+        "sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 455135,
+        "bytes": 701,
+        "sha256": "27c11da307c069253fac10b31d033e7c24b17feb8b80f0d0cef75ca719c05249",
+        "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (717996380) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss\n   5: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "candidate_failure_phase_review": null,
+      "disposition": "Matched frozen-base failure for the qualification rule; no historical cause inference or failure waiver."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "base": "FAILED",
+      "candidate": {
+        "status": "ok",
+        "target": "lamp-expression:test:runtime",
+        "phase": "readers-default-parallel",
+        "executable_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6"
+      },
+      "reviewed_assertion_phase": "runtime.rs:1048 a light request. Candidate full observation passed.",
+      "identical_assertion_file": {
+        "path": "lampOS/crates/expression/tests/runtime.rs",
+        "sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 455836,
+        "bytes": 861,
+        "sha256": "22cd7326f4ccb080d868d65903ba74c8200317f4c7ea7b8633363e68d652cea5",
+        "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (717996384) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   5: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\n   6: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "candidate_failure_phase_review": null,
+      "disposition": "Matched frozen-base failure for the qualification rule; no historical cause inference or failure waiver."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "base": "FAILED",
+      "candidate": {
+        "status": "ok",
+        "target": "lamp-expression:test:runtime",
+        "phase": "readers-default-parallel",
+        "executable_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6"
+      },
+      "reviewed_assertion_phase": "runtime.rs:1008 a body request. Candidate full observation passed.",
+      "identical_assertion_file": {
+        "path": "lampOS/crates/expression/tests/runtime.rs",
+        "sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 456697,
+        "bytes": 745,
+        "sha256": "f333d52aefdee69e685c735dd638b69981114338b7d56f7f52f5e95fd2f06fa4",
+        "utf8": "---- without_a_pause_said_expression_asks_exactly_as_before stdout ----\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (717996422) panicked at crates/expression/tests/runtime.rs:1008:57:\na body request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   5: runtime::without_a_pause_said_expression_asks_exactly_as_before\n   6: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "candidate_failure_phase_review": null,
+      "disposition": "Matched frozen-base failure for the qualification rule; no historical cause inference or failure waiver."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "base": "FAILED",
+      "candidate": {
+        "status": "ok",
+        "target": "lamp-expression:test:runtime",
+        "phase": "readers-default-parallel",
+        "executable_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6"
+      },
+      "reviewed_assertion_phase": "runtime.rs:943 journal fixture host watchdog. Candidate full observation passed.",
+      "identical_assertion_file": {
+        "path": "lampOS/crates/expression/tests/runtime.rs",
+        "sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4"
+      },
+      "base_diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 457442,
+        "bytes": 665,
+        "sha256": "cdb0107123a19a11a6bb69d2b349625d70064b2378385a4023df6f5bfb0fe625",
+        "utf8": "---- sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service stdout ----\n\nthread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (717996391) panicked at crates/expression/tests/runtime.rs:943:13:\njournal fixture host watchdog\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\n   3: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "candidate_failure_phase_review": null,
+      "disposition": "Matched frozen-base failure for the qualification rule; no historical cause inference or failure waiver."
+    }
+  ],
+  "standalone_required": [
+    "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+    "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+  ],
+  "historical_limit": "Original nine failures remain at their original source. Seven are reproduced on this frozen clean base at the same observed assertion phase; that does not determine the cause of any historical failure."
+}

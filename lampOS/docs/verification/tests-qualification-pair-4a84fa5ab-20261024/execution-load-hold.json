@@ -1,0 +1,8 @@
+{
+  "controller_hold_required": false,
+  "linux_fmt_all_completed_by_utc": "2026-10-24T02:10:24Z",
+  "base_gate_started_at": "2026-10-24T02:10:05.977194+00:00",
+  "source": "Parent terminal receipts: three source-only Linux formatting checks, all exit0/source unchanged",
+  "own_linux_fmt_receipt": "/private/tmp/tests-3190-linux-fmt-4a84-20261024/run-20261024T020809.851548Z/result.json",
+  "status": "No controller pause; full test start will be recorded from the native gate receipt."
+}

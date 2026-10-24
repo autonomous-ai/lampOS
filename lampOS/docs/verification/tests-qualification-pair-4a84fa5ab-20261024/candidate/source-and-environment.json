@@ -1,0 +1,103 @@
+{
+  "identity": {
+    "worktree": "/private/tmp/tests-codex-boot-clock-current-20261023",
+    "head": "93c995a6b1757af77d5d2a25f1567f314ad5f72d",
+    "base_tree": "00435faf86c34147fd870f08a7b53c5d3df0a8b4",
+    "qualification_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+    "branch": "tests/1569-boot-clock-current",
+    "tracked_paths": 10309,
+    "lampos_paths": 6963,
+    "source_aggregate_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+    "owned_paths": [],
+    "combined_authored_paths": [
+      "lampOS/crates/voice/src/coordinator/second.rs",
+      "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "lampOS/crates/voice/src/scenario_clock.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/stop_words.rs",
+      "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "lampOS/docs/voice-test-fixtures.md"
+    ],
+    "source_map_sha256": "4d86fdfafd1c8926769374270784a31364550a93fa66f8dc956e12837b3dea18",
+    "clean_committed_source": true
+  },
+  "candidate_commit_at_execution": "93c995a6b1757af77d5d2a25f1567f314ad5f72d",
+  "source_unchanged": true,
+  "source_before_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+  "source_after_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+  "freshness": {
+    "mtime_ns": 1792811417237823000,
+    "paths": 10309,
+    "before_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+    "after_sha256": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+    "bytes_modes_symlinks_identical": true
+  },
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "before": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "after": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced"
+    },
+    {
+      "step": "clippy",
+      "before": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "after": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced"
+    },
+    {
+      "step": "voice-default-parallel",
+      "before": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "after": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced"
+    },
+    {
+      "step": "readers-default-parallel",
+      "before": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "after": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced"
+    },
+    {
+      "step": "workspace-build",
+      "before": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "after": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced"
+    },
+    {
+      "step": "diff-check",
+      "before": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced",
+      "after": "52a8fb75ebb66fc38704735686a06d362938354872491c26dd7f3aedee5a5ced"
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "launch_permissions": "Explicitly authorized require_escalated for local fixture sockets.",
+  "architecture": "Rust host x86_64-apple-darwin and captured Mach-O x86_64 artifacts; physical hardware ISA not independently measured.",
+  "source_map": {
+    "external_file": "/private/tmp/tests-3190-qualification-4a84-20261024/candidate/source-map.json",
+    "bytes": 2837141,
+    "sha256": "4d86fdfafd1c8926769374270784a31364550a93fa66f8dc956e12837b3dea18"
+  },
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-3190-qualification-4a84-20261024/candidate/run-2026-10-24T031017.138397Z/results.json",
+    "bytes": 98640,
+    "sha256": "5c2b644437c3fd572f546ab6e68d8209ab15efa4715e0ae44848998900740acb"
+  },
+  "limit": "All tracked repository inputs/modes/symlink values were guarded on a clean committed source. Bulk source map remains external."
+}

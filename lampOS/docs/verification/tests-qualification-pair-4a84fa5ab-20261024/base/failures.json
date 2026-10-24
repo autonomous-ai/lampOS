@@ -1,0 +1,298 @@
+{
+  "head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "comparison_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "count": 17,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 626726,
+        "bytes": 966,
+        "sha256": "c1856d4e068c13983e4ce71c8c94fc34c30c818cf83cb69cb69af8088d5a114a",
+        "utf8": "---- coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean stdout ----\nlamp-voice: the ring faulted (ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms); starting it again, 1 of 3\n\nthread 'coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean' (717839541) panicked at crates/voice/src/coordinator/optional_ring_tests.rs:881:5:\nrestart tick took 56.31105ms\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::coordinator::optional_ring_tests::restart_tick_at\n   3: lamp_voice::coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean\n   4: lamp_voice::coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 627692,
+        "bytes": 3274,
+        "sha256": "3c7cdf744815a24ac1e498a3cfbcaee6642ba08ed7d24697bd877deaa1ecd299",
+        "utf8": "---- coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its look's picture is dropped; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture' (717862251) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture\n   5: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 630966,
+        "bytes": 844,
+        "sha256": "fb94d343e824a6b7070b912d09d2a0d4abe2d39f657a34b15ec4c31fec530d4e",
+        "utf8": "---- coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics stdout ----\n\nthread 'coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics' (717887906) panicked at crates/voice/src/coordinator/tests/termination.rs:68:9:\nsignal child did not finish\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::coordinator::tests::termination::real_signal\n   3: lamp_voice::coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics\n   4: lamp_voice::coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 631810,
+        "bytes": 848,
+        "sha256": "2d3d67bd38bc6a05267030de20e28ac00c72385ad6a8262d0fbba220d36806ca",
+        "utf8": "---- coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics stdout ----\n\nthread 'coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics' (717887959) panicked at crates/voice/src/coordinator/tests/termination.rs:68:9:\nsignal child did not finish\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::coordinator::tests::termination::real_signal\n   3: lamp_voice::coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics\n   4: lamp_voice::coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 632658,
+        "bytes": 861,
+        "sha256": "f43b5b30f221e79eb2fa9d1f9b8296bd7ba1c399ebe774a6db066ca892bd114c",
+        "utf8": "---- hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives stdout ----\n\nthread 'hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives' (717893356) panicked at crates/voice/src/hand_controls/tests.rs:1529:13:\nthe touch never arrived: Health { received: 2, rejected: 1, lost: 0, reconnects: 0, discontinuities: 2, pump_running: false, persistence_failed: false }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::hand_controls::tests::head_touch_rounds\n   3: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives\n   4: lamp_voice::hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 633519,
+        "bytes": 6430,
+        "sha256": "20d5c9fa7840ed8d808bdbae1c49fbe180e8ce0bdbc00cbbc6c2cc316627d687",
+        "utf8": "---- coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 55021 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"provider_first_audio\", \"provider_audio_enqueued\", \"turn_taking_availability\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_renewals\", \"ring_requested\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken' (717882846) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 55021 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"provider_first_audio\", \"provider_audio_enqueued\", \"turn_taking_availability\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_renewals\", \"ring_requested\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken\n   5: lamp_voice::coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 639949,
+        "bytes": 871,
+        "sha256": "ab6a43cc86c3b66e8710d8f522997589edd6e6ab63fcca785ac6b2dd69509b6b",
+        "utf8": "---- privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second stdout ----\n\nthread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (717900248) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 640820,
+        "bytes": 911,
+        "sha256": "75fe1851f081874a7d28961674de7e1e7c2051e03fb3c3741d10864050fca2ff",
+        "utf8": "---- session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure stdout ----\nlamp-voice serve: session reader unavailable; metadata remains private\n\nthread 'session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure' (717934509) panicked at crates/voice/src/session_reader/tests.rs:74:5:\nassertion failed: report.acknowledged && report.degraded && !report.writer_failed\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic\n   3: lamp_voice::session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure\n   4: lamp_voice::session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+      "actual_status": "FAILED",
+      "binary_sha256": "366ac00c3d3546f83f5c713ba31f5934b606456791209f7780ebd65b4f3ed470",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 667282,
+        "bytes": 807,
+        "sha256": "c938d58dc5beed43d3783177fab560cf9e898d4987127d10b38c8778fd317c4c",
+        "utf8": "---- diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs stdout ----\n\nthread 'diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs' (717937296) panicked at crates/voice/tests/it/diagnostics.rs:370:5:\nFinishReport { valid: false, outcome: TimedOut, faults: 512, completion_marker_published: false, completion_sha256: None, summary: None }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs\n   3: it::diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+      "actual_status": "FAILED",
+      "binary_sha256": "366ac00c3d3546f83f5c713ba31f5934b606456791209f7780ebd65b4f3ed470",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 668089,
+        "bytes": 803,
+        "sha256": "a7a6a8403d249ac7e4b038e106df8cfb7ee7ef0002e9b5c0dc621ad97d03fdaf",
+        "utf8": "---- diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement stdout ----\n\nthread 'diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement' (717937290) panicked at crates/voice/tests/it/diagnostics.rs:102:5:\nFinishReport { valid: false, outcome: TimedOut, faults: 512, completion_marker_published: false, completion_sha256: None, summary: None }\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement\n   3: it::diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "366ac00c3d3546f83f5c713ba31f5934b606456791209f7780ebd65b4f3ed470",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 671494,
+        "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+        "byte_offset": 668892,
+        "bytes": 1247,
+        "sha256": "2b08efaa680ec373732818af7c6787191d0085eb9aa42afff20057c9d7daea85",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (717937690) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "actual_status": "FAILED",
+      "binary_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 455135,
+        "bytes": 701,
+        "sha256": "27c11da307c069253fac10b31d033e7c24b17feb8b80f0d0cef75ca719c05249",
+        "utf8": "---- enabled_output_uses_a_new_session_and_expires_after_input_loss stdout ----\n\nthread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (717996380) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss\n   5: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "actual_status": "FAILED",
+      "binary_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 455836,
+        "bytes": 861,
+        "sha256": "22cd7326f4ccb080d868d65903ba74c8200317f4c7ea7b8633363e68d652cea5",
+        "utf8": "---- only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline stdout ----\n\nthread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (717996384) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   5: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\n   6: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "actual_status": "FAILED",
+      "binary_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 456697,
+        "bytes": 745,
+        "sha256": "f333d52aefdee69e685c735dd638b69981114338b7d56f7f52f5e95fd2f06fa4",
+        "utf8": "---- without_a_pause_said_expression_asks_exactly_as_before stdout ----\n\nthread 'without_a_pause_said_expression_asks_exactly_as_before' (717996422) panicked at crates/expression/tests/runtime.rs:1008:57:\na body request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   5: runtime::without_a_pause_said_expression_asks_exactly_as_before\n   6: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-expression:test:runtime",
+      "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "actual_status": "FAILED",
+      "binary_sha256": "c68e21d126c9db439d8ad2246dddf7d3df299b48e6f7d054382542e64b6b1eb6",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 457442,
+        "bytes": 665,
+        "sha256": "cdb0107123a19a11a6bb69d2b349625d70064b2378385a4023df6f5bfb0fe625",
+        "utf8": "---- sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service stdout ----\n\nthread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (717996391) panicked at crates/expression/tests/runtime.rs:943:13:\njournal fixture host watchdog\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\n   3: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "actual_status": "FAILED",
+      "binary_sha256": "cf8a340bc7882113f364b3dff5e6f75a6ee4ed8dec604e4c2d7cae029d84a3cc",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 495530,
+        "bytes": 750,
+        "sha256": "3c5d57d6b2ed841debccbcd56c7abf62b3bdb01f7ea65ae18e445cfcb999c02c",
+        "utf8": "---- health::the_environment_alone_does_not_enable_reporting_or_create_bus_data stdout ----\n\nthread 'health::the_environment_alone_does_not_enable_reporting_or_create_bus_data' (718022270) panicked at crates/memory/tests/it/health.rs:237:13:\nmemory never became ready; lamp-memory: health reports off: no --bus-root\n\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::health::Process::ready\n   3: it::health::the_environment_alone_does_not_enable_reporting_or_create_bus_data\n   4: it::health::the_environment_alone_does_not_enable_reporting_or_create_bus_data::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "actual_status": "FAILED",
+      "binary_sha256": "cf8a340bc7882113f364b3dff5e6f75a6ee4ed8dec604e4c2d7cae029d84a3cc",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 669725,
+        "original_stream_sha256": "e416fdcf3f3ca832aa3ca01cc51e308a0ed81d94d479bb89d61ededb6b7018ef",
+        "byte_offset": 496280,
+        "bytes": 808,
+        "sha256": "cdf579888c9ed03888e6d14579c51a6346f76a091f3683fd14759026dff61e29",
+        "utf8": "---- voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note stdout ----\n\nthread 'voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note' (718022603) panicked at crates/memory/tests/it/voice.rs:142:18:\ncalled `Result::unwrap()` on an `Err` value: Timeout\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::result::unwrap_failed\n   3: it::voice::Fixture::next\n   4: it::voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note\n   5: it::voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "paired_baseline_run_in_this_plan": true,
+  "failed_candidate_runs_repeated": false
+}

@@ -1,0 +1,134 @@
+{
+  "run": 40055587720,
+  "head": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "job": 120757735585,
+  "conclusion": "success",
+  "event": "push",
+  "counts": {
+    "PASS": 11163,
+    "LEAK": 1
+  },
+  "summary": "Summary [ 200.342s] 11164 tests run: 11164 passed (1 leaky), 71 skipped",
+  "skipped": 71,
+  "unique_indices_and_identities": 11164,
+  "non_pass": [
+    {
+      "status": "LEAK",
+      "seconds": 0.263,
+      "index": 8992,
+      "total": 11164,
+      "identity": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "log_sha256": "eca321f872dc36dca64f22f8d236db67e22e151120ae1ece1f912908ebfbf97a",
+  "profile": "pr",
+  "configured_default_filter": "all()",
+  "workflow_mode": "ordinary integration push, workspace selection; source config includes realtime",
+  "checkout_hash_lines": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T02:47:25.0838861Z 9ed44f88c573837c50451c94f4d88f010e8a6721",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:14:57.7250951Z   name: lampos-arm64-9ed44f88c573837c50451c94f4d88f010e8a6721",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:15:05.5942186Z   key: lampos-arm64-u2204-cbfcdb29fe3d015ba02742f7f48dfe401f7f264225fe58a69b8968c841867c48-9ed44f88c573837c50451c94f4d88f010e8a6721",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:15:15.6579357Z Cache saved with key: lampos-arm64-u2204-cbfcdb29fe3d015ba02742f7f48dfe401f7f264225fe58a69b8968c841867c48-9ed44f88c573837c50451c94f4d88f010e8a6721"
+  ],
+  "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "observed_realtime_example_rows": [
+    {
+      "status": "PASS",
+      "seconds": 0.96,
+      "index": 1336,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1.56,
+      "index": 1493,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.875,
+      "index": 1494,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1.011,
+      "index": 1496,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.252,
+      "index": 1666,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.807,
+      "index": 1812,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.81,
+      "index": 2194,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.81,
+      "index": 2466,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1.311,
+      "index": 2621,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.316,
+      "index": 2794,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block"
+    },
+    {
+      "status": "PASS",
+      "seconds": 3.507,
+      "index": 2890,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on"
+    },
+    {
+      "status": "PASS",
+      "seconds": 7.912,
+      "index": 3346,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked"
+    },
+    {
+      "status": "PASS",
+      "seconds": 1.602,
+      "index": 3446,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.511,
+      "index": 3481,
+      "total": 11164,
+      "identity": "lamp-voice::it capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms"
+    }
+  ]
+}

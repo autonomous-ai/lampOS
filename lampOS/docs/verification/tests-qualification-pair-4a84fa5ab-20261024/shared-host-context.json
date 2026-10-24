@@ -1,0 +1,22 @@
+{
+  "source": "Fresh matched4a84 qualification",
+  "target_ownership": "Exclusive MAIN/CPU Cargo gate ownership; other builders prepare source only.",
+  "interpretation": "The recorded commands and environment settings are matched. No idle-machine or identical instantaneous host-load claim is made. Exact-source Linux formatting is kept outside full test stages; its stage coordination is recorded separately.",
+  "previous_run_limit": "Earlier88 source-checkout I/O context belongs to its preserved earlier receipt and is not asserted to have repeated here.",
+  "events": [
+    {
+      "reported_at": "2026-10-24T02:21:57.535524+00:00",
+      "source": "Parent builder report",
+      "event": "Source-only cargo fmt -p lamp-tasks -p lamp-voice in a separate worktree for the completed #2839 draft; no build, test or shared-target use. Bounded interval and before/after source hashes retained by parent.",
+      "actual_interval": {
+        "start": "2026-10-24T02:22:07.499895Z",
+        "end": "2026-10-24T02:22:13.451165Z",
+        "seconds": 5.951,
+        "exit_code": 0
+      },
+      "limit": "Ordinary shared-host preparation CPU/I/O; no idle-machine, equal-load or failure-cause claim.",
+      "receipt": "/private/tmp/tests-2839-validation-plan-20261024/format-preparation",
+      "preflight": "First attempt did not spawn Cargo because PATH was missing; raw preflight retained by parent."
+    }
+  ]
+}

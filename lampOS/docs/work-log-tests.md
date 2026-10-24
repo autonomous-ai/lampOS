@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-24 10:59 +0700 — matched qualification complete; latest carries underway
+
+Ready for lamp-voice: no; fresh carried-head gates and native checks remain.
+
+The [complete matched comparison](verification/tests-qualification-pair-4a84fa5ab-20261024/) satisfies the agreed local rule: base 4a84fa5ab **7,219 passed / 17 failed / 34 ignored**, candidate 93c995a6b **7,234 / 2 / 34**. All 88 changed fixture cases pass. Full Voice changes from 3,950/11/15 to 3,959/2/15; its library is 3,672/8/15 before and 3,679/1/15 after. The eleven readers are 3,269/6/19 before and 3,275/0/19 after. Formatting, strict Clippy, workspace build, source and census guards complete. Body and Memory's two unmatched original observations each pass exactly three standalone observations. Every failed full run and all fifteen base-only failures remain retained; no causal or timing improvement is inferred.
+
+The two remaining candidate failures match the reviewed base phases: kept-privacy resync (ten accepted stalled-category attempts, only final unavailable error known) and light-call's unchanged strict 25 ms index-10 predicate. They remain named failures, not green tests. [Existing ARM baseline context](verification/tests-arm64-base-context-20261024/) records full workspace ordinary-profile integration counts separately; no candidate native result is claimed.
+
+All three owned carries rebased cleanly onto 9ed44f88c: #3190 at 414b2df34, #3218 at e63a86d0d and #3273 at 4f969a57b, with old heads retained and equal range-diffs. Exact-source Linux x86 formatting is running before the fresh candidate gates; no new blanket baseline is being started. The sign-in and same-voice controls remain unexecuted. No local ARM build or lamp action ran.
+
 ## 2026-10-24 10:42 +0700 — package execution and renewed rested read
 
 Ready for lamp-voice: no; own frozen candidate qualification continues.

@@ -1,0 +1,212 @@
+{
+  "failures": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/voice-default-parallel/target-outcomes.json",
+      "original_failure_detail": "{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its look's picture is dropped; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 3755 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture' (711875823) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 3755 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture\n   5: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/voice-default-parallel/target-outcomes.json",
+      "original_failure_detail": "thread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (711901452) panicked at crates/voice/src/privacy_bus.rs:1313:25:\nthe host stalled in 10 of 10 attempts: privacy publisher unavailable\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second\n   3: lamp_voice::privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/voice-default-parallel/target-outcomes.json",
+      "original_failure_detail": "light calls, fastest to slowest: [19.356788ms, 20.165884ms, 24.558864ms, 38.475542ms, 40.254541ms, 56.222472ms, 74.600004ms, 77.042638ms, 94.347111ms, 97.000364ms, 98.38947ms, 99.986133ms, 111.157484ms, 117.359524ms, 123.061131ms, 129.99072ms, 137.674512ms, 148.535584ms, 155.281521ms, 181.168724ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (711925736) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[19.356788ms, 20.165884ms, 24.558864ms, 38.475542ms, 40.254541ms, 56.222472ms, 74.600004ms, 77.042638ms, 94.347111ms, 97.000364ms, 98.38947ms, 99.986133ms, 111.157484ms, 117.359524ms, 123.061131ms, 129.99072ms, 137.674512ms, 148.535584ms, 155.281521ms, 181.168724ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-body",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/readers-default-parallel/target-outcomes.json",
+      "original_failure_detail": "thread 'runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets' (711951283) panicked at crates/body/src/runtime/supervisor/tests.rs:949:5:\nSome(\"motor inhibit acknowledgement timed out\")\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_body::runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets\n   3: lamp_body::runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/readers-default-parallel/target-outcomes.json",
+      "original_failure_detail": "thread 'enabled_output_uses_a_new_session_and_expires_after_input_loss' (711958361) panicked at crates/expression/tests/runtime.rs:127:28:\nfresh voice and joints\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss\n   5: runtime::enabled_output_uses_a_new_session_and_expires_after_input_loss::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/readers-default-parallel/target-outcomes.json",
+      "original_failure_detail": "thread 'only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline' (711958365) panicked at crates/expression/tests/runtime.rs:1048:14:\na light request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   5: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline\n   6: runtime::only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/readers-default-parallel/target-outcomes.json",
+      "original_failure_detail": "thread 'without_a_pause_said_expression_asks_exactly_as_before' (711958434) panicked at crates/expression/tests/runtime.rs:1008:57:\na body request\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::option::expect_failed\n   3: core::option::Option<T>::expect\n   4: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   5: runtime::without_a_pause_said_expression_asks_exactly_as_before\n   6: runtime::without_a_pause_said_expression_asks_exactly_as_before::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/readers-default-parallel/target-outcomes.json",
+      "original_failure_detail": "thread 'sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service' (711958372) panicked at crates/expression/tests/runtime.rs:943:13:\njournal fixture host watchdog\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\n   3: runtime::sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-codex-boot-clock-current-20261023/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "original_status": "FAILED",
+      "original_head": "72a62a51c065002eeff4407dba77c56088e3649f",
+      "original_execution_source": "4e8ea747cd7dc745742283d6d08cb100297a8bfa plus recorded overlays",
+      "original_output": "/private/tmp/tests-3190-peer-fold-gates-20261023/run-2026-10-23T145546.121457Z/readers-default-parallel/target-outcomes.json",
+      "original_failure_detail": "lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh' (711988883) panicked at crates/memory/tests/it/voice.rs:960:5:\nassertion `left == right` failed: the retry sends one forget: []\n  left: 0\n right: 1\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed::<usize, usize>\n   4: it::voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh\n   5: it::voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace."
+    }
+  ],
+  "original_publication": "https://github.com/autonomous-ai/lampOS/tree/3abad8fcff/lampOS/docs/verification/voice-boot-clock-20261023/combined-09f8e7412/full-gates"
+}

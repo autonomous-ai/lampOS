@@ -1,0 +1,270 @@
+{
+  "cases": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Existing fixture ledger; exact identity recorded in comment 6345203929"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "issue": 3315,
+      "owner": "Tests",
+      "note": "First assigned the seven retained fixture failures together in #3315; this tracking does not establish cause or waive qualification."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "edition": "2024"
+      },
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "issue": 3315,
+      "owner": "Tests",
+      "note": "First assigned the seven retained fixture failures together in #3315; this tracking does not establish cause or waive qualification."
+    },
+    {
+      "package": "lamp-body",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "edition": "2024"
+      },
+      "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+      "issue": 3315,
+      "owner": "Tests",
+      "note": "First assigned the seven retained fixture failures together in #3315; this tracking does not establish cause or waive qualification."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "runtime",
+        "edition": "2024"
+      },
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "issue": 3315,
+      "owner": "Tests",
+      "note": "First assigned the seven retained fixture failures together in #3315; this tracking does not establish cause or waive qualification."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "runtime",
+        "edition": "2024"
+      },
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "issue": 3315,
+      "owner": "Tests",
+      "note": "First assigned the seven retained fixture failures together in #3315; this tracking does not establish cause or waive qualification."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "runtime",
+        "edition": "2024"
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "issue": 3315,
+      "owner": "Tests",
+      "note": "First assigned the seven retained fixture failures together in #3315; this tracking does not establish cause or waive qualification."
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "runtime",
+        "edition": "2024"
+      },
+      "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "issue": 1386,
+      "owner": "Tests",
+      "note": "Existing dedicated issue labelled builder:tests"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "edition": "2024"
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "issue": 3315,
+      "owner": "Tests",
+      "note": "First assigned the seven retained fixture failures together in #3315; this tracking does not establish cause or waive qualification."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "edition": "2024"
+      },
+      "name": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "edition": "2024"
+      },
+      "name": "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "edition": "2024"
+      },
+      "name": "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Exact clean-base failure phase recorded in #1569 comment6378808342; not a current fix or qualification claim. Optional-ring row65 retains Seventh product-boundary decision; no bound widening."
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "edition": "2024"
+      },
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Clean 4a84 base failure explicitly routed #1569 comment6379157037, owner Tests. Classification requires the actual candidate assertion/phase, not only matching names."
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "edition": "2024"
+      },
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "issue": 1569,
+      "owner": "Tests",
+      "note": "Clean 4a84 base failure explicitly routed #1569 comment6379157037, owner Tests. Classification requires the actual candidate assertion/phase, not only matching names."
+    }
+  ]
+}

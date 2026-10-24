@@ -1,0 +1,14 @@
+{
+  "4a84.json": {
+    "bytes": 4933,
+    "sha256": "22bc0f0fe5919d2f78ef119babda0955785135264bc404fc921d5ff6b716ea79"
+  },
+  "9ed.json": {
+    "bytes": 4929,
+    "sha256": "e00c2e14207a70c2b518552690a807b4b6cc98b3a1ba06c427dd60ce3f280f1c"
+  },
+  "README.md": {
+    "bytes": 1830,
+    "sha256": "5985a6bcd1fe4f37c17e4cbf9f1675fa7a31ef1c357267dd9c10ea18123e31ef"
+  }
+}

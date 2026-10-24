@@ -1,0 +1,93 @@
+{
+  "identity": {
+    "worktree": "/private/tmp/tests-3190-qualification-base-20261024",
+    "head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+    "base_tree": "ed86f52528cf34b784bd592bdd88d8d3f9ec777a",
+    "qualification_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+    "branch": "",
+    "tracked_paths": 10309,
+    "lampos_paths": 6963,
+    "source_aggregate_sha256": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+    "owned_paths": [],
+    "combined_authored_paths": [],
+    "source_map_sha256": "42f4afafb2848be4fa05596cd2ff4f911922838b819315109a5f3d089efa863f",
+    "clean_committed_source": true
+  },
+  "candidate_commit_at_execution": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "source_unchanged": true,
+  "source_before_sha256": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+  "source_after_sha256": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+  "freshness": {
+    "mtime_ns": 1792807806509206000,
+    "paths": 10309,
+    "before_sha256": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+    "after_sha256": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+    "bytes_modes_symlinks_identical": true
+  },
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "before": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+      "after": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5"
+    },
+    {
+      "step": "clippy",
+      "before": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+      "after": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5"
+    },
+    {
+      "step": "voice-default-parallel",
+      "before": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+      "after": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5"
+    },
+    {
+      "step": "readers-default-parallel",
+      "before": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+      "after": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5"
+    },
+    {
+      "step": "workspace-build",
+      "before": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+      "after": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5"
+    },
+    {
+      "step": "diff-check",
+      "before": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5",
+      "after": "bfaedc43c590075135ab366e9a548f926ee3c8e8895b0174200099122fe8acd5"
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "launch_permissions": "Explicitly authorized require_escalated for local fixture sockets.",
+  "architecture": "Rust host x86_64-apple-darwin and captured Mach-O x86_64 artifacts; physical hardware ISA not independently measured.",
+  "source_map": {
+    "external_file": "/private/tmp/tests-3190-qualification-4a84-20261024/base/source-map.json",
+    "bytes": 2837141,
+    "sha256": "42f4afafb2848be4fa05596cd2ff4f911922838b819315109a5f3d089efa863f"
+  },
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/results.json",
+    "bytes": 46179,
+    "sha256": "b61f4de787ae40db6985b5e9937f2466862b6ba5db12209aabcf84e067296144"
+  },
+  "limit": "All tracked repository inputs/modes/symlink values were guarded on a clean committed source. Bulk source map remains external."
+}

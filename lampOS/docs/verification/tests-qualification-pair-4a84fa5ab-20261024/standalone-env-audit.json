@@ -1,0 +1,41 @@
+{
+  "source_head": "93c995a6b1757af77d5d2a25f1567f314ad5f72d",
+  "scope": "Original-case families plus the twelve-package reader closure; workspace Cargo/loader-variable string audit",
+  "findings": [
+    "197 workspace Cargo/loader variable references: Cargo values are compile-time env!/option_env! except camera/build.rs build-only CARGO_MANIFEST_DIR read.",
+    "No runtime DYLD_/LD_LIBRARY_PATH or bulk env::vars/vars_os readers found in the four original-case crate source/test trees.",
+    "Body and Expression child fixtures re-execute current_exe and set their own LAMP_* fixture variables; the original Memory case runs its service in process.",
+    "Full-run compiled census directly invokes each bound executable with --list under the recorded fixed environment, demonstrating executable startup without Cargo runtime injection.",
+    "The other eight reader crates have no bulk environment/current-directory reads except Update functions.rs, whose two enumerations only remove LAMP_* before re-executing the same test binary; Update round has none."
+  ],
+  "standalone_environment": "Same fixed gate environment settings, no test-thread override, package working directory, exact full-candidate test executable.",
+  "limit": "Cargo-injected child environment (including dynamic-loader path additions) was not captured during the full run. Byte-for-byte complete runtime environment equality is not claimed. Compile-time Cargo macro values remain embedded in the exact executable. Any new candidate failure family must be checked before standalone execution.",
+  "search_receipts": [
+    {
+      "path": "/private/tmp/tests-3190-qualification-20261024/runtime-env-search.txt",
+      "bytes": 48059,
+      "sha256": "de587e9c6e5f04c1a502e81f06c005a02458f3e5e18773d436518c912e3b26d7"
+    },
+    {
+      "path": "/private/tmp/tests-3190-qualification-20261024/workspace-cargo-env-search.txt",
+      "bytes": 22535,
+      "sha256": "c7e8f7a4a95a2be58d7f8f9cbd58cd01a30069ff02ecf63f7303b3b85556182e"
+    },
+    {
+      "path": "/private/tmp/tests-3190-qualification-20261024/runtime-env-bulk-search.txt",
+      "bytes": 76,
+      "sha256": "b82dfa6b48d5eaf3c0b3fdccaa93646a56ee3e8888fb0563d2b8c6fcf56e7a26"
+    },
+    {
+      "path": "/private/tmp/tests-3190-qualification-20261024/readers-runtime-env-bulk-search.txt",
+      "bytes": 174,
+      "sha256": "586fdd6146732b1588ea7807cf35a204e8c7470f97af0359948e94738109b3a0"
+    },
+    {
+      "path": "/private/tmp/tests-3190-qualification-4a84-20261024/workspace-cargo-env-search.txt",
+      "bytes": 22535,
+      "sha256": "066a6aa14f704eea5b4941dc79ce0a4d4472ee978b267696e9d8462d1e014201"
+    }
+  ],
+  "carry_limit": "Selected-case/source helper files are byte unchanged from5f87; delta is Eyes source and eyes/switches docs. Workspace Cargo/loader variable search repeated on93c995."
+}
