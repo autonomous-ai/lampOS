@@ -1,0 +1,25 @@
+{
+  "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/release_pair-606fc65107fb6878",
+  "executable_sha256": "89ab1d6affd0853f9363b7482f547581e9245313adbc127f4ce6779fd50f337e",
+  "source_fixture_sha256": "c7c27d923511a41025d952584e46cfffb836e219da59d4ab58fb6eb52e7dd726",
+  "result": {
+    "actual_released_pair": false,
+    "already_reaped_independently_checked": true,
+    "elapsed_us": 32739,
+    "group_absent": true,
+    "hardware_or_device_acceptance": false,
+    "pid": 23606,
+    "reaped": true,
+    "result": "passed",
+    "running_at_deadline": true,
+    "timed_out": true
+  },
+  "primary": {
+    "group_absent": true,
+    "pid": 23606,
+    "reaped": true
+  },
+  "fallback_used": false,
+  "external_group_absence_checked": true,
+  "evidence_directory": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/controls-timeout-23605-0"
+}

@@ -5331,3 +5331,5 @@ wait on their owners and a lamp
   started, one reply to the room's talk, median 3.47 s (speed is next).
   Privacy read of Sixth's #1748 and #1707 (one P2, fixed). Head-pad step on
   lamp-52e6 failed (no touch seen); the next probe is on #1362.
+
+- **24 Oct, 17:40.** Pushed #3369 `714c30820`: ordinary Controls fixture proves the existing guard kills and reaps a child still alive at its deadline. Fresh-target package 509/0/3, fmt and strict Clippy passed; positive independent checks and expected mutation failure/fallback retained in [the evidence packet](verification/controls-timeout-control-20261024/README.md). Linux gates and one reader pending; no device or runtime change.

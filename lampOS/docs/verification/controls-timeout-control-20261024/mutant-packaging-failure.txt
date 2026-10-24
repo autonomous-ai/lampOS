@@ -1,0 +1,31 @@
+     Locking 27 packages to latest Rust 1.96.0 compatible versions
+      Adding serde_json v1.0.151 (available: v1.0.154)
+   Compiling version_check v0.9.5
+   Compiling typenum v1.20.1
+   Compiling generic-array v0.14.7
+   Compiling libc v0.2.190
+   Compiling zmij v1.0.23
+   Compiling serde_core v1.0.229
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling rustix v1.1.5
+   Compiling serde_json v1.0.151
+   Compiling errno v0.3.14
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling bitflags v2.13.2
+   Compiling itoa v1.0.18
+   Compiling cfg-if v1.0.5
+   Compiling memchr v2.8.3
+   Compiling sha2 v0.10.9
+   Compiling controls-timeout-mutation-probe v0.0.0 (/private/tmp/third-controls-timeout-mutant)
+error: couldn't read `src/../../fixtures/strip-711-working-pins-example.json`: No such file or directory (os error 2)
+   --> src/fixture.rs:566:48
+    |
+566 |       let mut seed: Value = serde_json::from_str(include_str!(
+    |  ________________________________________________^
+567 | |         "../../fixtures/strip-711-working-pins-example.json"
+568 | |     ))
+    | |_____^
+
+error: could not compile `controls-timeout-mutation-probe` (lib test) due to 1 previous error

@@ -1,0 +1,358 @@
+[
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/bus#lamp-bus@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/bus/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_bus",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/bus/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_bus-31989afa1c567c2e.rlib",
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_bus-31989afa1c567c2e.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/ipc#lamp-ipc@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/ipc/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_ipc",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/ipc/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_ipc-22dfd2d41740deeb.rlib",
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_ipc-22dfd2d41740deeb.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/msgs#lamp-msgs@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/msgs/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_msgs",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/msgs/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_msgs-94b51bcd40438751.rlib",
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_msgs-94b51bcd40438751.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_controls",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_controls-277bed1d65abb11a.rlib",
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/liblamp_controls-277bed1d65abb11a.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/release_pair-606fc65107fb6878"
+    ],
+    "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/release_pair-606fc65107fb6878",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_controls",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/lamp_controls-7bdb54ab006e8e4e"
+    ],
+    "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/lamp_controls-7bdb54ab006e8e4e",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-controls",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/lamp_controls-34fbe0aa49005928"
+    ],
+    "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/lamp_controls-34fbe0aa49005928",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-controls",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/lamp-controls"
+    ],
+    "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/lamp-controls",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "strip_worker",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/tests/strip_worker.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/strip_worker-464798b73656996b"
+    ],
+    "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/strip_worker-464798b73656996b",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "replay_cost",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/examples/replay_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/examples/replay_cost"
+    ],
+    "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/examples/replay_cost",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-controls-timeout-control/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/private/tmp/third-controls-timeout-control/lampOS/crates/controls/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/it-96474fc3d511c3a9"
+    ],
+    "executable": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a/debug/deps/it-96474fc3d511c3a9",
+    "fresh": false
+  }
+]

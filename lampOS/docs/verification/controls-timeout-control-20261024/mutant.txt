@@ -1,0 +1,142 @@
+   Compiling controls-timeout-mutation-probe v0.0.0 (/private/tmp/third-controls-timeout-mutant)
+warning: constant `PIN` is never used
+  --> src/release_pair/fixture.rs:21:7
+   |
+21 | const PIN: &str = "fc3f73157e21c6b3f662ee469f5febeeaa56bbc84091e0b781157192a3961555";
+   |       ^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `BYTES` is never used
+  --> src/release_pair/fixture.rs:22:7
+   |
+22 | const BYTES: usize = 2_463_440;
+   |       ^^^^^
+
+warning: constant `SOURCES` is never used
+  --> src/release_pair/fixture.rs:23:7
+   |
+23 | const SOURCES: [&str; 2] = [
+   |       ^^^^^^^
+
+warning: constant `CASE` is never used
+  --> src/release_pair/fixture.rs:27:7
+   |
+27 | const CASE: Duration = Duration::from_secs(60);
+   |       ^^^^
+
+warning: constant `CANARY` is never used
+  --> src/release_pair/fixture.rs:30:7
+   |
+30 | const CANARY: &str = "synthetic-value-never-for-the-journal";
+   |       ^^^^^^
+
+warning: function `sha` is never used
+  --> src/release_pair/fixture.rs:33:4
+   |
+33 | fn sha(bytes: &[u8]) -> String {
+   |    ^^^
+
+warning: struct `Image` is never constructed
+  --> src/release_pair/fixture.rs:64:8
+   |
+64 | struct Image {
+   |        ^^^^^
+
+warning: function `image` is never used
+  --> src/release_pair/fixture.rs:73:4
+   |
+73 | fn image(path: &Path) -> Image {
+   |    ^^^^^
+
+warning: field `cleanup` is never read
+  --> src/release_pair/fixture.rs:90:5
+   |
+88 | struct Owned {
+   |        ----- field in this struct
+89 |     child: Child,
+90 |     cleanup: PathBuf,
+   |     ^^^^^^^
+
+warning: struct `Binary` is never constructed
+   --> src/release_pair/fixture.rs:254:8
+    |
+254 | struct Binary {
+    |        ^^^^^^
+
+warning: struct `Case` is never constructed
+   --> src/release_pair/fixture.rs:261:8
+    |
+261 | struct Case {
+    |        ^^^^
+
+warning: multiple associated items are never used
+   --> src/release_pair/fixture.rs:269:8
+    |
+268 | impl Case {
+    | --------- associated items in this implementation
+269 |     fn new(actual: bool) -> Self {
+    |        ^^^
+...
+339 |     fn file(&self, name: &str) -> PathBuf {
+    |        ^^^^
+...
+342 |     fn json(&self, name: &str, value: &Value) {
+    |        ^^^^
+...
+345 |     fn data_image(&self) -> BTreeMap<String, Image> {
+    |        ^^^^^^^^^^
+...
+361 |     fn call(
+    |        ^^^^
+...
+464 |     fn calibrate(
+    |        ^^^^^^^^^
+...
+489 |     fn replay(&mut self, which: usize, name: &str, pins: &str, good: bool) -> Vec<u8> {
+    |        ^^^^^^
+
+warning: function `signals` is never used
+   --> src/release_pair/fixture.rs:515:4
+    |
+515 | fn signals(electrode: Option<usize>, delta: u16) -> Value {
+    |    ^^^^^^^
+
+warning: function `check_report` is never used
+   --> src/release_pair/fixture.rs:522:4
+    |
+522 | fn check_report(report: &Value) {
+    |    ^^^^^^^^^^^^
+
+warning: function `check_frames` is never used
+   --> src/release_pair/fixture.rs:534:4
+    |
+534 | fn check_frames(bytes: &[u8]) {
+    |    ^^^^^^^^^^^^
+
+warning: function `run` is never used
+   --> src/release_pair/fixture.rs:563:8
+    |
+563 | pub fn run(actual: bool, reverse: bool, name: &str) {
+    |        ^^^
+
+warning: `controls-timeout-mutation-probe` (lib test) generated 16 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running unittests src/lib.rs (/private/tmp/third-controls-timeout-mutant-target/debug/deps/controls_timeout_mutation_probe-06b589728862222a)
+
+running 1 test
+test missing_primary_guard_is_rejected ... Controls timeout evidence: /var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/controls-timeout-42547-0
+
+thread 'missing_primary_guard_is_rejected' (244590586) panicked at src/release_pair/fixture.rs:37:43:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    missing_primary_guard_is_rejected
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `--lib`

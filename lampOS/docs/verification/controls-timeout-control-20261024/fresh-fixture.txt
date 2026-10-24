@@ -1,0 +1,10 @@
+
+running 3 tests
+test current_cli_exercises_the_controls_pair_fixture ... Controls timeout evidence: /var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/controls-timeout-23605-0
+Controls pair evidence: /var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/controls-pair-23605-1
+ok
+test release_6408_reads_6498_calibration_and_6498_reads_returned_pins ... ignored, requires pinned 6408/6498 artifacts on native Linux ARM64
+test release_6498_reads_6408_calibration_and_6408_reads_returned_pins ... ignored, requires pinned 6408/6498 artifacts on native Linux ARM64
+
+test result: ok. 1 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.29s
+

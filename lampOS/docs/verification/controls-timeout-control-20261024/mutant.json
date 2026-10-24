@@ -1,0 +1,17 @@
+{
+  "mutation": "Only Owned destructor replaced by empty body",
+  "original_fixture_sha256": "c7c27d923511a41025d952584e46cfffb836e219da59d4ab58fb6eb52e7dd726",
+  "mutant_fixture_sha256": "eadd569ebfa5d7831f934e2f374620d95b9d10cda79959c4eab7b60b96c2e9a7",
+  "cargo_exit": 101,
+  "expected_test_result": "0 passed; 1 failed",
+  "fallback": {
+    "group_absent": true,
+    "reaped": true
+  },
+  "host_group_absence_checked": true,
+  "pid": 42618,
+  "seconds": 1.444,
+  "evidence_directory": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/controls-timeout-42547-0",
+  "released_or_hardware_execution": false,
+  "earlier_packaging_failure": "compile only, no test executed"
+}

@@ -1,0 +1,72 @@
+{
+  "base": "83da28dc7f1ea5d6a3d0ab5b599e6b023520c636",
+  "target": "/private/tmp/third-controls-timeout-fresh-1qnvwp7a",
+  "target_initially_empty": true,
+  "before": {
+    "crates/controls/tests/release_pair.rs": "21f980d804169b65fea9ef2a3d7ba046a4df88a90b94f9a37664b3152733032c",
+    "crates/controls/tests/release_pair/fixture.rs": "c7c27d923511a41025d952584e46cfffb836e219da59d4ab58fb6eb52e7dd726",
+    "crates/controls/tests/release_pair/README.md": "49bed9cc09dd41f78df0aa8c0373e8fa7c62606219b1a277163d44301dea9158",
+    "docs/verification/controls-release-pair-20261024/README.md": "2b2a9647928738a724e307184b8c043fb632af0a8e8cfd873dfcacbe12d64318"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.887,
+      "log": "/private/tmp/third-controls-timeout-final-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 22.496,
+      "log": "/private/tmp/third-controls-timeout-final-clippy.txt"
+    },
+    {
+      "name": "controls",
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 56.761,
+      "log": "/private/tmp/third-controls-timeout-final-controls.txt"
+    }
+  ],
+  "complete": true,
+  "after": {
+    "crates/controls/tests/release_pair.rs": "21f980d804169b65fea9ef2a3d7ba046a4df88a90b94f9a37664b3152733032c",
+    "crates/controls/tests/release_pair/fixture.rs": "c7c27d923511a41025d952584e46cfffb836e219da59d4ab58fb6eb52e7dd726",
+    "crates/controls/tests/release_pair/README.md": "49bed9cc09dd41f78df0aa8c0373e8fa7c62606219b1a277163d44301dea9158",
+    "docs/verification/controls-release-pair-20261024/README.md": "2b2a9647928738a724e307184b8c043fb632af0a8e8cfd873dfcacbe12d64318"
+  },
+  "workspace_artifact_count": 11,
+  "workspace_artifact_paths_current": true
+}

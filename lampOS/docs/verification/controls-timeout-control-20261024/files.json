@@ -1,0 +1,42 @@
+{
+  "final-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "positive.json": {
+    "bytes": 868,
+    "sha256": "886c5d5f5c257ec90d5e1416ec67690610308e2bf4d4bb3ca644153b71cc09fb"
+  },
+  "fresh-fixture.txt": {
+    "bytes": 651,
+    "sha256": "94a72fb627da7047c000d9c286f7a311033bb0ba53df71aa6d88c575ce8631b4"
+  },
+  "final-clippy.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "mutant.json": {
+    "bytes": 675,
+    "sha256": "a55f1fd79e40a7508d1e5d19a13d373473303854208f41471024a0c1974e74b2"
+  },
+  "compiler-artifacts.json": {
+    "bytes": 11214,
+    "sha256": "293f7e42371d59372dbb71e8a4a4f0a2815b22b055c508004b82153a74073bf4"
+  },
+  "final-gates.json": {
+    "bytes": 2300,
+    "sha256": "48dfc111599fbc66389940100576b03c331aad9310ea680340684ba4214ca694"
+  },
+  "mutant.txt": {
+    "bytes": 4125,
+    "sha256": "8c126e1b4814c9f2dc6fc24a864347e17632fb4e53aa15d540a282731f94daa8"
+  },
+  "mutant-packaging-failure.txt": {
+    "bytes": 1227,
+    "sha256": "efde4b1053806c4487226787dda03bf939371ba1a57b162736d1c573725ad620"
+  },
+  "final-controls.txt": {
+    "bytes": 44593,
+    "sha256": "f55e250f15c51e66570c75fc092c5da0f0f24482fdad49833d658b52d132c675"
+  }
+}
