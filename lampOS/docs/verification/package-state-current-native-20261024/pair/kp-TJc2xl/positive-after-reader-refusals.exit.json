@@ -1,0 +1,7 @@
+{
+  "code": 0,
+  "event": "reaped",
+  "pid": 10076,
+  "signal": null,
+  "stage": "positive-after-reader-refusals"
+}

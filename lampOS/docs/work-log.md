@@ -1,6 +1,6 @@
 ## Current checkpoint: 2026-10-24 10:26 +07, current native pairs green and package continuation opened
 
-Ready for lamp-voice: yes (#3323); #3312 awaits its second current read.
+Ready for lamp-voice: yes (#3312 and #3323); both have two current-head reads.
 
 These are explicitly selected verification fixtures, with no runtime or default
 behavior change. #3323 `6c8c52e37` has both current-head READ-OKs and all native
@@ -19,19 +19,36 @@ retained separately rather than presented as an uninterrupted green suite.
 #3327 `8bc821736` resolves the first native run's private-directory collision.
 Corrected dedicated **6/0**, ordinary ARM and Linux Clippy are green; the
 first **4/2** run stays retained. Mac **514/0/7 ignored** and exact-head Linux
-fmt pass. Final evidence publication and reads proceed while the parent lands.
+fmt pass. [Final corrected-head proof](verification/rested-state-current-native-20261024/README.md)
+is published. Tests cleared that head; `22bf27d34` then folds the requested
+README execution record only. Fresh Mac **514/0/7 ignored**, strict Clippy and
+Mac/Linux formatting pass; new-head native gates run separately while the
+parent lands.
 
 #3330 `22e5f4873` adds two actual released package/installable-folder cases,
 using offline `pack/install/list` and seven refusal controls per reader.
 Mac fmt, strict Skills Clippy and **514/0/7 ignored** pass. Exact-head Linux
 fmt preserves 6,974 files, cleanup verified. Official dedicated/ordinary/Clippy
-runs have started. No native package result is claimed. Parent #3323 lands
-before this continuation is rebased and offered to the train.
+runs are green. The detailed audit verifies both package directions, 60 owned
+command/reap pairs and 28 intended refusals without installed-tree changes;
+[Current native proof](verification/package-state-current-native-20261024/README.md)
+is retained. Parent #3323 lands before this continuation
+is rebased and offered to the train.
 
 #1812 still needs the independently trusted signing key; #2810 still needs
 an attended lamp window. Neither wait stops these software qualifications.
-Next: finish publication and own-PR findings, the requested independent #3329
-Records read, then the next unclaimed ship-critical qualification boundary.
+The independent #3329 source/artifact read found no additional P1/P2; Third's
+existing descendant-cleanup HOLD remains, with no new systemd result claimed.
+Next: finish publication and own-PR findings, carry Third's requested exact
+Linux formatting to #3328 `7fb4feb20`, then the next unclaimed qualification
+boundary.
+
+Taken on #2809: Actions output-cap persistence, `second/caps-release-pair`,
+after open/merged PR and Queue ownership checks. Two actual 6408/6498 A→B→A
+cases will cover active restrictions, cancellation tombstones, exact retries,
+stale/wrong-token refusal and subsequent fresh writes. Both Actions artifacts
+are identical, explicitly disclosed. Private runtime/bus/store only, no mixer,
+device, actuator, broker or provider. No native pass is claimed before execution.
 
 ---
 

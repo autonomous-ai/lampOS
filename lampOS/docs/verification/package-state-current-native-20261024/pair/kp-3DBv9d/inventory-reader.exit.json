@@ -1,0 +1,7 @@
+{
+  "code": 0,
+  "event": "reaped",
+  "pid": 10186,
+  "signal": null,
+  "stage": "inventory-reader"
+}
