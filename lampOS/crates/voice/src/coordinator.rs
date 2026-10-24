@@ -771,27 +771,20 @@ fn while_answer_waits(
     }
 }
 
-/// A block's score before the faint floor, for a soft start
-/// (`LAMP_SOFT_START`, `TurnDetector::unfloored`): only while the lamp is
-/// silent, its sound not reaching the microphone by the echo evidence
-/// (`sounding`) and nothing of a reply to yield as the duplex mask hears the
-/// block ([`reply_sounding`]: audio still to hand over, or the lamp's sound
-/// accepted, queued or within its tail), and no busy answer kept, so that a
-/// start never reaches back into the lamp's own voice. `None` otherwise,
-/// which a soft start never reaches past.
+/// Whether a block is heard with the lamp silent, for a soft start
+/// (`LAMP_SOFT_START`, `TurnDetector::lamp_silent`): its sound not reaching
+/// the microphone by the echo evidence (`sounding`), nothing of a reply to
+/// yield as the duplex mask hears the block ([`reply_sounding`]: audio still
+/// to hand over, or the lamp's sound accepted, queued or within its tail),
+/// and no busy answer kept. A soft start never reaches back past a block that
+/// was not, so never into the lamp's own voice.
 ///
 /// Not the reply's playback token: it is held from a reply's start until
 /// its audio is retired, so on lamp-4ace on 25 October the lines begun after
 /// an answer, or after a bare "Lamp." whose answer waited, kept no soft start
 /// at all, and two lost their "what" as before.
-fn unfloored_score(
-    sounding: bool,
-    keeping_answer: bool,
-    reply_sounding: bool,
-    probability: f32,
-) -> Option<f32> {
-    (!sounding && !reply_sounding && !keeping_answer && probability.is_finite())
-        .then_some(probability)
+fn lamp_silent(sounding: bool, keeping_answer: bool, reply_sounding: bool) -> bool {
+    !sounding && !reply_sounding && !keeping_answer
 }
 
 /// Whether `current` is an answer to someone's request that has ended, none
@@ -8164,11 +8157,10 @@ fn conversation_with_gate_inner(
             let sounding = frame.echo.as_ref().is_some_and(|echo| {
                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
             });
-            detector.unfloored(unfloored_score(
+            detector.lamp_silent(lamp_silent(
                 sounding,
                 keeping_answer,
                 reply_sounding(&playback_mask, reply, frame.read_completed_at_us),
-                frame.probability,
             ));
             let (update, input_ended) = observe_prospective_heard(
                 &mut playback_mask,

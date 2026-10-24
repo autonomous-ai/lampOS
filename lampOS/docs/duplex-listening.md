@@ -1153,38 +1153,42 @@ on #3126).
   ask you?", four times of four that evening). With 171 ms of quiet before
   the "what", the same kind of line was heard whole.
 - **With the switch,** an ordinary start (not a yield's, nor a line begun as
-  the lamp's sound ends) keeps 200 ms more than the usual 300 ms
-  (`SOFT_START_LEAD_BLOCKS`). If the speech-like run it starts on began
-  earlier, it begins 200 ms (`REACH_LEAD_BLOCKS`) before the run. The run is
-  judged by each block's score before the faint floor, at 0.35 or more
-  (`SILENCE_PROBABILITY`), through gaps under 100 ms
-  (`SOFT_START_GAP_BLOCKS`). That keeps a soft first word that is still
-  under the floor (`TurnDetector::soft_begin`).
+  the lamp's sound ends) keeps 300 ms more than the usual 300 ms
+  (`SOFT_START_LEAD_BLOCKS`, `TurnDetector::soft_begin`). That's 600 ms before
+  the start's sixth block.
+  - **Why 300 ms:** in 60 lines recorded on lamp-4ace on 24 and 25 October,
+    a start came 58 to 458 ms after its speech began. Every line with 100 ms
+    or more of its sound before the word was heard whole.
+  - **Why a fixed lead, not the detector's scores:** they dip inside such a
+    word, so they are no guide to where it began. A first version reached
+    back along them, 200 ms more and through gaps under 100 ms. It stopped
+    short on q03 and q08, which lost their "what" again (the first builder's
+    A/B, 25 Oct, 01:58).
 - **Bounds:**
-  - It reaches at most 500 ms (`SOFT_START_BLOCKS`) before the usual start.
-    Talk across a room that runs straight into a line adds half a second at
-    most.
-  - Additional lead never crosses a block marked unavailable by
-    `unfloored_score`. The coordinator records a score only when the echo
-    evidence does not say the lamp is sounding, no busy answer is kept, and
+  - Additional lead never crosses a block the coordinator marks as not
+    silent (`lamp_silent`). A block is silent only when the echo evidence
+    does not say the lamp is sounding, no busy answer is kept, and
     `reply_sounding` is false: no reply audio still to hand over, accepted,
     queued or within the playback mask's tail. With echo evidence, the
     sounding guard requires 30 quiet 10 ms blocks (300 ms). Without it,
     the mask's existing fallback tail is 100 ms (`TAIL_US`), not 300 ms.
     These are software evidence bounds, not a measured acoustic tail.
-    The reply's playback token alone is not the test: it remains held until
-    audio is retired, even after that audio is handed over and quiet.
+  - The reply's playback token alone is not the test. It remains held until
+    audio is retired, even after that audio is handed over and quiet, and
+    on 25 October it kept every line begun after an answer, or after a bare
+    "Lamp." whose answer waited, from a soft start.
   - It never begins later than the usual start. If pending reply PCM still
-    makes the onset's score unavailable, it keeps the ordinary prefix rather
-    than returning empty audio (the reviewer's P2 on #3392). Once the PCM is
-    handed over and the mask and echo guards are clear, a retained playback
-    token does not prevent the extra lead. The ordinary 300 ms prefix is
-    never shortened by these guards, so it can still contain samples that
-    would block additional lead.
-  - A pause of 100 ms or more ends the speech-like run. The additional lead
-    starts after the preceding speech, so it does not add a name from before
-    that pause. This does not remove speech already inside the unchanged
-    ordinary prefix.
+    makes the onset's block not silent, it keeps the ordinary prefix rather
+    than returning empty audio, which admission refuses and which ended the
+    conversation (the reviewer's P2 on #3392). Once the PCM is handed over
+    and the mask and echo guards are clear, a retained playback token does
+    not prevent the extra lead. The ordinary 300 ms prefix is never
+    shortened by these guards, so it can still contain samples that would
+    block additional lead.
+  - What it costs: 300 ms more of the room before each line goes to speech
+    to text. The lead does not stop at a pause, so a name said less than
+    about half a second before the question may come with it ("Lamp. What
+    time…"), which the second route reads as a call with its line.
 - `input_candidate`'s `first_read_at_us` shows where each line's sound began.
   With `mic2/audio` recorded off the bus, which is on the voice's clock, the
   line's onset can be set against it.

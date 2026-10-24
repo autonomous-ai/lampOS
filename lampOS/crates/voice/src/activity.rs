@@ -81,11 +81,8 @@ pub const REACH_LEAD_BLOCKS: usize = 20;
 /// Where the coordinator reads whether a line's sound begins a moment before
 /// its first word (`on`; off unless set). With first words kept, an ordinary
 /// start, the lamp silent, keeps [`SOFT_START_LEAD_BLOCKS`] more than the
-/// usual 300 ms, and begins earlier still at [`REACH_LEAD_BLOCKS`] (200 ms)
-/// before the earliest block of the speech-like run it starts on, by each
-/// block's score before the faint floor: at most [`SOFT_START_BLOCKS`] before
-/// the usual start, only across gaps shorter than [`SOFT_START_GAP_BLOCKS`],
-/// and never past a block heard while the lamp was sounding.
+/// usual 300 ms, never past a block heard while the lamp was sounding, and
+/// never later than the usual start.
 ///
 /// Why: a line starts on [`START_BLOCKS`] blocks scored [`START_PROBABILITY`]
 /// and over the faint floor, and keeps 300 ms before that. A first word that
@@ -103,20 +100,15 @@ pub fn soft_start() -> bool {
     std::env::var(SOFT_START_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
-/// How much more than the usual 300 ms every soft start keeps: 200 ms. The
-/// detector's own scores can be slow on a word that is not soft at all
-/// ("what" at -11 dBFS within 50 ms, on lamp-4ace, started its line 278 ms
-/// in), so the run of speech-like blocks alone does not give it room.
-pub const SOFT_START_LEAD_BLOCKS: usize = 20;
-/// How much further back than the usual 300 ms a soft start may begin:
-/// 500 ms. A word's soft opening is a syllable, not a phrase; this keeps
-/// faint talk across a room, which may run straight into a line, to half a
-/// second at most.
-pub const SOFT_START_BLOCKS: usize = 50;
-/// Quiet this long, by the score before the floor, is a pause: a soft
-/// start reaches back only through the run before it. 100 ms, under the
-/// gaps between the words of a phrase and over none of a pause after a name.
-pub const SOFT_START_GAP_BLOCKS: usize = 10;
+/// How much more than the usual 300 ms a soft start keeps: 300 ms, so 600
+/// ms before the start's sixth block. The detector can take that long to be
+/// sure of a word that is not soft at all: in 60 lines recorded on lamp-4ace
+/// on 24 and 25 October a start came 58 to 458 ms after its speech began
+/// ("what" at -11 dBFS within 50 ms started its line 278 ms in), and every
+/// line with 100 ms or more of its sound before the word was heard whole.
+/// Its own scores are no guide to where such a word began: they dip inside
+/// it, so a reach along them stopped short (the first builder's A/B, 25 Oct).
+pub const SOFT_START_LEAD_BLOCKS: usize = 30;
 
 /// With `linear`, the detector reads the echo canceller's linear output in
 /// place of the processed block (#828): the residual suppressor that follows
@@ -260,13 +252,13 @@ pub struct TurnDetector {
     /// The next start comes as the lamp's sound ends, and may reach back
     /// to the onset the lamp's sound hid.
     reach_onset: bool,
-    /// With first words kept, `LAMP_SOFT_START=on`: each prefix block's
-    /// score before the faint floor, or `None` while the lamp was sounding,
-    /// which a soft start may not reach back past. Empty otherwise.
-    unfloored: VecDeque<Option<f32>>,
+    /// With first words kept, `LAMP_SOFT_START=on`: whether each prefix
+    /// block was heard with the lamp silent; a soft start never reaches back
+    /// past one that was not. Empty otherwise.
+    lamp_silent: VecDeque<bool>,
     soft_start: bool,
-    /// The score before the floor of the next block pushed.
-    next_unfloored: Option<f32>,
+    /// Whether the next block pushed is heard with the lamp silent.
+    next_lamp_silent: bool,
     start_count: u16,
     silence_count: u16,
     end_silence_blocks: u16,
@@ -320,9 +312,9 @@ impl Default for TurnDetector {
             first_words: false,
             reach_back: false,
             reach_onset: false,
-            unfloored: VecDeque::new(),
+            lamp_silent: VecDeque::new(),
             soft_start: false,
-            next_unfloored: None,
+            next_lamp_silent: false,
             start_count: 0,
             silence_count: 0,
             end_silence_blocks: END_SILENCE_BLOCKS,
@@ -407,16 +399,16 @@ impl TurnDetector {
         self.reach_onset = self.first_words;
     }
 
-    /// `LAMP_SOFT_START=on`: with first words kept, an ordinary start may
-    /// begin at its soft first word ([`SOFT_START_ENVIRONMENT`]).
+    /// `LAMP_SOFT_START=on`: with first words kept, an ordinary start keeps
+    /// [`SOFT_START_LEAD_BLOCKS`] more ([`SOFT_START_ENVIRONMENT`]).
     pub fn keep_soft_starts(&mut self, on: bool) {
         self.soft_start = on;
     }
 
-    /// The next block's score before the faint floor, or `None` while the
-    /// lamp is sounding. Only for the next block pushed.
-    pub fn unfloored(&mut self, score: Option<f32>) {
-        self.next_unfloored = score;
+    /// Whether the next block is heard with the lamp silent. Only for the
+    /// next block pushed; unsaid, it was not.
+    pub fn lamp_silent(&mut self, silent: bool) {
+        self.next_lamp_silent = silent;
     }
 
     /// Configured silence window; with confirmation it is the fallback.
@@ -577,7 +569,7 @@ impl TurnDetector {
     ) -> Activity {
         let reach_back = std::mem::take(&mut self.reach_back);
         let reach_onset = std::mem::take(&mut self.reach_onset);
-        let unfloored = self.next_unfloored.take();
+        let lamp_silent = std::mem::take(&mut self.next_lamp_silent);
         if let Err(reason) = self.validate(&frame, probability) {
             return Activity::Fault(reason);
         }
@@ -663,13 +655,13 @@ impl TurnDetector {
         if self.prefix.len() == kept {
             self.prefix.pop_front();
             self.scores.pop_front();
-            self.unfloored.pop_front();
+            self.lamp_silent.pop_front();
         }
         self.prefix.push_back(frame);
         if self.first_words {
             self.scores.push_back(own);
             if self.soft_start {
-                self.unfloored.push_back(unfloored);
+                self.lamp_silent.push_back(lamp_silent);
             }
         }
         self.start_count = if probability >= START_PROBABILITY {
@@ -681,7 +673,7 @@ impl TurnDetector {
             let begin = self.begin(reach_back, reach_onset);
             self.prefix.drain(..begin);
             self.scores.clear();
-            self.unfloored.clear();
+            self.lamp_silent.clear();
             self.active = true;
             self.active_blocks = self.prefix.len() as u32;
             self.silence_count = 0;
@@ -794,63 +786,22 @@ impl TurnDetector {
     }
 
     /// An ordinary start with soft starts kept: [`SOFT_START_LEAD_BLOCKS`]
-    /// before the usual start, or [`REACH_LEAD_BLOCKS`] before the earliest
-    /// block of the speech-like run (scored [`SILENCE_PROBABILITY`] or more
-    /// before the faint floor) that the start is on, through gaps shorter
-    /// than [`SOFT_START_GAP_BLOCKS`], if that is earlier; never more than
-    /// [`SOFT_START_BLOCKS`] before the usual start, nor past a block heard
-    /// while the lamp was sounding, nor into speech before the pause that
-    /// ends the run, and never later than the usual start. Without the
-    /// switch, the usual start.
+    /// before the usual start, never past a block heard while the lamp was
+    /// sounding, and never later than the usual start: a block so heard at
+    /// or after it (the onset's own, under a reply not yet over) leaves the
+    /// start as it was, never with less (the reviewer's P2 on #3392: `Start`
+    /// with no audio). Without the switch, the usual start.
     fn soft_begin(&self, usual: usize) -> usize {
-        if !self.soft_start || self.unfloored.len() != self.prefix.len() {
+        if !self.soft_start || self.lamp_silent.len() != self.prefix.len() {
             return usual;
         }
-        let most = usual.saturating_sub(SOFT_START_BLOCKS);
-        // Never later than the usual start: a block heard while the lamp was
-        // sounding at or after it (the onset's own, under a reply's playback
-        // gone quiet but not retired) leaves the start as it was, never
-        // with less (the reviewer's P2 on #3392: `Start` with no audio).
         let floor = self
-            .unfloored
+            .lamp_silent
             .iter()
-            .rposition(Option::is_none)
+            .rposition(|silent| !silent)
             .map_or(0, |at| at + 1)
-            .max(most)
             .min(usual);
-        let speech =
-            |at: usize| self.unfloored[at].is_some_and(|score| score >= SILENCE_PROBABILITY);
-        let mut earliest = None;
-        let mut pause = None;
-        let mut gap = 0;
-        for at in (floor..self.prefix.len()).rev() {
-            if speech(at) {
-                earliest = Some(at);
-                gap = 0;
-            } else {
-                gap += 1;
-                if gap >= SOFT_START_GAP_BLOCKS {
-                    pause = Some(at);
-                    break;
-                }
-            }
-        }
-        // Nor into speech before the pause that ends the run: a lead stops
-        // after it, so a name said before the pause isn't taken (the
-        // reviewer's P3 on #3392).
-        let after_pause = pause
-            .and_then(|at| (floor..at).rev().find(|&at| speech(at)))
-            .map_or(floor, |at| at + 1);
-        let lead = usual
-            .saturating_sub(SOFT_START_LEAD_BLOCKS)
-            .max(after_pause)
-            .min(usual);
-        earliest.map_or(lead, |earliest| {
-            earliest
-                .saturating_sub(REACH_LEAD_BLOCKS)
-                .max(after_pause)
-                .min(lead)
-        })
+        usual.saturating_sub(SOFT_START_LEAD_BLOCKS).max(floor)
     }
 
     /// Discard prospective PCM without erasing capture continuity checks.
@@ -867,7 +818,7 @@ impl TurnDetector {
     pub fn clear_prospective(&mut self) {
         self.prefix.clear();
         self.scores.clear();
-        self.unfloored.clear();
+        self.lamp_silent.clear();
         self.start_count = 0;
         self.silence_count = 0;
         self.active_blocks = 0;
@@ -882,7 +833,7 @@ impl TurnDetector {
     pub fn reset(&mut self) {
         self.prefix.clear();
         self.scores.clear();
-        self.unfloored.clear();
+        self.lamp_silent.clear();
         self.start_count = 0;
         self.silence_count = 0;
         self.active_blocks = 0;
@@ -917,7 +868,7 @@ impl TurnDetector {
         if !self.active {
             self.prefix.clear();
             self.scores.clear();
-            self.unfloored.clear();
+            self.lamp_silent.clear();
             self.start_count = 0;
         }
     }
