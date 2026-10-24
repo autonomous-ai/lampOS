@@ -2352,7 +2352,11 @@ after a take-over, but now for every turn:
     - a line let out only by someone turned to the lamp must ask it
       something (`BUSY_TURNED`);
     - its name, its words calling it, a tap, or being said close to it let
-      a line out as before.
+      a line out as before. A line whose words call it is never held by the
+      two rules above, whatever else let it out: on lamp-4ace on 24 Oct the
+      owner's "Lamp.", answered as a call once no line came after it, was
+      also let out as the conversation going on and held as a short line
+      (`busy_bar`).
 
     In a quiet room it is as on Live, and one more thing: a conversation is
     also going on for 20 s after the end of the lamp's words
