@@ -1,0 +1,16 @@
+
+running 1 test
+test no_two_files_of_a_test_binary_build_the_same_scratch_folder ... 
+thread 'no_two_files_of_a_test_binary_build_the_same_scratch_folder' (4330753) panicked at /private/tmp/fourth-callback-scratch-census-20261024/before/lampOS/crates/update/tests/it/scratch_paths.rs:177:5:
+one scratch folder for two files of a test binary; give each file a prefix of its own:
+voice (src): "lamp-voice-routes-{}-{}" in {"src/second_provider/services.rs", "src/second_provider/worker/kept_name_privacy_tests.rs"}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    no_two_files_of_a_test_binary_build_the_same_scratch_folder
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.13s
+

@@ -1,0 +1,23 @@
+{
+  "source_test": "lampOS/crates/update/tests/it/scratch_paths.rs",
+  "exact_filter": "no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+  "standalone_actual_std_test_not_cargo_gate": true,
+  "runs": [
+    {
+      "label": "before",
+      "exit": 101,
+      "test_source_sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+      "cargo_manifest_dir": "/private/tmp/fourth-callback-scratch-census-20261024/before/lampOS/crates/update",
+      "binary_sha256": "99165dffde36ef79b91842713aa408d73b207ed473ff8ad0be7f5599f55f4a12",
+      "raw_test_log_sha256": "c236e96d65e72fa2a4c4c4fa9999b4c9063828e04e2fee9adebcd16527de18eb"
+    },
+    {
+      "label": "after",
+      "exit": 0,
+      "test_source_sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554",
+      "cargo_manifest_dir": "/private/tmp/fourth-common-private-callback-composition-20261024/lampOS/crates/update",
+      "binary_sha256": "b35883da7fab4ce7b1b4fcbf7407c1546761c584f5f559dd07b96e220f3b049e",
+      "raw_test_log_sha256": "78b88d8e34bc844e6916900aafee8d1e75981f7de056e387aa357aa39c7c483d"
+    }
+  ]
+}
