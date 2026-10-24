@@ -1,0 +1,412 @@
+[
+  {
+    "headRefName": "first/train-107",
+    "number": 3424,
+    "title": "lampOS: merge train 107: #3422",
+    "paths": [
+      "lampOS/crates/voice/src/attention.rs",
+      "lampOS/crates/voice/src/known_faces.rs",
+      "lampOS/docs/eyes.md"
+    ]
+  },
+  {
+    "headRefName": "first/build-rows-1025-0602",
+    "number": 3423,
+    "title": "lampOS: docs/build-rows.md as at 06:02: Build 92.9% over 70 rows. Quality 62.5% over 16 rows. Mood, for later: 58.5% over 2 rows, not in the build figure",
+    "paths": [
+      "lampOS/docs/build-rows.md"
+    ]
+  },
+  {
+    "headRefName": "first/call-word-is-no-name",
+    "number": 3422,
+    "title": "lampOS: with names checked, the word that called the lamp is never kept as the person's name",
+    "paths": [
+      "lampOS/crates/voice/src/attention.rs",
+      "lampOS/crates/voice/src/known_faces.rs",
+      "lampOS/docs/eyes.md"
+    ]
+  },
+  {
+    "headRefName": "third/carry-held-constraints",
+    "number": 3420,
+    "title": "lampOS: retain each held voice constraint for the current caller",
+    "paths": [
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  {
+    "headRefName": "third/controls-recording-stop",
+    "number": 3419,
+    "title": "lampOS: verify bounded recording completion on SIGTERM",
+    "paths": [
+      "lampOS/crates/controls/src/record.rs",
+      "lampOS/crates/controls/tests/it/program.rs",
+      "lampOS/docs/controls.md"
+    ]
+  },
+  {
+    "headRefName": "tests/1569-wifi-ack-events",
+    "number": 3410,
+    "title": "lampOS: end Wi-Fi acknowledgment test on worker completion",
+    "paths": [
+      "lampOS/crates/cloud/src/settings.rs",
+      "lampOS/docs/cloud.md"
+    ]
+  },
+  {
+    "headRefName": "third/carry-late-verdict",
+    "number": 3408,
+    "title": "lampOS: apply late carry evidence to the current verdict",
+    "paths": [
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  {
+    "headRefName": "tests/1569-no-pause-fresh-setup",
+    "number": 3404,
+    "title": "lampOS: publish no-pause fixture inputs after service setup",
+    "paths": [
+      "lampOS/crates/expression/tests/runtime.rs",
+      "lampOS/docs/realtime-tests.md"
+    ]
+  },
+  {
+    "headRefName": "fourth/common-private-callback-composition-20261024",
+    "number": 3391,
+    "title": "lampOS: test private name and hits through guarded HTTP",
+    "paths": [
+      "lampOS/Cargo.lock",
+      "lampOS/crates/eyes/Cargo.toml",
+      "lampOS/crates/eyes/src/bus_out.rs",
+      "lampOS/crates/eyes/src/main.rs",
+      "lampOS/crates/eyes/src/who.rs",
+      "lampOS/crates/update/src/unit.rs",
+      "lampOS/crates/voice/src/memory_scope.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/services.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/tests/music_scope.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+      "lampOS/crates/voice/src/second_provider/tests/unplayed_join.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+      "lampOS/crates/voice/src/second_provider/worker/private_output_tests.rs",
+      "lampOS/crates/voice/src/speaking_faces.rs",
+      "lampOS/deploy/lamp-4ace/RUNBOOK.md",
+      "lampOS/deploy/lamp-4ace/lamp-eyes.service",
+      "lampOS/deploy/lamp-4ace/lamp-voice.service",
+      "lampOS/docs/eyes.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/verification/common-checking-20261023/README.md",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-flags.json",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-help.txt",
+      "lampOS/docs/verification/private-callback-http-20261024/README.md",
+      "lampOS/docs/vi/memory-speaking-frames_vi.md"
+    ]
+  },
+  {
+    "headRefName": "first/product-voice-as-owners-lamp",
+    "number": 3371,
+    "title": "lampOS: the product's voice takes the hearing setup that won the owner's lamp's A/B",
+    "paths": [
+      "lampOS/crates/update/src/unit.rs",
+      "lampOS/deploy/product/lamp-name.service",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/deploy/units/lamp-voice.service",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  {
+    "headRefName": "sixth/two-faces-held",
+    "number": 3355,
+    "title": "lampOS: with LAMP_TWO_FACES_HELD, two faces make the room busy only when they stay",
+    "paths": [
+      "lampOS/crates/voice/src/process.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  {
+    "headRefName": "sixth/carry-colleague-held",
+    "number": 3331,
+    "title": "lampOS: under the same speaker's carry one colleague line is held and ends nothing, two in a row end it",
+    "paths": [
+      "lampOS/crates/voice/src/attention.rs",
+      "lampOS/crates/voice/src/room_told.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  {
+    "headRefName": "first/voice-routes-design",
+    "number": 3321,
+    "title": "lampOS: docs/voice-routes.md, one route contract and several voice experiences a person can choose",
+    "paths": [
+      "lampOS/docs/voice-routes.md"
+    ]
+  },
+  {
+    "headRefName": "docs/install-device-type",
+    "number": 3286,
+    "title": "docs: pass DEVICE_TYPE to the provisioning installer",
+    "paths": [
+      "docs/bootstrap-ota.md",
+      "docs/vi/bootstrap-ota.md",
+      "scripts/README.md",
+      "scripts/provision/install.sh"
+    ]
+  },
+  {
+    "headRefName": "reviewer-lead/3196-rebased",
+    "number": 3248,
+    "title": "lampOS: a joint resting inside its deadband never reports body/hand pushed, whichever lamp's calibration (06c1's joint 0)",
+    "paths": [
+      "lampOS/crates/body/src/body.rs",
+      "lampOS/crates/body/src/body/tests.rs",
+      "lampOS/docs/body.md"
+    ]
+  },
+  {
+    "headRefName": "migrate/v2-image",
+    "number": 3246,
+    "title": "imager: build-orangepi-v2.sh, a lamp image that boots straight into lampOS setup (#2538)",
+    "paths": [
+      "lampOS/docs/install.md",
+      "scripts/imager/Dockerfile",
+      "scripts/imager/Makefile",
+      "scripts/imager/README.md",
+      "scripts/imager/build-orangepi-v2.sh"
+    ]
+  },
+  {
+    "headRefName": "twelve/room-speaker",
+    "number": 3213,
+    "title": "lampOS: with LAMP_MEMORY_ROOM_SPEAKER a room line keeps who was seen saying it, and forget everything takes the room's lines they said (#2849)",
+    "paths": [
+      "lampOS/crates/memory/src/days.rs",
+      "lampOS/crates/memory/src/days.sql",
+      "lampOS/crates/memory/src/days_protocol.rs",
+      "lampOS/crates/memory/src/protocol.rs",
+      "lampOS/crates/memory/tests/fixtures/stores/days-2026-10-23.sql",
+      "lampOS/crates/memory/tests/it/days_speakers.rs",
+      "lampOS/crates/memory/tests/it/kept.rs",
+      "lampOS/crates/memory/tests/it/main.rs",
+      "lampOS/crates/voice/src/process.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/docs/memory-days.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/updates.md"
+    ]
+  },
+  {
+    "headRefName": "nine/chat-round-hedge",
+    "number": 3107,
+    "title": "lampOS: with LAMP_SECOND_CHAT_AGAIN=on a chat round 1 not begun in 2.5 s is asked once more on a fresh connection, and the first to begin is said (#2602)",
+    "paths": [
+      "lampOS/crates/voice/src/process.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/net/chat.rs",
+      "lampOS/crates/voice/src/second_provider/services.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  {
+    "headRefName": "fourth/speaker-foundation-20261022",
+    "number": 3064,
+    "title": "lampOS: bind private context to current speaker evidence",
+    "paths": [
+      "lampOS/Cargo.lock",
+      "lampOS/crates/eyes/Cargo.toml",
+      "lampOS/crates/eyes/src/bus_out.rs",
+      "lampOS/crates/eyes/src/main.rs",
+      "lampOS/crates/eyes/src/who.rs",
+      "lampOS/crates/update/src/unit.rs",
+      "lampOS/crates/voice/src/memory_scope.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/services.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/tests/music_scope.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+      "lampOS/crates/voice/src/second_provider/tests/unplayed_join.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+      "lampOS/crates/voice/src/second_provider/worker/private_output_tests.rs",
+      "lampOS/crates/voice/src/speaking_faces.rs",
+      "lampOS/deploy/lamp-4ace/RUNBOOK.md",
+      "lampOS/deploy/lamp-4ace/lamp-eyes.service",
+      "lampOS/deploy/lamp-4ace/lamp-voice.service",
+      "lampOS/docs/eyes.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/verification/common-checking-20261023/README.md",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-flags.json",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-help.txt",
+      "lampOS/docs/vi/memory-speaking-frames_vi.md"
+    ]
+  },
+  {
+    "headRefName": "fourth/face-name-product-20261022",
+    "number": 3014,
+    "title": "lampOS: prepare known-face names in the product voice",
+    "paths": [
+      "lampOS/Cargo.lock",
+      "lampOS/crates/eyes/Cargo.toml",
+      "lampOS/crates/eyes/src/bus_out.rs",
+      "lampOS/crates/eyes/src/main.rs",
+      "lampOS/crates/eyes/src/who.rs",
+      "lampOS/crates/update/src/unit.rs",
+      "lampOS/crates/update/tests/install.rs",
+      "lampOS/crates/voice/src/memory_scope.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/services.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/tests/music_scope.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+      "lampOS/crates/voice/src/second_provider/tests/unplayed_join.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+      "lampOS/crates/voice/src/second_provider/worker/private_output_tests.rs",
+      "lampOS/crates/voice/src/speaking_faces.rs",
+      "lampOS/deploy/lamp-4ace/RUNBOOK.md",
+      "lampOS/deploy/lamp-4ace/lamp-eyes.service",
+      "lampOS/deploy/lamp-4ace/lamp-voice.service",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/docs/eyes.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/verification/common-checking-20261023/README.md",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-flags.json",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-help.txt",
+      "lampOS/docs/verification/known-name-product-prep-20261022/README.md",
+      "lampOS/docs/vi/memory-speaking-frames_vi.md"
+    ]
+  },
+  {
+    "headRefName": "el/own-keys-product",
+    "number": 3004,
+    "title": "lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846",
+    "paths": [
+      "lampOS/crates/selftest/src/voice_route.rs",
+      "lampOS/crates/update/src/install.rs",
+      "lampOS/crates/update/tests/install.rs",
+      "lampOS/crates/voice/src/second_config.rs",
+      "lampOS/deploy/product/README.md",
+      "lampOS/deploy/product/lamp-cloud.service",
+      "lampOS/deploy/product/lamp-setup-keys.socket",
+      "lampOS/deploy/product/lamp-setup.service",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/deploy/product/own-keys-voice.conf",
+      "lampOS/docs/cloud.md",
+      "lampOS/docs/install.md",
+      "lampOS/docs/own-keys.md",
+      "lampOS/docs/setup.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  {
+    "headRefName": "fourth/photo-product-activation-review",
+    "number": 2988,
+    "title": "lampOS: prepare photo consent through scoped voice calls",
+    "paths": [
+      "lampOS/Cargo.lock",
+      "lampOS/crates/cloud/Cargo.toml",
+      "lampOS/crates/cloud/src/main.rs",
+      "lampOS/crates/cloud/src/photos.rs",
+      "lampOS/crates/cloud/src/photos/sweep.rs",
+      "lampOS/crates/cloud/tests/it/switch.rs",
+      "lampOS/crates/eyes/Cargo.toml",
+      "lampOS/crates/eyes/src/bus_out.rs",
+      "lampOS/crates/eyes/src/main.rs",
+      "lampOS/crates/eyes/src/who.rs",
+      "lampOS/crates/update/src/unit.rs",
+      "lampOS/crates/update/tests/functions.rs",
+      "lampOS/crates/voice/src/known_faces.rs",
+      "lampOS/crates/voice/src/memory_scope.rs",
+      "lampOS/crates/voice/src/photo_faces.rs",
+      "lampOS/crates/voice/src/photo_faces/replies.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/net/chat.rs",
+      "lampOS/crates/voice/src/second_provider/net/chat/photo_replies.rs",
+      "lampOS/crates/voice/src/second_provider/services.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/tests/music_scope.rs",
+      "lampOS/crates/voice/src/second_provider/tests/photo_replies.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+      "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+      "lampOS/crates/voice/src/second_provider/tests/unplayed_join.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+      "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs",
+      "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+      "lampOS/crates/voice/src/second_provider/worker/private_output_tests.rs",
+      "lampOS/crates/voice/src/speaking_faces.rs",
+      "lampOS/crates/voice/src/tools.rs",
+      "lampOS/crates/voice/src/tools/photo_exchange_tests.rs",
+      "lampOS/crates/voice/src/tools/photo_replies.rs",
+      "lampOS/deploy/lamp-4ace/RUNBOOK.md",
+      "lampOS/deploy/lamp-4ace/lamp-eyes.service",
+      "lampOS/deploy/lamp-4ace/lamp-voice.service",
+      "lampOS/deploy/product/lamp-cloud.service",
+      "lampOS/deploy/product/lamp-eyes.service",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/docs/cloud.md",
+      "lampOS/docs/eyes.md",
+      "lampOS/docs/install.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/verification/common-checking-20261023/README.md",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-flags.json",
+      "lampOS/docs/verification/common-checking-20261023/eyes-pin-help.txt",
+      "lampOS/docs/verification/photo-product-activation-20261022/README.md",
+      "lampOS/docs/verification/photo-product-activation-20261022/validation.json"
+    ]
+  }
+]

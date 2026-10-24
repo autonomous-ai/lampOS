@@ -1,0 +1,27 @@
+{
+  "base": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+  "candidate_file_sha256": "b1b004332865ff2cdb781d6e5c431c4dca68da13250271bc2029bb608ad1c500",
+  "base_file_sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a",
+  "all_other_fixture_code_unchanged": true,
+  "all_pre_teardown_assertions_unchanged": true,
+  "product_supervisor_unchanged": true,
+  "no_runtime_or_safety_bound_change": true,
+  "original_current_fc31_observations": [
+    {
+      "ordinal": 1,
+      "result": "1/0"
+    },
+    {
+      "ordinal": 2,
+      "result": "0/1",
+      "failure": "motor inhibit acknowledgement timed out",
+      "assertion": "next.clean_exit()"
+    },
+    {
+      "ordinal": 3,
+      "result": "1/0"
+    }
+  ],
+  "original_observation_packet": "744d9fae32ca0fd6daabcff3a7bd54d37778a8cf",
+  "new_execution": "UNRUN; source-only preparation, no compiler allocation"
+}

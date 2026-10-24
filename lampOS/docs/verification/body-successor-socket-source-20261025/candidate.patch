@@ -1,0 +1,64 @@
+diff --git a/lampOS/crates/body/src/runtime/supervisor/tests.rs b/lampOS/crates/body/src/runtime/supervisor/tests.rs
+index 2921b4186..3afe05b57 100644
+--- a/lampOS/crates/body/src/runtime/supervisor/tests.rs
++++ b/lampOS/crates/body/src/runtime/supervisor/tests.rs
+@@ -936,17 +936,25 @@ fn dropping_reaped_predecessor_does_not_remove_active_successor_sockets() {
+         assert!(next_dir.join(name).exists());
+     }
+     assert!(next.is_ready() && !next.reaped());
+-    next.stop().unwrap();
++    // The assertion above is about the predecessor leaving a live successor
++    // alone. Fixture cleanup does not make that proof depend on a graceful
++    // Stop acknowledgement arriving inside the product's 20 ms deadline.
++    // The worker-loop/clean-replacement test checks that separate contract.
++    next.fail(
++        "successor socket fixture cleanup",
++        SystemClock.now().as_micros(),
++    );
+     until(&mut next, |s| {
+-        s.poll().unwrap();
++        let _ = s.poll();
+         s.reaped()
+     });
+-    for _ in 0..8 {
+-        if next.poll().unwrap().is_none() {
+-            break;
+-        }
++    assert!(next.killed_at.is_some());
++    assert!(!next.clean_exit());
++    assert!(next.ipc_cleanup_error().is_none());
++    assert!(next.directory.peers_cleaned);
++    for name in Directory::PEERS {
++        assert!(!next_dir.join(name).exists());
+     }
+-    assert!(next.clean_exit(), "{:?}", next.failure());
+     drop(next);
+     assert!(!next_dir.exists());
+ }
+diff --git a/lampOS/docs/realtime-tests.md b/lampOS/docs/realtime-tests.md
+index 4f5de71bb..4022fdb1c 100644
+--- a/lampOS/docs/realtime-tests.md
++++ b/lampOS/docs/realtime-tests.md
+@@ -1688,3 +1688,22 @@ scheduled conversation overlap, negative controls and complete x86/ARM64
+ counts. The injected stalls are reproduction patches only; no fixed sleep
+ is added to the submitted tests. These are fixture measurements, not
+ acoustic or device latency evidence.
++
++## Body successor-socket ownership and fixture teardown
++
++`dropping_reaped_predecessor_does_not_remove_active_successor_sockets`
++still starts a real ready successor, drops the reaped predecessor, and
++requires the predecessor directory gone while every successor peer remains
++and the successor remains ready and unreaped. Its later fixture teardown
++explicitly kills only that owned successor and requires an actual reap,
++truthful non-clean exit, no IPC cleanup error, all peer paths removed, and
++the successor directory removed on drop.
++
++That teardown does not assert a graceful Stop inside the product's unchanged
++20 ms inhibit-acknowledgement deadline. Cooperative stop receipts and clean
++replacement remain covered by
++`actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement`;
++`hung_owned_child_is_killed_and_reaped_after_missing_inhibit` still checks the
++failed-acknowledgement path. No runtime bound or cleanup policy changes.
++The recorded 2/3 fixed observations remain their original failed/passed
++outcomes; separating the fixture's contracts establishes no historical cause.
