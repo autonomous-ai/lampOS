@@ -8400,3 +8400,20 @@ Resumed under the continuous-work order. #3277 is landed. Common is resolved on 
 ## 2026-10-24: close the historical Third formatting request
 
 Exact #3275 head ff99df288 Linux source-only formatting passes once, 20.50 seconds. All 6,963 archived blobs/modes match and bytes/modes/mtimes stay unchanged; container removed, no shared target or compilation. [Receipt](verification/third-linux-fmt-ff99df288-20261024/README.md). This closes the old request only, not current Common qualification.
+
+## 2026-10-24 08:49 +07: actual-pair startup failures and Records implementation
+
+Ready for lamp-voice: no (new compatibility fixtures are not qualified).
+
+Memory’s actual 6408/6449 pair compiled but failed 0 passed / 2 failed before
+server readiness. No RPC or rollback assertion ran; source and cleanup checks
+passed. Native socket binds work on both candidate filesystems, so diagnosis
+continues without claiming the mount caused the error. The real Voice producer
+probe refused unverifiable legacy-service ownership before metadata; no bypass
+or second-version retry. [Retained failure evidence](verification/release-pair-startup-20261024/README.md).
+
+Taken: the separate Records actual-reader tests under #2809, on
+fourth/records-release-pair-20261024, after open and merged PR searches and Queue
+6378347221. Native systemd, genuine muted Voice sessions and unchanged production
+guards are required. Common’s full host gates continue independently; Photo and
+Name carry audits remain prepared. No lamp result or row increase is claimed.
