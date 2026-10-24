@@ -55,3 +55,27 @@ the authored repository tree by Third. [Original receipt](https://github.com/aut
 are the assigned readers. No ARM64 test pass, merge, physical identity accuracy,
 acoustic latency or readiness claim is made here. Existing four-second Eyes
 capture and six-second tool deadlines remain; no added inference or wait.
+
+## Latest carry and requested P3 coverage
+
+Current head is `8b42bb15f26169f9d148940ac42dc8f745a65887` on `59c4ac795`.
+The original implementation is an equal range-diff carry to `11c75e024`.
+One following commit adds a recognition-policy/cache regression for both
+phases of a 1.8-second line, explicit cadence/classifier limits, and the
+unexecuted camera-backed main-loop boundary. It adds no runtime behavior.
+
+Current-base fmt and both strict Clippy gates pass; full Eyes is now
+**334 passed / 0 failed / 5 ignored**. The tested Voice source/manifests
+are unchanged from **3,977/0/15 ignored**. The carry gate hashes every
+tracked Voice/Eyes file plus workspace manifests and changed docs before
+and after execution; all remain equal. See `cadence-carry-gates.json`,
+`cadence-carry-eyes.txt` and `cadence-carry-range-diff.txt`.
+
+The original head completed ARM64 **11,153 passed (one existing Voice
+journal LEAK), 71 skipped**, process **12/0**, on an identical authored
+and preview tree; its result is `original-head-native.json`. These are
+historical passes, not carried-head acceptance. Fresh carried-head ARM64
+**40053707125**, Linux Clippy **40053707118**, Linux formatting and carried
+reads remain pending. Third posted the addressed P3s and current head on
+[the PR](https://github.com/autonomous-ai/lampOS/pull/3318#issuecomment-6378682327)
+and Queue #3126. Physical qualification remains unexecuted by Third.

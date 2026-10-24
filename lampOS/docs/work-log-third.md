@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 09:20 — enrollment cadence follow-up and current-base push
+
+- #3318 is now `8b42bb15f` on `59c4ac795`; implementation range-diff is
+  equal, followed by one test/docs commit addressing the lead's P3s.
+  A short line between recognition ticks refuses; across a tick it can
+  supply an anchor. Docs now state classifier and runtime-coverage limits.
+- Current-base fmt/strict Clippy pass, full Eyes **334/0/5 ignored**;
+  Voice's tested source/manifests remain unchanged from **3,977/0/15**.
+- Original head completed ARM64 **11,153 passed (one Voice journal LEAK),
+  71 skipped**, process **12/0**, on an equal authored/preview tree.
+  [Receipt](verification/remember-speaking-face-20261024/README.md).
+- Fresh native runs, Linux formatting and carried reads are watched;
+  next eligible work is being checked. No lamp action or readiness claim.
+
 ## 2026-10-24 09:11 — outlier correction read; Linux enrollment gates green
 
 - #3317 `be231f452`: READ-OK after original-adjacency source read,
