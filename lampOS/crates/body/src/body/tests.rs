@@ -1702,7 +1702,8 @@ fn three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run() {
         .collect();
     let time = clock.time.clone();
     let news = move || Some((Mood::Listening, 100));
-    let (mut resting, mut resting_s, mut after) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut resting, mut resting_s, mut after, mut after_s) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let report = run_standing(
         &mut lamp,
         &mut clock,
@@ -1718,6 +1719,7 @@ fn three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run() {
             }
             if now > ends - Duration::from_secs(60) {
                 after.push(glimpse.stand);
+                after_s.push(glimpse.resting_s);
             }
         },
     );
@@ -1732,6 +1734,10 @@ fn three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run() {
         "said while it rests"
     );
     assert!(resting_s.first() > resting_s.last(), "counting down");
+    assert!(
+        !after_s.is_empty() && after_s.iter().all(|left| *left == 0),
+        "no longer said once it may rise: {after_s:?}"
+    );
     assert!(
         after.iter().any(|stand| *stand > 0.99),
         "it stands again after the long rest: {:?}",
