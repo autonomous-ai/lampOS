@@ -6557,8 +6557,37 @@ impl Heeding {
                 .sure_of_another_only(self.sure_other_samples, crate::same_voice::DIFFERENT_BELOW);
         }
         let going_on_unheard = signs.going_on;
-        let (mut going_on, mut other_voice, same_voice, likeness) =
-            self.voice_going_on_in(request, going_on_unheard, busy);
+        let extended_before =
+            self.carries && self.carrying && self.carry_window.extra_allows(began_us);
+        let mut voice = self.voice_going_on_in(request, going_on_unheard, busy);
+        // That poll may first identify the earlier colleague. Reconsider
+        // this line's start against the newly known end, then read this
+        // line's own identity through the same check. Neither is a wait or
+        // an admission: the classifier below still requires a sure owner.
+        let late_window = self.carries
+            && self.carrying
+            && !extended_before
+            && self.carried.is_none()
+            && self.carry_window.extra_allows(began_us);
+        if late_window {
+            self.carried = Some((request, false));
+            // An active thread may already have consumed this line's one
+            // likeness before reporting the colleague's late print. Keep
+            // that evidence for the owner/nearness check below; polling a
+            // second time must not replace it with an empty judgement.
+            let likeness = voice.3;
+            voice = self.voice_going_on_in(request, true, busy);
+            voice.3 = likeness.or(voice.3);
+            if self.voice_ends_going_on
+                && let Some(likeness) = likeness
+            {
+                // The first lookup consumed this evidence. Keep the same
+                // classification as voice_going_on_in for downstream rules.
+                voice.1 = likeness < crate::same_voice::DIFFERENT_BELOW;
+                voice.2 = !voice.1;
+            }
+        }
+        let (mut going_on, mut other_voice, same_voice, likeness) = voice;
         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
         // Whether a carry still stands for the caller after this line.
         let mut carry_stands = false;
@@ -6615,7 +6644,19 @@ impl Heeding {
                     }
                 }
             }
-            if busy {
+            // A newly opened late window is only eligibility, in every
+            // room. A generic same-voice continuation must not bypass the
+            // owner's stricter nearness check. An unsure held line is no
+            // talk for the room, just as in the existing quiet-room path.
+            if late_window && !busy && carried.goes_on != Some(true) {
+                held_here = true;
+                if carried.goes_on.is_none()
+                    && let Ok(mut room) = crate::room_told::room().lock()
+                {
+                    room.colleague_held(request);
+                }
+            }
+            if busy || late_window {
                 // No sure sign: past the 8 s held; within them the ordinary
                 // follow-up rule, the legacy exception, whenever the print
                 // comes.
@@ -10457,6 +10498,169 @@ mod tests {
             desk.heeding.carried.is_some(),
             "fresh actual answer reopens the allowance"
         );
+    }
+
+    /// Synthetic sure-other bar, as the existing late-print control: the
+    /// first colleague print is learned only at the owner's +25 s verdict.
+    /// Production calibration and activation are unchanged.
+    #[test]
+    fn a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for answered_s in [30, 60] {
+            for room in ["busy", "unknown", "quiet"] {
+                for (voice, owner) in [(1, true), (4, false), (3, false), (0, false), (-1, false)] {
+                    for after_s in [25, 45] {
+                        let mut desk = CarryDesk::new(true);
+                        desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
+                        desk.answered(answered_s);
+                        let answer = desk.heeding.said_until_us.unwrap();
+                        desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
+                        assert_eq!(
+                            desk.line_at(
+                                -1,
+                                "",
+                                "I sent the slides to the client this morning.",
+                                answer + 3_000_000
+                            ),
+                            None
+                        );
+                        // Keep the initial legacy follow-up's admission, then
+                        // vary the room observed at the owner's later verdict.
+                        {
+                            let mut told = crate::room_told::room().lock().unwrap();
+                            let expected = match room {
+                                "unknown" => {
+                                    *told = crate::room_told::RoomTold::new();
+                                    told.count_only_talk(true);
+                                    told.count_held_talk(true);
+                                    told.end_busy_sooner(true);
+                                    told.end_busy_once_answered(true);
+                                    crate::room_told::Room::Unknown
+                                }
+                                "quiet" => {
+                                    told.set_quiet();
+                                    crate::room_told::Room::Quiet
+                                }
+                                _ => crate::room_told::Room::Busy,
+                            };
+                            assert_eq!(told.at(monotonic_us()), expected, "fixture room {room}");
+                        }
+                        desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
+                        assert_eq!(
+                            desk.line_at(
+                                voice,
+                                "",
+                                "Will it rain in the afternoon?",
+                                answer + after_s * 1_000_000
+                            )
+                            .is_none(),
+                            owner && after_s == 25,
+                            "answer {answered_s} s, room {room}, voice {voice}, +{after_s} s"
+                        );
+                        if after_s == 25 && voice != -1 {
+                            let expected = match room {
+                                "unknown" => crate::room_told::Room::Unknown,
+                                "quiet" => crate::room_told::Room::Quiet,
+                                _ => crate::room_told::Room::Busy,
+                            };
+                            assert_eq!(
+                                crate::room_told::room().lock().unwrap().at(monotonic_us()),
+                                expected,
+                                "room unchanged: answer {answered_s} s, {room}, voice {voice}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_late_window_keeps_the_same_voice_sign_for_going_on_same_one() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for answered_s in [30, 60] {
+            let mut desk = CarryDesk::new(true);
+            desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
+            desk.answered(answered_s);
+            let answer = desk.heeding.said_until_us.unwrap();
+            desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
+            assert_eq!(
+                desk.line_at(
+                    -1,
+                    "",
+                    "I sent the slides to the client this morning.",
+                    answer + 3_000_000
+                ),
+                None
+            );
+            desk.heeding.going_on_same_one = true;
+            desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
+            let request = desk.request + 1;
+            let began = answer + 25_000_000;
+            let line = (began, began + 2_000_000);
+            desk.heeding.hear(
+                request,
+                crate::second_provider::Heard::Began {
+                    over_the_lamps_voice: false,
+                },
+            );
+            desk.heeding.hear(
+                request,
+                crate::second_provider::Heard::Samples(&[1; 48_000]),
+            );
+            desk.heeding
+                .hear(request, crate::second_provider::Heard::Ended);
+            let mut signs = desk.heeding.signs_begun(request, line, began);
+            assert!(
+                desk.heeding.carried.is_none(),
+                "the late window is not known yet"
+            );
+            // Exercise an independently supplied continuation sign: the
+            // first lookup consumes the owner print before opening the
+            // late window, so the second lookup cannot classify it again.
+            signs.going_on = true;
+            assert_eq!(
+                desk.heeding
+                    .judge(request, line, "Will it rain in the afternoon?", signs),
+                None,
+                "voice-only owner with the same-speaker rule, answer {answered_s} s"
+            );
+        }
+    }
+
+    #[test]
+    fn a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry() {
+        let _one = crate::provider_worker::tests::one_thread();
+        for end in ["stop", "privacy", "forget", "off"] {
+            let mut desk = CarryDesk::new(end != "off");
+            desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
+            desk.answered(60);
+            let answer = desk.heeding.said_until_us.unwrap();
+            desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
+            assert_eq!(
+                desk.line_at(
+                    -1,
+                    "",
+                    "I sent the slides to the client this morning.",
+                    answer + 3_000_000
+                ),
+                None
+            );
+            match end {
+                "stop" => desk.heeding.lamp_did(crate::second_provider::Did::Stopped),
+                "privacy" => desk.heeding.privacy_changed(),
+                "forget" => crate::thread::THREAD.lock().unwrap().forget(),
+                _ => {}
+            }
+            desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
+            let began = answer + 25_000_000;
+            assert!(
+                desk.line_at(1, "", "Will it rain in the afternoon?", began)
+                    .is_some(),
+                "{end}"
+            );
+            assert!(!desk.heeding.carry_window.extra_allows(began), "{end}");
+        }
     }
 
     /// The owner's P1 on Queue #3126 (lamp-4ace, 23 Oct 18:51): in a busy
