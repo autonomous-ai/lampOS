@@ -1166,9 +1166,15 @@ on #3126).
     most.
   - It never reaches past a block heard while the lamp was sounding, or kept
     quiet for a busy answer. The coordinator gives the detector a block's
-    score before the floor only while the lamp is silent and no reply is
-    playing (`unfloored_score`), so a start never reaches into the lamp's
-    own voice.
+    score before the floor only while the lamp is silent: its sound not
+    reaching the microphone by the echo evidence, and nothing of a reply to
+    yield as the duplex mask hears the block (`reply_sounding`: audio still
+    to hand over, or the lamp's sound accepted, queued or within its tail)
+    (`unfloored_score`). So a start never reaches into the lamp's own voice,
+    nor into the 300 ms after it. The reply's playback token is not the
+    test: it is held from a reply's start until its audio is retired, and
+    on 25 October it kept every line begun after an answer, or after a bare
+    "Lamp." whose answer waited, from a soft start.
   - It never begins later than the usual start. A line begun while a reply's
     playback is still held but its sound has gone quiet has every block
     marked so, its onset's among them, and starts as without the switch
