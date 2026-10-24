@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 09:41 — enrollment follows the multi-face base
+
+- #3318 pushed as `207358456` on `090847e59`; only the large help string
+  conflicted, and both switch descriptions remain. Upstream patch verified
+  exact; Voice unchanged. Independent source audit found no lost fences.
+- Mac fmt, strict Eyes Clippy and full Eyes **337/0/5 ignored** pass.
+  Fresh native gates and renewed carried reads requested on the PR/Queue.
+- Own-name follow-up has reproduced both findings and passed its first
+  focused **21/0** run; audit-driven punctuation/uncertainty controls are
+  being finished before the whole Voice gate. No lamp action.
+
 ## 2026-10-24 09:36 — current enrollment native gate and own-name follow-up
 
 - #3318 `8b42bb15f` ARM64 **11,161 passed (one reported Voice journal

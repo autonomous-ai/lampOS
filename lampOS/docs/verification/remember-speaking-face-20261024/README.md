@@ -96,3 +96,13 @@ At 09:25 Third claimed the guarded name-ownership P2 and unusable rename
 prompt P3 on `third/remember-own-name`. This follow-up preserves #3318 as
 read, rejects third-person name mentions, and keeps the switch off pending
 those corrections and physical qualification.
+
+## Multi-face-base carry
+
+`207358456` on `090847e59`: only a help-string conflict, preserving both
+switches. The upstream patch remains exact after removing the unchanged
+enrollment paragraph from the mechanical comparison. Voice is unchanged.
+Mac formatting, strict Eyes Clippy and full Eyes **337/0/5 ignored** pass;
+all recorded source hashes remain unchanged. Source review also checks the
+detector-index mapping into `bus.saw` and the one-near-face enrollment fence.
+Current native gates and renewed reads are requested. See `multiface-carry-*`.

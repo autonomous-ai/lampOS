@@ -1,0 +1,25 @@
+{
+  "old_head": "8b42bb15f26169f9d148940ac42dc8f745a65887",
+  "new_head": "20735845651f8e919648c59d21f06ca3c9cedaa0",
+  "base": "090847e59f89b8d02923eca79707c42b3da0a0a6",
+  "voice_unchanged": true,
+  "carry_checks": [
+    {
+      "path": "lampOS/crates/eyes/src/main.rs",
+      "upstream_changes_equal_carried_changes": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/mesh.rs",
+      "upstream_changes_equal_carried_changes": true
+    },
+    {
+      "path": "lampOS/docs/eyes.md",
+      "upstream_changes_equal_carried_changes": true
+    },
+    {
+      "path": "lampOS/docs/switches.md",
+      "upstream_changes_equal_carried_changes": true
+    }
+  ],
+  "conflict": "Only help text; both switch descriptions retained."
+}
