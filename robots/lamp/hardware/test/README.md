@@ -64,6 +64,10 @@ lamp-lock.sh <lamp> run <builder> <session> routine -- \
   lamp-voice stopped, and lamp-voice is started again (`--voice-settle`, 6 s)
   before every step that needs it. A prompt is always finished before a step
   uses the microphones or speaker.
+- **Post a slot first:** the prompts, the self-test and the spoken exchange
+  make sound, so post `PLAYING <lamp> HH:MM–HH:MM` on the software Queue
+  (#3126) before a run, as every builder does (hardware-process.md, "How a
+  hardware builder works").
 - `--only` / `--skip` take the step names; `--dry-run` says what it would do.
 - `tools/routine-run-test.py` tests it on a host with stand-ins (no lamp, no sound).
 
