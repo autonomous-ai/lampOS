@@ -1,0 +1,60 @@
+{
+  "ledger_present": true,
+  "units": [
+    {
+      "unit": "lamp-records-pair-13313-old-0.service",
+      "exit_confirmed": true,
+      "main_pid_zero": true,
+      "control_pid_zero": true,
+      "no_job": true,
+      "cgroup_empty": true,
+      "driver_exit": 0
+    },
+    {
+      "unit": "lamp-records-pair-13313-old-1.service",
+      "exit_confirmed": true,
+      "main_pid_zero": true,
+      "control_pid_zero": true,
+      "no_job": true,
+      "cgroup_empty": true,
+      "driver_exit": 0
+    },
+    {
+      "unit": "lamp-records-pair-13313-shared-0.service",
+      "exit_confirmed": true,
+      "main_pid_zero": true,
+      "control_pid_zero": true,
+      "no_job": true,
+      "cgroup_empty": true,
+      "driver_exit": 0
+    },
+    {
+      "unit": "lamp-records-pair-13313-shared-1.service",
+      "exit_confirmed": true,
+      "main_pid_zero": true,
+      "control_pid_zero": true,
+      "no_job": true,
+      "cgroup_empty": true,
+      "driver_exit": 0
+    },
+    {
+      "unit": "lamp-records-pair-13313-current-0.service",
+      "exit_confirmed": true,
+      "main_pid_zero": true,
+      "control_pid_zero": true,
+      "no_job": true,
+      "cgroup_empty": true,
+      "driver_exit": 0
+    },
+    {
+      "unit": "lamp-records-pair-13313-current-1.service",
+      "exit_confirmed": true,
+      "main_pid_zero": true,
+      "control_pid_zero": true,
+      "no_job": true,
+      "cgroup_empty": true,
+      "driver_exit": 0
+    }
+  ],
+  "complete": true
+}

@@ -1,0 +1,34 @@
+{
+  "audit.json": {
+    "bytes": 2454,
+    "sha256": "1b882ee6042ce27862e121a71e93331cbbdd03323973da7583e84dfd9349daff"
+  },
+  "test-inventory.json": {
+    "bytes": 267,
+    "sha256": "30088767f48eda8cbcbea30616eee08ae146dd4fefb6db4d836e1f7ebf074840"
+  },
+  "owned-unit-cleanup.json": {
+    "bytes": 1472,
+    "sha256": "c9275f67c8efbe3a3ed79d73f780c3754b14c7595d8fa40502784f44f79f9182"
+  },
+  "source-before.json": {
+    "bytes": 596,
+    "sha256": "b9f7d7e9ded571c00ec67c8e179412833f7309bb4a04c03c31a95e72db2f07eb"
+  },
+  "source-after.json": {
+    "bytes": 596,
+    "sha256": "b9f7d7e9ded571c00ec67c8e179412833f7309bb4a04c03c31a95e72db2f07eb"
+  },
+  "README.md": {
+    "bytes": 2484,
+    "sha256": "bdc7271d170ae609547045ad0060546603b230232588f479e9896d9182b17650"
+  },
+  "case-verification.json": {
+    "bytes": 215,
+    "sha256": "70500392bfee1ad949808f52332b5f047e028748e802a0e3b9207eeaa5a2ee76"
+  },
+  "test-exit.json": {
+    "bytes": 41,
+    "sha256": "181cbe85d40c1630fff978295500f84e4f8018b323dbae572544e1a7eaca6624"
+  }
+}

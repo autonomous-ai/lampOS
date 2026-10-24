@@ -1,0 +1,6 @@
+{
+  "passing_test_command": true,
+  "qualified": true,
+  "external_cleanup_exit": 0,
+  "meaning": "Only exact successful case receipts qualify; failed or absent execution retains partial evidence without a pass."
+}

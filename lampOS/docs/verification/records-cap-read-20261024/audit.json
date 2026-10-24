@@ -1,0 +1,61 @@
+{
+  "head": "0d057ef4be25107e203d8ccdef246360b2357ab0",
+  "executed_preview": "e52cd65f6fb5789a266b5bbfa78a7518b2f53428",
+  "tree": "c2e7857fc8b1f2a8dcb83378028e36397f7e321f",
+  "whole_authored_preview_tree_equal": true,
+  "source_hashes": 10441,
+  "all_source_maps_unchanged": true,
+  "changed_file_bindings": [
+    {
+      "path": "lampOS/crates/records/tests/support/release_pair/host.rs",
+      "sha256": "33fedeb4650bf4a0549277b81bd760a7d22a74065be368f96925ca12a8057f30"
+    },
+    {
+      "path": "lampOS/docs/verification/records-release-pair-20261024/README.md",
+      "sha256": "b133daa00b554427f77384468bb46f54969e0ee779e57fea24e62273ed6eb046"
+    }
+  ],
+  "native_controls_once": [
+    "empty_parent_with_live_descendant_refuses_cleanup",
+    "genuine_empty_subtree_and_absent_exact_group_allow_cleanup",
+    "missing_or_invalid_events_and_live_parent_refuse_cleanup",
+    "absent_group_without_unified_v2_proof_refuses_cleanup",
+    "symlinks_and_unexpected_group_paths_refuse_cleanup",
+    "oversized_evidence_refuses_cleanup"
+  ],
+  "ordinary_arm_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T12:45:16.6724096Z      Summary [  30.248s] 1448 tests run: 1448 passed, 16 skipped",
+  "ordinary_process_controls": "12/0",
+  "cases": [
+    {
+      "test": "records_6408_prunes_6449_private_sessions_and_preserves_live_invocation",
+      "command_count": 24,
+      "cleanup_confirmed": true,
+      "native_root_systemd": true
+    },
+    {
+      "test": "records_6449_prunes_6408_private_sessions_and_preserves_live_invocation",
+      "command_count": 23,
+      "cleanup_confirmed": true,
+      "native_root_systemd": true
+    },
+    {
+      "test": "records_6408_refuses_6449_shared_layout_and_6449_can_resume",
+      "command_count": 24,
+      "cleanup_confirmed": true,
+      "native_root_systemd": true
+    }
+  ],
+  "six_external_unit_cleanups": true,
+  "preliminary_selection_receipts_flag": false,
+  "final_separate_case_validation": {
+    "passing_test_command": true,
+    "qualified": true,
+    "external_cleanup_exit": 0,
+    "meaning": "Only exact successful case receipts qualify; failed or absent execution retains partial evidence without a pass."
+  },
+  "raw_log_sha256": {
+    "arm": "532d1804a85313ab669cc05325f65aa63dd488a59b96cfdcc174debb48eb3b81",
+    "pair": "474521e5733991413313c81f7238a3b87fdd36f4a24b2b0a7c1d0bab9919a438"
+  },
+  "local_cargo_or_payload_execution_by_reader": false
+}
