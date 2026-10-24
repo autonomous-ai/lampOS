@@ -1473,11 +1473,28 @@ distinct looks must positively show that speaker, at least half the looks
 in the line must be positive, and all must share one Eyes boot. Unknown
 looks do not count as positive evidence. The complete audio interval is
 at most 30 seconds. Short or missed camera evidence therefore refuses.
-The name must be supported by that line's words: earlier exchanges and
-model-supplied face identifiers are not evidence. With no eyes, missing or stale evidence,
+The requested name must belong to a direct self-introduction in that line,
+or be its entire bare-name or spelling response. A line containing a
+greeting, polite preface or remember-my-face/name request needs an explicit
+self-introduction too:
+"Hi, Kess" and "Remember my face, Kess" may address Kess, so they refuse. Merely mentioning a name
+is insufficient: "Remember her face, she's Kess" cannot save the speaker
+as Kess. A self-introduction elsewhere in mixed-person narration does not
+authorize another name; ambiguous mixed clauses, quoted/reported speech,
+negation and tentative introductions refuse and need a fresh direct
+introduction. Both the heard line and raw requested name are limited to
+4 KiB. Existing spelling and letter-count checks still apply. A word name
+that collides with the refusal vocabulary needs a spelling-only response.
+Earlier exchanges and model-supplied face identifiers are not evidence.
+With no eyes, missing or stale evidence,
 or an unsupported route, nothing is saved. Guarded `replace=true` is refused:
 the earlier confirmation is not yet bound to the same speaker. Ordinary
 enrollment with the switch off keeps its existing behavior.
+
+If Eyes says the face is already known by another name, the guarded reply
+says the name has not changed. It neither reveals that stored name nor
+asks for a replacement confirmation that this path cannot honor. The
+ordinary switch-off name/read-back behavior remains unchanged.
 
 These are checks on the classifier's observations, not independent proof
 of acoustic identity. An unread, far or turned-away second face does not
