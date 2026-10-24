@@ -4336,3 +4336,9 @@ Published the exact missing nine-controller manifest (476 bytes, b180e343...) an
 Ready for lamp-voice: no
 
 Taken Queue6387992551: the Cloud followup3 no-join result-ack test measured11.025s in ARM40118324976. Exact open/merged and related relink searches plus complete open-PR file ownership census find no competing settings.rs task. The test-only plan replaces both fixed5.5s completion sleeps with terminal worker-state observation using the same5.5s watchdog; both ACK branches and every assertion stay. The real unacknowledged5s product deadline is untouched. No new measured result or API change is claimed. Source preparation proceeds while two existing frozen427 full gates finish; no third Rust job.
+
+## 25 October, 02:13 — Native821 proof and train100 carries
+
+Ready for lamp-voice: no
+
+[Independent primary native821 proof](verification/tests-821-native-20261024/) verifies current-at-execution Update7,408PASS+1LEAK and NoPause7,398PASS+1LEAK, zero failures/unrun,53 skipped each, successful pinned Linux commands and exact actual checkout/authored trees. Raw console logs and complete case projections are retained, including the collector’s read-only pinned-command matcher correction without a test rerun. After train100, both PRs were rebased with equal patches and pushed on8db: Update02065c4221 and NoPause7f75cc0ea2. Fresh checks are separate; frozen427 local gates continue without source mutation. Cloud’s two-file event wait is prepared/formatted on8db but no compile/test is allocated while both existing Rust gates run.

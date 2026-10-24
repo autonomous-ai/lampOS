@@ -1,0 +1,18 @@
+{
+  "PR": 3404,
+  "kind": "Linux",
+  "run": 40120157622,
+  "head": "7c0cf8d3399a2733b316839aac4a36ce5829e624",
+  "conclusion": "success",
+  "primary_console_log_sha256": "d54431e8da6208cc58a0b5ad0c511a5e354f68c432a386cc06c123ed7955b070",
+  "bytes": 69289,
+  "source": "https://github.com/autonomous-ai/lampOS/actions/runs/40120157622",
+  "actual_successful_commands": [
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "checkout_lines": [
+    "lampOS \u2014 clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-24T18:19:53.2021191Z HEAD is now at 2f081fd Merge 7c0cf8d3399a2733b316839aac4a36ce5829e624 into 8219e711ad6de24a63f124ba86b985b2fcb3e8a3"
+  ],
+  "read_only_projection_correction": "Collector76428 failed only literal cargo fmt pattern because actual invocation includes pinned +1.96.0. Original raw logs unchanged; no refetch, CI restart or test execution."
+}

@@ -1,0 +1,8 @@
+{
+  "at": "2026-10-24T18:57:33.809000+00:00",
+  "initial_collector_native": 76428,
+  "initial_exit": 1,
+  "reason": "literal formatting matcher omitted +1.96.0",
+  "correction": "Read-only projection on the four already downloaded primary logs; actual heads/conclusions and successful pinned command steps verified",
+  "CI_or_Rust_rerun": false
+}

@@ -1,0 +1,24 @@
+[
+  {
+    "actual_checkout": "534266e6d14e43b3a08d2d411a62411024fa0fa7",
+    "actual_parents": [
+      "8219e711ad6de24a63f124ba86b985b2fcb3e8a3",
+      "be88244fbd68c4cc08d7d1043635b3de416e2174"
+    ],
+    "complete_checkout_tree": "b763c64e30463e726d66c0a2727b5bd59b11bccc",
+    "authored_head": "be88244fbd68c4cc08d7d1043635b3de416e2174",
+    "authored_tree": "b763c64e30463e726d66c0a2727b5bd59b11bccc",
+    "equal": true
+  },
+  {
+    "actual_checkout": "2f081fdc8c7727f5724084ec16e34712601ed78b",
+    "actual_parents": [
+      "8219e711ad6de24a63f124ba86b985b2fcb3e8a3",
+      "7c0cf8d3399a2733b316839aac4a36ce5829e624"
+    ],
+    "complete_checkout_tree": "6fcfd4acc8389f13eee8efe4910661ad49110ab2",
+    "authored_head": "7c0cf8d3399a2733b316839aac4a36ce5829e624",
+    "authored_tree": "6fcfd4acc8389f13eee8efe4910661ad49110ab2",
+    "equal": true
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "PR": 3404,
+  "kind": "ARM",
+  "run": 40120157609,
+  "head": "7c0cf8d3399a2733b316839aac4a36ce5829e624",
+  "conclusion": "success",
+  "primary_console_log_sha256": "fa28adb30f4e2078fe8e79f93299a448175521f7b4566681c3fca144d1832aab",
+  "bytes": 1832460,
+  "source": "https://github.com/autonomous-ai/lampOS/actions/runs/40120157609",
+  "checkout_lines": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T18:19:59.5670900Z HEAD is now at 2f081fd Merge 7c0cf8d3399a2733b316839aac4a36ce5829e624 into 8219e711ad6de24a63f124ba86b985b2fcb3e8a3"
+  ],
+  "summary_line": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T18:31:46.7159326Z      Summary [ 154.957s] 7399 tests run: 7399 passed (1 leaky), 53 skipped",
+  "primary_counts": {
+    "PASS": 7398,
+    "LEAK": 1,
+    "FAIL": 0,
+    "TIMEOUT": 0
+  },
+  "terminal_selected": 7399
+}
