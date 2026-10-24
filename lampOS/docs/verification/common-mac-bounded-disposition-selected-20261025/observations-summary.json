@@ -1,0 +1,56 @@
+{
+  "format": "frozen-f5d-local-observations-count-hash-boolean/1",
+  "local_diagnostic_only": true,
+  "head": "f5d92567ef89f7a7aeebee1d591038bb586c7b20",
+  "tree": "d454da643e6b9809a36c1cfc87ea5c8b03df110f",
+  "terminal_sha256": "d1d0328d6a2bce700d435a1916f705ed36ac521d8c3f1b619485e50edf8b01c0",
+  "diagnostic_phases_required": 3,
+  "diagnostic_phases_observed": 3,
+  "diagnostic_phases_exit_zero": true,
+  "prescribed_observation_count": 36,
+  "observation_counts": {
+    "passed": 36,
+    "failed": 0,
+    "unrun": 0
+  },
+  "case_groups": 12,
+  "first_prescribed_slots_each": [
+    1,
+    2,
+    3
+  ],
+  "replaced_observations": 0,
+  "source_guard_processes_passed": 74,
+  "same_recorded_source_cleanup_release": true,
+  "original_full_gate_exit": 101,
+  "original_full_Voice_counts": {
+    "passed": 4127,
+    "failed": 12,
+    "ignored": 21
+  },
+  "clean427_base_Voice_counts": {
+    "passed": 4018,
+    "failed": 0,
+    "ignored": 21
+  },
+  "clean427_fixed_cases_once_passed": 12,
+  "original_failures_matched_on_cleanbase": 0,
+  "local_failure_condition_satisfied": true,
+  "full_rule_satisfied": false,
+  "current_native_condition": "UNRUN",
+  "exact_current9df_qualification_or_transfer": false,
+  "initial_failed_driver_launch_hash_observed": false,
+  "full_inherited_Cargo_loader_environment_observed": false,
+  "selected_private_settings_count": 9,
+  "explicit_unset_count": 2,
+  "originalpath_defaultcapture_exactargv_verified": true,
+  "canonical_Voice_only_clean_exit_zero_destination_absent": true,
+  "Root_design_grant_baseline_capture_bindings_verified": true,
+  "fixture_issue_owner_assignments_independently_verified": false,
+  "historical_cause_or_waiver_or_READ_OK_claim": false,
+  "binary_target_currentartifact_or_activeprocess_read": false,
+  "raw_private_values_or_helpercode_publication_authorized": false,
+  "qualification_sha256": "a993c19df2232393e2d099acde3c32fc598430704cd099c298ae946add246471",
+  "local_disposition_sha256": "17f226b4f4a0ed60991e13464cd9bd343487c7d81db36b5f364220f698394114",
+  "source_binding_sha256": "c4b83c21af394a874ee0b47874182bb7008bde209d5c50756f4922a2d28b7316"
+}

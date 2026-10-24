@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 04:14: bounded Mac observations complete; current host gates active
+
+- [Selected baseline and observation results](verification/common-mac-bounded-disposition-selected-20261025/README.md): clean 427 full Voice 4018/0/21 and all twelve containing cases PASS; first three frozen f5d observations each produce 36/0/0, 74 source guards and verified exact Voice cleanup. Original full 4127/12/21 and exit 101 remain. The local condition is satisfied; full rule remains false/current native UNRUN, with launch hash and environment gaps explicit and no historical cause or waiver.
+- Current Common 9df on bcb now runs both fresh eight-stage gates. Linux fmt/strict Clippy/build pass; its suites continue. Mac fmt passes/Clippy active. No old result or READ-OK transfers. Current Name f517 and callback ba527 are frozen with 259/225 preparation checks; both grants pending. Photo e0c is current source copy with 2698 preparation checks and original-capture/strict-interval/privacy/physical holds.
+- New raw evidence stays private; selected counts/hashes/Booleans only. No device action or activation.
+
 ## 2026-10-25 03:49: current bcb carries and interrupted older Linux epoch
 
 - [Selected interrupted Linux receipt](verification/common-f978-interrupted-selected-20261025/README.md):08ed formatting0, Clippy KeyboardInterrupt125, two of eight observed, six UNRUN, no compiler/test/fresh46 credit. Exact-owned bounded cleanup and source/target release verify. Current-base direction requires bcb; old source and failed epochs remain preserved.
