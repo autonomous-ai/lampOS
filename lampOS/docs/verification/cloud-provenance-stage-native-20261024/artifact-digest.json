@@ -1,0 +1,8 @@
+{
+  "artifact_id": 12553531529,
+  "zip_bytes": 935593,
+  "api_zip_sha256": "d3e3b9da14f5f40b201af95c498340f64a319915bbf524be5fbc560396ac37bc",
+  "api_digest_verified": true,
+  "native_archive_sha256": "60c28851eeaa8695d0276684735713afd52fabc2a9ccd035696d48be5dc3858d",
+  "gh_download_archive_matches_api_zip": true
+}

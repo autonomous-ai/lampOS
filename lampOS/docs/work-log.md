@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-24 15:03 +07, corrected Cloud gates green and two reads delivered
+
+#3342 `e81c64854` fixes explicit stage metadata; all 14 native spawns agree
+with those maps. Fresh Mac Cloud **196/0/4 ignored**, exact Mac/Linux fmt,
+strict Mac/Linux Clippy pass. Dedicated native **2/0**, ordinary ARM64
+**11,195 PASS + 1 LEAK**, 92 skipped, no failed/unrun cases.
+[Native proof](verification/cloud-provenance-stage-native-20261024/README.md)
+binds all 10,349 preview hashes, exact replies/snapshots/reaps, API ZIP digest
+and isolation/removal. Original results remain separately bound. Reader
+confirmation of this small metadata correction remains pending.
+
+Independent READ-OK delivered for #3344 `f653bc5bd` privacy ownership and
+#3346 `27b3695f0` Controls released-file compatibility. Exact Mac gates:
+Voice **3,993/0/21 ignored**, Controls **509/0/3 ignored**. Both requested
+exact Linux fmt checks and official native gates pass. Controls ordinary
+ARM is **11,196 PASS + 1 LEAK**, 92 skipped; dedicated **2/0**, 36 verified
+reaps. Read scope and P3/physical limits remain in their receipts.
+
+#3327 `e4005f25a` and #3334 `63e2d963d` remain ready, reviewer-cleared and
+conflict-free when last checked. #3330 `4f44e25b4` has reviewer-cleared
+prepared eight-case composition and green gates, with original failed ARM
+attempt retained. It stays draft for parent #3327 integration and final
+carry. No base-drift-only carry or manual merge. Second holds no lamp;
+#1812 trusted key and #2810 attended lamp window remain external blocks.
+Next: current Cloud reader confirmation, parent integration, then package
+final carry; meanwhile check incoming findings and uncovered peer reads.
+
+---
+
 ## Current checkpoint: 2026-10-24 14:53 +07, reader gate complete and Cloud metadata correction
 
 #3344 `f653bc5bd` independent privacy read finds no new source P1/P2.

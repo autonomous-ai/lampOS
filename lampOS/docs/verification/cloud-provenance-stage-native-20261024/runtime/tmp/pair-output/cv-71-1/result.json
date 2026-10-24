@@ -1,0 +1,11 @@
+{
+  "actual_released_writers_and_readers": true,
+  "artifacts_unchanged": true,
+  "children_reaped": 7,
+  "cloud_queries": 9,
+  "fixed_paths_removed": true,
+  "provenance_parser_changed": false,
+  "result": "passed",
+  "synthetic_metadata_controls": 4,
+  "test": "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement"
+}

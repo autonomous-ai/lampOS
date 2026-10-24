@@ -1,0 +1,25 @@
+{
+  "sha256": "49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05",
+  "manifest": {
+    "format": 1,
+    "name": "provenance-kit",
+    "version": "1.1.0",
+    "files": [
+      {
+        "path": "SKILL.md",
+        "size": 103,
+        "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+      },
+      {
+        "path": "notes.txt",
+        "size": 23,
+        "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+      },
+      {
+        "path": "skill.toml",
+        "size": 160,
+        "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+      }
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "data": {
+    "left_out": 0,
+    "skills": [
+      {
+        "can_remove": true,
+        "can_turn_off": true,
+        "description": "A synthetic package provenance fixture.",
+        "group": "installed",
+        "loads": true,
+        "may_use": [
+          {
+            "name": "speak",
+            "privacy": null,
+            "says": "speaks, or plays a short sound"
+          }
+        ],
+        "name": "provenance-kit",
+        "off": false,
+        "sha256": null,
+        "title": "Provenance fixture",
+        "version": "1.0.0",
+        "why": null
+      }
+    ],
+    "version": 1
+  },
+  "device": "lamp",
+  "generation": "lamp-v2",
+  "id": "compat-dummy",
+  "kind": "skills.list",
+  "mac": "cloud-provenance-pair",
+  "status": "success",
+  "time": "2026-10-24T07:58:49Z",
+  "timezone": "Etc/UTC",
+  "type": "data",
+  "version": "",
+  "voice_input_mode": "automatic",
+  "wakeword_enabled": false
+}

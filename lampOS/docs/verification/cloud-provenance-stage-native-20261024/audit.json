@@ -1,0 +1,57 @@
+{
+  "head": "e81c64854c284f43cbdc88cbf4ff282bf99806b6",
+  "tested_merge": "7ab26879d74c70d36569095bfc4ed63562522290",
+  "source_files": 10349,
+  "symlink_target_hashes": [
+    "robots/lamp/rootfs/etc/systemd/system/sysinit.target.wants/led-boot.service"
+  ],
+  "source_unchanged_and_matches_git": true,
+  "native_cases": "2/0/0 ignored",
+  "archive_sha256": "60c28851eeaa8695d0276684735713afd52fabc2a9ccd035696d48be5dc3858d",
+  "archive_members": 281,
+  "cases": [
+    {
+      "test": "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement",
+      "queries": 9,
+      "positive_hashes": 5,
+      "synthetic_null_hashes": 4,
+      "owned_exits": 7,
+      "snapshot_manifests_verified": 18,
+      "snapshot_file_hashes_verified": 72,
+      "actual_package_hashes_verified": 2
+    },
+    {
+      "test": "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement",
+      "queries": 9,
+      "positive_hashes": 5,
+      "synthetic_null_hashes": 4,
+      "owned_exits": 7,
+      "snapshot_manifests_verified": 18,
+      "snapshot_file_hashes_verified": 72,
+      "actual_package_hashes_verified": 2
+    }
+  ],
+  "isolated_container_verified": true,
+  "owned_container_removed": true,
+  "explicit_stage_maps_match_all_spawns": true,
+  "scope": "source, isolation, process exits, actual package hashes, replies and snapshot content/paired manifests audited; transient installed preservation additionally relies on executed fixture",
+  "ordinary_workflow": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "headSha": "e81c64854c284f43cbdc88cbf4ff282bf99806b6",
+    "status": "completed",
+    "run": 40075952464,
+    "private_primary_log_sha256": "6b02a21999662ef5022abe2da1c949dcab35a88545cdfbcb5330f5186d413355"
+  },
+  "clippy_workflow": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "headSha": "e81c64854c284f43cbdc88cbf4ff282bf99806b6",
+    "status": "completed",
+    "run": 40075952506,
+    "private_primary_log_sha256": "17e39a6a65cdc77a634a33a2392341d53558d6fcaef23410219f6d5bf2d0433d"
+  },
+  "ordinary_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T08:00:39.0797973Z      Summary [ 219.870s] 11196 tests run: 11196 passed (1 leaky), 92 skipped"
+  ]
+}

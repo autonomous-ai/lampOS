@@ -1,0 +1,32 @@
+{
+  "reason": "compiler-artifact",
+  "package_id": "path+file:///home/runner/work/lampOS/lampOS/lampOS/crates/cloud#lamp-cloud@0.1.0",
+  "manifest_path": "/home/runner/work/lampOS/lampOS/lampOS/crates/cloud/Cargo.toml",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "release_pair",
+    "src_path": "/home/runner/work/lampOS/lampOS/lampOS/crates/cloud/tests/release_pair.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "profile": {
+    "opt_level": "3",
+    "debuginfo": 0,
+    "debug_assertions": false,
+    "overflow_checks": false,
+    "test": true
+  },
+  "features": [],
+  "filenames": [
+    "/home/runner/work/lampOS/lampOS/lampOS/target/release/deps/release_pair-25baaf9a59c6dd39"
+  ],
+  "executable": "/home/runner/work/lampOS/lampOS/lampOS/target/release/deps/release_pair-25baaf9a59c6dd39",
+  "fresh": false
+}

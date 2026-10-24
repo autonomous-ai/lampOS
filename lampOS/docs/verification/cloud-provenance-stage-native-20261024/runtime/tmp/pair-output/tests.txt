@@ -1,0 +1,9 @@
+
+running 2 tests
+test release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement ... Cloud provenance release-pair evidence: /tmp/pair-output/cv-71-0
+ok
+test release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement ... Cloud provenance release-pair evidence: /tmp/pair-output/cv-71-1
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.39s
+
