@@ -1,0 +1,51 @@
+{"round": "rP-0412", "at": "2026-10-25 04:18", "lines": 10, "answered_of_talk": "10/10", "held_of_desk": "0/0", "held_of_desk_after_answer": "0/0", "split": 6, "pieces_total": 16, "let_go": 0, "joined": 0, "not_heard": 0, "wer_median": 0.0, "wer_over_0.2": 0, "first_ms_median": 1371, "first_ms_max": 2228, "stalls": 0, "stall_ms_max": 0, "journal": {"memory note incomplete": 0, "memory note late": 1, "past the bound": 0, "cut short, are let go": 0, "joined": 0, "the line is someone else's": 0, "another voice than the conversation": 0, "not for me": 0, "in a busy room: its words are not chained": 0, "says stop or never mind": 0, "judged_without": 0}}
+pause1    q01 start  ask    pieces=[1] req=[1] wer=0.00 ANSWERED first=[1870] letgo=0 joined=0 names={'name/rising': 0.99063075, 'name/near': 0.9948359, 'name/heard': 0.9948359}
+    said:   Lamp, how are you today?
+    heard:  Lamp. How are you today?
+    lamp:   Still awake and glowing, same as you it seems. What's keeping you up at four in the morning?
+    why:    ["played: its name was heard in the room's sound"]
+pause2    q02 start  ask    pieces=[2, 3] req=[2, 3] wer=0.00 ANSWERED first=[1344] letgo=0 joined=0 names={'name/near': 0.8388171, 'name/rising': 0.99472153, 'name/heard': 0.99472153}
+    said:   Lamp, how are you today?
+    heard:  Lamp. How are you today?
+    lamp:   Bright and humming, happy to have company at this hour. What's got you up at four?
+    why:    ["played: its name was heard in the room's sound"]
+pause3    q03 start  ask    pieces=[4, 5] req=[4, 5] wer=0.00 ANSWERED first=[1138] letgo=0 joined=0 names={'name/rising': 0.97375596, 'name/heard': 0.99097776, 'name/near': 0.99097776}
+    said:   Lamp, what did I just ask you?
+    heard:  Lamp. What did I just ask you?
+    lamp:   You asked how I'm doing today. Twice, actually — and I'm still glad, quiet room and all.
+    why:    ["played: its name was heard in the room's sound"]
+pause4    q04 start  ask    pieces=[6] req=[6] wer=0.00 ANSWERED first=[1161] letgo=0 joined=0 names={'name/rising': 0.95434797, 'name/heard': 0.97535014, 'name/near': 0.97535014}
+    said:   Lamp, what did I just ask you?
+    heard:  Lamp. What did I just ask you?
+    lamp:   You asked what you'd just asked me. Chasing your own question in circles, that's what.
+    why:    ["played: its name was heard in the room's sound"]
+pause5    q07 start  ask    pieces=[7, 8] req=[7, 8] wer=0.00 ANSWERED first=[2228] letgo=0 joined=0 names={'name/near': 0.5625017, 'name/rising': 0.98657066, 'name/heard': 0.9985441}
+    said:   Lamp, what time is it in London?
+    heard:  Lamp. What time is it in London?
+    lamp:   Ten fourteen at night in London — Saturday still, so they're ahead of you in the evening. Almost midnight for them, actually.
+    why:    ["played: its name was heard in the room's sound"]
+pause6    q08 start  ask    pieces=[9, 10] req=[9, 10] wer=0.00 ANSWERED first=[2037] letgo=0 joined=0 names={'name/near': 0.62139404}
+    said:   Lamp, what time is it in London?
+    heard:  Lamp. What time is it in London?
+    lamp:   Quarter past ten at night there, still Saturday. Nine hours behind you.
+    why:    ['played: the text shows it was called']
+pause7    q09 start  ask    pieces=[11, 12] req=[11, 12] wer=0.00 ANSWERED first=[1371] letgo=0 joined=0 names={'name/rising': 0.9338354, 'name/near': 0.9338354, 'name/heard': 0.9338354}
+    said:   Lamp, tell me a joke.
+    heard:  Lamp. Tell me a joke.
+    lamp:   Okay, one for four in the morning: why did the lamp break up with the sun? Too bright and always showing off.
+    why:    ["played: its name was heard in the room's sound"]
+pause8    q10 start  ask    pieces=[13, 14] req=[13, 14] wer=0.00 ANSWERED first=[1158] letgo=0 joined=0 names={'name/rising': 0.93586355, 'name/heard': 0.93586355, 'name/near': 0.93586355}
+    said:   Lamp, tell me a joke.
+    heard:  Lamp. Tell me a joke.
+    lamp:   Another one? Fine. Why don't lamps ever get lost? We always follow the light.
+    why:    ["played: its name was heard in the room's sound"]
+pause9    q11 start  ask    pieces=[15] req=[15] wer=0.14 ANSWERED first=[1299] letgo=0 joined=0 names={}
+    said:   Lamp, do I need an umbrella today?
+    heard:  Do I need an umbrella today?
+    lamp:   Let me check. Probably not — it's drizzle and only an 18% chance of rain in Ho Chi Minh City today. Mind you, 95% humidity, so you'll feel damp anyway.
+    why:    ['played: a conversation with the lamp is going on, only as the conversation going on: the m']
+pause10   q12 start  ask    pieces=[16] req=[16] wer=0.14 ANSWERED first=[1490] letgo=0 joined=0 names={'name/rising': 0.9966077, 'name/heard': 0.9971753, 'name/near': 0.9993776}
+    said:   Lamp, do I need an umbrella today?
+    heard:  Do I need an umbrella today?
+    lamp:   Nope, not really. Drizzle and an 18% chance later, nothing to soak you — though the air's so thick at 95% humidity you'll feel clammy regardless.
+    why:    ["played: its name was heard in the room's sound"]
