@@ -1,0 +1,7 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:00:46.2609670Z HEAD is now at 6137863 Merge 6cd08d29cbe2ffecb4d05f0e8bbcee4ff1c98586 into 22b753df5db6434d21455f40f67926e0ecee9d91
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:12:23.1315122Z         PASS [   3.066s] (4143/7372) lamp-voice messages::tests::a_text_never_waits_on_the_news_for_the_phone
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:12:42.7659607Z         LEAK [   0.229s] (5193/7372) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:12:45.5353121Z         PASS [   2.412s] (5532/7372) lamp-voice second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:12:51.1236633Z         PASS [   0.006s] (5868/7372) lamp-voice second_provider::worker::tests::a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:13:14.3174513Z      Summary [ 152.110s] 7372 tests run: 7372 passed (1 leaky), 53 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:13:28.8509645Z test result: 12 passed; 0 failed

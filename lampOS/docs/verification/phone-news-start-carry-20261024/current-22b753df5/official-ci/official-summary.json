@@ -1,0 +1,24 @@
+{
+  "head": "6cd08d29cbe2ffecb4d05f0e8bbcee4ff1c98586",
+  "base": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "checked_merge": "6137863180efd4bf2faed8d614a6fefffc865153",
+  "arm64_run": 40100546330,
+  "linux_run": 40100546281,
+  "PASS": 7371,
+  "LEAK": 1,
+  "skipped": 53,
+  "failed": 0,
+  "unrun": 0,
+  "unique_ordinals": 7372,
+  "full_private_log_sha256": {
+    "arm64": "29d74e665d65117182f0a5fbb4d75ac967cfd0ca4e0d225c2fa7860a28704efb",
+    "linux": "2b5cbda574c3f1edd93526b32cae57dcd89c9073024374d68aa4f39a82e071d4"
+  },
+  "checked_tree": "5853e9dcd5c8a9ef71c7f14507dc4d5d4c09ed37",
+  "authored_tree": "5853e9dcd5c8a9ef71c7f14507dc4d5d4c09ed37",
+  "whole_tree_equal": true,
+  "required_controls_once_pass": [
+    "a_text_never_waits_on_the_news_for_the_phone"
+  ],
+  "actual_linux_fmt_and_clippy_pass": true
+}
