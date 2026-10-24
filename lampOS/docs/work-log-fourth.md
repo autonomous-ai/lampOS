@@ -8493,3 +8493,11 @@ First's15:41 voice freeze holds Common's new default-on voice/unit merge until t
 Records P3 candidate5328b0dce modifies only the existing ordinary test and its verification note. [Isolated helper evidence](verification/records-cap-helper-20261024/README.md) passes1/0 with the real helper and records the intentional removed-guard mutant's expected0/1 failure. Full gates remain queued; this is not substituted for package/native qualification.
 
 Common fresh fmt, strict workspace Clippy, workspace build and full Eyes pass on both hosts: Mac357/0/5, Linux360/0/5; the required Linux capture/private-disclosure control passes exactly once. Full Voice now runs on both. A temporary-index application against latest c6dfe9809 finds one genuine conflict, docs/reuse-decisions.md only; active frozen sources/indices stay untouched. The current voice freeze still holds Common's default-on merge.
+
+## 2026-10-24 16:20 +07: both compatibility slices landed
+
+Memory #3333 landed in train 78 as part of lamp-voice c6dfe9809; Records #3329 previously landed in train 71. Both retain their exact raw qualification and limits. No whole-update or physical acceptance is inferred. The tested-README P3 was independently closed by Reviewer-two from the published reconstruction.
+
+Common's fresh Mac/Linux first four stages pass: formatting, strict workspace/all-target Clippy, workspace build and full Eyes (Mac357/0/5, Linux360/0/5), including the Linux capture/private-proof control once. Both full Voice suites remain active. Current frozen source stays unchanged; later carry must resolve the sole verified docs/reuse-decisions.md conflict. Voice freeze and First's physical/compatible-pin holds still prohibit activation.
+
+Records cap-control candidate5328b0dce is staged in its own branch with persistent patch/source checkpoints. Isolated real-helper1/0 and intentional-mutant0/1 proof is published; full Records/native gates remain queued behind exclusive Common target ownership. No failed or unrun gate is called green.
