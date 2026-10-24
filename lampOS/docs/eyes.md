@@ -1496,6 +1496,18 @@ says the name has not changed. It neither reveals that stored name nor
 asks for a replacement confirmation that this path cannot honor. The
 ordinary switch-off name/read-back behavior remains unchanged.
 
+The text check is not general language understanding. A bare name after a
+question about a friend is indistinguishable from the speaker naming themself.
+Folding punctuation can also join a name and an addressee: "I'm Kess, Mai"
+can pass for the requested name "Kess Mai", although "Mai" alone refuses.
+A question mark lost in transcription cannot be recovered from these words,
+including in "em là…". These remain explicit physical/model trial limits.
+
+Some ordinary forms refuse conservatively: "Remember my face, I'm Kess,
+and this is Mai" refuses even Kess; "Remember me please, I'm Kess", "Im
+Kess", "It's Kess", and "anh/chị là…" need a fresh supported introduction.
+The refusal fixtures and the physical sheet record these expected outcomes.
+
 These are checks on the classifier's observations, not independent proof
 of acoustic identity. An unread, far or turned-away second face does not
 automatically refuse the request: only a second face positively read as
