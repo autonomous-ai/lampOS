@@ -2128,6 +2128,18 @@ with the known face's id the eyes keep beside the known file
   window, its eyes are under 24 detector pixels apart on average, it is
   turned more than 30 degrees or its turn was not measured (see above), or
   the eye line bends more than 0.1 radians a look.
+- **One misread look (`LAMP_EYES_SPEAKING_DROP_OUTLIER=on`, off unless
+  set, #3296).** Off, one look whose landmarks misread (on lamp-52e6 a look
+  at 14 px between the eyes among 28 to 33 px, its eye line bent) trips the
+  jitter gate or leaves the window without the mesh, and the face reads
+  `unknown` for the whole 2 s while the mouth was plainly open and shutting.
+  On, a look whose eye distance is 30% (`OUTLIER_SHARE`) or more off its
+  window's median is left out, and the rest is judged as above, with the same
+  gates: still at least 5 looks, every one with the mesh for the mesh to
+  judge. A window with more than one such look (`MOST_OUTLIERS`) is
+  `unknown` (`reason` `outliers`). A window with none is judged exactly as
+  with it off. Offline only: a talking face with one 14 px look reads `yes`,
+  a still one `no`; two such looks, or one in a window of five, `unknown`.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
@@ -2246,7 +2258,10 @@ without stretching. Mesh crop upsampling does not change `eyes_px`. The box
 helps interpret framing but does not prove identity or physical distance.
 
 `reason` names the first returning branch: `invalid_eyes`, `turn_unavailable`,
-`turned`, `small`, `too_few_looks`, `jitter`, `mesh`, or `corners`. `mesh` and
+`turned`, `outliers` (with `LAMP_EYES_SPEAKING_DROP_OUTLIER=on` only),
+`small`, `too_few_looks`, `jitter`, `mesh`, or `corners`. With that switch,
+`window_looks` and `window_span_us` count the whole window, while
+`window_mean_eyes_px` and `mesh_window_looks` count the looks kept. `mesh` and
 `corners` identify the scoring path, not necessarily speech. Later unevaluated
 metrics are null, including window count/span/mesh count after `invalid_eyes`;
 zero is a measured value. `window_reset=true` means this valid look starts a

@@ -1130,6 +1130,21 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             lamp_eyes::speaking::ENVIRONMENT
         );
     }
+    if std::env::var(lamp_eyes::speaking::OUTLIER_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+        && std::env::var(lamp_eyes::speaking::ENVIRONMENT)
+            .ok()
+            .as_deref()
+            != Some("on")
+    {
+        eprintln!(
+            "lamp-eyes: {} is on without {}=on: no mouth is read, so nothing is dropped",
+            lamp_eyes::speaking::OUTLIER_ENVIRONMENT,
+            lamp_eyes::speaking::ENVIRONMENT
+        );
+    }
     let voice_bus = answered
         .as_ref()
         .and_then(|_| lamp_bus::Bus::from_environment().ok());

@@ -26,6 +26,16 @@ use std::collections::{HashMap, VecDeque};
 /// Where the eyes read whether to judge speaking. `on` only; with
 /// `LAMP_BUS=on`, since it is published there.
 pub const ENVIRONMENT: &str = "LAMP_EYES_SPEAKING";
+/// With `LAMP_EYES_SPEAKING=on` too, `on` drops from a face's window the one
+/// look whose eye distance is off its window's median by more than
+/// [`OUTLIER_SHARE`] (a landmark misread, as one look at 14 px among 28 to
+/// 33 px on lamp-52e6), instead of letting it void the window. Off: as before.
+pub const OUTLIER_ENVIRONMENT: &str = "LAMP_EYES_SPEAKING_DROP_OUTLIER";
+/// A look whose eye distance is this share or more off the window's median
+/// is an outlier.
+pub const OUTLIER_SHARE: f32 = 0.3;
+/// The outliers a window may drop; one more and it is `unknown`.
+pub const MOST_OUTLIERS: usize = 1;
 /// How far back a face's mouth is read: five to eight looks at the eyes'
 /// pace while they follow a face (250 ms, up to 350 ms on a 10 fps camera,
 /// `main.rs`). With `--steady-rate` a still face is looked at 500 to 600 ms
@@ -61,7 +71,10 @@ const FORGET_US: u64 = 3_000_000;
 
 /// Whether the environment asks for it.
 pub fn from_environment() -> Option<Mouths> {
-    (std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")).then(Mouths::default)
+    (std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")).then(|| Mouths {
+        drop_outliers: std::env::var(OUTLIER_ENVIRONMENT).ok().as_deref() == Some("on"),
+        ..Mouths::default()
+    })
 }
 
 /// The mouth's width over the distance between the eyes, that distance in
@@ -90,6 +103,8 @@ struct Mouth {
 #[derive(Debug, Default)]
 pub struct Mouths {
     faces: HashMap<u32, Mouth>,
+    /// [`OUTLIER_ENVIRONMENT`].
+    drop_outliers: bool,
 }
 
 const UNKNOWN: Speaking = Speaking {
@@ -107,6 +122,9 @@ pub enum Reason {
     TurnUnavailable,
     Turned,
     Small,
+    /// More looks off the window's median eye distance than it may drop
+    /// (`LAMP_EYES_SPEAKING_DROP_OUTLIER`).
+    Outliers,
     TooFewLooks,
     Jitter,
     Mesh,
@@ -204,17 +222,30 @@ impl Mouths {
         {
             mouth.looks.pop_front();
         }
-        let looks = &mouth.looks;
+        // With the switch, a look whose eye distance is off the window's
+        // median by OUTLIER_SHARE or more is left out; off, none is.
+        let median = self.drop_outliers.then(|| {
+            let mut eyes: Vec<f32> = mouth.looks.iter().map(|look| look.2).collect();
+            eyes.sort_by(f32::total_cmp);
+            eyes[eyes.len() / 2]
+        });
+        let looks: Vec<_> = mouth
+            .looks
+            .iter()
+            .copied()
+            .filter(|look| median.is_none_or(|m| (look.2 - m).abs() < OUTLIER_SHARE * m))
+            .collect();
+        let outliers = mouth.looks.len() - looks.len();
         let turned = turn_deg.is_none_or(|degrees| degrees > MOST_TURN_DEG);
-        let mean_eyes = looks.iter().map(|look| look.2).sum::<f32>() / (looks.len() as f32);
+        let mean_eyes = looks.iter().map(|look| look.2).sum::<f32>() / (looks.len().max(1) as f32);
         let small = mean_eyes < LEAST_EYES_PX;
         if let Some(detail) = diagnostic.as_deref_mut() {
             detail.eyes_px = Some(eyes);
             detail.window_mean_eyes_px = Some(mean_eyes);
-            detail.window_looks = Some(looks.len());
+            detail.window_looks = Some(mouth.looks.len());
             detail.window_span_us =
-                Some(now_us.saturating_sub(looks.front().map_or(now_us, |look| look.0)));
-            detail.window_reset = looks.len() == 1;
+                Some(now_us.saturating_sub(mouth.looks.front().map_or(now_us, |look| look.0)));
+            detail.window_reset = mouth.looks.len() == 1;
             detail.mesh_window_looks = Some(looks.iter().filter(|look| look.4.is_some()).count());
         }
         let refusal = if turned {
@@ -223,6 +254,8 @@ impl Mouths {
             } else {
                 Reason::Turned
             })
+        } else if outliers > MOST_OUTLIERS {
+            Some(Reason::Outliers)
         } else if small {
             Some(Reason::Small)
         } else if looks.len() < LEAST_LOOKS {
@@ -817,5 +850,76 @@ mod diagnostic_tests {
             other.window_reset,
             "a new passing track begins its own window"
         );
+    }
+}
+
+#[cfg(test)]
+mod outlier_tests {
+    //! One misread look (eyes 14 px among 30 px looks, its eye line bent) in
+    //! a speaking face's window, as on lamp-52e6 (#3296).
+    use super::*;
+
+    fn marks(eyes: f32, angle: f32) -> [(f32, f32); 5] {
+        let (sin, cos) = angle.sin_cos();
+        [
+            (0.0, 0.0),
+            (eyes * cos, eyes * sin),
+            (eyes / 2.0, 10.0),
+            (0.0, 20.0),
+            (eyes, 20.0),
+        ]
+    }
+
+    /// The last verdict over `looks` looks 250 ms apart, the misread ones at
+    /// `bad`; the mesh's gap opens and shuts when `talking`.
+    fn last(drop_outliers: bool, talking: bool, looks: u64, bad: &[u64]) -> Speaking {
+        let mut mouths = Mouths {
+            drop_outliers,
+            ..Mouths::default()
+        };
+        let mut said = UNKNOWN;
+        for look in 0..looks {
+            let seen = if bad.contains(&look) {
+                marks(14.0, 0.3)
+            } else {
+                marks(30.0 + (look % 3) as f32, 0.0)
+            };
+            let open = if talking {
+                if look % 2 == 0 { 0.04 } else { 0.08 }
+            } else {
+                0.002
+            };
+            said = mouths.judge(1, &seen, Some(0.0), Some(open), look * 250_000);
+        }
+        said
+    }
+
+    #[test]
+    fn one_outlier_is_dropped_only_with_the_switch() {
+        assert_eq!(last(true, true, 9, &[6]).state, SpeakingState::Yes);
+        assert_eq!(last(false, true, 9, &[6]).state, SpeakingState::Unknown);
+    }
+
+    #[test]
+    fn two_outliers_or_too_few_good_looks_stay_unknown() {
+        assert_eq!(last(true, true, 9, &[3, 6]).state, SpeakingState::Unknown);
+        assert_eq!(last(true, true, 5, &[3]).state, SpeakingState::Unknown);
+    }
+
+    #[test]
+    fn a_still_face_with_one_outlier_is_not_speaking() {
+        assert_eq!(last(true, false, 9, &[6]).state, SpeakingState::No);
+    }
+
+    #[test]
+    fn without_an_outlier_the_switch_changes_nothing() {
+        for talking in [false, true] {
+            for looks in 1..12 {
+                assert_eq!(
+                    last(true, talking, looks, &[]),
+                    last(false, talking, looks, &[])
+                );
+            }
+        }
     }
 }
