@@ -1,0 +1,34 @@
+{
+  "gate-result.json": {
+    "original_sha256": "5f1deb77bc6f5855d016cc4af4e0f291eee3e6f485bc1b4671e449c181dbe8a4",
+    "published_sha256": "a030d1e27d76eb73857b2d1320832fc1c5620ebc836db3308c43772650e54664"
+  },
+  "fmt.txt": {
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clean-selected.txt": {
+    "original_sha256": "d6526141b7306ee3e50452544526b00bb9f3207895e287a1c462151435d059fa",
+    "published_sha256": "d6526141b7306ee3e50452544526b00bb9f3207895e287a1c462151435d059fa"
+  },
+  "clippy-summary.json": {
+    "original_sha256": "472271fdb8b26ca9973efff0f429bb046be0fc6a8dadaf6d9b318743da9c679d",
+    "published_sha256": "4a9b19f2b40627f9974ca18aee865431a0e5a1a07effd8cff78790aa0ddbf429"
+  },
+  "test-compile-summary.json": {
+    "original_sha256": "917f4df38001a634c6ea67b98f526ff67fae1f3f6ac8e9e2ddea443050b35aa4",
+    "published_sha256": "a7a23ecce19803965770eb019eebf289e3bb3da9a63b57193a0c525728584b42"
+  },
+  "test.txt": {
+    "original_sha256": "5a03f2bda0aeae7d55db38cc49ce9eb5f73d1b3277e68d01f25dfe3f37d63441",
+    "published_sha256": "e14d0a850e451a1ea5e6105bca06bcc2b885ec4d725a6bf43bf319267b9c7643"
+  },
+  "source-before.json": {
+    "original_sha256": "57ba2165a0381523570f46b833840b4e2e78565287dbffce2403084d22d50982",
+    "published_sha256": "57ba2165a0381523570f46b833840b4e2e78565287dbffce2403084d22d50982"
+  },
+  "source-after.json": {
+    "original_sha256": "57ba2165a0381523570f46b833840b4e2e78565287dbffce2403084d22d50982",
+    "published_sha256": "57ba2165a0381523570f46b833840b4e2e78565287dbffce2403084d22d50982"
+  }
+}
