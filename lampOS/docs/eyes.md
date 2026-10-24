@@ -1318,6 +1318,16 @@ With the switch:
   still correcting it. And seven letters were put together from four
   spelled letters, an ordinary first name said twice between them, and
   "three letters".
+- **The word that called the lamp is not their name**
+  (`known_faces::only_the_call`, 25 Oct).
+  - **What's refused:** a name heard only as the line's opening word, past any greeting and set off by a comma or a
+    stop with more said after it, when that word is the lamp's name or one the service writes for it
+    (`attention::written_for_the_name`: "Man", "Helen", "Lynn", "Louvre" and the rest). The model is told to ask them
+    their name.
+  - **Why:** on lamp-4ace on 24 October the owner's "Lamp, remember my face, and I'm …" was heard as "Man. Remember my
+    face and do", and their face was kept as "Man" and greeted by it.
+  - **Still a name:** a line that is only the name ("Helen."), or the name said again as theirs ("Helen, remember my
+    face. I'm Helen.").
 - **One name for one face.** The voice asks the eyes
   `{"remember":"Jim","one_face":true}`. Prints already someone's under
   another name are refused with `{"error":"known_as","known_as":"A"}`
