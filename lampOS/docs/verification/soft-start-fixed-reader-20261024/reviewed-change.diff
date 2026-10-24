@@ -1,0 +1,653 @@
+diff --git a/lampOS/crates/voice/src/activity.rs b/lampOS/crates/voice/src/activity.rs
+index 54f5ce7a5..eaff60a90 100644
+--- a/lampOS/crates/voice/src/activity.rs
++++ b/lampOS/crates/voice/src/activity.rs
+@@ -81,11 +81,8 @@ pub const REACH_LEAD_BLOCKS: usize = 20;
+ /// Where the coordinator reads whether a line's sound begins a moment before
+ /// its first word (`on`; off unless set). With first words kept, an ordinary
+ /// start, the lamp silent, keeps [`SOFT_START_LEAD_BLOCKS`] more than the
+-/// usual 300 ms, and begins earlier still at [`REACH_LEAD_BLOCKS`] (200 ms)
+-/// before the earliest block of the speech-like run it starts on, by each
+-/// block's score before the faint floor: at most [`SOFT_START_BLOCKS`] before
+-/// the usual start, only across gaps shorter than [`SOFT_START_GAP_BLOCKS`],
+-/// and never past a block heard while the lamp was sounding.
++/// usual 300 ms, never past a block heard while the lamp was sounding, and
++/// never later than the usual start.
+ ///
+ /// Why: a line starts on [`START_BLOCKS`] blocks scored [`START_PROBABILITY`]
+ /// and over the faint floor, and keeps 300 ms before that. A first word that
+@@ -103,20 +100,15 @@ pub fn soft_start() -> bool {
+     std::env::var(SOFT_START_ENVIRONMENT).ok().as_deref() == Some("on")
+ }
+ 
+-/// How much more than the usual 300 ms every soft start keeps: 200 ms. The
+-/// detector's own scores can be slow on a word that is not soft at all
+-/// ("what" at -11 dBFS within 50 ms, on lamp-4ace, started its line 278 ms
+-/// in), so the run of speech-like blocks alone does not give it room.
+-pub const SOFT_START_LEAD_BLOCKS: usize = 20;
+-/// How much further back than the usual 300 ms a soft start may begin:
+-/// 500 ms. A word's soft opening is a syllable, not a phrase; this keeps
+-/// faint talk across a room, which may run straight into a line, to half a
+-/// second at most.
+-pub const SOFT_START_BLOCKS: usize = 50;
+-/// Quiet this long, by the score before the floor, is a pause: a soft
+-/// start reaches back only through the run before it. 100 ms, under the
+-/// gaps between the words of a phrase and over none of a pause after a name.
+-pub const SOFT_START_GAP_BLOCKS: usize = 10;
++/// How much more than the usual 300 ms a soft start keeps: 300 ms, so 600
++/// ms before the start's sixth block. The detector can take that long to be
++/// sure of a word that is not soft at all: in 60 lines recorded on lamp-4ace
++/// on 24 and 25 October a start came 58 to 458 ms after its speech began
++/// ("what" at -11 dBFS within 50 ms started its line 278 ms in), and every
++/// line with 100 ms or more of its sound before the word was heard whole.
++/// Its own scores are no guide to where such a word began: they dip inside
++/// it, so a reach along them stopped short (the first builder's A/B, 25 Oct).
++pub const SOFT_START_LEAD_BLOCKS: usize = 30;
+ 
+ /// With `linear`, the detector reads the echo canceller's linear output in
+ /// place of the processed block (#828): the residual suppressor that follows
+@@ -260,13 +252,13 @@ pub struct TurnDetector {
+     /// The next start comes as the lamp's sound ends, and may reach back
+     /// to the onset the lamp's sound hid.
+     reach_onset: bool,
+-    /// With first words kept, `LAMP_SOFT_START=on`: each prefix block's
+-    /// score before the faint floor, or `None` while the lamp was sounding,
+-    /// which a soft start may not reach back past. Empty otherwise.
+-    unfloored: VecDeque<Option<f32>>,
++    /// With first words kept, `LAMP_SOFT_START=on`: whether each prefix
++    /// block was heard with the lamp silent; a soft start never reaches back
++    /// past one that was not. Empty otherwise.
++    lamp_silent: VecDeque<bool>,
+     soft_start: bool,
+-    /// The score before the floor of the next block pushed.
+-    next_unfloored: Option<f32>,
++    /// Whether the next block pushed is heard with the lamp silent.
++    next_lamp_silent: bool,
+     start_count: u16,
+     silence_count: u16,
+     end_silence_blocks: u16,
+@@ -320,9 +312,9 @@ impl Default for TurnDetector {
+             first_words: false,
+             reach_back: false,
+             reach_onset: false,
+-            unfloored: VecDeque::new(),
++            lamp_silent: VecDeque::new(),
+             soft_start: false,
+-            next_unfloored: None,
++            next_lamp_silent: false,
+             start_count: 0,
+             silence_count: 0,
+             end_silence_blocks: END_SILENCE_BLOCKS,
+@@ -407,16 +399,16 @@ impl TurnDetector {
+         self.reach_onset = self.first_words;
+     }
+ 
+-    /// `LAMP_SOFT_START=on`: with first words kept, an ordinary start may
+-    /// begin at its soft first word ([`SOFT_START_ENVIRONMENT`]).
++    /// `LAMP_SOFT_START=on`: with first words kept, an ordinary start keeps
++    /// [`SOFT_START_LEAD_BLOCKS`] more ([`SOFT_START_ENVIRONMENT`]).
+     pub fn keep_soft_starts(&mut self, on: bool) {
+         self.soft_start = on;
+     }
+ 
+-    /// The next block's score before the faint floor, or `None` while the
+-    /// lamp is sounding. Only for the next block pushed.
+-    pub fn unfloored(&mut self, score: Option<f32>) {
+-        self.next_unfloored = score;
++    /// Whether the next block is heard with the lamp silent. Only for the
++    /// next block pushed; unsaid, it was not.
++    pub fn lamp_silent(&mut self, silent: bool) {
++        self.next_lamp_silent = silent;
+     }
+ 
+     /// Configured silence window; with confirmation it is the fallback.
+@@ -577,7 +569,7 @@ impl TurnDetector {
+     ) -> Activity {
+         let reach_back = std::mem::take(&mut self.reach_back);
+         let reach_onset = std::mem::take(&mut self.reach_onset);
+-        let unfloored = self.next_unfloored.take();
++        let lamp_silent = std::mem::take(&mut self.next_lamp_silent);
+         if let Err(reason) = self.validate(&frame, probability) {
+             return Activity::Fault(reason);
+         }
+@@ -663,13 +655,13 @@ impl TurnDetector {
+         if self.prefix.len() == kept {
+             self.prefix.pop_front();
+             self.scores.pop_front();
+-            self.unfloored.pop_front();
++            self.lamp_silent.pop_front();
+         }
+         self.prefix.push_back(frame);
+         if self.first_words {
+             self.scores.push_back(own);
+             if self.soft_start {
+-                self.unfloored.push_back(unfloored);
++                self.lamp_silent.push_back(lamp_silent);
+             }
+         }
+         self.start_count = if probability >= START_PROBABILITY {
+@@ -681,7 +673,7 @@ impl TurnDetector {
+             let begin = self.begin(reach_back, reach_onset);
+             self.prefix.drain(..begin);
+             self.scores.clear();
+-            self.unfloored.clear();
++            self.lamp_silent.clear();
+             self.active = true;
+             self.active_blocks = self.prefix.len() as u32;
+             self.silence_count = 0;
+@@ -794,63 +786,22 @@ impl TurnDetector {
+     }
+ 
+     /// An ordinary start with soft starts kept: [`SOFT_START_LEAD_BLOCKS`]
+-    /// before the usual start, or [`REACH_LEAD_BLOCKS`] before the earliest
+-    /// block of the speech-like run (scored [`SILENCE_PROBABILITY`] or more
+-    /// before the faint floor) that the start is on, through gaps shorter
+-    /// than [`SOFT_START_GAP_BLOCKS`], if that is earlier; never more than
+-    /// [`SOFT_START_BLOCKS`] before the usual start, nor past a block heard
+-    /// while the lamp was sounding, nor into speech before the pause that
+-    /// ends the run, and never later than the usual start. Without the
+-    /// switch, the usual start.
++    /// before the usual start, never past a block heard while the lamp was
++    /// sounding, and never later than the usual start: a block so heard at
++    /// or after it (the onset's own, under a reply not yet over) leaves the
++    /// start as it was, never with less (the reviewer's P2 on #3392: `Start`
++    /// with no audio). Without the switch, the usual start.
+     fn soft_begin(&self, usual: usize) -> usize {
+-        if !self.soft_start || self.unfloored.len() != self.prefix.len() {
++        if !self.soft_start || self.lamp_silent.len() != self.prefix.len() {
+             return usual;
+         }
+-        let most = usual.saturating_sub(SOFT_START_BLOCKS);
+-        // Never later than the usual start: a block heard while the lamp was
+-        // sounding at or after it (the onset's own, under a reply's playback
+-        // gone quiet but not retired) leaves the start as it was, never
+-        // with less (the reviewer's P2 on #3392: `Start` with no audio).
+         let floor = self
+-            .unfloored
++            .lamp_silent
+             .iter()
+-            .rposition(Option::is_none)
++            .rposition(|silent| !silent)
+             .map_or(0, |at| at + 1)
+-            .max(most)
+-            .min(usual);
+-        let speech =
+-            |at: usize| self.unfloored[at].is_some_and(|score| score >= SILENCE_PROBABILITY);
+-        let mut earliest = None;
+-        let mut pause = None;
+-        let mut gap = 0;
+-        for at in (floor..self.prefix.len()).rev() {
+-            if speech(at) {
+-                earliest = Some(at);
+-                gap = 0;
+-            } else {
+-                gap += 1;
+-                if gap >= SOFT_START_GAP_BLOCKS {
+-                    pause = Some(at);
+-                    break;
+-                }
+-            }
+-        }
+-        // Nor into speech before the pause that ends the run: a lead stops
+-        // after it, so a name said before the pause isn't taken (the
+-        // reviewer's P3 on #3392).
+-        let after_pause = pause
+-            .and_then(|at| (floor..at).rev().find(|&at| speech(at)))
+-            .map_or(floor, |at| at + 1);
+-        let lead = usual
+-            .saturating_sub(SOFT_START_LEAD_BLOCKS)
+-            .max(after_pause)
+             .min(usual);
+-        earliest.map_or(lead, |earliest| {
+-            earliest
+-                .saturating_sub(REACH_LEAD_BLOCKS)
+-                .max(after_pause)
+-                .min(lead)
+-        })
++        usual.saturating_sub(SOFT_START_LEAD_BLOCKS).max(floor)
+     }
+ 
+     /// Discard prospective PCM without erasing capture continuity checks.
+@@ -867,7 +818,7 @@ impl TurnDetector {
+     pub fn clear_prospective(&mut self) {
+         self.prefix.clear();
+         self.scores.clear();
+-        self.unfloored.clear();
++        self.lamp_silent.clear();
+         self.start_count = 0;
+         self.silence_count = 0;
+         self.active_blocks = 0;
+@@ -882,7 +833,7 @@ impl TurnDetector {
+     pub fn reset(&mut self) {
+         self.prefix.clear();
+         self.scores.clear();
+-        self.unfloored.clear();
++        self.lamp_silent.clear();
+         self.start_count = 0;
+         self.silence_count = 0;
+         self.active_blocks = 0;
+@@ -917,7 +868,7 @@ impl TurnDetector {
+         if !self.active {
+             self.prefix.clear();
+             self.scores.clear();
+-            self.unfloored.clear();
++            self.lamp_silent.clear();
+             self.start_count = 0;
+         }
+     }
+diff --git a/lampOS/crates/voice/src/coordinator.rs b/lampOS/crates/voice/src/coordinator.rs
+index 727479745..d10d190aa 100644
+--- a/lampOS/crates/voice/src/coordinator.rs
++++ b/lampOS/crates/voice/src/coordinator.rs
+@@ -771,27 +771,20 @@ fn while_answer_waits(
+     }
+ }
+ 
+-/// A block's score before the faint floor, for a soft start
+-/// (`LAMP_SOFT_START`, `TurnDetector::unfloored`): only while the lamp is
+-/// silent, its sound not reaching the microphone by the echo evidence
+-/// (`sounding`) and nothing of a reply to yield as the duplex mask hears the
+-/// block ([`reply_sounding`]: audio still to hand over, or the lamp's sound
+-/// accepted, queued or within its tail), and no busy answer kept, so that a
+-/// start never reaches back into the lamp's own voice. `None` otherwise,
+-/// which a soft start never reaches past.
++/// Whether a block is heard with the lamp silent, for a soft start
++/// (`LAMP_SOFT_START`, `TurnDetector::lamp_silent`): its sound not reaching
++/// the microphone by the echo evidence (`sounding`), nothing of a reply to
++/// yield as the duplex mask hears the block ([`reply_sounding`]: audio still
++/// to hand over, or the lamp's sound accepted, queued or within its tail),
++/// and no busy answer kept. A soft start never reaches back past a block that
++/// was not, so never into the lamp's own voice.
+ ///
+ /// Not the reply's playback token: it is held from a reply's start until
+ /// its audio is retired, so on lamp-4ace on 25 October the lines begun after
+ /// an answer, or after a bare "Lamp." whose answer waited, kept no soft start
+ /// at all, and two lost their "what" as before.
+-fn unfloored_score(
+-    sounding: bool,
+-    keeping_answer: bool,
+-    reply_sounding: bool,
+-    probability: f32,
+-) -> Option<f32> {
+-    (!sounding && !reply_sounding && !keeping_answer && probability.is_finite())
+-        .then_some(probability)
++fn lamp_silent(sounding: bool, keeping_answer: bool, reply_sounding: bool) -> bool {
++    !sounding && !reply_sounding && !keeping_answer
+ }
+ 
+ /// Whether `current` is an answer to someone's request that has ended, none
+@@ -8164,11 +8157,10 @@ fn conversation_with_gate_inner(
+             let sounding = frame.echo.as_ref().is_some_and(|echo| {
+                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
+             });
+-            detector.unfloored(unfloored_score(
++            detector.lamp_silent(lamp_silent(
+                 sounding,
+                 keeping_answer,
+                 reply_sounding(&playback_mask, reply, frame.read_completed_at_us),
+-                frame.probability,
+             ));
+             let (update, input_ended) = observe_prospective_heard(
+                 &mut playback_mask,
+diff --git a/lampOS/crates/voice/src/coordinator/tests/duplex.rs b/lampOS/crates/voice/src/coordinator/tests/duplex.rs
+index e09ec7a3e..4e0db4104 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/duplex.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/duplex.rs
+@@ -103,9 +103,9 @@ pub(super) struct Harness {
+     /// Every candidate is let go, as the session loop lets go talk over the
+     /// lamp's own line in a busy room (`busy_room`, #2602).
+     let_go: bool,
+-    /// Each block's score before the faint floor is given to the detector,
+-    /// as the session loop gives it with `LAMP_SOFT_START=on`
+-    /// ([`unfloored_score`]).
++    /// Whether each block is heard with the lamp silent is given to the
++    /// detector, as the session loop gives it with `LAMP_SOFT_START=on`
++    /// ([`lamp_silent`]).
+     pub(super) soft_start: bool,
+ }
+ 
+@@ -300,11 +300,10 @@ impl Harness {
+             let sounding = echo.as_ref().is_some_and(|echo| {
+                 echo.render_quiet_blocks < Hearing::EVALUATED.clear_after_blocks
+             });
+-            self.detector.unfloored(unfloored_score(
++            self.detector.lamp_silent(lamp_silent(
+                 sounding,
+                 false,
+                 reply_sounding(&self.mask, &self.reply, at),
+-                score,
+             ));
+         }
+         let samples = observation.samples;
+@@ -894,13 +893,13 @@ fn with_soft_starts_a_line_under_a_quiet_unretired_reply_starts_as_before() {
+ 
+ /// With `LAMP_SOFT_START=on`, a line begun once the lamp's answer is all
+ /// handed over and its sound quiet a second, though its turn is not retired
+-/// and its playback still held, keeps 200 ms more than the usual 300 ms (on
++/// and its playback still held, keeps 300 ms more than the usual 300 ms (on
+ /// lamp-4ace on 25 October the playback token alone kept every such line
+ /// from it). While any of the answer is still to hand over, as above, it
+ /// starts as before; and never reaches into the 300 ms after the lamp's
+ /// sound, which the echo evidence still hears as it.
+ #[test]
+-fn with_soft_starts_a_line_after_the_lamps_answer_keeps_its_200_ms() {
++fn with_soft_starts_a_line_after_the_lamps_answer_keeps_its_300_ms() {
+     let request = |soft: bool| {
+         let mut h = Harness::keeping_first_words(true, 100);
+         h.soft_start = soft;
+diff --git a/lampOS/crates/voice/tests/it/soft_start.rs b/lampOS/crates/voice/tests/it/soft_start.rs
+index dac977df3..3736890fc 100644
+--- a/lampOS/crates/voice/tests/it/soft_start.rs
++++ b/lampOS/crates/voice/tests/it/soft_start.rs
+@@ -1,14 +1,10 @@
+ //! A line's sound begins a moment before its first word (`LAMP_SOFT_START=on`,
+-//! with `LAMP_FIRST_WORDS=kept`): an ordinary start keeps 200 ms more than the
+-//! usual 300 ms, or begins 200 ms before the earliest block of the
+-//! speech-like run it starts on, by its score before the faint floor, if that
+-//! is earlier; at most 500 ms more, only through gaps under 100 ms, never
+-//! into speech before such a pause, never past a block heard while the lamp
+-//! was sounding, and never later than the usual start. A yield's start and a
+-//! start without the switch are unchanged.
++//! with `LAMP_FIRST_WORDS=kept`): an ordinary start keeps 300 ms more than the
++//! usual 300 ms, never past a block heard while the lamp was sounding, and
++//! never later than the usual start. A yield's start and a start without the
++//! switch are unchanged.
+ use lamp_voice::activity::{
+-    Activity, ObservedAudio, PRE_ROLL_BLOCKS, REACH_LEAD_BLOCKS, SOFT_START_BLOCKS,
+-    SOFT_START_LEAD_BLOCKS, START_BLOCKS, TurnDetector,
++    Activity, ObservedAudio, PRE_ROLL_BLOCKS, SOFT_START_LEAD_BLOCKS, START_BLOCKS, TurnDetector,
+ };
+ 
+ fn frame(sequence: u64) -> ObservedAudio {
+@@ -19,19 +15,25 @@ fn frame(sequence: u64) -> ObservedAudio {
+     }
+ }
+ 
+-/// 120 blocks of quiet; then `before`: each block's score before the floor,
+-/// the last of them just ahead of the onset, all given to the detector as
+-/// nothing (under the floor); then the onset, six blocks over the start's
+-/// bar. The sequence the start's audio begins at, and the onset's first.
+-fn start(soft: bool, kept: bool, before: &[Option<f32>], yield_start: bool) -> (u64, u64) {
++/// 120 blocks of quiet heard with the lamp silent, then `before`, whether each
++/// block was heard with the lamp silent, the last just ahead of the onset; then
++/// the onset, six blocks over the start's bar, heard with the lamp silent as
++/// `onset_silent` says, marked a yield on its last block when `yield_start`.
++/// The sequence the start's audio begins at, and the onset's first.
++fn start(
++    soft: bool,
++    kept: bool,
++    before: &[bool],
++    onset_silent: bool,
++    yield_start: bool,
++) -> (u64, u64) {
+     let mut detector = TurnDetector::v1_baseline();
+     detector.keep_first_words(kept);
+     detector.keep_soft_starts(soft);
+     let mut sequence = 0;
+-    let quiet = std::iter::repeat_n(Some(0.05), 120);
+-    for unfloored in quiet.chain(before.iter().copied()) {
++    for silent in std::iter::repeat_n(true, 120).chain(before.iter().copied()) {
+         sequence += 1;
+-        detector.unfloored(unfloored);
++        detector.lamp_silent(silent);
+         assert!(matches!(
+             detector.push_heard(frame(sequence), 0.0, Some(0.0)),
+             Activity::Quiet
+@@ -43,8 +45,9 @@ fn start(soft: bool, kept: bool, before: &[Option<f32>], yield_start: bool) -> (
+         if yield_start && n == START_BLOCKS {
+             detector.reach_back();
+         }
+-        detector.unfloored(Some(0.95));
++        detector.lamp_silent(onset_silent);
+         if let Activity::Start(audio) = detector.push_heard(frame(sequence), 0.95, Some(0.95)) {
++            assert!(!audio.is_empty());
+             assert!(
+                 audio
+                     .windows(2)
+@@ -62,123 +65,61 @@ fn usual(onset: u64) -> u64 {
+     onset + START_BLOCKS as u64 - PRE_ROLL_BLOCKS as u64
+ }
+ 
+-/// A soft "what" before a louder "time": 40 blocks scored 0.5 before the
+-/// floor, all under it, run into the onset.
+-fn soft_word() -> Vec<Option<f32>> {
+-    vec![Some(0.5); 40]
+-}
+-
++/// "what" on lamp-4ace: started 278 ms after the word began, so the usual
++/// 300 ms began 12 ms before it, and the word was lost. With the switch the
++/// line's sound begins 300 ms earlier still; without it, or without first
++/// words kept, as before.
+ #[test]
+-fn a_soft_first_word_is_kept_only_with_the_switch_and_first_words() {
+-    let (begins, onset) = start(true, true, &soft_word(), false);
+-    // The run's first block is 40 before the onset; 200 ms before it.
+-    assert_eq!(begins, onset - 40 - REACH_LEAD_BLOCKS as u64);
+-    assert!(begins < usual(onset));
+-    // Without the switch, or without first words kept: the usual 300 ms.
++fn a_soft_start_keeps_300_ms_more_only_with_the_switch_and_first_words() {
++    let (begins, onset) = start(true, true, &[true; 40], true, false);
++    assert_eq!(begins, usual(onset) - SOFT_START_LEAD_BLOCKS as u64);
+     for (soft, kept) in [(false, true), (true, false), (false, false)] {
+-        let (begins, onset) = start(soft, kept, &soft_word(), false);
++        let (begins, onset) = start(soft, kept, &[true; 40], true, false);
+         assert_eq!(begins, usual(onset), "soft {soft} kept {kept}");
+     }
+ }
+ 
+-#[test]
+-fn a_soft_start_reaches_at_most_half_a_second_before_the_usual_one() {
+-    // A run of 200 blocks before the onset: talk going on all along.
+-    let (begins, onset) = start(true, true, &[Some(0.6); 200], false);
+-    assert_eq!(begins, usual(onset) - SOFT_START_BLOCKS as u64);
+-}
+-
+-#[test]
+-fn a_pause_of_a_tenth_of_a_second_ends_what_a_soft_start_reaches() {
+-    // "Lamp," 20 blocks, a 120 ms pause scored quiet, then the soft word of
+-    // 30 blocks: the name, inside the half second, is not reached, and the
+-    // 200 ms lead stops at the pause's first block, short of the name (the
+-    // reviewer's P3 on #3392).
+-    let mut before = vec![Some(0.9); 20];
+-    before.extend(std::iter::repeat_n(Some(0.1), 12));
+-    before.extend(vec![Some(0.5); 30]);
+-    let (begins, onset) = start(true, true, &before, false);
+-    assert_eq!(begins, onset - 30 - 12);
+-    // A gap of 9 quiet blocks inside the word is gone through, with the full
+-    // lead before it; 10 is a pause, and the lead stops at it.
+-    for (gap, begins_before) in [(9, 49 + REACH_LEAD_BLOCKS as u64), (10, 30 + 10)] {
+-        let mut before = vec![Some(0.5); 10];
+-        before.extend(std::iter::repeat_n(Some(0.1), gap));
+-        before.extend(vec![Some(0.5); 30]);
+-        let (begins, onset) = start(true, true, &before, false);
+-        assert_eq!(begins, onset - begins_before, "gap {gap}");
+-    }
+-}
+-
+-/// "what" on lamp-4ace: the word's first block at the usual start, so the
+-/// line's sound began at it, and the word was lost. It gets its 200 ms.
+-#[test]
+-fn a_word_begun_at_the_usual_start_gets_its_200_ms_before() {
+-    let (begins, onset) = start(true, true, &[Some(0.5); 24], false);
+-    assert_eq!(usual(onset), onset - 24);
+-    assert_eq!(begins, onset - 24 - REACH_LEAD_BLOCKS as u64);
+-    // Said 200 ms or more inside the usual start already: 200 ms more all
+-    // the same.
+-    let (begins, onset) = start(true, true, &[Some(0.5); 4], false);
+-    assert_eq!(begins, usual(onset) - SOFT_START_LEAD_BLOCKS as u64);
+-}
+-
++/// A block heard while the lamp was sounding, 10 blocks before the usual
++/// start: the line begins after it, never in the lamp's own voice.
+ #[test]
+ fn a_soft_start_never_reaches_into_the_lamps_own_sound() {
+-    // The block 30 before the onset was heard while the lamp sounded.
+-    let mut before = soft_word();
+-    before[10] = None;
+-    let (begins, onset) = start(true, true, &before, false);
+-    assert_eq!(begins, onset - 29);
++    let mut before = [true; 40];
++    before[40 - 24 - 10] = false;
++    let (begins, onset) = start(true, true, &before, true, false);
++    assert_eq!(begins, usual(onset) - 9);
+ }
+ 
+-/// The reviewer's P2 on #3392: every block, the onset's own among them, heard
+-/// while the lamp's reply was playing (`None`): the usual start, with its
+-/// audio, never one with none.
++/// The reviewer's P2 on #3392: every block, the onset's own among them,
++/// heard while the lamp was sounding (a reply not yet over): the usual start,
++/// with its audio, never one with none.
+ #[test]
+-fn a_start_heard_all_under_the_lamps_reply_begins_as_usual() {
+-    let mut detector = TurnDetector::v1_baseline();
+-    detector.keep_first_words(true);
+-    detector.keep_soft_starts(true);
+-    let mut sequence = 0;
+-    for _ in 0..120 {
+-        sequence += 1;
+-        detector.unfloored(None);
+-        assert!(matches!(
+-            detector.push_heard(frame(sequence), 0.0, Some(0.0)),
+-            Activity::Quiet
+-        ));
+-    }
+-    for _ in 1..=START_BLOCKS {
+-        sequence += 1;
+-        detector.unfloored(None);
+-        if let Activity::Start(audio) = detector.push_heard(frame(sequence), 0.95, Some(0.95)) {
+-            assert_eq!(audio.len(), PRE_ROLL_BLOCKS);
+-            assert_eq!(audio.last().unwrap().sequence, sequence);
+-            return;
+-        }
+-    }
+-    panic!("the onset did not start an utterance");
++fn a_start_heard_all_with_the_lamp_sounding_begins_as_usual() {
++    let (begins, onset) = start(true, true, &[false; 40], false, false);
++    assert_eq!(begins, usual(onset));
++    // Silent until the onset, the onset not: still the usual start.
++    let (begins, onset) = start(true, true, &[true; 40], false, false);
++    assert_eq!(begins, usual(onset));
+ }
+ 
+-/// A word the detector's scores are slow on: nothing speech-like before the
+-/// onset, and still 200 ms more than the usual 300 ms.
++/// A soft start never reaches before what the detector keeps: with first
++/// words kept that is 1.6 s, so 300 ms more is always there; and it is the
++/// same 300 ms more after a short quiet as after a long one.
+ #[test]
+-fn every_soft_start_keeps_200_ms_more_than_the_usual() {
+-    let (begins, onset) = start(true, true, &[Some(0.2); 40], false);
+-    assert_eq!(begins, usual(onset) - SOFT_START_LEAD_BLOCKS as u64);
+-    // And with the lamp sounding 10 blocks before the usual start, from
+-    // after that block.
+-    let mut before = vec![Some(0.2); 40];
+-    before[40 - 24 - 10] = None;
+-    let (begins, onset) = start(true, true, &before, false);
+-    assert_eq!(begins, usual(onset) - 9);
++fn a_soft_start_keeps_the_same_300_ms_after_any_quiet() {
++    for quiet in [24 + SOFT_START_LEAD_BLOCKS, 60, 200] {
++        let (begins, onset) = start(true, true, &vec![true; quiet], true, false);
++        assert_eq!(
++            begins,
++            usual(onset) - SOFT_START_LEAD_BLOCKS as u64,
++            "{quiet}"
++        );
++    }
+ }
+ 
++/// A yield's start reaches back by its own scores (here all 0): the usual
++/// start, as without the switch.
+ #[test]
+ fn a_yields_start_is_not_a_soft_start() {
+-    // A yield reaches back by its own scores, which here are all 0: the
+-    // usual start, as without the switch.
+-    let (begins, onset) = start(true, true, &soft_word(), true);
++    let (begins, onset) = start(true, true, &[true; 40], true, true);
+     assert_eq!(begins, usual(onset));
+ }
+diff --git a/lampOS/docs/duplex-listening.md b/lampOS/docs/duplex-listening.md
+index 4eea27670..6e8792407 100644
+--- a/lampOS/docs/duplex-listening.md
++++ b/lampOS/docs/duplex-listening.md
+@@ -1153,38 +1153,42 @@ on #3126).
+   ask you?", four times of four that evening). With 171 ms of quiet before
+   the "what", the same kind of line was heard whole.
+ - **With the switch,** an ordinary start (not a yield's, nor a line begun as
+-  the lamp's sound ends) keeps 200 ms more than the usual 300 ms
+-  (`SOFT_START_LEAD_BLOCKS`). If the speech-like run it starts on began
+-  earlier, it begins 200 ms (`REACH_LEAD_BLOCKS`) before the run. The run is
+-  judged by each block's score before the faint floor, at 0.35 or more
+-  (`SILENCE_PROBABILITY`), through gaps under 100 ms
+-  (`SOFT_START_GAP_BLOCKS`). That keeps a soft first word that is still
+-  under the floor (`TurnDetector::soft_begin`).
++  the lamp's sound ends) keeps 300 ms more than the usual 300 ms
++  (`SOFT_START_LEAD_BLOCKS`, `TurnDetector::soft_begin`). That's 600 ms before
++  the start's sixth block.
++  - **Why 300 ms:** in 60 lines recorded on lamp-4ace on 24 and 25 October,
++    a start came 58 to 458 ms after its speech began. Every line with 100 ms
++    or more of its sound before the word was heard whole.
++  - **Why a fixed lead, not the detector's scores:** they dip inside such a
++    word, so they are no guide to where it began. A first version reached
++    back along them, 200 ms more and through gaps under 100 ms. It stopped
++    short on q03 and q08, which lost their "what" again (the first builder's
++    A/B, 25 Oct, 01:58).
+ - **Bounds:**
+-  - It reaches at most 500 ms (`SOFT_START_BLOCKS`) before the usual start.
+-    Talk across a room that runs straight into a line adds half a second at
+-    most.
+-  - Additional lead never crosses a block marked unavailable by
+-    `unfloored_score`. The coordinator records a score only when the echo
+-    evidence does not say the lamp is sounding, no busy answer is kept, and
++  - Additional lead never crosses a block the coordinator marks as not
++    silent (`lamp_silent`). A block is silent only when the echo evidence
++    does not say the lamp is sounding, no busy answer is kept, and
+     `reply_sounding` is false: no reply audio still to hand over, accepted,
+     queued or within the playback mask's tail. With echo evidence, the
+     sounding guard requires 30 quiet 10 ms blocks (300 ms). Without it,
+     the mask's existing fallback tail is 100 ms (`TAIL_US`), not 300 ms.
+     These are software evidence bounds, not a measured acoustic tail.
+-    The reply's playback token alone is not the test: it remains held until
+-    audio is retired, even after that audio is handed over and quiet.
++  - The reply's playback token alone is not the test. It remains held until
++    audio is retired, even after that audio is handed over and quiet, and
++    on 25 October it kept every line begun after an answer, or after a bare
++    "Lamp." whose answer waited, from a soft start.
+   - It never begins later than the usual start. If pending reply PCM still
+-    makes the onset's score unavailable, it keeps the ordinary prefix rather
+-    than returning empty audio (the reviewer's P2 on #3392). Once the PCM is
+-    handed over and the mask and echo guards are clear, a retained playback
+-    token does not prevent the extra lead. The ordinary 300 ms prefix is
+-    never shortened by these guards, so it can still contain samples that
+-    would block additional lead.
+-  - A pause of 100 ms or more ends the speech-like run. The additional lead
+-    starts after the preceding speech, so it does not add a name from before
+-    that pause. This does not remove speech already inside the unchanged
+-    ordinary prefix.
++    makes the onset's block not silent, it keeps the ordinary prefix rather
++    than returning empty audio, which admission refuses and which ended the
++    conversation (the reviewer's P2 on #3392). Once the PCM is handed over
++    and the mask and echo guards are clear, a retained playback token does
++    not prevent the extra lead. The ordinary 300 ms prefix is never
++    shortened by these guards, so it can still contain samples that would
++    block additional lead.
++  - What it costs: 300 ms more of the room before each line goes to speech
++    to text. The lead does not stop at a pause, so a name said less than
++    about half a second before the question may come with it ("Lamp. What
++    time…"), which the second route reads as a call with its line.
+ - `input_candidate`'s `first_read_at_us` shows where each line's sound began.
+   With `mic2/audio` recorded off the bus, which is on the voice's clock, the
+   line's onset can be set against it.
+diff --git a/lampOS/docs/switches.md b/lampOS/docs/switches.md
+index 048e9470e..f12e95756 100644
+--- a/lampOS/docs/switches.md
++++ b/lampOS/docs/switches.md
+@@ -156,7 +156,7 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
+ | LAMP_REACH_PROBE | `on` (with LAMP_OFFLINE_VOICE); off. The link down says no internet only on `lamp-health --reach-probe on`'s verdict, so a relay outage with the internet up gets no offline line or breath | on (#830, with `lamp-health --online on --reach-probe on`) | — (not without a second route: a relay outage would drop speech in silence unless LAMP_SERVICE_DOWN_LINE=on, #830) | #1247 | offline.md: a minute with the Wi-Fi off (offline, the line once) and a minute with only the relay unreachable (online from `reach`, no line); not run, Monday on lamp-4ace with a person at the router (#830) | off until that check, and only where LAMP_VOICE_SECOND_CONFIG is set | Without the second route, speech while the link is down and the probe says online is dropped without a word (offline.md) | until |
+ | `lamp-health` --reach-idle | `on` (with `--online on --reach-probe on`); off. The probe asks with the voice's link up too, every 30 s and every 5 s once the internet doesn't answer; not answering is `lamp/online` false from `reach`, so a cut nobody spoke in is offline on the second route too | — | — | #1844 | A Wi-Fi minute on lamp-06c1 with nobody speaking: `lamp/online` false within about 30 s of the cut, and true within about 5 s of the Wi-Fi back | off until that run | 2 TCP connects every 30 s while online; a network that blocks 1.1.1.1 and 8.8.8.8 on 443 reads as offline | until |
+ | LAMP_REPLY_END_REACH | `on`; off; only with LAMP_FIRST_WORDS=kept and duplex. A line begun as the lamp's sound ends (quiet under 640 ms) starts 200 ms before the onset its speech made under that sound, so a name said under the lamp's last words isn't lost | — | — | #1722 (the first builder, 06:56) | the hand-overs on lamp-4ace: "Hey Lamp, ask Codex …" at 3 of 3, and its `heard N words` at 10 | off until that run | At most 200 ms before the person's onset goes with the line; the lamp's last words, under the onset's bar, aren't taken | until |
+-| LAMP_SOFT_START | `on`; off; only with LAMP_FIRST_WORDS=kept. An ordinary start, the lamp silent, keeps 200 ms more than the usual 300 ms, or begins 200 ms before the speech-like run it starts on (scored before the faint floor), at most 500 ms more, so a first word the detector is slow on isn't lost | — | — | the first builder, 24 Oct (lost first word after a pause, #3126) | the ten pause lines on lamp-4ace with `mic2/audio` recorded: each line's sound against its onset, and its first word heard, on and off | off until that run | Up to half a second more of the room before a line goes to speech to text; never the lamp's own voice | until |
++| LAMP_SOFT_START | `on`; off; only with LAMP_FIRST_WORDS=kept. An ordinary start, the lamp silent, keeps 300 ms more than the usual 300 ms, never past a block heard while the lamp was sounding and never later than the usual start, so a first word the detector is slow on (up to 458 ms measured) isn't lost | — | — | the first builder, 24 Oct (lost first word after a pause, #3126) | the ten pause lines and the owner's set on lamp-4ace with `mic2/audio` recorded, on against off: each line's sound against its onset, and its first word heard | off until that run | 300 ms more of the room before a line goes to speech to text; never the lamp's own voice | until |
+ | LAMP_REMARKS | `on` only, with LAMP_ATTENTION; off; the Live route only. In a busy room a line let out only as the conversation going on (no name, no call, nobody turned or near), not answering the lamp's question, that looks like a remark (begins with I/we/she/they…, 4+ words, no need/want/like/too/wonder) and asks nothing (no `?`, question or helping word, telling word, or "you"/"please"/"thanks"), in plain-ASCII letters, is held as a remark to the room, and two held remarks end the conversation (with LAMP_SPOKEN_TO, #1522); and the lamp's question is known by the end of its line (which `SOUND_ANSWERS` and the unclear check read too) | — | — | #705 (18 Oct, 13:0x) | Tests only: the night's scripted lines by kind (umbrella and car held, the 13 of ours said to the lamp played, 8 not ours not judged), scene 3 without punctuation, and the reviewer's 30 asks on #1499 played; a battery with it on: scene 3's umbrella held, every day line and every "No, not now." answered | off until a battery on lamp-4ace holds the umbrella in every scene 3 and answers every line said to the lamp, light asks among them | Scene 3's umbrella was answered 10 of 10 overnight, and on 3f4f3c5c3 every line of scene 3 and scene 4's opening (#1522); a remark meant for the lamp that begins with a person goes unanswered in a busy room unless named or faced, and one person's two remark-shaped lines end their own conversation, so their next unnamed ask is held (#1533 review); lamp-4ace sets LAMP_SPOKEN_TO on the lamp, not in its repo unit | until |
+ | LAMP_RESEND_LOST_LINE | `on` only; off. A line lost with its connection after it ended, before any output or tool call, is sent once more on the next ready session (same privacy generation, ≤15 s, ready within 5 s, a failure a retry mends); one still open fails as before. On the second route as the only voice, a spoken line whose chat was lost on the network (`link::lost`) before any word or call is asked once more if a service host answers within 5 s and no newer line began (#1722) | — | — | #705 (17 Oct, Step B) | Tests only: the worker's end-to-end on a scripted drop; lamp-cb94's 57 `barrier_timeout` and 7 `write_timeout` drops, and lamp-4ace's 84 `write_timeout`, each lost a line | off until a recorded drop replayed on a lamp is answered once, and a line with a tool call is not resent | a night on a lamp with it on, comparing `drop_cost_twelve.py`'s table, (the privacy question is settled: any lost line, service-privacy.md) | until |
+ | LAMP_ROOM_FILE | absolute short path; unset = the room in memory only. The room and its clocks kept across a restart of under five minutes, so it isn't unknown for five minutes after each (#1465) | — | — | #1465 (18 Oct) | none yet: the first builder's deliberate voice restart in a quiet room, then the 10:57 follow-up, with #1474 | off until that check passes | A room kept may be wrong if it changed while the voice was down | until |

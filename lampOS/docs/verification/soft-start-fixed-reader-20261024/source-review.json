@@ -1,0 +1,31 @@
+{
+  "head": "0b41ef8250711cec5c27e7b260fb5be28281821d",
+  "base": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "source_P1_P2": "none demonstrated",
+  "local_tests": {
+    "soft-start-it.txt": [
+      "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 270 filtered out; finished in 0.00s"
+    ],
+    "activity-duplex-census.txt": [
+      "test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 3669 filtered out; finished in 28.14s"
+    ]
+  },
+  "source_unchanged": true,
+  "checked": [
+    "extra 30 blocks only for ordinary soft starts with first words kept; default-off and yield/onset paths preserved",
+    "prefix alignment and bounded retained history unchanged; extra history bool queue replaces score queue",
+    "latest non-silent marker limits additional lead, with min(usual) preserving ordinary prefix and nonempty Start",
+    "pending/accepted/tail reply_sounding, echo 30 quiet blocks and kept-busy-answer guards retained",
+    "clear/reset/inactive-discard clear marker history; unsaid next marker is conservatively false",
+    "renamed APIs and removed constants have no remaining Rust callers across crates; switch census/docs updated"
+  ],
+  "nonblocking_P3": [
+    "The coordinator helper comment still says never into the lamp own voice without the additional-lead qualification. Implementation and duplex docs correctly retain the ordinary prefix even when it contains a not-silent marker. The code guarantee is narrower than that absolute comment."
+  ],
+  "limits": [
+    "Only 94 focused software tests, not a full Voice/workspace test.",
+    "Original producer integration failure remains failed and needs its own exact-head record; no cause claim.",
+    "No new third physical A/B, acoustic boundary measurement, product activation, or device action.",
+    "Current native checks are separate from this local software read."
+  ]
+}

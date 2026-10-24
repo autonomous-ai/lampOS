@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/it/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c75c87452d24a363)
+
+running 5 tests
+test soft_start::a_soft_start_keeps_300_ms_more_only_with_the_switch_and_first_words ... ok
+test soft_start::a_soft_start_keeps_the_same_300_ms_after_any_quiet ... ok
+test soft_start::a_soft_start_never_reaches_into_the_lamps_own_sound ... ok
+test soft_start::a_start_heard_all_with_the_lamp_sounding_begins_as_usual ... ok
+test soft_start::a_yields_start_is_not_a_soft_start ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 270 filtered out; finished in 0.00s
+
