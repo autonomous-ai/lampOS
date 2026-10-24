@@ -1,0 +1,34 @@
+{
+  "arm64": [
+    {
+      "id": 121008093239,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "conclusion": "success",
+      "started_at": "2026-10-24T22:40:02Z",
+      "completed_at": "2026-10-24T23:01:22Z"
+    },
+    {
+      "id": 121012520540,
+      "name": "report-full-run-failure",
+      "conclusion": "skipped",
+      "started_at": "2026-10-24T23:01:22Z",
+      "completed_at": "2026-10-24T23:01:22Z"
+    },
+    {
+      "id": 121012520701,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "conclusion": "skipped",
+      "started_at": "2026-10-24T23:01:22Z",
+      "completed_at": "2026-10-24T23:01:22Z"
+    }
+  ],
+  "linux": [
+    {
+      "id": 121008093091,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "conclusion": "success",
+      "started_at": "2026-10-24T22:39:56Z",
+      "completed_at": "2026-10-24T22:42:47Z"
+    }
+  ]
+}

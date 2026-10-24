@@ -1,0 +1,4 @@
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-24T22:40:27.2872543Z HEAD is now at ab5dc8f Merge e79ddfcf7f9de92b663fa18c43b0131911762d7b into 42f08cf038660ff60b3415f7c3a64740ce782fcc
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	﻿2026-10-24T22:41:24.5111585Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-24T22:41:24.5112174Z [36;1mcargo clippy --locked --workspace --all-targets -- -D warnings[0m
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-24T22:42:46.4698509Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 21s

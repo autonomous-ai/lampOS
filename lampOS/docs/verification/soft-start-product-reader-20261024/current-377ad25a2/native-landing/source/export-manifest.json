@@ -1,0 +1,17 @@
+[
+  {
+    "file": "receipt.json",
+    "original_sha256": "3a145779a2048686cd15c55a4aaa1e86a07b761b3d6cd716f1fd74c9d97a92c0",
+    "published_sha256": "3a145779a2048686cd15c55a4aaa1e86a07b761b3d6cd716f1fd74c9d97a92c0"
+  },
+  {
+    "file": "arm64-selected.txt",
+    "original_sha256": "2d45831129f3d40858629b2470638ac93727f761f08e3edf27530495cf783a72",
+    "published_sha256": "2d45831129f3d40858629b2470638ac93727f761f08e3edf27530495cf783a72"
+  },
+  {
+    "file": "linux-selected.txt",
+    "original_sha256": "b11bbacc8deddbcaf29a8e8cdc4c87da8160a667f59f3f778d97e4a1ceb793cb",
+    "published_sha256": "b11bbacc8deddbcaf29a8e8cdc4c87da8160a667f59f3f778d97e4a1ceb793cb"
+  }
+]
