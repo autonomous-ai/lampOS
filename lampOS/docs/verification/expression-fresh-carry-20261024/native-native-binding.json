@@ -1,0 +1,10 @@
+{
+  "arm": {
+    "checkout": "1d999e12f3649a1c1cf08b70b8d42fa5ff2f0ad1",
+    "raw_log_sha256": "025840c1fd25e84ff8e109d1929b98b5af5b0bd88faea0f73f96fd36cd5560df"
+  },
+  "clippy": {
+    "checkout": "1d999e12f3649a1c1cf08b70b8d42fa5ff2f0ad1",
+    "raw_log_sha256": "01e266bafe6e3f5feae4dcd0446dcb79a60d7cc5af934eacce70fd3c4404f868"
+  }
+}

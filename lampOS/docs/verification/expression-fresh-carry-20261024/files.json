@@ -1,67 +1,31 @@
 {
-  "final-fmt.txt": {
-    "bytes": 0,
-    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-  },
-  "combined-clippy.txt": {
-    "bytes": 353269,
-    "sha256": "2290704d94cc710010840755a87406b613aa75510023a845d0017590340ff984"
-  },
-  "combined-build.txt": {
-    "bytes": 371377,
-    "sha256": "805853457caed90de6d0618f506d6b01c7c68484f8410a1eadf98043aef1f3b9"
-  },
-  "combined-workspace-artifacts.json": {
-    "bytes": 391334,
-    "sha256": "084d2845da60344a5a64b25f4612cd283bb981983e3d91699da26352998eaee3"
-  },
-  "focus-artifacts.json": {
-    "bytes": 17658,
-    "sha256": "1f1403d6b77ad39c2e2956c756b263fd8cd73e6f4658b5f5b77b9e02ee98471e"
-  },
-  "combined-compiler-audit.json": {
-    "bytes": 424,
-    "sha256": "81504d2d90b80eca75660162e5b5160dfac5469c04764dda5898300a160d5fd5"
-  },
-  "focus-clippy.json": {
-    "bytes": 713,
-    "sha256": "c1366b7bc8a37e410e8252375f6cf43957b21637aa5a10725c60ac4cbafc2007"
-  },
-  "combined-tests.txt": {
-    "bytes": 445391,
-    "sha256": "9c750c6012da7233b8186bb8665cc7f9984bd9433e857e058b0d711b991b71aa"
-  },
-  "combined-gates.json": {
-    "bytes": 3162,
-    "sha256": "0e95ea4bb2a32b6996f084cf8dd1441bc164646be34c12a0bf550caf7e49c6f8"
+  "README.md": {
+    "bytes": 5470,
+    "sha256": "2a029e31e705f6d1726f30443be32df77dd9d24e838d9b53c319d7b9034b6de2"
   },
   "assertion-tails.json": {
     "bytes": 509,
     "sha256": "24343ac4bf1098a395319f7ad98bbca84553a44080a5d377565641dfbeca5d8f"
   },
-  "combined-summary.json": {
-    "bytes": 3517,
-    "sha256": "8620e9758c477fd019368c5e0e7fdfd4f11ba58dc0bd45f0b551733d10e04228"
+  "combined-build.txt": {
+    "bytes": 371377,
+    "sha256": "805853457caed90de6d0618f506d6b01c7c68484f8410a1eadf98043aef1f3b9"
   },
-  "final-source-binding.json": {
-    "bytes": 870,
-    "sha256": "8770175eb40afc227dbabfaccc5cc5ab66ca460e5fcce6efa472f62cfae47db4"
+  "combined-clippy.txt": {
+    "bytes": 353269,
+    "sha256": "2290704d94cc710010840755a87406b613aa75510023a845d0017590340ff984"
   },
-  "README.md": {
-    "bytes": 4472,
-    "sha256": "f242cd044f587195826fd5d6b24b463e43efc71dd6e1beaf168ad9075ec43fbf"
+  "combined-compiler-audit.json": {
+    "bytes": 424,
+    "sha256": "81504d2d90b80eca75660162e5b5160dfac5469c04764dda5898300a160d5fd5"
   },
-  "focus-gates.json": {
-    "bytes": 1362,
-    "sha256": "331da6f72c9cf5891a2c33cf59ca9d7b305cf7889338409f5c3de2dc39b434cb"
-  },
-  "focus-expression.txt": {
-    "bytes": 55717,
-    "sha256": "a53ef9f0862330f09e64a91feab793f8494c98429496737fcc28634b61cf1f87"
-  },
-  "focus-fmt.txt": {
+  "combined-fmt.txt": {
     "bytes": 0,
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "combined-gates.json": {
+    "bytes": 3162,
+    "sha256": "0e95ea4bb2a32b6996f084cf8dd1441bc164646be34c12a0bf550caf7e49c6f8"
   },
   "combined-source-after.json": {
     "bytes": 1179336,
@@ -71,16 +35,76 @@
     "bytes": 1179336,
     "sha256": "d1b3f6ea39c7803333ce9f76844e0ba589ea4beb3b82fec8e92418290be3006b"
   },
-  "combined-fmt.txt": {
+  "combined-summary.json": {
+    "bytes": 3517,
+    "sha256": "8620e9758c477fd019368c5e0e7fdfd4f11ba58dc0bd45f0b551733d10e04228"
+  },
+  "combined-tests.txt": {
+    "bytes": 445391,
+    "sha256": "9c750c6012da7233b8186bb8665cc7f9984bd9433e857e058b0d711b991b71aa"
+  },
+  "combined-workspace-artifacts.json": {
+    "bytes": 391334,
+    "sha256": "084d2845da60344a5a64b25f4612cd283bb981983e3d91699da26352998eaee3"
+  },
+  "final-fmt.txt": {
     "bytes": 0,
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
-  "range-diff.txt": {
-    "bytes": 90,
-    "sha256": "6253fb85683e40eb066d37642b4c882e3255345ae80c5759bd67115948e319a4"
+  "final-source-binding.json": {
+    "bytes": 870,
+    "sha256": "8770175eb40afc227dbabfaccc5cc5ab66ca460e5fcce6efa472f62cfae47db4"
+  },
+  "focus-artifacts.json": {
+    "bytes": 17658,
+    "sha256": "1f1403d6b77ad39c2e2956c756b263fd8cd73e6f4658b5f5b77b9e02ee98471e"
+  },
+  "focus-clippy.json": {
+    "bytes": 713,
+    "sha256": "c1366b7bc8a37e410e8252375f6cf43957b21637aa5a10725c60ac4cbafc2007"
   },
   "focus-clippy.txt": {
     "bytes": 0,
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "focus-expression.txt": {
+    "bytes": 55717,
+    "sha256": "a53ef9f0862330f09e64a91feab793f8494c98429496737fcc28634b61cf1f87"
+  },
+  "focus-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "focus-gates.json": {
+    "bytes": 1362,
+    "sha256": "331da6f72c9cf5891a2c33cf59ca9d7b305cf7889338409f5c3de2dc39b434cb"
+  },
+  "native-arm-run.json": {
+    "bytes": 5159,
+    "sha256": "0e566e20714a08d3d48097c6f229b16b252d76aa71203caca46e2d5506b9b156"
+  },
+  "native-arm.txt": {
+    "bytes": 1826029,
+    "sha256": "025840c1fd25e84ff8e109d1929b98b5af5b0bd88faea0f73f96fd36cd5560df"
+  },
+  "native-clippy-run.json": {
+    "bytes": 2224,
+    "sha256": "ed6d603442a09c3df5f4b9e733bfd9750d07f5e691d5e3f8d0b3c8597b5d030e"
+  },
+  "native-clippy.txt": {
+    "bytes": 72111,
+    "sha256": "01e266bafe6e3f5feae4dcd0446dcb79a60d7cc5af934eacce70fd3c4404f868"
+  },
+  "native-native-audit.json": {
+    "bytes": 1853,
+    "sha256": "1d1e5c2f6f9cc384b2361499c1177be2ee192d54df6b81c2b13d027907044eaf"
+  },
+  "native-native-binding.json": {
+    "bytes": 336,
+    "sha256": "c05fa6d0d9ddc47c0dabaf328b7e4d61bd5c248755e4156d0b304a967647892a"
+  },
+  "range-diff.txt": {
+    "bytes": 90,
+    "sha256": "6253fb85683e40eb066d37642b4c882e3255345ae80c5759bd67115948e319a4"
   }
 }

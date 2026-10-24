@@ -1,0 +1,29 @@
+{
+  "head": "122f1233999bc8e4b01fa358df35423b4f394b65",
+  "executed_preview": "1d999e12f3649a1c1cf08b70b8d42fa5ff2f0ad1",
+  "tree": "ad079aafa76e35e20ad522b8d0dab2cf289ac669",
+  "whole_authored_preview_tree_equal": true,
+  "arm_run": 40098993504,
+  "linux_run": 40098993483,
+  "arm_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T13:50:38.0125939Z      Summary [ 151.286s] 7372 tests run: 7372 passed (1 leaky), 53 skipped",
+  "process_controls": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T13:50:51.7895799Z test result: 12 passed; 0 failed",
+  "fixture_pass_rows": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T13:48:23.4606680Z         PASS [   0.010s] (1126/7372) lamp-expression::runtime enabled_output_uses_a_new_session_and_expires_after_input_loss",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T13:48:23.4839240Z         PASS [   0.010s] (1130/7372) lamp-expression::runtime only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T13:48:24.6604135Z         PASS [   0.789s] (1138/7372) lamp-expression::runtime sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does"
+  ],
+  "logs": {
+    "arm": {
+      "checkout": "1d999e12f3649a1c1cf08b70b8d42fa5ff2f0ad1",
+      "raw_log_sha256": "025840c1fd25e84ff8e109d1929b98b5af5b0bd88faea0f73f96fd36cd5560df"
+    },
+    "clippy": {
+      "checkout": "1d999e12f3649a1c1cf08b70b8d42fa5ff2f0ad1",
+      "raw_log_sha256": "01e266bafe6e3f5feae4dcd0446dcb79a60d7cc5af934eacce70fd3c4404f868"
+    }
+  },
+  "current_linux_fmt_executed": true,
+  "linux_strict_clippy": "success",
+  "historical_failure_cause_inferred": false,
+  "device_acceptance": false
+}
