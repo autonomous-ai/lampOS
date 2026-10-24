@@ -5,6 +5,23 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 05:25 — two follow-ups qualified and pushed
+
+Ready for lamp-voice: no (new native/current reads remain).
+
+- Controls d8f02bc7a is pushed with exactly three test/docs paths; production
+  prefix and 100 ms deadline unchanged. All local gates pass **510/0/3**,
+  six summaries; all 7,027 source records independently Git-bound.
+  [Final proof](verification/controls-recording-stop-20261025/final-d8f02bc7a/README.md).
+- Held-print 58a9aa6b5 is pushed stacked on parent96. Its separate latest
+  full gate passes **4,663/0/21**, eleven summaries and 7,028 Git-bound
+  source records. [Latest proof](verification/held-colleague-constraints-20261025/latest-fc31-58a9aa6b5/README.md).
+- Parent96's new native watcher ended successfully; terminal raw/log/tree
+  audit and current reader disposition are next before ready. Original
+  failed05 remains failed, with no causal or physical waiver.
+- Opening both follow-up PRs and collecting their distinct native gates;
+  no local ARM linking, device, calibration or activation.
+
 ## 2026-10-25 05:08 — latest parent pushed; original ARM failure retained
 
 Ready for lamp-voice: no (#3408 new native/current reads remain).

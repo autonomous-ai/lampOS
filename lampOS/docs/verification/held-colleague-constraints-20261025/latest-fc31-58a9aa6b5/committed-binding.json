@@ -1,0 +1,17 @@
+{
+  "gate_start_head": "58a9aa6b505facab36e737a6368a054dae8ed6db",
+  "head": "58a9aa6b505facab36e737a6368a054dae8ed6db",
+  "tree": "aa7817fc181827580247cde9c87e5d6a12ceb1fe",
+  "base": "fc31e012334cda59eb3c489560454c515fb86386",
+  "source_count": 7028,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "summaries": 11,
+    "passed": 4663,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "private held-print helper and worker ownership verdict only; no public API, dependency, schema or default change; full Voice/Eval tests plus workspace build; rebased onto actual latest fc31 parent source; new full composition gate, with inherited Soft/Name/fixture/Expression paths kept; no prior-base full execution transferred"
+}

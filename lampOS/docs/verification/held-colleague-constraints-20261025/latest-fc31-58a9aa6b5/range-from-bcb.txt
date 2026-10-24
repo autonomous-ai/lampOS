@@ -1,0 +1,21 @@
+1:  2855d6983d ! 1:  58a9aa6b50 lampOS: retain held voice constraints for each caller
+    @@ lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs (new)
+     +}
+     
+      ## lampOS/docs/second-voice.md ##
+    -@@ lampOS/docs/second-voice.md: after a take-over, but now for every turn:
+    -   ends give no extension. Identity checks and the switch-off path remain
+    -   unchanged. When that colleague print is first learned at the current
+    -   owner's verdict, the worker rechecks the current line's captured start
+    --  against the newly available window. It retains that line's own voice
+    --  evidence if the first lookup consumed its one judgement; otherwise it
+    --  reads the cached reply again. Neither lookup waits for a print.
+    -+  against the newly available window. It always reads the cached reply
+    -+  again and retains any own-voice likeness consumed by the first lookup
+    -+  in preference to the second result. Neither lookup waits for a print.
+    -   In Busy, Unknown and Quiet, that new eligibility still needs the owner's
+    -   positive face or sufficiently nearer voice; missing, uncertain or
+    -   confusable voice evidence is held for this verdict without turning a
+     @@ lampOS/docs/second-voice.md: after a take-over, but now for every turn:
+        talking to a colleague (reviewer-two at 03:01): held, and it ends the
+        carry, their voice sure or not, so turning back needs a fresh call or

@@ -1,0 +1,93 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "fc31e012334cda59eb3c489560454c515fb86386",
+  "carried_head": "58a9aa6b505facab36e737a6368a054dae8ed6db",
+  "target": "/private/tmp/third-carry-window-target-ld637ldg",
+  "target_scope": "exclusive to this worktree; initially empty for red regression, reused after source edits/rebase; no all-fresh claim",
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "private held-print helper and worker ownership verdict only; no public API, dependency, schema or default change; full Voice/Eval tests plus workspace build; rebased onto actual latest fc31 parent source; new full composition gate, with inherited Soft/Name/fixture/Expression paths kept; no prior-base full execution transferred",
+  "source_count": 7028,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.206,
+      "log": "/private/tmp/third-held-constraints-fc31-full-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 82.682,
+      "log": "/private/tmp/third-held-constraints-fc31-full-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 92.993,
+      "log": "/private/tmp/third-held-constraints-fc31-full-build.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 1024.654,
+      "log": "/private/tmp/third-held-constraints-fc31-full-tests.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}
