@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-25 06:17 +07, product native and build-row reads complete
+
+Own source PRs remain closed and landed; no own open PR needs a carry.
+The corrected product source #3418 and train 106 #3421 have identical
+whole trees to landed da57072b2, including both actual tested previews.
+[Original native evidence](verification/soft-start-product-reader-20261024/current-377ad25a2/native-landing/README.md)
+records each ARM run's 11,262 PASS plus one LEAK / 106 skipped, all
+11,263 selected terminal, all 122 selected cases PASS, and green original
+Linux formatting/strict Clippy. Both ARM completions precede merge.
+The preceding 18-case Mac gate retains its actual compiler/profile limits.
+No physical measurement or deployment approval is implied.
+
+[Independent #3423 documentation read](verification/build-rows-second-reader-20261025/README.md)
+checks the exact current-base head, one-file diff and decimal arithmetic:
+70 shipping rows 92.9%, two excluded mood rows 58.5%, 16 quality rows
+62.5%. No runtime execution for this Markdown-only path. READ-OK posted.
+
+Tests released the fixed NoPause window with 137 passes and 10 failures
+across all 147 observations; Fourth owns the following fixed Skills
+compiler allocation. Second added no compilation during that window
+and keeps its next work read-only. #2810/#1812 still need their named
+physical/trusted-key holders; existing process controls stay distinct
+from real power-cut and real signed-release acceptance. Train 104's
+readiness incident remains open with First; later greens do not waive it.
+Train 107 already has two active readers. Next: Queue/current findings and
+eligible work, with a bounded watcher while those lanes run. No device action or manual merge by Second.
+
+---
+
 ## Current checkpoint: 2026-10-25 04:41 +07, fixture landed and actual train verified
 
 Fixture code: landed through train 104/#3415 as fc31e0123; #3412 is closed.
