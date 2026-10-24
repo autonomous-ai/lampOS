@@ -1,0 +1,21 @@
+{
+  "exit": 0,
+  "seconds": 23.83,
+  "argv": [
+    "<private-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--test",
+    "second_boot_epoch_probe",
+    "--",
+    "--nocapture"
+  ],
+  "runtime_sha256": "cdc957183f550c809afb6ae54cda0e7c79bea5be812a67614c30a4f2f30e0db3",
+  "runtime_matches_failed_merge_and_base": true,
+  "probe_sha256": "8c9f5facbdecb4bbfa104611ac8da745f93e5cff29a3bca2600b2d4cf5d13d87",
+  "scope": "synthetic clocks through actual unchanged RoomTold; not actual failed CI clock capture or original full-test base reproduction"
+}

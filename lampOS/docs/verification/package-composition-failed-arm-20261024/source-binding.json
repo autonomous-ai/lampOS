@@ -1,0 +1,23 @@
+{
+  "failed_run": 40073299536,
+  "attempt": 1,
+  "head": "4f44e25b49dfec41d93454f95d5d5fc70696ebad",
+  "tested_merge": "fbfd214bbac6c501dee929621a5b1f265b8434c1",
+  "base": "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+  "unchanged_sources": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "base_and_candidate_identical": true,
+      "sha256": "882d9cf8a1350195a35eb72709d87636963d16d5d5632083149f1bc19e234547"
+    },
+    {
+      "path": "lampOS/crates/voice/src/room_told.rs",
+      "base_and_candidate_identical": true,
+      "sha256": "cdc957183f550c809afb6ae54cda0e7c79bea5be812a67614c30a4f2f30e0db3"
+    }
+  ],
+  "failure": "with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy: Unknown != Quiet",
+  "observed_summary": "6003/7352 run; 6002 passed including1leaky,1failed,49skipped,1349unrun",
+  "source_supported_inference": "now_us-400_000_000 and now_us-90_000_000 can wrap in release below400s monotonic uptime; subsequent saturating elapsed remains0/Unknown",
+  "not_proven": "run did not capture exact monotonic clock at failure; identical sources alone do not prove an observed failure on base"
+}

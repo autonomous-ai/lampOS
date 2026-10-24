@@ -1,0 +1,12 @@
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-reports-consent-base-20261024/lampOS/crates/camera)
+   Compiling lamp-voice v0.1.0 (/private/tmp/second-reports-consent-base-20261024/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.66s
+     Running tests/second_boot_epoch_probe.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/second_boot_epoch_probe-4dc7bd422188e558)
+
+running 1 test
+clock=500000000 first=100000000 second=410000000 room=Quiet
+clock=100000000 first=18446744073409551616 second=10000000 room=Unknown
+test unsigned_boot_epoch_wrap_reproduces_unknown_on_the_unchanged_classifier ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

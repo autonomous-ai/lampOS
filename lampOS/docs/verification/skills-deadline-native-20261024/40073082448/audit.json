@@ -1,0 +1,103 @@
+{
+  "run": 40073082448,
+  "head": "e4005f25a669bf45f6c9e211f2d7d2aebe8c7057",
+  "archive_sha256": "58ac0e0af52f8f619b4a023b304fb252c645a6b4ef2d1edc861b1e629dca5e3d",
+  "members": 382,
+  "source_files": 6992,
+  "source_matches_git": true,
+  "tested_merge": "9299ec80b60a4127c6a41f611554e8873bef4a19",
+  "authored_head_parent_verified": true,
+  "case_counts": "6/0/0 ignored",
+  "filtered_ordinary_controls": 2,
+  "cases": [
+    {
+      "folder": "kn-eljz4k",
+      "kind": "rested-night",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kn-qIuZCt",
+      "kind": "rested-night",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kr-AjmPg3",
+      "kind": "on-off",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 8,
+      "reaps": 8,
+      "exit_codes": {
+        "0": 6,
+        "None": 2
+      },
+      "signals": {
+        "None": 6,
+        "9": 2
+      }
+    },
+    {
+      "folder": "kr-IZrkLy",
+      "kind": "daily",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kr-WBJOGK",
+      "kind": "daily",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kr-abF3Pj",
+      "kind": "on-off",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 8,
+      "reaps": 8,
+      "exit_codes": {
+        "0": 6,
+        "None": 2
+      },
+      "signals": {
+        "None": 6,
+        "9": 2
+      }
+    }
+  ],
+  "scope": "raw case inventory, source blob equality and matched direct-child exits; not independent replay of every domain assertion"
+}
