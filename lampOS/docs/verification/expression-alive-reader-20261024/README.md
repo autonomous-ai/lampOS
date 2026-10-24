@@ -1,0 +1,9 @@
+# Additional independent Expression software read
+
+Exact 33e6ffb6535d0c4713c69026f062cc631c3b00f5 on authored 22b753df5. Mac fmt, strict Expression all-target Clippy, fresh compilation and complete Expression crate tests pass. Literal groups 27/ 0,4/ 0,280/ 0,27/ 0: **338 passed / 0 failed / 0 ignored**, no retry. All 7,023 tracked source hashes unchanged. Compiler-scope records distinguish 26 invalidated names from 9 observed path identities; Only observed artifacts contribute to the freshness record; invalidating a name does not mean it was rebuilt. Primary full compiler streams remain private; their hashes and bounded projections are included, without an independent full-stream-reprojection claim.
+
+No source P1/P2 found across the four changed files. Product/alive speaking sections match. The raised-cosine bump derivative is A*pi/T, so the new per 20ms bound is 0.0104719755rad and the actual assertion allows 10 percent (0.0115191731rad); yaw remains 0.007. The old 0.007 floor remains. No nod-frequency policy changes. Body still converts 4096 counts/turn and clips the Expression pitch contribution to 60 counts before mood/gaze, with final body limits, velocity and resistance handling unchanged.
+
+P3: the nearby two-degree comment is stale. The changed test uses the alive catalogue with injected zero body lag; product equality checks speaking data, not the new product postures. Neither test proves physical amplitude, face retention or naturalness. This repeats the existing coverage boundary, not a new hardware finding.
+
+This is an exact old-head software read, not latest-base/whole-train clearance. First must carry onto current main and qualify that source; the designated Reviewer-lead read and physical acceptance remain separate. Earlier failed observations remain failed and are not given a cause by this pass. No affected Voice/Skills/Update rerun, new native read, device/motion or latency measurement is claimed.

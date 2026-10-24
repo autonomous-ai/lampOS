@@ -1,0 +1,44 @@
+{
+  "head": "33e6ffb6535d0c4713c69026f062cc631c3b00f5",
+  "authored_base": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "changed_paths": [
+    "lampOS/crates/expression/alive-behaviours.json",
+    "lampOS/crates/expression/tests/it/speaking_engine.rs",
+    "lampOS/deploy/product/settings/expression.json",
+    "lampOS/docs/expression.md"
+  ],
+  "changed_hashes": {
+    "lampOS/crates/expression/alive-behaviours.json": "fc8474cff5d5c85d379b3f9effe45bb8cfc12c30c8e102488beece21b1c83384",
+    "lampOS/crates/expression/tests/it/speaking_engine.rs": "57b9836642025cc9899f05e7b66ce3accd1c3574c7f7dc5e14655930ce2e65c6",
+    "lampOS/deploy/product/settings/expression.json": "a3270298166f5b03c109005ef75b3c74d30ef6739cc27dce021f958bb9f6d79c",
+    "lampOS/docs/expression.md": "dc62bd68891e40cfccf73aa0782e034ca4f4e67b4beda80f9f0c51e457a7104c"
+  },
+  "speaking_sections_equal": true,
+  "new_nod": {
+    "radians": 0.075,
+    "microseconds": 450000,
+    "derivative_bound_per_20ms": 0.010471975511965976,
+    "test_bound_with_10_percent_allowance": 0.011519173063162575,
+    "exact_max_discrete_step_per_20ms": 0.010437982572004907
+  },
+  "previous_nod": {
+    "radians": 0.035,
+    "microseconds": 360000,
+    "derivative_bound_per_20ms": 0.006108652381980154,
+    "test_floor": 0.007
+  },
+  "body_expression_pitch_clip_counts": 60,
+  "body_expression_pitch_clip_degrees": 5.2734375,
+  "software_findings_p1_p2": "none demonstrated",
+  "p3": [
+    "speaking_engine.rs:219 still describes about two degrees after increasing the configured nod to approximately 4.3 degrees.",
+    "The changed planner test uses the alive catalogue with injected zero body lag; product equality covers the speaking section, not the new product listening/thinking/speaking postures."
+  ],
+  "limits": [
+    "Own exact-head Mac Expression gate only; no affected Voice/Skills/Update gate or native audit rerun here.",
+    "Authored base 22 is not latest 821; current carry, conflicts and gates remain First's.",
+    "Designated Reviewer-lead read and real camera/gaze/naturalness acceptance remain separate.",
+    "Earlier failed runtime/Voice observations remain retained; this pass neither establishes their cause nor changes their qualification.",
+    "No motion, SSH, device or new acoustic/physical latency measurement."
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "gate-result.json": {
+    "original_sha256": "8104a9442527a3772ccee064b42a8449cbebef7995c1147da89e74675548490c",
+    "published_sha256": "82687a53af5b3cb7480b4a1bd9a082808bf84660a1b05767bb42420a3e159e72"
+  },
+  "fmt.txt": {
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clean-selected.txt": {
+    "original_sha256": "ab82b25be61ebb21902a7d96b081268c97aa4bec976a94dc705f3faa615ceb7f",
+    "published_sha256": "ab82b25be61ebb21902a7d96b081268c97aa4bec976a94dc705f3faa615ceb7f"
+  },
+  "clippy-summary.json": {
+    "original_sha256": "44f1e89db01b89ca63df440ca565b8180b70fa36841effd6a69d6b9310ce68dd",
+    "published_sha256": "6d1d53a854051450223ec1effc85a73e3ee0fb71b71aca5cc569a630e880b4c0"
+  },
+  "test-compile-summary.json": {
+    "original_sha256": "f9fe2ffae3c372eeecfed71a3fc8947f59c30e664019ba3e1ff19de9cafafc77",
+    "published_sha256": "0179a4b20e0fb1b89d1a2ba411edf39de5411ec9887dd65ef6ce7f5f2bc51934"
+  },
+  "test.txt": {
+    "original_sha256": "db8ce88f007c5aa0ba97f433b6b642ea2343557db637beb9a3807b3830c36f59",
+    "published_sha256": "f4e9f3f760420fcf5c78558df2c0d34cc4ede811720fd8cbb5db89e17e980ef8"
+  },
+  "source-before.json": {
+    "original_sha256": "5f58805865f8561f6ef03fd60e8d2792a565c3014963b66c3d6b28b7adca2245",
+    "published_sha256": "5f58805865f8561f6ef03fd60e8d2792a565c3014963b66c3d6b28b7adca2245"
+  },
+  "source-after.json": {
+    "original_sha256": "5f58805865f8561f6ef03fd60e8d2792a565c3014963b66c3d6b28b7adca2245",
+    "published_sha256": "5f58805865f8561f6ef03fd60e8d2792a565c3014963b66c3d6b28b7adca2245"
+  },
+  "head.json": {
+    "original_sha256": "6a047c43b7c53542f473cf204c879a2b92d20023a85d2937e8bfe81b70d2f503",
+    "published_sha256": "6a047c43b7c53542f473cf204c879a2b92d20023a85d2937e8bfe81b70d2f503"
+  },
+  "source-review.json": {
+    "original_sha256": "8414dd4b2bed8a4682e6e3836e61ffc7104493361b2fbed0e326159e95c70c70",
+    "published_sha256": "8414dd4b2bed8a4682e6e3836e61ffc7104493361b2fbed0e326159e95c70c70"
+  }
+}
