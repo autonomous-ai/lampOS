@@ -998,13 +998,13 @@ fn without_a_pause_said_expression_asks_exactly_as_before() {
     let asked = |said: Option<bool>| {
         let root = Root::new();
         let bus = Bus::new(&root.0).unwrap();
-        let wall = populate(&bus, 10_000_000);
         if let Some(paused) = said {
             keeper(&bus)
                 .publish_json(1, &lamp_msgs::Pause { paused })
                 .unwrap();
         }
         let mut service = runtime::Service::new(&bus, Catalogue::builtin(), true, "test").unwrap();
+        let wall = populate(&bus, 10_000_000);
         let output = service.step(|| 10_000_000, wall);
         let mut body = serde_json::to_value(output.body.expect("a body request")).unwrap();
         let mut light = serde_json::to_value(output.light.expect("a light request")).unwrap();
