@@ -1,0 +1,370 @@
+name: lampOS published Surround candidate readers
+
+# Compile the driver on the ordinary native ARM64 host. Only the isolated
+# runtime executes it and the two pinned published Surround artifacts.
+on:
+  pull_request:
+    branches: ['lamp-voice']
+    paths:
+      - 'lampOS/crates/surround/tests/release_pair*'
+      - 'lampOS/crates/surround/tests/release_pair/**'
+      - 'lampOS/crates/surround/Cargo.toml'
+      - 'lampOS/Cargo.toml'
+      - 'lampOS/Cargo.lock'
+      - '.github/workflows/lampos-surround-candidate-pair.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lampos-surround-candidate-pair-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  published-pair:
+    name: published 6408 and 6498 Surround candidate readers on ARM64
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 45
+    env:
+      PAIR_HOST: /tmp/surround-candidate-pair
+      PAIR_CONTAINER: surround-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+      PAIR_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: record the exact checkout before preparation
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(uname -m)" = aarch64
+          mkdir -m 0700 "$PAIR_HOST"
+          mkdir -m 0700 "$PAIR_HOST/evidence" "$PAIR_HOST/input" "$PAIR_HOST/image"
+          git rev-parse HEAD 'HEAD^{tree}' > "$PAIR_HOST/evidence/source-revision.txt"
+          printf '%s\n' "run_id=$GITHUB_RUN_ID" "run_attempt=$GITHUB_RUN_ATTEMPT" \
+            "pr_head=$PAIR_PR_HEAD" "event=$GITHUB_EVENT_NAME" \
+            > "$PAIR_HOST/evidence/run-provenance.txt"
+          uname -sm > "$PAIR_HOST/evidence/platform.txt"
+          git ls-files -z | LC_ALL=C sort -z | xargs -0 sha256sum \
+            > "$PAIR_HOST/evidence/source-before.sha256"
+      - name: ordinary ARM64 host build dependencies and Rust 1.96.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev procps file jq
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            lampOS/target
+          key: lampos-surround-candidate-pair-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
+      - name: build and select the exact integration-test artifact
+        working-directory: lampOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc +1.96.0 --version --verbose > "$PAIR_HOST/evidence/rustc-version.txt"
+          set +e
+          cargo +1.96.0 test --locked --release -p lamp-surround --test release_pair \
+            --no-run --message-format=json > "$PAIR_HOST/evidence/build.jsonl" \
+            2> "$PAIR_HOST/evidence/build.stderr"
+          build_status=$?
+          set -e
+          printf '%s\n' "$build_status" > "$PAIR_HOST/evidence/build-exit.txt"
+          test "$build_status" = 0
+          cargo +1.96.0 metadata --locked --offline --no-deps --format-version 1 \
+            > "$PAIR_HOST/metadata.json"
+          package=$(jq -er '[.packages[] | select(.name == "lamp-surround") | .id] |
+            if length == 1 then .[0] else error("exactly one lamp-surround package") end' "$PAIR_HOST/metadata.json")
+          jq -se 'map(select(.reason == "build-finished")) |
+            length == 1 and .[0].success == true' "$PAIR_HOST/evidence/build.jsonl" > /dev/null
+          jq -s --arg package "$package" '[.[] | select(.reason == "compiler-artifact" and
+            .package_id == $package and .target.name == "release_pair" and
+            .target.kind == ["test"] and .profile.test == true and .executable != null)] |
+            if length == 1 then .[0] else error("exactly one release_pair test artifact") end' \
+            "$PAIR_HOST/evidence/build.jsonl" > "$PAIR_HOST/evidence/selected-artifact.json"
+          test_binary=$(jq -er .executable "$PAIR_HOST/evidence/selected-artifact.json")
+          test -f "$test_binary" && test ! -L "$test_binary" && test -x "$test_binary"
+          case "$(realpath "$test_binary")" in
+            "$GITHUB_WORKSPACE"/lampOS/target/release/deps/*) ;;
+            *) echo 'test artifact is outside the selected release target' >&2; exit 1 ;;
+          esac
+          install -m 0555 "$test_binary" "$PAIR_HOST/input/surround-release-pair"
+          sha256sum "$test_binary" "$PAIR_HOST/input/surround-release-pair" \
+            > "$PAIR_HOST/evidence/test-binary.sha256"
+          file "$PAIR_HOST/input/surround-release-pair" > "$PAIR_HOST/evidence/test-binary-format.txt"
+          timeout 20s ldd "$test_binary" > "$PAIR_HOST/evidence/test-binary-host-ldd.txt" 2>&1
+          ! grep -q 'not found' "$PAIR_HOST/evidence/test-binary-host-ldd.txt"
+      - name: fetch and verify four published payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          while read -r part release bytes digest; do
+            artifact="$PAIR_HOST/input/lamp-$part-$release"
+            # Bound both elapsed transfer time and the output file even when
+            # a server does not provide Content-Length.
+            (
+              ulimit -f 65536
+              timeout --kill-after=5s 150s curl --fail --location \
+                --proto '=https' --proto-redir '=https' --connect-timeout 10 \
+                --max-time 90 --retry 2 --retry-max-time 120 --max-filesize "$bytes" \
+                "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-$release/lamp-$part" \
+                --output "$artifact"
+            )
+            test "$(stat -c '%s' "$artifact")" = "$bytes"
+            printf '%s  %s\n' "$digest" "$artifact" | sha256sum --check --strict
+            test "$(od -An -tx1 -N6 "$artifact" | tr -d ' \n')" = 7f454c460201
+            test "$(od -An -tx1 -j18 -N2 "$artifact" | tr -d ' \n')" = b700
+            chmod 0555 "$artifact"
+            printf '%s %s %s %s\n' "$part" "$release" "$bytes" "$digest" \
+              >> "$PAIR_HOST/evidence/verified-payloads.txt"
+          done <<'PINS'
+          surround 6408 13871368 f75b1a57dd2cfc4edcc521b0d8a254ca72c9ba4402de61a6873b3bcafd0ca765
+          surround 6498 13871368 f75b1a57dd2cfc4edcc521b0d8a254ca72c9ba4402de61a6873b3bcafd0ca765
+          PINS
+          (
+            cd "$PAIR_HOST/input"
+            sha256sum surround-release-pair lamp-surround-6408 lamp-surround-6498 \
+              > SHA256SUMS
+          )
+          cp "$PAIR_HOST/input/SHA256SUMS" "$PAIR_HOST/evidence/input-before.sha256"
+          tar -C "$PAIR_HOST/input" -cf "$PAIR_HOST/input.tar" .
+          sha256sum "$PAIR_HOST/input.tar" > "$PAIR_HOST/evidence/input-archive.sha256"
+      - name: prepare and record the bookworm runtime before isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --kill-after=10s 180s docker pull --platform linux/arm64 rust:1.96.0-bookworm \
+            > "$PAIR_HOST/evidence/image-pull.txt" 2>&1
+          docker image inspect rust:1.96.0-bookworm > "$PAIR_HOST/evidence/base-image.json"
+          base=$(jq -er '.[0].RepoDigests | if length > 0 then .[0] else error("pulled image digest missing") end' \
+            "$PAIR_HOST/evidence/base-image.json")
+          cat > "$PAIR_HOST/image/Dockerfile" <<'DOCKERFILE'
+          ARG BASE_IMAGE
+          FROM ${BASE_IMAGE}
+          RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libasound2 ca-certificates && rm -rf /var/lib/apt/lists/*
+          DOCKERFILE
+          # Resolve native runtime libraries before isolating the fixture.
+          timeout --kill-after=10s 300s docker build --pull=false --platform linux/arm64 \
+            --build-arg "BASE_IMAGE=$base" --tag "$PAIR_CONTAINER:runtime" "$PAIR_HOST/image" \
+            > "$PAIR_HOST/evidence/image-build.txt" 2>&1
+          runtime=$(docker image inspect --format '{{.Id}}' "$PAIR_CONTAINER:runtime")
+          printf '%s\n' "$runtime" > "$PAIR_HOST/evidence/runtime-image-id.txt"
+          docker image inspect "$runtime" > "$PAIR_HOST/evidence/runtime-image.json"
+      - name: execute only inside private network-none temporary filesystems
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime=$(cat "$PAIR_HOST/evidence/runtime-image-id.txt")
+          # Standard output is reserved for the evidence tar. Everything the
+          # test prints is first retained inside /tmp/pair-output. EXIT streams
+          # those regular files while tmpfs still exists, including on failure.
+          runtime_script=$(cat <<'RUNTIME'
+          set -euo pipefail
+          umask 077
+          mkdir -m 0700 /tmp/pair-output /tmp/pair-input
+          exec 3>&1
+          exec > /tmp/pair-output/runtime.txt 2>&1
+          collect() {
+            runtime_status=$?
+            trap - EXIT
+            set +e
+            printf '%s\n' "$runtime_status" > /tmp/pair-output/runtime-exit.txt
+            cd /
+            # Only safe receipts, never configuration/credentials or executables.
+            find tmp/pair-output -maxdepth 1 -type f -print0 > /tmp/evidence-files
+            while IFS= read -r -d '' case_dir; do
+              find "$case_dir" -maxdepth 1 -type f \
+                \( -name case.json -o -name artifacts.json -o -name transcript.jsonl -o -name result.json \) \
+                -print0 >> /tmp/evidence-files
+              # A final passing receipt exists only after all child logs have
+              # passed the fixture's synthetic-code/credential leak checks.
+              if [ -f "$case_dir/result.json" ]; then
+                find "$case_dir" -maxdepth 1 -type f \
+                  \( -name '*.stdout' -o -name '*.stderr' \) -print0 >> /tmp/evidence-files
+              fi
+            done < <(find tmp/pair-output -mindepth 1 -maxdepth 1 -type d -name 'sr-*' -print0)
+            list_status=$?
+            if [ "$list_status" -ne 0 ]; then exit 97; fi
+            timeout --kill-after=5s 30s tar --null --verbatim-files-from -T /tmp/evidence-files -czf - >&3
+            archive_status=$?
+            if [ "$archive_status" -ne 0 ]; then exit 98; fi
+            exit "$runtime_status"
+          }
+          trap collect EXIT
+          test "$(id -u)" = 0
+          test "$(uname -m)" = aarch64
+          tar --no-same-owner -xf - -C /tmp/pair-input
+          (
+            cd /tmp/pair-input
+            sha256sum --check --strict SHA256SUMS
+          )
+          cp /tmp/pair-input/SHA256SUMS /tmp/pair-output/verified-inputs.sha256
+          for binary in /tmp/pair-input/surround-release-pair /tmp/pair-input/lamp-*; do
+            timeout 20s ldd "$binary" > "/tmp/pair-output/$(basename "$binary").ldd.txt" 2>&1
+            ! grep -q 'not found' "/tmp/pair-output/$(basename "$binary").ldd.txt"
+          done
+          printf 'lamp-surround-candidate-pair network-none tmpfs-v1\n' > /run/lamp-surround-pair-isolated
+          chmod 0400 /run/lamp-surround-pair-isolated
+          test ! -e /var/lib/lampOS && test ! -e /var/lib/lampos-skills-state
+          set +e
+          timeout --signal=TERM --kill-after=5s 300s /tmp/pair-input/surround-release-pair \
+            --ignored --nocapture --test-threads=1 > /tmp/pair-output/tests.txt 2>&1
+          test_status=$?
+          set -e
+          printf '%s\n' "$test_status" > /tmp/pair-output/test-exit.txt
+          test "$test_status" = 0 || exit "$test_status"
+          test ! -e /var/lib/lampOS && test ! -e /var/lib/lampos-skills-state
+          printf 'fixed_paths_absent=true\n' > /tmp/pair-output/fixed-paths-after.txt
+          (
+            cd /tmp/pair-input
+            sha256sum --check --strict SHA256SUMS
+          )
+          RUNTIME
+          )
+          docker container create --pull=never --name "$PAIR_CONTAINER" --hostname surround-candidate-pair \
+            --platform linux/arm64 --network none --read-only --user 0:0 --init \
+            --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 2g --cpus 2 \
+            --ipc private --stop-timeout 5 --label "lamp.compat.owner=$PAIR_CONTAINER" \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=1536m,mode=0700 \
+            --tmpfs /run:rw,noexec,nosuid,nodev,size=16m,mode=0700 \
+            --tmpfs /var/lib:rw,noexec,nosuid,nodev,size=256m,mode=0700 \
+            --env LAMP_COMPAT_OUTPUT=/tmp/pair-output \
+            --env LAMP_COMPAT_SURROUND_6408=/tmp/pair-input/lamp-surround-6408 \
+            --env LAMP_COMPAT_SURROUND_6498=/tmp/pair-input/lamp-surround-6498 \
+            --interactive --entrypoint /bin/bash "$runtime" --noprofile --norc -c "$runtime_script" \
+            > "$PAIR_HOST/evidence/container-create.txt"
+          docker container inspect "$PAIR_CONTAINER" > "$PAIR_HOST/evidence/container-before.json"
+          jq -e --arg owner "$PAIR_CONTAINER" '.[0] |
+            .Config.Labels["lamp.compat.owner"] == $owner and .Config.User == "0:0" and
+            .HostConfig.NetworkMode == "none" and .HostConfig.ReadonlyRootfs == true and
+            .HostConfig.Privileged == false and .HostConfig.Binds == null and
+            (.Mounts | length) == 0 and (.HostConfig.Devices | length) == 0 and
+            .HostConfig.CapDrop == ["ALL"] and .HostConfig.SecurityOpt == ["no-new-privileges"] and
+            .HostConfig.PidsLimit == 128 and .HostConfig.Memory == 2147483648 and
+            (.HostConfig.Tmpfs | keys | sort) == ["/run", "/tmp", "/var/lib"]' \
+            "$PAIR_HOST/evidence/container-before.json" > "$PAIR_HOST/evidence/isolation-check.txt"
+          set +e
+          timeout --signal=TERM --kill-after=15s 420s docker container start --attach --interactive "$PAIR_CONTAINER" \
+            < "$PAIR_HOST/input.tar" > "$PAIR_HOST/evidence/native-evidence.tar.gz" \
+            2> "$PAIR_HOST/evidence/container-start.stderr"
+          start_status=$?
+          set -e
+          printf '%s\n' "$start_status" > "$PAIR_HOST/evidence/container-start-exit.txt"
+          docker container inspect "$PAIR_CONTAINER" > "$PAIR_HOST/evidence/container-after.json"
+          test "$start_status" = 0
+          jq -e '.[0].State | .Status == "exited" and .Running == false and
+            .ExitCode == 0 and .OOMKilled == false and .Error == ""' \
+            "$PAIR_HOST/evidence/container-after.json" > "$PAIR_HOST/evidence/container-state-check.txt"
+      - name: inspect retained regular evidence and require both actual cases
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$PAIR_HOST/evidence"
+          archive="$PAIR_HOST/evidence/native-evidence.tar.gz"
+          test -s "$archive"
+          tar -tzf "$archive" > "$PAIR_HOST/evidence/native-members.txt"
+          tar -tvzf "$archive" > "$PAIR_HOST/evidence/native-member-types.txt"
+          awk 'substr($0,1,1) != "-" { exit 1 }' "$PAIR_HOST/evidence/native-member-types.txt"
+          awk '$0 !~ /^(tmp\/pair-output\/)/ ||
+            $0 ~ /(^|\/)\.\.(\/|$)/ { exit 1 }' "$PAIR_HOST/evidence/native-members.txt"
+          mkdir -m 0700 "$PAIR_HOST/retained"
+          tar --no-same-owner --no-same-permissions -xzf "$archive" -C "$PAIR_HOST/retained"
+          native="$PAIR_HOST/retained/tmp/pair-output"
+          validate_pair() {
+            test "$(cat "$native/test-exit.txt")" = 0
+            test "$(cat "$native/runtime-exit.txt")" = 0
+            test "$(cat "$PAIR_HOST/evidence/container-start-exit.txt")" = 0
+            grep -Fx 'fixed_paths_absent=true' "$native/fixed-paths-after.txt"
+            grep -Eq '^test result: ok\. 2 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out;' "$native/tests.txt"
+            mapfile -d '' results < <(find "$native" -mindepth 2 -maxdepth 2 -path '*/sr-*/result.json' -type f -print0 | sort -z)
+            test "${#results[@]}" = 2
+            jq -se 'length == 2 and
+              (map(.test) | sort) == [
+                "release_6408_surround_candidates_cross_6498_and_return",
+                "release_6498_surround_candidates_cross_6408_and_return"] and
+              all(.[]; .result == "passed" and .actual_released_pair == true and
+                .children_reaped == 7 and .groups_absent == 7 and
+                .candidate_writes == 3 and .synthetic_request_refusals == 3 and
+                .synthetic_stored_refusals == 2 and .no_selected_configuration == true and
+                .no_automatic_reexecution == true and .identical_selected_artifacts == true)' "${results[@]}"
+            for result in "${results[@]}"; do
+              jq -se '
+                [.[] | select(.event == "spawn")] as $spawn |
+                [.[] | select(.event == "reaped")] as $reaped |
+                ($spawn | length) == 7 and ($reaped | length) == 7 and
+                ([$spawn[].pid] | unique | length) == 7 and
+                all($spawn[]; . as $child | any($reaped[]; .pid == $child.pid and .stage == $child.stage)) and
+                all($reaped[]; .group_absent == true and .signal == null and
+                  (if .expected_stored_refusal == true then .code == 1 else .code == 0 end)) and
+                ([.[] | select(.event == "candidate_verified")] | length) == 3 and
+                ([.[] | select(.event == "synthetic_stored_refusal")] | length) == 2 and
+                ([.[] | select(.event == "synthetic_input_refused")] | length) == 3 and
+                all(.[]; .event != "failure_cleanup")' "$(dirname "$result")/transcript.jsonl"
+            done
+          }
+          set +e
+          (set -e; validate_pair) > "$PAIR_HOST/evidence/execution-validation.txt" 2>&1
+          validation_status=$?
+          set -e
+          printf '%s\n' "$validation_status" > "$PAIR_HOST/evidence/execution-validation-exit.txt"
+          exit "$validation_status"
+      - name: always remove the owned container and verify absence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$PAIR_HOST/evidence"
+          if docker container inspect "$PAIR_CONTAINER" > "$PAIR_HOST/evidence/cleanup-before.json" 2> "$PAIR_HOST/evidence/cleanup-inspect.stderr"; then
+            jq -e --arg owner "$PAIR_CONTAINER" '.[0].Config.Labels["lamp.compat.owner"] == $owner' \
+              "$PAIR_HOST/evidence/cleanup-before.json" > "$PAIR_HOST/evidence/cleanup-owner-check.txt"
+            timeout --kill-after=5s 30s docker container rm --force "$PAIR_CONTAINER" \
+              > "$PAIR_HOST/evidence/cleanup-remove.txt" 2> "$PAIR_HOST/evidence/cleanup-remove.stderr"
+            docker container ls --all --filter "name=^/$PAIR_CONTAINER$" --format '{{.ID}}' \
+              > "$PAIR_HOST/evidence/cleanup-remaining.txt"
+            test ! -s "$PAIR_HOST/evidence/cleanup-remaining.txt"
+            jq -n --arg name "$PAIR_CONTAINER" '{name:$name,owner_verified:true,removed:true,remaining_empty:true}' \
+              > "$PAIR_HOST/evidence/cleanup.json"
+          else
+            jq -n --arg name "$PAIR_CONTAINER" '{name:$name,created:false,removed:false}' \
+              > "$PAIR_HOST/evidence/cleanup.json"
+            test ! -f "$PAIR_HOST/evidence/container-create.txt"
+          fi
+      - name: always compare source and host input bytes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$PAIR_HOST/evidence"
+          git ls-files -z | LC_ALL=C sort -z | xargs -0 sha256sum > "$PAIR_HOST/evidence/source-after.sha256"
+          source_status=0
+          cmp "$PAIR_HOST/evidence/source-before.sha256" "$PAIR_HOST/evidence/source-after.sha256" \
+            > "$PAIR_HOST/evidence/source-compare.txt" 2>&1 || source_status=$?
+          printf '%s\n' "$source_status" > "$PAIR_HOST/evidence/source-compare-exit.txt"
+          input_status=1
+          if [ -f "$PAIR_HOST/input/SHA256SUMS" ]; then
+            input_status=0
+            (cd "$PAIR_HOST/input"; sha256sum --check --strict SHA256SUMS) \
+              > "$PAIR_HOST/evidence/input-after-check.txt" 2>&1 || input_status=$?
+          fi
+          printf '%s\n' "$input_status" > "$PAIR_HOST/evidence/input-after-exit.txt"
+          test "$source_status" = 0 && test "$input_status" = 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lampos-surround-candidate-pair-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/surround-candidate-pair/evidence/
+          if-no-files-found: error
+          retention-days: 7
