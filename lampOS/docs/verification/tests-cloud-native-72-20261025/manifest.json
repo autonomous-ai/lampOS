@@ -1,0 +1,55 @@
+{
+  "files": [
+    {
+      "path": "40130844249/primary-case-outcomes.json",
+      "bytes": 262834,
+      "sha256": "7d8382d3fd114a2cbbacc70bef34ee544e11186dfea643ab8917136ba536ad8c"
+    },
+    {
+      "path": "40130844249/primary.txt",
+      "bytes": 412755,
+      "sha256": "20e958916354deb79932347e264a18499eaedff635c354efc924d9f16d136124"
+    },
+    {
+      "path": "40130844249/receipt.json",
+      "bytes": 876,
+      "sha256": "00a7fe6d20c4ac9bee1df6e5c5707e17a8bddb9c894a398306e02a230ca4868a"
+    },
+    {
+      "path": "40130844249/run.json",
+      "bytes": 5255,
+      "sha256": "e91331d72f6c059068e45322ac03568dd3858c2c6a2b7a74cf34e8d92ecf8b49"
+    },
+    {
+      "path": "40130844271/primary.txt",
+      "bytes": 74655,
+      "sha256": "04be8cb47b70bfae813f2850803a372d21c5e979caacbab4b3e0c500c2f05374"
+    },
+    {
+      "path": "40130844271/receipt.json",
+      "bytes": 595,
+      "sha256": "ba61fd0d0438389662224d2939a8907f9a4df5a8bbd926b49b4493999e07bb06"
+    },
+    {
+      "path": "40130844271/run.json",
+      "bytes": 2320,
+      "sha256": "b20943ccd16309d1363ccc43751bd5a095bdd5f5d16f5d1d5f2c7a9a3cfe33e0"
+    },
+    {
+      "path": "affected-case-native.json",
+      "bytes": 221,
+      "sha256": "358dec2f184b34228513c6a4a50f2ce4b7ed3d8142cd244ceb3030edf3824a7c"
+    },
+    {
+      "path": "complete-tree-proof.json",
+      "bytes": 460,
+      "sha256": "e10a4d480dab1d48f004507313c86f2ee77dbb4ba283bb8f21af1e8e2672c723"
+    },
+    {
+      "path": "prior-head-case-comparison.json",
+      "bytes": 2825,
+      "sha256": "369cbb0bc7293d657c58250a9b56445d0dd329930d016ffca803ea6a93379735"
+    }
+  ],
+  "source": "Original completed CI logs, not a rerun. Derived projections are labeled by filenames. No current-carry result is implied."
+}

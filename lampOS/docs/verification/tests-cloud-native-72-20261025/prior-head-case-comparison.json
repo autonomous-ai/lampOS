@@ -1,0 +1,91 @@
+{
+  "old_head": "5b23ab556",
+  "current_head": "72a5a0f67c1a9d12d257e38d85cff7bfaf268999",
+  "prior_selected": 1206,
+  "current_selected": 1216,
+  "added": [
+    {
+      "status": "PASS",
+      "seconds": 5.004,
+      "index": 589,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.009,
+      "index": 562,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.004,
+      "index": 560,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.009,
+      "index": 563,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.211,
+      "index": 564,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.01,
+      "index": 570,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog"
+    },
+    {
+      "status": "PASS",
+      "seconds": 2.01,
+      "index": 572,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.009,
+      "index": 565,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::no_output_is_not_readiness"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.009,
+      "index": 566,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly"
+    },
+    {
+      "status": "PASS",
+      "seconds": 0.035,
+      "index": 567,
+      "total": 1216,
+      "binary": "lamp-update::round",
+      "case": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture"
+    }
+  ],
+  "removed": [],
+  "changed_status": [],
+  "qualification": "Actual selected native census only; no full-workspace or timing equivalence claim."
+}

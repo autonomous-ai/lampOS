@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-25 05:32 — original Cloud native result retained
+
+Ready for lamp-voice: no
+
+[Published-head Cloud native evidence](verification/tests-cloud-native-72-20261025/) preserves complete original logs and run metadata: 72a5a0f67/bcb ARM40130844249 passes 1,216 selected / eight skipped, Linux40130844271 passes, actual merge-preview whole-tree equality verified. Ten added updater controls explain the earlier 1,206 to 1,216 population change; no test removal/status change. These observations do not transfer to the unpushed fc31 carry. Both clean-only recoveries succeeded; Cloud's six original unrun stages and NoPause's no-run compilation have resumed on distinct targets, two compiler jobs each. No current NoPause observations have run. Skills observer source work continues under the pushed claim, with policy and assertions unchanged.
+
 ## 2026-10-25 05:25 — updater qualification complete; Skills observer taken
 
 Ready for lamp-voice: no
