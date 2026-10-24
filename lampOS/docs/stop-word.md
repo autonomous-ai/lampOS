@@ -956,8 +956,19 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   dropped with the yield: a slow speech-to-text starts no second answer and
   leaves nothing yielding; a person who goes on talking yields the lamp
   again. Only speech reaching 700 ms, a sentence, commits without words
-  ("... committed"). A stop phrase ("wait" is one) and a forced
-  `stop/heard` are never held.
+  ("... committed"), and so does speech that goes on in the clear for
+  60 ms (the rule's `speech_blocks`) after the words were asked for: the
+  ask, at the first pause, heard only what came before it. On lamp-52e6 on
+  24 October (`heard`, 10:46, and 2 of 3 played cut-ins at 12:57 and
+  12:59), "Wait" or "Sorry", a 300 ms pause, then the question: the ask
+  went out at the pause, the stream heard the lone first word and gave
+  back no words, and the question in the clear was held as a wordless
+  yield to the 1.1 s deadline and the story resumed; "Hold on", both
+  words before the pause, committed. Now the question commits at its
+  sixth block after the ask, and the turn's own speech-to-text hears it
+  whole from the held audio; a lone "Right." or "Uh-huh." whose words
+  come back empty has no speech after the ask and still resumes. A stop
+  phrase ("wait" is one) and a forced `stop/heard` are never held.
 - **With `heard-always`** (#2939, lamp-52e6 at 09:44 on 23 October: 5 of
   5 backchannels cut a story with `heard-always`, where the hold was inert),
   the one stream that hears the whole reply also tells the yield its words

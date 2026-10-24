@@ -1600,6 +1600,96 @@ fn with_backchannel_holds_a_wordless_yield_resumes_the_reply() {
     assert_eq!((at, committed), (71, true));
 }
 
+/// lamp-52e6 on 24 Oct (`heard`, the switch on): a first word over the
+/// story ("Wait", "Sorry"), 150 ms in the clear, then a 300 ms pause, at
+/// which its words are asked for, then `then` blocks of the question in
+/// the clear. The ask hears only the first word, and its words come back
+/// as `words`. The block the yield settled at after it, whether it
+/// committed, and its record.
+fn a_first_word_then_its_question(
+    words: Option<&'static str>,
+    then: usize,
+    holds: bool,
+) -> (u64, bool, Value) {
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    h.stop_words = Some(crate::stop_words::StopWords::new(Box::new(Ears {
+        words,
+        asked: false,
+        heard: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        wait: 0,
+    })));
+    if holds {
+        h.mask.hold_backchannels();
+    }
+    let old = h.old();
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    h.blocks(ONSET + 2, 0.9, Some(evidence(0, OVER)));
+    let yielded_at = h.events("duplex_yield")[0]["frame_sequence"]
+        .as_u64()
+        .unwrap();
+    for quiet in 1..=29 {
+        h.block(0.1, Some(evidence(quiet, None)));
+    }
+    let mut found = None;
+    let plan = std::iter::repeat_n(0.9, 15)
+        .chain(std::iter::repeat_n(0.1, 30))
+        .chain(std::iter::repeat_n(0.9, then))
+        .chain(std::iter::repeat_n(0.1, 150));
+    for score in plan {
+        h.block(score, Some(evidence(40, None)));
+        found = h
+            .events("duplex_commit")
+            .into_iter()
+            .chain(h.events("duplex_resume"))
+            .next();
+        if found.is_some() {
+            break;
+        }
+    }
+    let found = found.expect("the yield never settled");
+    let committed = !h.events("duplex_commit").is_empty();
+    if committed {
+        assert_eq!(h.events("turn_finished")[0]["outcome"], "user_interrupted");
+        assert_ne!(h.old(), old);
+    } else {
+        assert_eq!(h.old(), old);
+        assert!(h.events("turn_finished").is_empty());
+    }
+    (
+        found["frame_sequence"].as_u64().unwrap() - yielded_at,
+        committed,
+        found,
+    )
+}
+
+/// lamp-52e6 on 24 Oct (`heard`, the switch on), 2 of 3 cut-ins: "Wait"
+/// or "Sorry", a 300 ms pause, then the question. The words were asked
+/// for at the pause and heard only the first word, which came back as no
+/// words; the question that went on in the clear was held as a wordless
+/// yield until the deadline, and the story resumed. Speech that goes on
+/// after the ask now ends the wait for words: the question commits at its
+/// sixth block, and the turn's own speech-to-text hears it whole. A lone
+/// backchannel whose words come back empty still resumes; "Stop." still
+/// commits at its words; the switch off, as before.
+#[test]
+fn with_backchannel_holds_a_question_after_a_pause_commits_though_its_first_word_came_back_empty() {
+    // 2 over, 29 dying away, 15 of "Wait", 30 still (asked at the tenth),
+    // then the question's sixth block.
+    let (at, committed, event) = a_first_word_then_its_question(Some(""), 60, true);
+    assert_eq!((at, committed), (2 + 29 + 15 + 30 + 6, true));
+    assert_eq!(event["backchannel"], Value::Null);
+    // No question after it: held 500 ms past the ask, then resumed.
+    let (at, committed, event) = a_first_word_then_its_question(Some(""), 0, true);
+    assert_eq!((at, committed), (2 + 29 + 15 + 60, false));
+    assert_eq!(event["backchannel"], Value::Null);
+    // A stop commits at its words, the block after the ask.
+    let (at, committed, _) = a_first_word_then_its_question(Some("Stop."), 60, true);
+    assert_eq!((at, committed), (2 + 29 + 15 + 11, true));
+    // The switch off: the first word's speech commits at its sixth block.
+    let (at, committed, _) = a_first_word_then_its_question(Some(""), 60, false);
+    assert_eq!((at, committed), (2 + 29 + 6, true));
+}
+
 /// lamp-52e6 on #3200: "a yield ended before its words came". With the
 /// switch on the yield it ends is resumed, not committed, and the words
 /// said to be missing are recorded; with `heard` too.
