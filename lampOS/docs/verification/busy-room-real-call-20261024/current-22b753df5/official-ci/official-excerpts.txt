@@ -1,0 +1,9 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T13:49:51.2609773Z HEAD is now at e77296b Merge 29cbcd69fce7c0ff9e415e6f7ab32a1aec477db1 into 22b753df5db6434d21455f40f67926e0ecee9d91
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:00:41.2967863Z         PASS [   0.006s] (2847/7374) lamp-voice attention::tests::the_real_name_call_keeps_positions_without_recognizer_stand_ins
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:01:05.6062547Z         PASS [   3.321s] (4148/7374) lamp-voice messages::tests::a_text_never_waits_on_the_news_for_the_phone
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:01:25.1403660Z         LEAK [   0.250s] (5194/7374) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:01:27.8905814Z         PASS [   2.413s] (5533/7374) lamp-voice second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:01:33.4475854Z         PASS [   0.006s] (5869/7374) lamp-voice second_provider::worker::tests::a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:01:33.4538060Z         PASS [   0.006s] (5870/7374) lamp-voice second_provider::worker::tests::a_busy_room_never_holds_a_line_that_calls_the_lamp
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:01:56.5684409Z      Summary [ 153.916s] 7374 tests run: 7374 passed (1 leaky), 53 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T14:02:10.5731885Z test result: 12 passed; 0 failed

@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-24 21:30 +07, both current native gates green
+
+[Literal-name current CI](verification/busy-room-real-call-20261024/current-22b753df5/official-ci/README.md)
+on29cbcd69f passes: ARM 7,373 PASS + 1 LEAK / 53 skipped, zero failed/unrun;
+actual Linux fmt/strict Clippy pass. Preview e77296b13 equals authored tree
+bb1602e15. The retained Mac 4,005/1/21 plus captured standalone3/3 and single
+clean-base1/0 remain for reader classification; no failure is erased.
+
+[Phone current CI](verification/phone-news-start-carry-20261024/current-22b753df5/official-ci/README.md)
+on6cd08d29c also passes: ARM 7,371 PASS + 1 LEAK / 53 skipped, zero
+failed/unrun, actual Linux fmt/strict Clippy pass. Preview613786318 equals
+authored tree5853e9dcd. Mac4,004/0/21 and both P3 fault controls remain bound;
+historical Update2/3 HOLD still waits with Tests/#1569 and Reviewer-two.
+Both current heads include22b; no later base or physical claim.
+
+Took the separate #1806 keep-alive mock framing gap on
+second/chat-kept-framing, after open/merged/ownership checks. Only test code
+and voice-test-fixtures.md change; seven original assertions and idle/pool/
+overlap durations are exact. Its split-header/EOF control and original idle
+case passed so far in the active full Voice gate; no terminal count yet.
+No client policy edit, inferred historical cause or full-workspace gate.
+
+---
+
 ## Current checkpoint: 2026-10-24 21:03 +07, both rebased carries pushed
 
 #3382 is pushed at `6cd08d29c` on `22b753df5`, retaining the original commit

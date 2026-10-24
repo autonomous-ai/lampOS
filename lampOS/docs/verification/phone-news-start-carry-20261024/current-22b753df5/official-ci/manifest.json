@@ -1,0 +1,18 @@
+{
+  "official-summary.json": {
+    "original_sha256": "170a0ca3c433b3311fbc383c86a555b2073c64e470bfc53248a63b934eff51be",
+    "published_sha256": "170a0ca3c433b3311fbc383c86a555b2073c64e470bfc53248a63b934eff51be"
+  },
+  "official-excerpts.txt": {
+    "original_sha256": "a343c80cf635a93b01fccf41d917fd95e7a11302920da6ad7516776ac27e8f46",
+    "published_sha256": "a343c80cf635a93b01fccf41d917fd95e7a11302920da6ad7516776ac27e8f46"
+  },
+  "arm64-official.json": {
+    "original_sha256": "d1a037270dd771770afffac433d5e9f6aefd08da7efcbb8706cf16ac6ece0cf0",
+    "published_sha256": "d1a037270dd771770afffac433d5e9f6aefd08da7efcbb8706cf16ac6ece0cf0"
+  },
+  "linux-official.json": {
+    "original_sha256": "ffde0477ba4ba0198e96e7e171d11dd1aba6edd7bb39e69b104bb5efc1e35896",
+    "published_sha256": "ffde0477ba4ba0198e96e7e171d11dd1aba6edd7bb39e69b104bb5efc1e35896"
+  }
+}
