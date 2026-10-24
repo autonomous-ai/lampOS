@@ -20,6 +20,7 @@ publish their names, face images, embeddings or full transcripts.
 | Speaker is out of view, far away, turned away or unreadable; visible bystander moves their mouth | No bystander is saved. Record classifier observations separately from who actually spoke. |
 | Both people visibly speak, including a brief interjection | Enrollment refuses; no face/name pairing is persisted. |
 | Requester leaves or another face replaces them during the five-frame capture | Capture refuses and leaves no new saved pairing. |
+| Both `LAMP_REMEMBER_SPEAKER` and `LAMP_MEMORY_ROOM_SPEAKER` on: ordinary direct self-introduction, then cancellation while the background known-file read is pending | Same request's original speaking proof survives attribution; cancelled/expired work never restores proof or saves a face. Compare repeated attempts to enrollment-only mode and record the extra work's latency separately. |
 | Camera privacy closes/reopens, stop, or forget occurs while STT/capture is pending | No delayed save survives; a fresh request is required. |
 | Already-known face introduces a different name | Saved name stays unchanged; reply neither speaks the stored name nor requests unsupported replacement confirmation. |
 | Ordinary short bare-name and spelling reply, including a multiword name | Same current-line and speaker proof applies; old history cannot supply a name. |
