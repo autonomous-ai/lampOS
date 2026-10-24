@@ -1,0 +1,13 @@
+{
+  "previous_head": "c185843f7495902223fa6abaa0687030696a2f0d",
+  "all_five_original_assertions_byte_exact": true,
+  "old_assertion_count": 5,
+  "current_assertion_count": 7,
+  "original_30_second_sleep_retained": true,
+  "original_2_second_observation_retained": true,
+  "counts": {
+    "passed": 4004,
+    "failed": 0,
+    "ignored": 21
+  }
+}

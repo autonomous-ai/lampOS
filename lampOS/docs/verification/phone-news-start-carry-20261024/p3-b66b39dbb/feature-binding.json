@@ -1,0 +1,8 @@
+{
+  "local_qualified_checkpoint": "b66b39dbb29a7034f6b88a32e33c309d2755414e",
+  "rebased_head": "6cd08d29cbe2ffecb4d05f0e8bbcee4ff1c98586",
+  "rebased_base": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "entire_messages_rs_identical": true,
+  "messages_rs_sha256": "8fc4441fb1cb1a3eb6bf7f3f3bd9e1241364ce71233cf58ddf881ab0289cce49",
+  "limits": "Old full gate stays on local pre-rebase checkpoint; current-base full gate is separate and pending."
+}

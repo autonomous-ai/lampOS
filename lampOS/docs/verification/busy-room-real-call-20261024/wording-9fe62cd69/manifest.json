@@ -26,5 +26,21 @@
   "linux-fmt-current-cleanup.json": {
     "original_sha256": "7068cc3b69c21669f91bbd11b3c6d6d15fcc13013e6cf7b5d5e50d00f0a54ec4",
     "published_sha256": "7068cc3b69c21669f91bbd11b3c6d6d15fcc13013e6cf7b5d5e50d00f0a54ec4"
+  },
+  "run-40095517855.json": {
+    "original_sha256": "7c5065281a1473c79aa37ef1ee09bf6eb39c4bf64b68a44a2c485073a79964d4",
+    "published_sha256": "7c5065281a1473c79aa37ef1ee09bf6eb39c4bf64b68a44a2c485073a79964d4"
+  },
+  "run-40095517832.json": {
+    "original_sha256": "812475cb9c98881bfe59c6876a21536c486c903edca0eae764b25ff8e6bc00fe",
+    "published_sha256": "812475cb9c98881bfe59c6876a21536c486c903edca0eae764b25ff8e6bc00fe"
+  },
+  "official-summary.json": {
+    "original_sha256": "a0c8f210eb2fc4358289d98ba1b125f8399d4645dd729a629a540bf1e07d97c7",
+    "published_sha256": "a0c8f210eb2fc4358289d98ba1b125f8399d4645dd729a629a540bf1e07d97c7"
+  },
+  "official-excerpts.txt": {
+    "original_sha256": "550eb8db1a9741db3d6d9aa2f8e440b9914b7cd7af33cc0240a8055bb533533e",
+    "published_sha256": "550eb8db1a9741db3d6d9aa2f8e440b9914b7cd7af33cc0240a8055bb533533e"
   }
 }

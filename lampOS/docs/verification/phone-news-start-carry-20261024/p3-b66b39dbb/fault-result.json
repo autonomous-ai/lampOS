@@ -1,0 +1,112 @@
+{
+  "head": "b66b39dbb29a7034f6b88a32e33c309d2755414e",
+  "cases": [
+    {
+      "kind": "missing-cancellation-witness",
+      "mutated_source_sha256": "61b7c6fdb3dc1471c31d1f007bdb32d8c712a04fea8f8cd41e4b5f1615bd9969",
+      "clean": {
+        "tag": "missing-cancellation-witness-clean",
+        "command": [
+          "<private-home>/.cargo/bin/cargo",
+          "+1.96.0",
+          "clean",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice"
+        ],
+        "exit": 0,
+        "seconds": 0.931
+      },
+      "compile": {
+        "tag": "missing-cancellation-witness-compile",
+        "command": [
+          "<private-home>/.cargo/bin/cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit": 0,
+        "seconds": 63.983
+      },
+      "executable_sha256": "05c57f3a25195e797d06f38c0adf85ef743159b173adabb602fefab58a7f0acc",
+      "compiler_artifact_fresh": false,
+      "test": {
+        "tag": "missing-cancellation-witness-test",
+        "command": [
+          "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+          "--exact",
+          "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+          "--test-threads=1"
+        ],
+        "exit": 101,
+        "seconds": 2.905
+      },
+      "remaining_owned_fixture_names": [],
+      "owned_fixture_cleanup_confirmed": true,
+      "other_temp_entries": [],
+      "temporary_root_removed": true
+    },
+    {
+      "kind": "early-assertion",
+      "mutated_source_sha256": "9def724bfd156148f462b806dea9b29ba0e95c1359e55fc6056cd078ce805159",
+      "clean": {
+        "tag": "early-assertion-clean",
+        "command": [
+          "<private-home>/.cargo/bin/cargo",
+          "+1.96.0",
+          "clean",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice"
+        ],
+        "exit": 0,
+        "seconds": 0.28
+      },
+      "compile": {
+        "tag": "early-assertion-compile",
+        "command": [
+          "<private-home>/.cargo/bin/cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit": 0,
+        "seconds": 51.737
+      },
+      "executable_sha256": "e0c81caae6b8bdd0d17f8a4d5eb5c71aff66233e6860014975d5d2f7ca3d419f",
+      "compiler_artifact_fresh": false,
+      "test": {
+        "tag": "early-assertion-test",
+        "command": [
+          "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+          "--exact",
+          "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+          "--test-threads=1"
+        ],
+        "exit": 101,
+        "seconds": 2.633
+      },
+      "remaining_owned_fixture_names": [],
+      "owned_fixture_cleanup_confirmed": true,
+      "other_temp_entries": [],
+      "temporary_root_removed": true
+    }
+  ],
+  "restored_source_sha256": "8fc4441fb1cb1a3eb6bf7f3f3bd9e1241364ce71233cf58ddf881ab0289cce49",
+  "source_restored": true,
+  "private_worktree_clean": true
+}
