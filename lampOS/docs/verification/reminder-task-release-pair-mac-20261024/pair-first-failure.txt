@@ -1,0 +1,28 @@
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	﻿2026-10-24T01:41:02.2346033Z ##[group]Run set -euo pipefail
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2346551Z [36;1mset -euo pipefail[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2346960Z [36;1mtest "$(uname -m)" = aarch64[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2347319Z [36;1mtest ! -e /run/systemd/timesync/synchronized[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2347728Z [36;1mmkdir -p /tmp/pair-output /tmp/pair-artifacts/{6408,6498}[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2348257Z [36;1mgit rev-parse HEAD 'HEAD^{tree}' > /tmp/pair-output/source-revision[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2348735Z [36;1mrustc --version --verbose > /tmp/pair-output/rustc-version[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2349181Z [36;1muname -sm > /tmp/pair-output/platform[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2349501Z [36;1mfor release in 6408 6498; do[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2349822Z [36;1m  for part in schedule tasks voice; do[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2350280Z [36;1m    curl --fail --location --proto '=https' --proto-redir '=https' \[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2350751Z [36;1m      --retry 3 --connect-timeout 20 --max-time 180 \[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2351388Z [36;1m      "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-$release/lamp-$part" \[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2352102Z [36;1m      --output "/tmp/pair-artifacts/$release/lamp-$part"[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2352464Z [36;1m  done[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2352690Z [36;1mdone[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2353036Z [36;1m# Each fixture also checks its hardcoded SHA-256/size/ELF before exec.[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2353596Z [36;1mfind /tmp/pair-artifacts -type f -print0 | sort -z | xargs -0 sha256sum \[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2354054Z [36;1m  > /tmp/pair-output/downloaded.sha256[0m
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2357101Z shell: bash --noprofile --norc -e -o pipefail {0}
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2357517Z env:
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2357764Z   CARGO_HOME: /github/home/.cargo
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2358091Z ##[endgroup]
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2706914Z fatal: detected dubious ownership in repository at '/__w/lampOS/lampOS'
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2707644Z To add an exception for this directory, call:
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2707885Z 
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2708139Z 	git config --global --add safe.directory /__w/lampOS/lampOS
+published 6408 and 6498 state readers on ARM64	fetch the exact published artifacts	2026-10-24T01:41:02.2747432Z ##[error]Process completed with exit code 128.
