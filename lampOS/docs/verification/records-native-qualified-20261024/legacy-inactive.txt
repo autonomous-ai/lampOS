@@ -1,0 +1,4 @@
+hal.service 3
+os-server.service 3
+led-boot.service 3
+led-shutdown.service 3

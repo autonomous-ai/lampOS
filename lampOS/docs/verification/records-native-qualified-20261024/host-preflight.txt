@@ -1,0 +1,4 @@
+pid1=systemd
+init_namespace=pid:[4026531836]
+self_namespace=pid:[4026531836]
+unified_cgroup_v2=true

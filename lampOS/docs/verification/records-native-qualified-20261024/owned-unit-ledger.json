@@ -1,0 +1,11 @@
+{
+  "units": [
+    "lamp-records-pair-9407-old-0.service",
+    "lamp-records-pair-9407-old-1.service",
+    "lamp-records-pair-9407-shared-0.service",
+    "lamp-records-pair-9407-shared-1.service",
+    "lamp-records-pair-9407-current-0.service",
+    "lamp-records-pair-9407-current-1.service"
+  ],
+  "version": 1
+}
