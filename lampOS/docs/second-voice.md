@@ -3160,7 +3160,26 @@ after a take-over, but now for every turn:
   actual answer renews the allowance; admitting a line does not. At most
   four recent eligible line ends are kept, and missing, future or evicted
   ends give no extension. Identity checks and the switch-off path remain
-  unchanged. A stop (`Did::Stopped`, from the next line's `after_stop`) and
+  unchanged. When that colleague print is first learned at the current
+  owner's verdict, the worker rechecks the current line's captured start
+  against the newly available window. It always reads the cached reply
+  again and retains any own-voice likeness consumed by the first lookup
+  in preference to the second result, including its same/other-voice
+  classification for the downstream same-speaker rule. Neither lookup
+  waits for a print. A line admitted only by this newly opened late window
+  is not recorded as another eligible colleague end: a later print for
+  that line gives no further extension. This fails closed.
+  In Busy, Unknown and Quiet, that new eligibility still needs the owner's
+  positive face or sufficiently nearer voice; missing, uncertain or
+  confusable voice evidence is held for this verdict without turning a
+  quiet or unknown room busy. A +25 s owner start can pass; +45 s cannot.
+  The chronological control covers both an active 30 s thread and an
+  expired 60 s thread. It uses a synthetic 1.5 s sure-other bar only;
+  the production 2.5 s bar and the 1.5 s print limit are unchanged.
+  The answer clock is existing `Did::Said` queued-PCM duration bookkeeping,
+  not acoustic drain attestation. Physical last-word timing and activation
+  still need the lamp's attended check.
+  A stop (`Did::Stopped`, from the next line's `after_stop`) and
   a privacy change end it, and a forgetting leaves no words to carry from.
   The caller's own face seen speaking turned away from the lamp is someone
   talking to a colleague (reviewer-two at 03:01): held, and it ends the
