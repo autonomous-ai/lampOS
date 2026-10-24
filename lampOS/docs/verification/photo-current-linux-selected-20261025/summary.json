@@ -1,0 +1,54 @@
+{
+  "base_head": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "cleanup_proved": true,
+  "counts": {
+    "full-cloud": {
+      "failed": 0,
+      "ignored": 4,
+      "passed": 209
+    },
+    "full-eyes": {
+      "failed": 0,
+      "ignored": 5,
+      "passed": 360
+    },
+    "full-update": {
+      "failed": 0,
+      "ignored": 4,
+      "passed": 389
+    },
+    "full-voice": {
+      "failed": 0,
+      "ignored": 24,
+      "passed": 4215
+    }
+  },
+  "final_head_bound": false,
+  "formal_read_ok_issued": false,
+  "format": "photo-linux-count-sourcehash-bool-review/1",
+  "fresh_local_member_count": 46,
+  "gate_exit": 0,
+  "mac_photo_run": false,
+  "metadata_member_count": 46,
+  "observed_once_passed_controls": 210,
+  "observed_stage_count": 7,
+  "owned_source_file_count": 29,
+  "photo_speaker_enabled": false,
+  "physical_qualified": false,
+  "public_raw_upload_authorized": false,
+  "readiness_or_activation_claim": false,
+  "required_controls_by_stage": {
+    "full-cloud": 19,
+    "full-eyes": 8,
+    "full-update": 14,
+    "full-voice": 169
+  },
+  "required_stage_count": 7,
+  "source_file_count": 10461,
+  "source_map_sha256": "5ed322ca89ef9c4ac47b1e9e8f0026ac0bcbf7a18fb7bc6ac0d27d1f55f1c407",
+  "source_semantic_index_sha256": "9592f7fceb835c9a30957d7ed0710770e5831b224199579505c154a32bd0620f",
+  "source_stable": true,
+  "strict_whole_interval_implemented": false,
+  "tested_staged_tree": "8ad5e1ae9a9f6cc88927f377f77003451474ec50",
+  "trusted_original_capture_integrated": false
+}

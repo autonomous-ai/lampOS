@@ -6,6 +6,13 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 00:47: Photo Linux qualified and failed callback epoch retained
+
+- [Photo Linux selected receipt](verification/photo-current-linux-selected-20261025/README.md): source `8ad5` passed seven stages and 210 controls, fresh 46, Voice 4215/0/24, Cloud 209/0/4, Update 389/0/4 and Eyes 360/0/5. Mac Photo not run; final/native/physical/original-capture/strict-interval holds remain.
+- [Failed callback Mac selected receipt](verification/callback-mac-failed-selected-20261025/README.md): a4ac full Voice 4117/9/21, census 1/0/12 filtered, five of six controls pass. All 9 failures retained; other 8 fixture/latency assertions handed to Tests #1806. No cause or blanket waiver.
+- Test-only short private root fixes the demonstrated Mac SUN_LEN defect. A wrapping-only formatting failure is retained before formatted source `30eab`. Both-source host gates now run: Mac fmt/strict Clippy pass and build active, Linux fmt pass and strict Clippy active. No new suite/pass/native claim yet.
+- Publish only deliberately selected count/hash/Boolean summaries; raw packets remain private. No lamp/device action or activation.
+
 ## 2026-10-25 00:25: direct callback control and current gates
 
 - Published only the selected [name callback count/hash/Boolean receipt](verification/name-direct-callback-control-20261025/README.md): old selector rejected at the exact silent callback assertion, raw Cargo 101 and expected-experiment 0. Earlier timeout stays inconclusive; no HTTP leakage or actual words inferred. Raw evidence stays private.

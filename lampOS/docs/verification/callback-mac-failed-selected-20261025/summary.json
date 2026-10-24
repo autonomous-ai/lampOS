@@ -1,0 +1,49 @@
+{
+  "base_head": "8aed9d14acadbbf66fd5e309c880dead0225643d",
+  "cause_assigned": false,
+  "census_control_passed": true,
+  "census_counts": {
+    "failed": 0,
+    "filtered": 12,
+    "ignored": 0,
+    "passed": 1
+  },
+  "cleanup_proved": true,
+  "combined_fixture_passed": false,
+  "failures_waived": false,
+  "final_head_bound": false,
+  "format": "failed-gate-count-sourcehash-bool-review/1",
+  "fresh_local_members": 46,
+  "full_gate_pass": false,
+  "gate_exit": 101,
+  "nested_failure_duplicate_count": 1,
+  "owned_test_files": 2,
+  "passing_controls": 5,
+  "public_raw_upload_authorized": false,
+  "required_controls": 6,
+  "retained_voice_controls_passed": 4,
+  "retry_performed": false,
+  "semantic_index_sha256": "d9b8e4daaa658d504dd4decee9f0c6787e96f14ef0720ae9d31ea030a2dc09d4",
+  "source_file_count": 10454,
+  "source_map_sha256": "790e02096c7b1c2215130e6f3b3191740aef684e95f0eb4f4aa8f833c74825f3",
+  "source_stable": true,
+  "stage_count": 5,
+  "stage_exits": [
+    0,
+    0,
+    0,
+    101,
+    0
+  ],
+  "tested_staged_tree": "a4acaf9aa01b420fe02e99957724355ce0489ba4",
+  "voice_final_counts": {
+    "failed": 9,
+    "ignored": 21,
+    "passed": 4117
+  },
+  "voice_raw_counts": {
+    "failed": 10,
+    "ignored": 21,
+    "passed": 4117
+  }
+}
