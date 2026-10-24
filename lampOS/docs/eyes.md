@@ -2136,8 +2136,11 @@ with the known face's id the eyes keep beside the known file
   On, a look whose eye distance is 30% (`OUTLIER_SHARE`) or more off its
   window's median is left out, and the rest is judged as above, with the same
   gates: still at least 5 looks, every one with the mesh for the mesh to
-  judge. A window with more than one such look (`MOST_OUTLIERS`) is
-  `unknown` (`reason` `outliers`). A window with none is judged exactly as
+  judge. The look it leaves out is a gap: the change from look to look and
+  the eye line's bend are measured only between looks that were next to each
+  other, so the two looks around it are never joined as if 500 ms were one
+  250 ms step. A window with more than one such look (`MOST_OUTLIERS`) is
+  `unknown` (`reason` `outliers`, after `small`: a far face reads `small`). A window with none is judged exactly as
   with it off. Offline only: a talking face with one 14 px look reads `yes`,
   a still one `no`; two such looks, or one in a window of five, `unknown`.
 - **The pace:** the eyes look every 250 ms while they follow a face, up to
@@ -2258,8 +2261,8 @@ without stretching. Mesh crop upsampling does not change `eyes_px`. The box
 helps interpret framing but does not prove identity or physical distance.
 
 `reason` names the first returning branch: `invalid_eyes`, `turn_unavailable`,
-`turned`, `outliers` (with `LAMP_EYES_SPEAKING_DROP_OUTLIER=on` only),
-`small`, `too_few_looks`, `jitter`, `mesh`, or `corners`. With that switch,
+`turned`, `small`, `outliers` (with `LAMP_EYES_SPEAKING_DROP_OUTLIER=on`
+only), `too_few_looks`, `jitter`, `mesh`, or `corners`. With that switch,
 `window_looks` and `window_span_us` count the whole window, while
 `window_mean_eyes_px` and `mesh_window_looks` count the looks kept. `mesh` and
 `corners` identify the scoring path, not necessarily speech. Later unevaluated
