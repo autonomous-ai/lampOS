@@ -1,0 +1,41 @@
+{
+  "executed_head": "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3",
+  "executed_base": "bcb540a085408cdf764dfdb211d415a0e8239727",
+  "run": 40130968164,
+  "actual_preview": "a69ec96fd3ed7cae06cbed165d1e898f94570caa",
+  "whole_tree": "8d8c615acf16f1dd865f64e957012220b0bb13c8",
+  "source_bindings": {
+    "lampOS/crates/update/tests/round/process_cuts.rs": {
+      "git_blob": "392156ef65d52fb0289867664ded4e6d75bba2f0",
+      "sha256": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c"
+    },
+    "lampOS/crates/update/tests/self_process_cuts.rs": {
+      "git_blob": "5ca02fbca1b25a2ce9aa7aaf42ee7953f53f41e0",
+      "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3"
+    },
+    "lampOS/crates/update/tests/self_cli_exec.rs": {
+      "git_blob": "7535b367803d2e410d3a52dea182f5f7426176fb",
+      "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd"
+    }
+  },
+  "source_declared_batch_cases": [
+    "candidate_synced",
+    "pending_synced",
+    "current_synced",
+    "confirmation_synced",
+    "put_back_link_synced",
+    "refusal_synced",
+    "put_back_cleanup_synced"
+  ],
+  "observed_native_case_results": {
+    "actual_cli_exec_confirms_before_the_next_round": "PASS 0.146s",
+    "persisted_self_switches_survive_sigkill": "PASS 3.893s"
+  },
+  "case_detail_scope": "One passing batch case calls all seven source-declared cut controls; successful per-cut stdout is not separately shown by the selected nextest lines. No new execution or hardware proof.",
+  "current_carry_scope": "a039 on 3d is a separate ongoing local Voice gate; these native observations retain fa82/bcb identity.",
+  "limits": [
+    "SIGKILL process/library recovery, not power-loss or filesystem flash durability.",
+    "No real daemon recovery timer/attended unplug or lamp action.",
+    "Operator selection, trusted real release key and physical restoration remain with named holders."
+  ]
+}

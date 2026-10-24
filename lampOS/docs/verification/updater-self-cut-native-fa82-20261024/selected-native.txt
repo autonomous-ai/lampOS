@@ -1,0 +1,2 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T20:53:50.2113972Z         PASS [   0.146s] (2708/7410) lamp-update::self-cli-exec actual_cli_exec_confirms_before_the_next_round
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T20:53:54.0070417Z         PASS [   3.893s] (3101/7410) lamp-update::self-process-cuts persisted_self_switches_survive_sigkill
