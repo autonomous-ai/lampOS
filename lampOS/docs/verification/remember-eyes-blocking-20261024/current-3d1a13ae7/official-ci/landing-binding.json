@@ -1,0 +1,23 @@
+{
+  "authored_head": "a039cc7fbbd06923db1fd038558ae1b9afba593f",
+  "landed_head": "fc31e012334cda59eb3c489560454c515fb86386",
+  "owned_blobs": {
+    "lampOS/crates/voice/src/remember_speaker.rs": {
+      "a039cc7fbbd06923db1fd038558ae1b9afba593f": "6147192170c3caf691d942c63ea44def0c5947fb",
+      "fc31e012334cda59eb3c489560454c515fb86386": "6147192170c3caf691d942c63ea44def0c5947fb"
+    },
+    "lampOS/docs/voice-test-fixtures.md": {
+      "a039cc7fbbd06923db1fd038558ae1b9afba593f": "785e1d56580d7a4c575fe5b780355aa0efe2980f",
+      "fc31e012334cda59eb3c489560454c515fb86386": "785e1d56580d7a4c575fe5b780355aa0efe2980f"
+    }
+  },
+  "owned_blobs_equal": true,
+  "whole_trees": {
+    "a039cc7fbbd06923db1fd038558ae1b9afba593f": "0a0d8f284e955370d286a603ab4b450fb23eb8d1",
+    "fc31e012334cda59eb3c489560454c515fb86386": "20695fa3e7ff2dc8f39c212dc1de1650dee6ee5d"
+  },
+  "whole_trees_equal": false,
+  "state": "PR closed through train104 while author draft/HOLD remained; author did not restore readiness or merge.",
+  "readiness_bypass_report": "https://github.com/autonomous-ai/lampOS/pull/3415#issuecomment-6389780744",
+  "limits": "Authored current native proof is not renamed to the different complete landed train tree. Actual train audit and missing designated Lead disposition remain separate."
+}
