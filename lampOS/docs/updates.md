@@ -963,6 +963,21 @@ slice adds no forward-field policy or setting consumer. The
 separates software store qualification from hardware, updater and power-loss
 acceptance; a pass requires the dedicated official native run.
 
+**Published Surround candidate readers** (#2809). The separate Surround
+`release_pair` target stages three synthetic provider candidates through actual
+Unix HTTP endpoints across 6408 → 6498 → 6408 and the reverse. The selected
+published payloads are byte-identical. It checks manifest/payload hashes,
+generated operation IDs and journal admission history, no automatic replay on
+reopen, and the existing collection of an unselected superseded generation.
+Unknown operations, authentication enum values and provider fields remain refused;
+synthetic unknown candidate fields and manifest schema 2 refuse startup without
+changing those bytes. This adds no runtime compatibility policy. The dedicated
+ARM64 workflow uses a fresh network-none container with private tmpfs state;
+ordinary tests use the current CLI. See the
+[fixture scope and retained-evidence contract](../crates/surround/tests/release_pair/README.md).
+No configuration is selected or applied, and no provider, device, updater or
+physical power-loss acceptance is claimed.
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
