@@ -1361,6 +1361,13 @@ assertion remain: reconnect promptly, start the confirmation window only
 at the acknowledgement, reset backoff, report rollback, and retain the
 offline will on the replacement connection.
 
+The no-join failure fixture observes the Wi-Fi worker's completion before
+checking whether a result needs a relink. It keeps both acknowledged and
+unacknowledged branches and the five-second result-ack contract. A
+5.5-second watchdog bounds the event wait in place of the former fixed
+5.5-second settling delay. The acknowledged branch ends when its worker
+completes; a fixed sleep no longer determines either branch's end.
+
 The reports (#1683): each kind's fields as sent; the canary; each of the
 three gates closed sends nothing (no setup file, a no, one unreadable,
 `"true"`, `1`, a newer wording; a later no of the lamp's own); the bus only
