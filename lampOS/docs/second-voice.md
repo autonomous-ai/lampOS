@@ -3185,23 +3185,39 @@ after a take-over, but now for every turn:
   talking to a colleague (reviewer-two at 03:01): held, and it ends the
   carry, their voice sure or not, so turning back needs a fresh call or
   answer (the first builder at 09:34; reviewer-two at 10:32 on #3331).
-  These signs are read in any room while a carry stands (reviewer-two at
-  10:35): in a room not busy, unknown or quiet, a line held by them, or
-  in a voice not surely the owner's, is judged as in a busy room for its
-  own verdict, the room itself unchanged. While the carry stands, the
-  owner's carried line is no reply to a colleague's question held just
-  before it (`Attention::carried_past_a_question`, no `AFTER_QUESTION`
-  hold; the reviewer-lead on #3331). Once a line has been held as someone
-  else's in a carry, the owner's voice alone carries only when its print
-  is nearer the conversation's than the held line's print by
-  `worker::CARRY_NEARER_BY` (0.10, provisional), with no held print known
-  only their face does (reviewer-three on #3331: two voices have read 0.69,
-  so owner and colleague lines could alternate, a colleague at 0.70
-  carried as the owner); the held print is kept until a new carry, a stop
-  or a privacy change. The faces read are those seen *speaking* the line.
-  A line with no sure sign either way, a print not back, a short print
-  under 0.70, no face seen speaking or only before the line, is held past
-  the 8 s, goes on within them as any follow-up, and ends nothing. The existing score rows of
+  Another speaking face and the caller turned away are held in every
+  room while a carry stands. The owner's carried line is no reply to a
+  colleague's held question (`Attention::carried_past_a_question`, no
+  `AFTER_QUESTION` hold). Once a line is held as someone else's, voice-only
+  identity carry needs its print nearer the conversation's than **every**
+  retained held line's print by `worker::CARRY_NEARER_BY` (0.10, provisional).
+  A newer visitor cannot replace an older visitor's constraint. At most
+  eight held line requests and their optional prints are kept in memory
+  for this call. Duplicate requests only fill a missing print. A missing
+  held print requires the owner's speaking face until that request's own
+  already-requested cached reply is available; no new inference or wait is
+  started. At capacity, another distinct held line latches face-only
+  identity carry until a fresh call, rather than evicting an older print.
+  Owner admissions and answers do not discard these constraints. A fresh
+  call, stop, privacy change, observed forget, caller turned away or two
+  consecutive other lines clears the scope; late prior-call callbacks
+  cannot restore it. A fresh caller has no old caller's constraints.
+  Observing a forgotten or absent answer closes the whole carry, including
+  its active marker. If the recent call still legitimately admits the same
+  owner's next line, that admission begins a fresh constraint scope; its
+  actual answer can then carry the owner's later voice-only follow-up.
+  This does not reopen a closed scope from a late old callback or reset
+  capacity within a still-live call.
+  In Busy, Unknown and Quiet, past the ordinary follow-up window, a
+  positive current voice whose held-print comparison was refused cannot
+  bypass that refusal through an active thread. The refused line is no
+  talk for the stored room. The caller's speaking face still carries.
+  The ordinary first 8 s follow-up remains unchanged. Generic missing or
+  weak current evidence in an Unknown/Quiet thread has a separate
+  personal-scope acceptance hold; this comparison does not close it.
+  In a Busy room, a line with no sure sign, a print not back, a short print
+  under 0.70 or no speaking face is held past 8 s, admitted within them as
+  the ordinary follow-up, and ends nothing. The existing score rows of
   `docs/verification/same-voice-early-20261018`, selected by their clips'
   original durations (no audio re-sliced, no CAM++ run again), give one
   synthetic voice's short clips (three of 0.93 to 1.45 s against seven
