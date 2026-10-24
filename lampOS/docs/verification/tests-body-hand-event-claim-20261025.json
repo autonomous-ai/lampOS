@@ -1,0 +1,11 @@
+{
+  "task": "Part of #1806; Body Hand fixture event sequencing",
+  "case": "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+  "base": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+  "branch": "tests/1806-body-hand-events",
+  "ownership_census": "22 open PRs, complete per-PR files, none owns lampOS/crates/body/src/bus_out.rs",
+  "open_and_merged_search": "Exact case search found only merged #848, original Hand support; no repair found",
+  "change_scope": "test fixture and English Body doc only; retain all assertions/20offers/5Handvalues/cleanup/productTTL",
+  "current_observations": "0/3 at frozen fc31, separately published; no current-base or candidate observation yet",
+  "no_code_before_claim": true
+}

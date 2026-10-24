@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-25 06:17 — Body Hand event sequencing taken
+
+Ready for lamp-voice: no
+
+Taken #1806's unresolved Body Hand fixture after the complete open-file census (22 PRs, no bus_out.rs owner) and open/merged case search (original #848 only). [Claim record](verification/tests-body-hand-event-claim-20261025.json). The planned fixture waits for each forwarded step's actual Hand before the next offer, preserving all20offers, five values/push-start assertions, cleanup and product freshness rules. Current fc31 controls remain0/3; this is no diagnosis or waiver. No code or candidate observation yet. Skills and Cloud keep their separate validation allocations.
+
 ## 2026-10-25 06:14 — complete NoPause current failures published
 
 Ready for lamp-voice: no
