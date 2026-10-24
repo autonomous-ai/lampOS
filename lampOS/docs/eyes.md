@@ -1473,11 +1473,20 @@ distinct looks must positively show that speaker, at least half the looks
 in the line must be positive, and all must share one Eyes boot. Unknown
 looks do not count as positive evidence. The complete audio interval is
 at most 30 seconds. Short or missed camera evidence therefore refuses.
-The name must be supported by that line's words: earlier exchanges and model-supplied
-face identifiers are not evidence. With no eyes, missing or stale evidence,
+The name must be supported by that line's words: earlier exchanges and
+model-supplied face identifiers are not evidence. With no eyes, missing or stale evidence,
 or an unsupported route, nothing is saved. Guarded `replace=true` is refused:
 the earlier confirmation is not yet bound to the same speaker. Ordinary
 enrollment with the switch off keeps its existing behavior.
+
+These are checks on the classifier's observations, not independent proof
+of acoustic identity. An unread, far or turned-away second face does not
+automatically refuse the request: only a second face positively read as
+speaking does. If that requester speaks while a near bystander's mouth is
+misclassified as speaking in enough looks, the bystander can still be saved
+under the requester's name. Unknown is not positive evidence, but it does
+not prove that an unobserved person is quiet. The two-person trial must
+cover these cases before activation; this change does not fix the classifier.
 
 Voice refuses enrollment evidence above 4 KiB of transcript or a 128-byte
 face identifier rather than truncating away a correction. Its existing
@@ -1507,6 +1516,14 @@ and a buffered frame from before the new hold cannot refill them. A request
 spanning a camera-hold reset or forget is refused even if the same tracking
 ID has a later print.
 
+Anchors are made only on the existing two-second recognition tick, and
+only when that tick's near face reads as speaking. A roughly 1.8-second
+enrollment line can fall wholly between ticks and return `speaker_not_seen`
+despite correct speaking observations at every camera look. Such short
+requests may refuse frequently; shifting the same line across a tick can
+succeed. The cadence regression exercises both phases through
+`recognise_due` and the actual anchor cache, without forcing extra inference.
+
 Five distinct fresh frames captured after the request must show the same
 face, each matching the immutable anchor at the existing SFace threshold
 0.363. A passing tracking ID alone is insufficient: another person can
@@ -1521,7 +1538,12 @@ Latency target: add no wait or inference to the microphone path or the
 background recognition cadence. The existing four-second Eyes capture
 limit and six-second tool deadline remain; absent proof refuses immediately.
 Software tests cover the protocol, collector, identity replacement, stale
-and buffered frames, cancellation and legacy behavior. Physical first-use,
+and buffered frames, cancellation, recognition cadence and legacy behavior.
+They do not launch Linux's camera/model-backed `main.rs` loop: its legacy
+request refusal, tick wiring and unreadable-frame dispatch are source-read
+and compiled by native CI, while the shared protocol/cache/collector paths
+are executed in host tests. End-to-end coverage of that loop remains part
+of the lamp qualification. Physical first-use,
 repeated-use and slow-dependency latency, and speaking-classifier accuracy
 in a room, still need a lamp trial. The switch remains off pending that trial.
 
