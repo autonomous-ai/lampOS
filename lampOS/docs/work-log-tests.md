@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 16:55 +0700 — current clock Voice phase retained
+
+Ready for lamp-voice: no; current carry's dependent gates and standalone review continue.
+
+[Current conflict-carry preparation](verification/tests-clock-c6-carry-20261024/) records the actual C6 resolution, full new source guard and successful exact-source Linux amd64 formatting with owned-container absence. Mac fmt and strict Clippy passed. Voice completed **3,991/6/21**, library **3,711/5/15**, all 88 authored cases passing. Four observed phases match the frozen base; two unmatched cases receive their fixed observations after the full gate. Later train changes merge cleanly with this frozen head, so it is kept rather than rebased again during execution.
+
+The Phone remains unqualified with its complete failed records published. Its failed standalone's elapsed metadata is corrected to the exact raw value **2.002924069 s**; the raw wrapper was unchanged. The Update diagnostic is prepared source-only, with its original two-second panic preserved; no additional observations ran. The coordination reader's UTC-offset query bug was repaired and the full comment window recovered, with earlier empty-batch completeness claims explicitly withdrawn. No local ARM build or lamp action ran.
+
 ## 2026-10-24 16:26 +0700 — phone rule unresolved; C6 clock carry starts
 
 Ready for lamp-voice: no for the new clock carry and phone candidate.

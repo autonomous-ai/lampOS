@@ -1,0 +1,263 @@
+{
+  "original_sha256": "ef1001ab9d05a262d4e6a75601d4221b4d4f2f7050a82559918a6eaffa7cca00",
+  "projection": "Only inherited PATH omitted; all commands, source identities and fixed Rust environment retained.",
+  "plan": {
+    "status": "PREPARED ONLY. Actual train merge conflict required fresh clean carry with one resolved stop_words test hunk; root review and explicit CPU grant before execution.",
+    "source_identity": {
+      "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice",
+      "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+      "base_tree": "1c0e32d045a022fe2d3f7a8bd140e4f7e384e111",
+      "qualification_base": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+      "branch": "tests/1569-boot-clock-current",
+      "tracked_paths": 10363,
+      "lampos_paths": 7008,
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "owned_paths": [],
+      "combined_authored_paths": [
+        "lampOS/crates/voice/src/coordinator/second.rs",
+        "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+        "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+        "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+        "lampOS/crates/voice/src/scenario_clock.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs",
+        "lampOS/crates/voice/src/stop_words.rs",
+        "lampOS/crates/voice/tests/it/fixture_provider.rs",
+        "lampOS/docs/voice-test-fixtures.md"
+      ],
+      "source_map_sha256": "78193464ce9afa5a861cb7d6c3e3ae5e612201e9dedb07670cc307d8ab8f0e90",
+      "clean_committed_source": true
+    },
+    "environment": {
+      "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target",
+      "CARGO_BUILD_JOBS": "4",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_TERM_COLOR": "never",
+      "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+      "RUST_BACKTRACE": "1",
+      "RUST_TEST_THREADS": null,
+      "CARGO_BUILD_TARGET": null,
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "CARGO_TARGET_TMPDIR": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "LAMP_RELAY_PID_CONTROL_DIR": null
+    },
+    "dependency_proof": "gate-dependencies.json",
+    "joining_scope": "Every touched crate and reverse dependent represented; cfg(test) unit fixtures plus integration fixture and docs. No inherited failure waiver or shared qualification.",
+    "packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "readers": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice-eval"
+    ],
+    "steps": [
+      {
+        "id": "fmt",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "timeout_seconds": 300
+      },
+      {
+        "id": "clippy",
+        "command": [
+          "cargo",
+          "clippy",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--all-targets",
+          "--message-format=json-render-diagnostics",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "timeout_seconds": 1800
+      },
+      {
+        "id": "voice-default-parallel",
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-voice",
+          "--no-fail-fast",
+          "--message-format=json-render-diagnostics"
+        ],
+        "timeout_seconds": 5400
+      },
+      {
+        "id": "readers-default-parallel",
+        "command": [
+          "cargo",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice-eval",
+          "--no-fail-fast",
+          "--message-format=json-render-diagnostics"
+        ],
+        "timeout_seconds": 5400
+      },
+      {
+        "id": "workspace-build",
+        "command": [
+          "cargo",
+          "build",
+          "--offline",
+          "--locked",
+          "--workspace",
+          "--message-format=json-render-diagnostics"
+        ],
+        "timeout_seconds": 1800
+      },
+      {
+        "id": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check",
+          "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice",
+        "timeout_seconds": 60
+      }
+    ],
+    "execution_requirements": [
+      "No RUST_TEST_THREADS or --test-threads override.",
+      "Full human stdout/stderr retained; compiler inventories are not executed tests.",
+      "Bind each actual test executable/case census; preserve should-panic display annotation only when uniquely mapped to its compiled identity.",
+      "Well-formed ordinary test failure may permit remaining independent reader/build gates, but final qualification remains FAILED. Stop on timeout, compile/source/infrastructure or census failure; never retry a full gate until green.",
+      "No current-head native Linux/ARM64 claim from local execution; native jobs and exact-source Linux formatting remain separately required."
+    ],
+    "doctest_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "custom_harness_targets": [
+      {
+        "package": "lamp-update",
+        "kind": "test",
+        "name": "self-process-cuts",
+        "path": "lampOS/crates/update/tests/self_process_cuts.rs",
+        "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3"
+      },
+      {
+        "package": "lamp-update",
+        "kind": "test",
+        "name": "self-cli-exec",
+        "path": "lampOS/crates/update/tests/self_cli_exec.rs",
+        "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd"
+      }
+    ],
+    "selected_case": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+    "candidate_source_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+    "candidate_doc_sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+    "candidate_commit": "42cf24d5a965abbc386e61672b15a4591a338607",
+    "fixed_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target",
+    "clear_environment_prefixes": [
+      "CARGO_TARGET_AARCH64_",
+      "CARGO_TARGET_ARM_"
+    ],
+    "gate_attempt_sentinel": "execution-start.json",
+    "qualification_base": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+    "selected_cases": "selected-cases.json",
+    "selected_case_count": 88,
+    "historical_scope": "Fresh42cf24/C6 conflict carry gate. Historical93/414 full runs and their failures remain bound to original sources. Earlier802 preparation was unexecuted and remains historical prepared-only. Single stop_words readiness-context conflict requires root semantic review; no equal whole-patch claim and no new blanket baseline.",
+    "selected_case_stage": "voice-default-parallel",
+    "selected_case_package": "lamp-voice",
+    "approved_helpers": {
+      "run.py": "b4e5a28eff498140e959397e053a2ce1d268b58e897186d76a43f8393d0cc555",
+      "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+      "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+    },
+    "candidate_snapshot_paths": {
+      "candidate-source.rs": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "candidate-doc.md": "lampOS/docs/voice-test-fixtures.md"
+    }
+  }
+}

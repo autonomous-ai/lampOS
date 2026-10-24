@@ -1,0 +1,22 @@
+{
+  "format.stdout": {
+    "bytes": 794,
+    "sha256": "eb367d0b9a4f68b96ff991035ebd1a8824d1b87d571bd6ce4edf393620206394",
+    "utf8": "Linux ab5385d3abaf 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux\nuid=1000(1000) gid=1000(1000) groups=1000(1000)\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nrustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2\nhost: x86_64-unknown-linux-gnu\ncargo 1.96.0 (30a34c682 2026-05-25)\nrustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\nsource-before-manifest 3ee73aaf2c350bc6038fea098e1976585c35cc81675f97e0a4dee8727c8f8726  /tmp/source-before.sha256\nsource-after-manifest 3ee73aaf2c350bc6038fea098e1976585c35cc81675f97e0a4dee8727c8f8726  /tmp/source-after.sha256\ncargo_fmt_exit=0\n"
+  },
+  "format.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  "final-source-identity.stdout": {
+    "bytes": 123,
+    "sha256": "4c8c7dc66878118e30b9ae82f78ede5968e249e99a12eda7f189cf49649db456",
+    "utf8": "42cf24d5a965abbc386e61672b15a4591a338607\n1c0e32d045a022fe2d3f7a8bd140e4f7e384e111\nc6dfe980979e0088cd94f1dab1fe4a70ddbcbe46\n"
+  },
+  "final-source-identity.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  }
+}

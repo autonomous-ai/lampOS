@@ -1,0 +1,65 @@
+{
+  "container": "tests-3190-42cf24d5a-fmt-45381-1792833573719009000",
+  "unique_absence_before_launch": {
+    "name": "owned-container-preexisting",
+    "command": [
+      "podman",
+      "container",
+      "exists",
+      "tests-3190-42cf24d5a-fmt-45381-1792833573719009000"
+    ],
+    "cwd": null,
+    "started_utc": "2026-10-24T09:19:33.719018+00:00",
+    "finished_utc": "2026-10-24T09:19:33.866182+00:00",
+    "elapsed_seconds": 0.14721047000057297,
+    "exit_code": 1,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "cleanup": {
+    "name": "owned-container-cleanup",
+    "command": [
+      "podman",
+      "rm",
+      "--force",
+      "--ignore",
+      "tests-3190-42cf24d5a-fmt-45381-1792833573719009000"
+    ],
+    "cwd": null,
+    "started_utc": "2026-10-24T09:19:49.520095+00:00",
+    "finished_utc": "2026-10-24T09:19:49.635813+00:00",
+    "elapsed_seconds": 0.11576211099963984,
+    "exit_code": 0,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "absence": {
+    "name": "owned-container-absence",
+    "command": [
+      "podman",
+      "container",
+      "exists",
+      "tests-3190-42cf24d5a-fmt-45381-1792833573719009000"
+    ],
+    "cwd": null,
+    "started_utc": "2026-10-24T09:19:49.636500+00:00",
+    "finished_utc": "2026-10-24T09:19:49.737234+00:00",
+    "elapsed_seconds": 0.10077682499922958,
+    "exit_code": 1,
+    "timed_out": false,
+    "timeout_seconds": 60,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "absence_verified": true
+}

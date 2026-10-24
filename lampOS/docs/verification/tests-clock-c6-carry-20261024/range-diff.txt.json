@@ -1,0 +1,5 @@
+{
+  "bytes": 693,
+  "sha256": "05abbeefa32a8955cf19668ad50eadd0e732aae6bc5e0ecc9581e13b08c5d972",
+  "utf8": "1:  80231a251e ! 1:  42cf24d5a9 lampOS: bind fixture clocks and wait for cue peer closure\n    @@ lampOS/crates/voice/src/stop_words.rs: mod tests {\n     +            .set((600_000_000, std::time::Instant::now()))\n     +            .unwrap();\n              ears.ready();\n    -         until(\"a stream is asked for\", || service.connections() == 1);\n    +         until(\"the ready stream and a spare are asked for\", || {\n    +             service.connections() >= 2\n    +         });\n     -        ears.hear(lamp_ipc::monotonic_us() - 4_000_000, &[1; 160]);\n     -        ears.hear(lamp_ipc::monotonic_us(), &[1; 160]);\n     +        ears.hear(ears.live.fixture_now_us() - 4_000_000, &[1; 160]);\n"
+}

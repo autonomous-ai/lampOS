@@ -1,0 +1,34 @@
+{
+  "root_provided_conflict_stages_verified": {
+    "ancestor": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-stop-words-conflict/ancestor.json",
+      "wrapper_sha256": "35e3d5161f628796d6059587a3c787bd3ed7253b6cb9a77d5358226e267472a7",
+      "source_sha256": "92d5f7e150de4cf6a9d7219af43d09054b6664922fa69ccb6ea6f6e5ae42c2d5",
+      "bytes": 150362
+    },
+    "integration": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-stop-words-conflict/integration.json",
+      "wrapper_sha256": "30f4d56ed719bf3544806bdb229e64d33ade6f7c805ec3d22659be3a195d3e07",
+      "source_sha256": "06f9afb86c90232e8627ad127da68f3886d7fd3d32905781b9dfe2eaa5730494",
+      "bytes": 157358
+    },
+    "clock-change": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-stop-words-conflict/clock-change.json",
+      "wrapper_sha256": "7a5aa3ef3b18ef8bd91a623ecefc8c201c310911cae36f29d65946c8505fe666",
+      "source_sha256": "34c0d57cae3112abc32158d751d4b00b5a621498a35c692a87811f68741ebf52",
+      "bytes": 151139
+    },
+    "resolution": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-stop-words-conflict/resolution.json",
+      "wrapper_sha256": "478452e870f59de0374c4373071ff9f1eed635fc31654f48f86f876b05f6a62f",
+      "source_sha256": "991231270c7977dc47e16bd6c77c30b1c3a54feb49b6294afa1a97971ba956d7",
+      "bytes": 158135
+    }
+  },
+  "changed_per_file_authored_patch_ids": [
+    "lampOS/crates/voice/src/stop_words.rs"
+  ],
+  "other_eight_per_file_patch_ids_unchanged": true,
+  "resolution_scope": "Keep upstream ready stream and spare connections>=2. Keep explicitly owned600s fixture clock and fixture_now_us sample timestamps. Root must review the single range-diff context hunk before execution.",
+  "execution": false
+}

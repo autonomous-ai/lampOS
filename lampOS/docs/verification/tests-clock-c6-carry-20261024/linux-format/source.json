@@ -1,0 +1,24 @@
+{
+  "label": "3190-42cf24d5a",
+  "kind": "exact_git_commit",
+  "pr": 3190,
+  "source": {
+    "commit": "42cf24d5a965abbc386e61672b15a4591a338607",
+    "root_tree": "1c0e32d045a022fe2d3f7a8bd140e4f7e384e111",
+    "parents": [
+      "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46"
+    ],
+    "workspace_tree": "852faf33a859875f2bade3037d622ca3439cd22c"
+  },
+  "expected_parent": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+  "overlays": [],
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "platform": "linux/amd64",
+  "expected_lampOS_source_map_sha256": "21ea0cbf3fc5834e73446f38b663a86febf72bf207931e09fd53a3d58a000b8f",
+  "lampOS_expected_entries": 7008,
+  "status": "PREPARED ONLY. Exact committed42cf source via Git archive, no overlays. Root CPU grant required; no launch/build/test/target access during preparation.",
+  "archive_sha256": "4f84c269491b2d25b9e461fab20fb214c3dfc29b2f3a8bfec0477f73933ff11e",
+  "archive_bytes": 213452800,
+  "verified_source_entries": 7008,
+  "every_source_path_mode_bytes_matches_frozen_Git_source": true
+}

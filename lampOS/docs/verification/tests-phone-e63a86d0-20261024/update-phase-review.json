@@ -15,7 +15,7 @@
     "caller": "self_cuts.rs:314",
     "where": "First new current executable after the interrupted current-switch prefix and sequence==2",
     "expected": "new",
-    "elapsed_seconds": 2.002924,
+    "elapsed_seconds": 2.002924069,
     "final_status": "Ok(None)",
     "phase_limit": "After the intended prefix, before pending/confirm/put-back branches."
   },

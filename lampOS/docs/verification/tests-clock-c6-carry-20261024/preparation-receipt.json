@@ -1,0 +1,124 @@
+{
+  "prepared_utc": "2026-10-24T09:06:14.839568+00:00",
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "base": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+  "range_diff": "range-diff.txt",
+  "stable_patch_id": "49e3b652bc585646f3d3f09f703cd4dc97df50ea",
+  "previous_stable_patch_id": "9bef0ebf8b0767cfe82b40c9abf11f1ead7f3364",
+  "whole_patch_equal": false,
+  "manual_conflict_path": "lampOS/crates/voice/src/stop_words.rs",
+  "owned_files": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "previous_full_file_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "current_full_file_sha256": "fb92b87d93c26658c2dcd627c59acb31ed52f4d752521dd2a0f26d0a74f7e1bf",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "6481ddcf39be1f2d2cd75e47ddd4c99f3bade981",
+      "current_per_file_stable_patch_id": "6481ddcf39be1f2d2cd75e47ddd4c99f3bade981",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "previous_full_file_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "current_full_file_sha256": "c9c7647a8ac55de5c580e9de3d04b82ff041d61945c912c7bbfeb9242693cad1",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "936c83f3705f9a2a09d8cf32c0ef1d78a0f398bb",
+      "current_per_file_stable_patch_id": "936c83f3705f9a2a09d8cf32c0ef1d78a0f398bb",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs",
+      "previous_full_file_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "current_full_file_sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "46a4fc00291469eaa09cf6802bf232e92f4cd48c",
+      "current_per_file_stable_patch_id": "46a4fc00291469eaa09cf6802bf232e92f4cd48c",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs",
+      "previous_full_file_sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "current_full_file_sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "f0eeb44b6fae6eb9b8d0378b4081175a993832e5",
+      "current_per_file_stable_patch_id": "f0eeb44b6fae6eb9b8d0378b4081175a993832e5",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "previous_full_file_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "current_full_file_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "7c49c9fd034ec174216796551d4cbf2ed0af9861",
+      "current_per_file_stable_patch_id": "7c49c9fd034ec174216796551d4cbf2ed0af9861",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "previous_full_file_sha256": "735048e2d253c180a934370b5277fede0660c96e798b35f44dd20c5494d21e61",
+      "current_full_file_sha256": "735048e2d253c180a934370b5277fede0660c96e798b35f44dd20c5494d21e61",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "ebeb0ed01498cdac717b76b7a364147739c5bad6",
+      "current_per_file_stable_patch_id": "ebeb0ed01498cdac717b76b7a364147739c5bad6",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/crates/voice/src/stop_words.rs",
+      "previous_full_file_sha256": "34c0d57cae3112abc32158d751d4b00b5a621498a35c692a87811f68741ebf52",
+      "current_full_file_sha256": "991231270c7977dc47e16bd6c77c30b1c3a54feb49b6294afa1a97971ba956d7",
+      "full_file_unchanged": false,
+      "previous_per_file_stable_patch_id": "0e7d3a019b33965508cf1ec89273267d4b89ec57",
+      "current_per_file_stable_patch_id": "bc70e294cb8485cc1277cf9e57beda3b36e909de",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/fixture_provider.rs",
+      "previous_full_file_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "current_full_file_sha256": "ae45931f8af3b066b717c2dff920174bf98f4a5db58aebbc6f771562762af400",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "16830f3dd3c0cbf3415939e0c0e3a2194d5f39ad",
+      "current_per_file_stable_patch_id": "16830f3dd3c0cbf3415939e0c0e3a2194d5f39ad",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "previous_full_file_sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+      "current_full_file_sha256": "77388c4a7523c56e20e5cbe9406f721e52db4463be34482ff831b6a0dd884615",
+      "full_file_unchanged": true,
+      "previous_per_file_stable_patch_id": "e338daa2c14ce4687c047e8d8db1508665fc3077",
+      "current_per_file_stable_patch_id": "e338daa2c14ce4687c047e8d8db1508665fc3077",
+      "review_scope": "One stop_words readiness-context conflict, preserved upstream ready/spare predicate and owned fixture clock; root semantic review required."
+    }
+  ],
+  "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+  "source_map_sha256": "78193464ce9afa5a861cb7d6c3e3ae5e612201e9dedb07670cc307d8ab8f0e90",
+  "source_paths": 10363,
+  "lampos_paths": 7008,
+  "manifests": 47,
+  "dependency_graph_declarations": 165,
+  "packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "selected_cases": 88,
+  "helper_hashes": {
+    "run.py": "b4e5a28eff498140e959397e053a2ce1d268b58e897186d76a43f8393d0cc555",
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+  },
+  "helpers_copied_byte_identically_from_current_approved_3218": true,
+  "active_phone_plan_and_target_not_modified_or_inspected": true,
+  "Cargo_executed": false,
+  "target_access": false,
+  "format_container_tests_builds_push": false
+}

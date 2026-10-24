@@ -1,0 +1,26 @@
+{
+  "source_kind": "exact_git_commit",
+  "source": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "candidate_commit": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "declared_overlays": [],
+  "format_container_exit": 0,
+  "timed_out": false,
+  "container_elapsed_seconds": 15.508302221000122,
+  "timing_boundary": "Entire container command, including setup, extraction, source hashing and cargo fmt.",
+  "formatting_success": true,
+  "source_archive_unchanged": true,
+  "git_identity_unchanged": true,
+  "source_before_manifest_sha256": [
+    "3ee73aaf2c350bc6038fea098e1976585c35cc81675f97e0a4dee8727c8f8726"
+  ],
+  "source_after_manifest_sha256": [
+    "3ee73aaf2c350bc6038fea098e1976585c35cc81675f97e0a4dee8727c8f8726"
+  ],
+  "container_source_hashes_unchanged": true,
+  "container_absence_verified": true,
+  "compilation": false,
+  "tests": false,
+  "ARM_build": false,
+  "source_edits": false,
+  "evidence_directory": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/linux-format/run-20261024T091549.236610Z"
+}
