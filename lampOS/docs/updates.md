@@ -850,15 +850,30 @@ prefix. These are logical filesystem-prefix checks, not physical power-loss
 or fsync durability proof, and the stubs do not exercise the daemon's `exec`
 handover.
 
-Each stub still has a two-second exit-observation bound after spawn, with
-five-millisecond polls. A timeout reports the check number on its test
-thread, call site, executable path, expected old/new bytes' hash, PID and
-poll timings; a last nonblocking status read is diagnostic only and cannot
-turn the timeout into a pass.
-Failure cleanup records the kill and reap results. These details distinguish
-the repeated checks when one fails; they do not establish why the original
-Mac consumer run timed out (#1569/#3012), extend its bound, or qualify that
-failed run. Runtime updater code and recovery assertions are unchanged.
+The builtin-only stubs have a test-harness startup watchdog of five seconds
+from spawn's return to the first observed stdout byte. That byte starts one
+absolute two-second deadline for both successful exit and stdout EOF; later
+bytes do not renew it. This changes the fixture's old two-second-after-spawn
+boundary, not a product startup or recovery deadline. A single owner polls
+nonblocking stdout and child status at up to five-millisecond intervals; it
+does not wait for a complete line or block reading after the leader exits.
+The exact old/new payload (including its final newline), successful status,
+file bytes/mode, links and recovery records are still checked. Output beyond
+the former 128-byte capture bound fails explicitly; observed bytes, including
+invalid UTF-8, remain in failure diagnostics.
+
+Timeouts report the check number, caller, selected path, expected script hash,
+PID, startup/finish phase, captured bytes, EOF/status and poll timing. A final
+status read is diagnostic only and cannot clear a timeout. The caller retains
+the direct child and its original kill/reap cleanup, whose results are logged
+on failure. These byte-checked scripts create no descendants; they retain the
+outer runner's inherited process group. The collector starts no thread and
+cannot leave a reader join waiting on an open pipe. Separate controls own
+held descriptors explicitly and exercise delayed first output, partial/full
+output followed by a hang, held EOF, wrong or missing output, nonzero status
+and read errors. This harness change does not establish the cause of, or
+qualify, either historical failed Mac run (#1569/#3012). Runtime updater code
+and recovery assertions are unchanged.
 
 **Unclean process death at the write boundaries** (#2810). The separate
 Linux `self-process-cuts` test uses the same signed install/round fixture in
