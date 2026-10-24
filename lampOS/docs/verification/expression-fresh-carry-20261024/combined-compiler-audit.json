@@ -1,0 +1,11 @@
+{
+  "workspace_member_count": 46,
+  "all_workspace_first_records_fresh_false": true,
+  "vendored_local_path_count": 2,
+  "vendor_paths": [
+    "third_party/sonora",
+    "vendor/tough"
+  ],
+  "compiler_records": 372,
+  "earlier_audit_error": "Initial expected-count assertion grouped 46 workspace members and 2 vendored local-path crates together as 48. Classification corrected from Cargo metadata; no gate/source rerun."
+}

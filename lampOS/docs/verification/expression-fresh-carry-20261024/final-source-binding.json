@@ -1,0 +1,25 @@
+{
+  "head": "122f1233999bc8e4b01fa358df35423b4f394b65",
+  "base": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "diagnostic_preview": "9f1a0786bff0191885d1d32c5b0fcbacf5807449",
+  "differing_paths": [
+    "lampOS/crates/records/tests/support/release_pair/host.rs",
+    "lampOS/docs/verification/records-release-pair-20261024/README.md"
+  ],
+  "reverse_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "records_outside_reverse_closure": true,
+  "explanation": "Only unrelated Linux Records test support and its result README differ. All manifests, production/build sources, data and the 12-package test inputs match the frozen preview. Whole-tree equality is not claimed."
+}

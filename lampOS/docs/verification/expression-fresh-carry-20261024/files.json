@@ -1,19 +1,55 @@
 {
+  "final-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "combined-clippy.txt": {
+    "bytes": 353269,
+    "sha256": "2290704d94cc710010840755a87406b613aa75510023a845d0017590340ff984"
+  },
+  "combined-build.txt": {
+    "bytes": 371377,
+    "sha256": "805853457caed90de6d0618f506d6b01c7c68484f8410a1eadf98043aef1f3b9"
+  },
+  "combined-workspace-artifacts.json": {
+    "bytes": 391334,
+    "sha256": "084d2845da60344a5a64b25f4612cd283bb981983e3d91699da26352998eaee3"
+  },
   "focus-artifacts.json": {
     "bytes": 17658,
     "sha256": "1f1403d6b77ad39c2e2956c756b263fd8cd73e6f4658b5f5b77b9e02ee98471e"
+  },
+  "combined-compiler-audit.json": {
+    "bytes": 424,
+    "sha256": "81504d2d90b80eca75660162e5b5160dfac5469c04764dda5898300a160d5fd5"
   },
   "focus-clippy.json": {
     "bytes": 713,
     "sha256": "c1366b7bc8a37e410e8252375f6cf43957b21637aa5a10725c60ac4cbafc2007"
   },
+  "combined-tests.txt": {
+    "bytes": 445391,
+    "sha256": "9c750c6012da7233b8186bb8665cc7f9984bd9433e857e058b0d711b991b71aa"
+  },
+  "combined-gates.json": {
+    "bytes": 3162,
+    "sha256": "0e95ea4bb2a32b6996f084cf8dd1441bc164646be34c12a0bf550caf7e49c6f8"
+  },
   "assertion-tails.json": {
     "bytes": 509,
     "sha256": "24343ac4bf1098a395319f7ad98bbca84553a44080a5d377565641dfbeca5d8f"
   },
+  "combined-summary.json": {
+    "bytes": 3517,
+    "sha256": "8620e9758c477fd019368c5e0e7fdfd4f11ba58dc0bd45f0b551733d10e04228"
+  },
+  "final-source-binding.json": {
+    "bytes": 870,
+    "sha256": "8770175eb40afc227dbabfaccc5cc5ab66ca460e5fcce6efa472f62cfae47db4"
+  },
   "README.md": {
-    "bytes": 2125,
-    "sha256": "c01543d1beb464ae90b268facd11164367ca8dc6bf7e3b2ce7165f055277dd47"
+    "bytes": 4472,
+    "sha256": "f242cd044f587195826fd5d6b24b463e43efc71dd6e1beaf168ad9075ec43fbf"
   },
   "focus-gates.json": {
     "bytes": 1362,
@@ -24,6 +60,18 @@
     "sha256": "a53ef9f0862330f09e64a91feab793f8494c98429496737fcc28634b61cf1f87"
   },
   "focus-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "combined-source-after.json": {
+    "bytes": 1179336,
+    "sha256": "d1b3f6ea39c7803333ce9f76844e0ba589ea4beb3b82fec8e92418290be3006b"
+  },
+  "combined-source-before.json": {
+    "bytes": 1179336,
+    "sha256": "d1b3f6ea39c7803333ce9f76844e0ba589ea4beb3b82fec8e92418290be3006b"
+  },
+  "combined-fmt.txt": {
     "bytes": 0,
     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
