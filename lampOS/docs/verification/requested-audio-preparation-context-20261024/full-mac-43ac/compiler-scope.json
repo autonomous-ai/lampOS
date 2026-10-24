@@ -1,0 +1,77 @@
+{
+  "artifact_freshness": {
+    "clippy": {
+      "artifacts": 42,
+      "fresh_false": 41,
+      "cached_vendor_records": [
+        "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/third_party/sonora#0.2.0"
+      ]
+    },
+    "test-compile": {
+      "artifacts": 40,
+      "fresh_false": 39,
+      "cached_vendor_records": [
+        "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/third_party/sonora#0.2.0"
+      ]
+    }
+  },
+  "all_observed_workspace_artifacts_fresh": true,
+  "invalidated_package_names": [
+    "lamp-actions",
+    "lamp-audio",
+    "lamp-body",
+    "lamp-bus",
+    "lamp-camera",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-gemini",
+    "lamp-health",
+    "lamp-ipc",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-local-time",
+    "lamp-msgs",
+    "lamp-near-call",
+    "lamp-policy",
+    "lamp-ring",
+    "lamp-schedule",
+    "lamp-skills",
+    "lamp-tasks",
+    "lamp-turn-end-wire",
+    "lamp-turn-owner",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-processes"
+  ],
+  "invalidated_name_count": 26,
+  "observed_package_identities": [
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/actions#lamp-actions@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/audio#lamp-audio@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/body#lamp-body@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/bus#lamp-bus@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/camera#lamp-camera@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/controls#lamp-controls@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/ears#lamp-ears@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/expression#lamp-expression@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/gemini#lamp-gemini@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/health#lamp-health@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/ipc#lamp-ipc@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/keeper#lamp-keeper@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/lean#lamp-lean@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/local-time#lamp-local-time@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/msgs#lamp-msgs@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/near-call#lamp-near-call@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/ring#lamp-ring@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/schedule#lamp-schedule@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/tasks#lamp-tasks@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+    "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/third_party/sonora#0.2.0"
+  ],
+  "observed_identity_count": 25,
+  "distinction": "Invalidated package names are not a count of rebuilt members; artifacts include observed path packages (including vendor), with target-specific dependencies potentially uncompiled."
+}
