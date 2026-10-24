@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-clean-46-lamp-voice-processes"
+  ],
+  "elapsed_seconds": 0.1440509079984622,
+  "exit": 0,
+  "pid": 93477,
+  "process_group": 93477,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

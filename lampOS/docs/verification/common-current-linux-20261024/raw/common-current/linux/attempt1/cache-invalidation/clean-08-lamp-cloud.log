@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-common-current/crates/cloud#lamp-cloud@0.1.0` is ignored, cleaning all versions of `lamp-cloud` found
+warning: url qualifier in `-p path+file:///src-fourth-common-current/crates/cloud#lamp-cloud@0.1.0` ignored, cleaning all versions of `lamp-cloud` found
+     Removed 17 files, 72.5MiB total

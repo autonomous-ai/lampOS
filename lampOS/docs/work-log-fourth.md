@@ -8543,3 +8543,9 @@ Re-read closed #2540 and accepted receipt6331136109: the 22 Oct lamp-52e6 /403b4
 ## 2026-10-24: remaining owned product boundaries checked
 
 [Lean/local-judge static addendum](verification/lean-local-judge-product-contract-20261024/README.md) compares 14 unchanged source files across release 6592 and sampled current 22b. Lean is embedded in Body, not a separate daemon; local-judge/fitting tools are separate opt-in programs, not the product Policy executable. First retains Body/Policy units and physical/default acceptance. No source/model/unit/default change, inference, device or new test result. Current Common Linux has passed Voice 4,186 / 0 / 24 and Update 388 / 0 / 4; Mac Voice 4,125 / 0 / 21 passes while its remaining stages run.
+
+## 2026-10-24 21:04 +07: current Linux evidence published
+
+[Current carry778e Linux receipts](verification/common-current-linux-20261024/README.md) verify all eight stages0, 46/46 post-clean fresh local members, all five controls, stable source/index and cleanup/release. Eyes360/0/5, Voice4186/0/24, Update388/0/4, Skills519/0/9, Memory324/0/8. The separate same-builder source audit records no new concrete P1/P2 and two combined integration-test gaps; it is not an independent read. Mac remains active under its original bounds before the #3064 lease push.
+
+Current build-rows.md on22b scores the memory-quality row0.35 after today's owner test, down from0.45; my retained0.40 handoff/status was stale. The historical #2540 retention acceptance remains valid but cannot qualify the new recognition/private-context path or raise this current score. No activation, lamp action or failure waiver.

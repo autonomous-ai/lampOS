@@ -1,0 +1,250 @@
+{
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "current_linux_gate_verified": true,
+  "gates": [
+    {
+      "actual_compilation_members": 46,
+      "all_host_process_groups_and_owned_containers_cleaned": true,
+      "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "captured_output_hashes_are_stage_time_observations": true,
+      "compiler_bindings_independently_reparsed": true,
+      "controls": [
+        {
+          "expected_cargo_target": "unittests src/main.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/main.rs",
+              "name": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+              "status": "ok"
+            }
+          ],
+          "name": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+          "observed_once_passed": true
+        }
+      ],
+      "linux_only": true,
+      "manual_actual_release_cases": [],
+      "name": "common-current",
+      "no_current_target_binary_read": true,
+      "no_mac_stream_read_or_copy": true,
+      "not_full_acceptance": true,
+      "owned_paths": 36,
+      "source_files": 10453,
+      "source_guard_verified": true,
+      "source_tree_and_index_reconstructed": true,
+      "stages": [
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "f5f2025cdf0514cafd4d55aba04cf0f5c7ef08c73d4dd149ed6dbcc24e0f6e04",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "required_control_count": 0,
+          "stage": "fmt"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "706d32e8426a1c080b4760577a49419a14dcc8ce897b4fd7570b9377c6707fb8",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "10b43e2c2fc2b20dd4dd3ea183849b20e43a9a7ad7b2bc403f97342178a5523f",
+          "required_control_count": 0,
+          "stage": "clippy"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "fa0fe1052055ec9bf221eede19b3b0f5b14d09021c18caaa421a2263512cdc15",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "0787ed2c70e6e7edda1ee47c9f438ae2c5be5f77616067cd7d9f89dc5e63d698",
+          "required_control_count": 0,
+          "stage": "workspace-build"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 360
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "3e988576186f1f7a6b6f0c0d3d26cee6d8442bb38e47a11dd958b1a3613b4cd0",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 360
+          },
+          "raw_stdout_sha256": "d04c5269c93f3c0b1b4e7635a847afb9461a2c931a134b5d1d537553b290e656",
+          "required_control_count": 1,
+          "stage": "full-eyes"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4186
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "740df95fe591983bec5860133b4b4dfcf016a17f4ce6a088b8f1e041f87fddfc",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4186
+          },
+          "raw_stdout_sha256": "e71bf60fb604dac082f1a434959e8a397e1f7c9a9a98a43dc85f1bd26b6e05f5",
+          "required_control_count": 4,
+          "stage": "full-voice"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 4,
+            "passed": 388
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "8bcdb8ff7a0a5452baf9d691add9e286f5615fc46f793ad6ec7f9b57b01f4dbb",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 4,
+            "passed": 388
+          },
+          "raw_stdout_sha256": "40f8137c2aa7eab331eb8b029817cc83e2eae68797258807943125a428921a65",
+          "required_control_count": 0,
+          "stage": "full-update"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 9,
+            "passed": 519
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "4f3ea2be6e30ac1c4afd8e8fe90002b4b06bc2a75281d1c7a74edca7f85f215d",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 9,
+            "passed": 519
+          },
+          "raw_stdout_sha256": "648cb85f20309306d06deca41c3f6feae956543436cec79e7a0d52f24cb60a56",
+          "required_control_count": 0,
+          "stage": "full-skills"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 8,
+            "passed": 324
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "4a93a6c50c80e0576ca41dd2d2f3290999114c80916f38bb800c774a399059b8",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 8,
+            "passed": 324
+          },
+          "raw_stdout_sha256": "cbfbc94612154592801fd30449b2baf94a27ce8099ad1cb312e7583b369e7f43",
+          "required_control_count": 0,
+          "stage": "full-memory"
+        }
+      ],
+      "terminal_sha256": "41004331c90d1714e04cae06aac40bd4fdddbaf92aeaa61268151c55ac3fb477",
+      "tested_source_epoch": "778e51d10695f37e5d4e05250f9814ea022edf26 before any later final-documentation binding; old665d evidence remains separate",
+      "tree": "778e51d10695f37e5d4e05250f9814ea022edf26"
+    }
+  ],
+  "historical_failures_not_waived": true,
+  "mac_not_collected_while_incomplete": true,
+  "not_claimed": [
+    "current Mac qualification",
+    "new ARM64 qualification",
+    "lamp behavior",
+    "latency",
+    "readiness",
+    "product activation"
+  ],
+  "separate_from_prior_epochs": [
+    "665d44694def1048095deb236a27d9677dc084fa",
+    "198e6784abb22eb0377606388ccd76cdcc4e8d07"
+  ],
+  "tested_tree": "778e51d10695f37e5d4e05250f9814ea022edf26",
+  "verification_boundary": "Completed current Linux receipts independently reparsed. No current source worktree, target/cache, index, refs or source mtime read or changed. Captured compiler-output hashes/exists_after_stage are stage-time observations, not current binary rehashes."
+}

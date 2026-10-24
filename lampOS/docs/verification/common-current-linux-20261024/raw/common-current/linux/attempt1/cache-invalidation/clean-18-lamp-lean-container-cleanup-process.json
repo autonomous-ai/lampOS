@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-clean-18-lamp-lean"
+  ],
+  "elapsed_seconds": 0.14303734799977974,
+  "exit": 0,
+  "pid": 92066,
+  "process_group": 92066,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

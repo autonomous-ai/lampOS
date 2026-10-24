@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-full-eyes"
+  ],
+  "elapsed_seconds": 0.14676207099910243,
+  "exit": 0,
+  "pid": 18030,
+  "process_group": 18030,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

@@ -1,0 +1,11 @@
+# Current Common bounded self-audit
+
+Same-builder source audit of frozen staged tree `778e51d10695f37e5d4e05250f9814ea022edf26`, compared with base2e2 and the prior read-only merge onto22b. All inspected source bytes match the staged tree; no source/helper/index/ref/target/cache changes or execution occurred.
+
+No new concrete P1/P2 found in the inspected boundaries. Name and hits switches off do not install/disclose those optional additions. Private note/history and dispatch protection are intentionally unconditional safety policy; disabling Photo/enrollment/scoped-context does not grant personal reads. The unscoped path retains the actual request lease. Speaker proof requires current accepted audio as well as any carried interval, rejects missing/unknown/other/current-only mismatches, and retains the original audio-end deadline. Stop drops scopes and carried words; revocation disables old speaker/IO/output authority. Cached private material cannot be relabelled as Room or resurrected after observed loss. The repaired publisher key survives missing reads, keeping the one-frame/recovery trace closed without new waits or growing state.
+
+Two useful specific composition regressions are not represented by a single inspected test: both real name+hits callbacks under product-loaded flags with silent visible A/off-camera B all the way to captured cloud payload; and real reader transient-error/recovered-frame input through carried-current-piece Engine/cloud dispatch. Existing source checks and tests cover these pieces separately. Their absence is not a demonstrated bypass or readiness approval.
+
+The slow Update case `lamp_update_back_puts_back_an_unreadable_self_json` has no intentional sleep loop. Its60s is mtime backdating. `own::back` compares the600s policy deadline and returns `Back::Waiting` immediately for a still-running updater, then a failed-state call settles. Real install/round files, sync_all and cleanup remain possible blocking kernel boundaries. No cause is established, failed gate waived or timeout changed.
+
+`audit.json` gives exact source hashes and locations. This is not formal independent READ-OK, an executed gate, product activation approval or physical identity/original-capture/liveness proof. Root retains the running handles and original cap.

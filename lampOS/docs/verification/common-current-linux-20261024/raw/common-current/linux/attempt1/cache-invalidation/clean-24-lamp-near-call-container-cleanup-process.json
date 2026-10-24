@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-clean-24-lamp-near-call"
+  ],
+  "elapsed_seconds": 0.14914685600160738,
+  "exit": 0,
+  "pid": 92300,
+  "process_group": 92300,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

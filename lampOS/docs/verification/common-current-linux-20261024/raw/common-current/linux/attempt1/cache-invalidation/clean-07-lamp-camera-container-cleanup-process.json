@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-clean-07-lamp-camera"
+  ],
+  "elapsed_seconds": 0.1518884480028646,
+  "exit": 0,
+  "pid": 91535,
+  "process_group": 91535,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

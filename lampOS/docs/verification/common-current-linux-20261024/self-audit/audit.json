@@ -1,0 +1,94 @@
+{
+  "candidate_tree": "778e51d10695f37e5d4e05250f9814ea022edf26",
+  "active_base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "prior_moving_base_tip": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "same_builder_self_audit": true,
+  "formal_read_ok": false,
+  "actual_P1_P2_found": [],
+  "source_sha256": {
+    "lampOS/crates/voice/src/memory_scope.rs": {
+      "sha256": "9f44aff9a3e1ca4ad368f7fbe6338a7d6c6cc6a0593c8ddaccf9fcc11d6ff046",
+      "bytes": 105477,
+      "mode": 420,
+      "mtime_ns": 1792845955668787835,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/voice/src/speaking_faces.rs": {
+      "sha256": "d97a33d48c6895a05185ab9a034e2afef80762517835c827a1a8e5370c9bad58",
+      "bytes": 68265,
+      "mode": 420,
+      "mtime_ns": 1792845955679223480,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/voice/src/second_provider.rs": {
+      "sha256": "15f16008c0d0b959b0b9a471566756fa9cf2dda831c239db67369f31129171e5",
+      "bytes": 444412,
+      "mode": 420,
+      "mtime_ns": 1792845955671866999,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker.rs": {
+      "sha256": "631c1d6b5268ba641fee9f0ef7118872008c0ee4d224d5fbec14389dfac54f6b",
+      "bytes": 873986,
+      "mode": 420,
+      "mtime_ns": 1792845983813506516,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs": {
+      "sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+      "bytes": 24403,
+      "mode": 420,
+      "mtime_ns": 1792845955677913462,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs": {
+      "sha256": "a83705cf3c74400c670ee816c8464dc0b89adac3f3db99d89ff487c59c31af53",
+      "bytes": 17287,
+      "mode": 420,
+      "mtime_ns": 1792845955676087184,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs": {
+      "sha256": "32814a0a1961741a06dc1c6109bc9a6ab7cdfaa10a2c5120f9a34af473081f90",
+      "bytes": 9841,
+      "mode": 420,
+      "mtime_ns": 1792845955676397778,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/update/tests/round.rs": {
+      "sha256": "fb4d5b1a8d1c2b378168dd915b9922c4b195af723a4d13445610bb578ed83ff2",
+      "bytes": 179165,
+      "mode": 420,
+      "mtime_ns": 1792845943817005559,
+      "equals_candidate_tree": true
+    },
+    "lampOS/crates/update/src/own.rs": {
+      "sha256": "dd6f7a14c825f78360dc781e10441429a586db28430483bf2b526be1cc80eec7",
+      "bytes": 17226,
+      "mode": 420,
+      "mtime_ns": 1792845943809922217,
+      "equals_candidate_tree": true
+    }
+  },
+  "spot_checks": {
+    "switch_off": "FACE_NAME false returns empty; HITS disabled installs no remembered callback. Private note/history/output protection is unconditional safety policy, not authorized by Photo/enrollment or scoped-context flags. Unscoped lease_system still carries actual lease.",
+    "current_vs_carried": "Proof requires captured nonempty actual line, valid microphone read interval, equal inner/outer positive speaker, and independently matching current piece; original audio end anchors30s ceiling. Empty/unknown/current-other/carry-only controls inspected.",
+    "stop_privacy_forget_cache": "RequestScope revoke disables speaker scope and cancels enrollment. Engine stop_through drops scopes and carried/queued words. Camera generation revokes personal scope; privacy hook clears enrollment observations and note-ahead state; history disclosure remains permission gated rather than claiming physical cache erasure. Source generation/Lost state fail closed. Memory cache adoption/composition/read boundaries revalidate exact request/person; pending does not renew audio deadline.",
+    "dedup": "Same boot/sequence retained through None; duplicate recovered input ignored before Look insertion; consecutive empties500ms; new sequence immediate. Stop/forget resets remain unchanged."
+  },
+  "specific_not_single_tested_combinations": [
+    "One product-flags-loaded integration combining both actual FACE_NAME+MEMORY_HITS callbacks, silent visible A and admitted off-camera B, then captured cloud payload. Existing controls cover each component and real Engine name/no-speaker separately.",
+    "Real bus read error/recovery feeding the actual current-piece/carry Engine and cloud boundary. Current coverage combines reader source trace,3dedup unit controls and route duplicate/none controls separately."
+  ],
+  "update_test": {
+    "name": "lamp_update_back_puts_back_an_unreadable_self_json",
+    "test_location": "crates/update/tests/round.rs:4507",
+    "back_location": "crates/update/src/own.rs:402",
+    "deadline_seconds": 600,
+    "deadline_is_real_sleep": false,
+    "behavior": "spoil_pending backdatesmtime60s; back(active running) returnsWaiting directly; back(failed failed) settles without policy wait. Real synchronous filesystem/sync/temp cleanup remain outside a complete userspace per-test wall bound.",
+    "causal_waiver": false,
+    "timeout_changed": false
+  },
+  "actions": "Read-only source/previous-audit inspection and scratch audit output; no Cargo/compiler/test/process poll/post/commit/ref/index/cache/source change."
+}

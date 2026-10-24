@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-clean-14-lamp-gemini"
+  ],
+  "elapsed_seconds": 0.15017673799957265,
+  "exit": 0,
+  "pid": 92008,
+  "process_group": 92008,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-full-update"
+  ],
+  "elapsed_seconds": 0.1463862810014689,
+  "exit": 0,
+  "pid": 86362,
+  "process_group": 86362,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

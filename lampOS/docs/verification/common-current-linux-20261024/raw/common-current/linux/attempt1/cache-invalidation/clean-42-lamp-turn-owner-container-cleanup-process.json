@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-current-9b9860b142fb-clean-42-lamp-turn-owner"
+  ],
+  "elapsed_seconds": 0.14950509700065595,
+  "exit": 0,
+  "pid": 93434,
+  "process_group": 93434,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}
