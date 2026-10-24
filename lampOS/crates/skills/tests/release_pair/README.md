@@ -1,15 +1,16 @@
-# Published Skills daily and on/off continuity
+# Published Skills daily, on/off and rested-night continuity
 
-Four ignored integration cases execute the actual published Linux ARM64
+Six ignored integration cases execute the actual published Linux ARM64
 `lamp-skills` artifacts, in both 6408 → 6498 → 6408 and
 6498 → 6408 → 6498 directions. Today's Skills library is not used as either
 persisted-state reader or writer. The harness supplies synthetic manifests,
 local bus input, a clock-drain control, and private output traps.
 
-These cases do not cover `rested`, updater installation, package permissions,
-the full skill loader, physical output, clock synchronization, or power-loss
-durability. `rested` remains a separate follow-up. No passing result is claimed
-until the pinned native cases have executed.
+These cases do not cover updater installation, package permissions, the full
+skill loader, physical output, clock synchronization, or power-loss durability.
+The two rested-night cases add synthetic Expression receipts and a private
+Body datagram peer. No passing result is claimed until the pinned native
+cases have executed.
 
 ## Inputs and isolated execution
 
@@ -21,7 +22,7 @@ until the pinned native cases have executed.
 Set `LAMP_COMPAT_SKILLS_6408` and `LAMP_COMPAT_SKILLS_6498` to those artifacts.
 Set `LAMP_COMPAT_OUTPUT` to an existing short absolute directory, such as
 `/tmp/pair-output`, created with mode 0700. When omitted, the system temporary
-directory is used. Each case retains a unique `kr-*` directory on success or
+directory is used. Each case retains a unique `kr-*` or `kn-*` directory on success or
 failure; its mode, and its state directory's mode, are explicitly set to 0700.
 Use an isolated native Linux ARM64 runner with no network, credentials, device
 mounts, running lamp services, or capture/playback access:
@@ -79,11 +80,66 @@ The opposite helper reads and reverses both records, including restoring the
 shipped-disabled manifest. The returning original daemon and helper consume
 those changes and restore the initial record bytes.
 
-There are no providers, accounts, microphone inputs or actuator processes.
-The daemon inherits no environment: only the recorded fixture settings are
-passed. Gaze/mood datagram sockets and Actions/Say stream listeners are private
-traps; any attempted output fails the case. All optional feature switches
-remain absent. `daily.json` must be mode 0600. Neither case creates `rested`.
+In these four daily/on/off cases, gaze/mood datagram sockets and Actions/Say
+stream listeners are private traps; any attempted output fails the case.
+All optional feature switches remain absent. `daily.json` must be mode 0600.
+These four cases do not create `rested`.
+
+## Rested-night cases
+
+The other two cases keep one enabled synthetic core skill, `rested-check`,
+unchanged throughout A → B → A. Stable named triggers select separate rest,
+wake and cancel steps with `on = trigger`; both `skill.toml` and `SKILL.md`
+are byte-compared and SHA-256 recorded before and after every process. The
+fixture never substitutes a state file or definition between releases.
+
+One jointly derived fixed-offset pair places A near 23:30 on local day D,
+and B plus returning A near 00:30 on D+1. Both offsets must be permitted,
+and their dates and window margins are checked. The night daily window is
+23:00–00:00, the owned rest window is 23:00–01:00, and the morning daily
+window is 00:00–01:00. This changes each process's configured local offset,
+not host wall time. It tests a deterministic consecutive-day state mapping,
+not an elapsed physical night, timezone migration or synchronization.
+
+Only these cases set `LAMP_SKILL_ROUTINES=on`, with explicit
+`LAMP_SKILLS_ASK=skip`, a private daily file and a synthetic host clock ID.
+The public bus declarations carry fresh fake Voice resting and Expression
+state/receipt heartbeats; no Expression executable or body owner runs.
+
+The actual A process first sends two rest admissions. A stale receipt, then
+a fresh receipt naming the wrong episode, must each end in a real refused
+Done and Cancel with no `rested` file. A third admission receives the exact
+skill, Skills publisher/session, Expression publisher/session, episode,
+operation and request sequence. The fixture requires a successful Done,
+the exact persisted `rested-check D` line, and a real same-episode renewal
+before SIGKILL and reap. Failed admissions' daily claims are retained too.
+
+B reads the untouched night line. The same fake Expression publisher keeps
+the old A receipt fresh, but B must send no rest request. A successful
+non-daily Cancel probe proves its live manager has no resumed active lease.
+B's morning Wake must then send exactly one `{"gesture":"stretching"}`
+datagram to a private socket. A matching synthetic `body/gesture` Over is
+published only after that datagram, and the actual run must finish. B writes
+the morning daily claim while the original night line remains unchanged.
+
+Returning A reads both records in the same morning window. It must explicitly
+report that the day is already claimed, preserve exact state bytes, and send
+no stretch or rest request. The consumed watch's neutral reset is checked as
+one exact phase-specific Answered(false), not discarded. Finally a Cancel
+probe with stale Expression readiness must refuse; restoring a fresh owner
+must permit a new Cancel probe to finish without any rest request. These
+positive process barriers distinguish suppression from a dead worker.
+
+The zero clock skip drains earlier bus input only; it is not treated as a
+routine-admission or receipt-completion barrier. Actual requests, terminal
+events, file contents and renewal establish those boundaries. Raw schema-2
+daily bitmaps are checked for the exact trigger/day set at every cut.
+
+There are no providers, accounts, microphone inputs or actuator processes
+in any of these cases. Each daemon inherits no environment beyond its
+recorded fixture settings. Actions, Say and gaze remain forbidden; the one
+synthetic morning stretch is the only permitted mood datagram. A fake Over
+receipt proves process sequencing, never physical movement or completion.
 
 ## Retained evidence and limits
 
@@ -105,3 +161,12 @@ They prove compatibility of these exact released artifacts and states, not a
 guarantee for arbitrary future schemas. The unversioned `on` record is consumed
 here by the helper alongside `enabled`; updater preservation of it is outside
 this fixture.
+
+## Absolute reply deadline correction
+
+The shared clock/asked reply helper now uses one absolute deadline capped
+by the original case, step and two-second I/O budget. Each buffer read uses
+the remaining time; partial bytes cannot renew it. Ordinary complete and
+dribbling-peer controls execute on the host; dedicated ignored selection
+filters those two controls while retaining the six artifact cases. Earlier
+fast native passes remain historical evidence, not timeout qualification.

@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
     fs::{self, File, OpenOptions},
-    io::{self, BufRead, BufReader, Read, Write},
+    io::{self, Read, Write},
     os::{
         fd::OwnedFd,
         unix::{
@@ -24,6 +24,10 @@ const WITHIN: Duration = Duration::from_secs(15);
 const IO_WITHIN: Duration = Duration::from_secs(2);
 const PAUSE: Duration = Duration::from_millis(5);
 const MAX_LOG: u64 = 64 * 1024;
+
+#[path = "rested.rs"]
+mod rested;
+pub use rested::check as rested_night;
 
 #[derive(Clone, Copy)]
 pub enum Release {
@@ -532,13 +536,15 @@ impl Daemon {
     }
 
     fn barrier(&mut self, case: &mut Case) {
+        let until = case.within();
         self.process.alive(case.within(), "clock barrier");
         case.clock_unchanged();
         let mut stream = UnixStream::connect(&self.clock).unwrap();
         stream.set_read_timeout(Some(IO_WITHIN)).unwrap();
         stream.set_write_timeout(Some(IO_WITHIN)).unwrap();
+        let deadline = until.min(Instant::now() + IO_WITHIN);
         stream.write_all(b"{\"skip_us\":0}\n").unwrap();
-        let answer = read_answer(stream, 1024);
+        let answer = read_answer(stream, 1024, deadline);
         assert!(answer["now_us"].is_u64(), "{answer}");
         case.record(json!({"event":"drained_before_clock_barrier","stage":self.process.stage,"answer":answer}));
         self.traps.empty();
@@ -664,16 +670,9 @@ fn spawn_recorded(case: &mut Case, release: Release, stage: &str, command: Comma
     OwnedChild::spawn(case, release, stage, command)
 }
 
-fn read_answer(stream: UnixStream, most: u64) -> Value {
-    let mut line = String::new();
-    BufReader::new(stream.take(most + 1))
-        .read_line(&mut line)
-        .unwrap();
-    assert!(
-        line.ends_with('\n') && line.len() as u64 <= most,
-        "bounded complete reply: {line:?}"
-    );
-    serde_json::from_str(&line).unwrap()
+fn read_answer(mut stream: UnixStream, most: u64, deadline: Instant) -> Value {
+    let line = reply_bytes(&mut stream, most as usize, deadline).unwrap();
+    serde_json::from_slice(&line).unwrap()
 }
 
 fn trigger(name: &str, daily: bool) -> String {
@@ -787,6 +786,7 @@ pub fn daily(writer: Release, reader: Release) {
 }
 
 fn asked(case: &mut Case, release: Release, stage: &str, op: &str, name: &str) {
+    let until = case.within();
     case.clock_unchanged();
     let (mut parent, child) = UnixStream::pair().unwrap();
     parent.set_read_timeout(Some(IO_WITHIN)).unwrap();
@@ -800,9 +800,10 @@ fn asked(case: &mut Case, release: Release, stage: &str, op: &str, name: &str) {
         .stdout(Stdio::from(OwnedFd::from(child)));
     let mut child = spawn_recorded(case, release, stage, command);
     let request = json!({(op):name});
+    let deadline = until.min(Instant::now() + IO_WITHIN);
     writeln!(parent, "{request}").unwrap();
     parent.shutdown(std::net::Shutdown::Write).unwrap();
-    let answer = read_answer(parent, 4096);
+    let answer = read_answer(parent, 4096, deadline);
     json_file(&case.root.join(format!("{stage}.response.json")), &answer);
     case.record(json!({"event":"asked","stage":stage,"request":request,"answer":answer}));
     assert_eq!(answer, json!({"done":format!("turned {name} {op}")}));
@@ -862,4 +863,81 @@ pub fn on_off(writer: Release, reader: Release) {
     assert!(!case.root.join("state/daily.json").exists());
     assert!(!case.root.join("state/rested").exists());
     case.finish();
+}
+
+// Socket timeouts are per read. One deadline prevents partial bytes from
+// renewing the original I/O, step or case budget.
+fn remaining(deadline: Instant) -> io::Result<Duration> {
+    deadline
+        .checked_duration_since(Instant::now())
+        .filter(|d| !d.is_zero())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "absolute reply deadline"))
+}
+fn reply_bytes(stream: &mut UnixStream, most: usize, deadline: Instant) -> io::Result<Vec<u8>> {
+    let mut line = Vec::new();
+    loop {
+        stream.set_read_timeout(Some(remaining(deadline)?))?;
+        let mut chunk = [0; 1024];
+        let n = match stream.read(&mut chunk) {
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            other => other?,
+        };
+        remaining(deadline)?;
+        if n == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "incomplete reply",
+            ));
+        }
+        if let Some(end) = chunk[..n].iter().position(|b| *b == b'\n') {
+            line.extend_from_slice(&chunk[..=end]);
+            if line.len() > most {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "oversized reply",
+                ));
+            }
+            return Ok(line);
+        }
+        line.extend_from_slice(&chunk[..n]);
+        if line.len() >= most {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "oversized reply",
+            ));
+        }
+    }
+}
+#[test]
+fn complete_reply_finishes_inside_absolute_deadline() {
+    let (mut reader, mut peer) = UnixStream::pair().unwrap();
+    peer.write_all(b"{\"ok\":true}\n").unwrap();
+    let line = reply_bytes(&mut reader, 1024, Instant::now() + Duration::from_secs(1)).unwrap();
+    assert_eq!(line, b"{\"ok\":true}\n");
+}
+#[test]
+fn dribbling_reply_cannot_renew_absolute_deadline() {
+    let (mut reader, mut peer) = UnixStream::pair().unwrap();
+    peer.set_write_timeout(Some(Duration::from_millis(100)))
+        .unwrap();
+    let writer = std::thread::spawn(move || {
+        for _ in 0..100 {
+            if peer.write_all(b" ").is_err() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    });
+    let began = Instant::now();
+    let error = reply_bytes(&mut reader, 1024, began + Duration::from_millis(100)).unwrap_err();
+    assert!(matches!(
+        error.kind(),
+        io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+    ));
+    assert!(
+        began.elapsed() < Duration::from_millis(500),
+        "dribbling renewed the budget"
+    );
+    drop(reader);
+    writer.join().unwrap();
 }
