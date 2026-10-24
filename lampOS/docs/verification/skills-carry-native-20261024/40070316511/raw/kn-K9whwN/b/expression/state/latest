@@ -1,0 +1,2 @@
+{"topic":"expression/state","kind":"latest","enc":"json","type":"lamp_msgs/ExpressionState","source":"expression","boot":"046dc9ef7c24a907","seq":612,"at_us":7395347671,"at_unix_ms":1792823517800,"expires_ms":500}
+{"stamp":{"clock_id":"rested-release-pair-host","at_us":7395347671,"sequence":612},"enabled":true,"behaviours":[],"missing":[],"warnings":[],"body":false,"light":false}

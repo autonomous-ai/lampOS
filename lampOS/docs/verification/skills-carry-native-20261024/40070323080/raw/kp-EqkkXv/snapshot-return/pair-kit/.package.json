@@ -1,0 +1,25 @@
+{
+  "sha256": "12b21b29ead92562605f01403b24b31594915ffc7db40657a196491f3499126b",
+  "manifest": {
+    "format": 1,
+    "name": "pair-kit",
+    "version": "1.1.0",
+    "files": [
+      {
+        "path": "SKILL.md",
+        "size": 103,
+        "sha256": "fd43ac28d196a269fa546738877fd424a2afb11ef6ecce2cb0b931fa0a1ed18e"
+      },
+      {
+        "path": "notes.txt",
+        "size": 42,
+        "sha256": "f8d10af77f743e993f6248835ea3abf6afb11b82124f7e46f725efc8f83d2748"
+      },
+      {
+        "path": "skill.toml",
+        "size": 148,
+        "sha256": "50a5353e9360a02f7fd14f2fb2fc61013c18ee08255f5e4de743680977882267"
+      }
+    ]
+  }
+}

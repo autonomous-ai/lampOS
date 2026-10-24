@@ -1,0 +1,65 @@
+[
+  {
+    "directory": true,
+    "mode": 448,
+    "path": "."
+  },
+  {
+    "directory": true,
+    "mode": 493,
+    "path": "pair-kit"
+  },
+  {
+    "bytes": 644,
+    "mode": 420,
+    "path": "pair-kit/.package.json",
+    "sha256": "033c2dd6dbf62b99a6e31636023419712cf7743716577a3aa723f881a5c17534"
+  },
+  {
+    "bytes": 103,
+    "mode": 420,
+    "path": "pair-kit/SKILL.md",
+    "sha256": "fd43ac28d196a269fa546738877fd424a2afb11ef6ecce2cb0b931fa0a1ed18e"
+  },
+  {
+    "bytes": 42,
+    "mode": 420,
+    "path": "pair-kit/notes.txt",
+    "sha256": "5006ded3e01aa85742b8508a38000c1c2cac3b3046e26e22d71dcef3cd913a20"
+  },
+  {
+    "bytes": 148,
+    "mode": 420,
+    "path": "pair-kit/skill.toml",
+    "sha256": "08ae8470de393ee93b3e0867cda2d5c61e6d483cb87fc688989633ce415718b1"
+  },
+  {
+    "directory": true,
+    "mode": 493,
+    "path": "sleeping-kit"
+  },
+  {
+    "bytes": 648,
+    "mode": 420,
+    "path": "sleeping-kit/.package.json",
+    "sha256": "fe5bc63758fe47512a258f118c49d5d6b2748b4b397da04a2c7d54a0dbcd2411"
+  },
+  {
+    "bytes": 107,
+    "mode": 420,
+    "path": "sleeping-kit/SKILL.md",
+    "sha256": "d3c594606c844096493a84c6a405ebb171a3289b91558afbe8e0162d255e35e7"
+  },
+  {
+    "bytes": 46,
+    "mode": 420,
+    "path": "sleeping-kit/notes.txt",
+    "sha256": "4bfc2936105f62f0e4af00190e9911f0488567177e6a623fd11bcdf69320231b"
+  },
+  {
+    "bytes": 148,
+    "mode": 420,
+    "path": "sleeping-kit/skill.toml",
+    "sha256": "7b15567b6e09eb5cec79c465933866e0d47e7f37aa726f921de5bfc37e429a65"
+  }
+]

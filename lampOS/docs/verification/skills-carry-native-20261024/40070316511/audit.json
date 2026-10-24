@@ -1,0 +1,102 @@
+{
+  "run": 40070316511,
+  "head": "fe04835b00646227941f1ee73035bda59cf9342a",
+  "archive_sha256": "3f714d3c527873742c12664d7e44eff55d3d9a9fbfa6b8fce97bdb50585a066e",
+  "members": 382,
+  "source_files": 6992,
+  "source_matches_git": true,
+  "tested_merge": "12b5f208dd508724174011df7d9d546ee49ab37f",
+  "authored_head_parent_verified": true,
+  "case_counts": "6/0/0 ignored",
+  "cases": [
+    {
+      "folder": "kn-K9whwN",
+      "kind": "rested-night",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kn-hCkWkP",
+      "kind": "rested-night",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kr-3ZLusa",
+      "kind": "daily",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kr-6kbu3E",
+      "kind": "daily",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kr-Gfdqha",
+      "kind": "on-off",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 8,
+      "reaps": 8,
+      "exit_codes": {
+        "0": 6,
+        "None": 2
+      },
+      "signals": {
+        "None": 6,
+        "9": 2
+      }
+    },
+    {
+      "folder": "kr-gYK8EJ",
+      "kind": "on-off",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 8,
+      "reaps": 8,
+      "exit_codes": {
+        "0": 6,
+        "None": 2
+      },
+      "signals": {
+        "None": 6,
+        "9": 2
+      }
+    }
+  ],
+  "scope": "raw case inventory, source blob equality and matched direct-child exits; not independent replay of every domain assertion"
+}

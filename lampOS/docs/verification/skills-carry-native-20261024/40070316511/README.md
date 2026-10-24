@@ -1,0 +1,3 @@
+# Skills carry native evidence
+
+Run 40070316511, head `fe04835b00646227941f1ee73035bda59cf9342a`: dedicated **6 passed / 0 failed / 0 ignored**. All 6,992 source hashes match the tested CI merge Git blobs and stayed unchanged; its parent is the authored head. Six case inventories and matching child exits are in audit.json. Raw text files are byte-identical; binary archives and full source manifests are excluded with hashes. This audit checks retained receipts and source binding, without independently replaying every domain assertion. Ordinary ARM64 and Linux Clippy are separate gates. No physical output, updater or power-loss claim.
