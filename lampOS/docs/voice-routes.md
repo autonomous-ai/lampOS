@@ -449,8 +449,13 @@ The same path the person's own keys already use (`docs/own-keys.md`;
 3. **The helper checks** the route is in the registry and offered, and that
    its files and keys are there (the selftest's checks, called as a library),
    then writes one drop-in, `/etc/systemd/system/lamp-voice.service.d/route.conf`,
-   with `Environment=LAMP_VOICE_ROUTE=<route>` and that route's own switches,
-   and runs `daemon-reload`. A lamp's own drop-ins already outlive updates
+   with `Environment=LAMP_VOICE_ROUTE=<route>` and that route's own tier-3
+   switches only, and runs `daemon-reload`. The helper refuses any other
+   name, so `route.conf` can never carry a privacy switch (reviewer-three on
+   #3321). `route.conf` is in both reset plans
+   (`setup/fixtures/reset-plan-*.json`), as the own-keys folder is, so a
+   reset lamp never sends the next owner's lines to the provider the last
+   owner chose. A lamp's own drop-ins already outlive updates
    ("A lamp that needs a switch off says so in lamp-voice.service.d/",
    `deploy/product/lamp-voice.service:3`).
 4. **A quiet restart.** It waits for quiet as an update does (voice resting,
@@ -471,6 +476,11 @@ answers are slower), the face cache, which starts cold after a voice start
 `dropped`). Reminders, memory, the room file, mute state and skills are
 kept. The lamp's voice itself changes.
 
+**What a switch sends:** what is kept (memory, the thread file, the room
+file) is also what the new provider receives from its first turn. "What
+leaves the lamp" in `docs/service-privacy.md`, and the app's screen, say so
+before `voice.route.set` (reviewer-three on #3321).
+
 ### 2.6 The parity matrix and the bar for offering a route
 
 - **Make it from the code.** Each switch row in `docs/switches.md` gets a
@@ -481,14 +491,18 @@ kept. The lamp's voice itself changes.
 - **Tier 1, must have before the app lists a route:** privacy (only admitted
   lines leave the lamp; mute ends the session; generations honoured); stops
   and cut-ins within the coordinator's bounds; the attention rule and
-  `LAMP_SPOKEN_TO`; per-person memory scope and the forget paths; the Policy
+  `LAMP_SPOKEN_TO`; per-person memory scope **with the speaking face**, or
+  every turn the room's, and the forget paths (reviewer-three on #3321: on
+  the product these are one decision, `LAMP_SECOND_SCOPED_CONTEXT` beside
+  `LAMP_SECOND_SPEAKING_FACE`, and a route with scope but no speaking face
+  would keep a bystander's line as the known person's); the Policy
   gate; the tools (light, volume, schedule, memory, tasks, skills, the time);
   reminders, task news and the say service's written turns; looks; requested
   audio; the offline line and `lamp/online`; texts from the app (through the
   shared text brain); the first-audio events for the A/B; a selftest check.
 - **Tier 2, should have:** the wait cue or the route's own sign it heard; the
-  down line; early words; holding answers; said-as-heard; the speaking face;
-  skill looks and the look walk.
+  down line; early words; holding answers; said-as-heard; skill looks and
+  the look walk.
 - **Tier 3, the route's own:** provider and speed switches.
 - **The proof:** the played tests (`pauses.sh`, `plain.sh`, `busy.sh`,
   `hold.sh`, `stories.sh`, `checks.sh`) and real people's lines, each route
@@ -496,8 +510,9 @@ kept. The lamp's voice itself changes.
   per hour of use. A route below the cascade on answered lines is not offered.
 
 Today `gemini-live` misses tier 1 on per-person context (only through
-`LAMP_LIVE_SCOPED_SESSION`, never run) and texts (only with the cascade
-standing by).
+`LAMP_LIVE_SCOPED_SESSION`, never run), on the speaking face (a switch to
+`gemini` quietly loses `LAMP_SECOND_SPEAKING_FACE`), and on texts (only with
+the cascade standing by).
 
 ### 2.7 Phases
 
