@@ -1,0 +1,48 @@
+{
+  "head": "8b1c91dffbd98128feaa5818bece5c8c83e5a109",
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "initially_empty_target": true,
+  "target": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6",
+  "before": {
+    "lampOS/crates/expression/tests/runtime.rs": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+    "lampOS/docs/expression.md": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.577,
+      "log": "/private/tmp/third-expression-carry-focus-fmt.txt"
+    },
+    {
+      "name": "expression",
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-expression",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 48.462,
+      "log": "/private/tmp/third-expression-carry-focus-expression.txt"
+    }
+  ],
+  "complete": true,
+  "after": {
+    "lampOS/crates/expression/tests/runtime.rs": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+    "lampOS/docs/expression.md": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+  }
+}

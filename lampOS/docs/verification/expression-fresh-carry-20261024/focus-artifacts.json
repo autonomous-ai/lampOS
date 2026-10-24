@@ -1,0 +1,555 @@
+[
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/local-time#lamp-local-time@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/local-time/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_local_time",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/local-time/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_local_time-65a349301943f6bf.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_local_time-65a349301943f6bf.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/ipc#lamp-ipc@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/ipc/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_ipc",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/ipc/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_ipc-35169ada1be49630.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_ipc-35169ada1be49630.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/turn-owner/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_turn_owner",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/turn-owner/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_turn_owner-4e8192b982ce99ba.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_turn_owner-4e8192b982ce99ba.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/bus#lamp-bus@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/bus/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_bus",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/bus/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_bus-8d0165f0ddd9c2ba.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_bus-8d0165f0ddd9c2ba.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/lean#lamp-lean@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/lean/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_lean",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/lean/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_lean-52670de8f912077b.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_lean-52670de8f912077b.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/msgs#lamp-msgs@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/msgs/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_msgs",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/msgs/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_msgs-80f53b9c6d09cd9a.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_msgs-80f53b9c6d09cd9a.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/keeper#lamp-keeper@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/keeper/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_keeper",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/keeper/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_keeper-cf1fa984ac52b82c.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_keeper-cf1fa984ac52b82c.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_body",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/body/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_body-2aff5fd4b938293c.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_body-2aff5fd4b938293c.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_expression",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_expression-2913822613a5ac53.rlib",
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/liblamp_expression-2913822613a5ac53.rmeta"
+    ],
+    "executable": null,
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-expression",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/lamp_expression-8b6e911019d478d6"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/lamp_expression-8b6e911019d478d6",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_expression",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/lamp_expression-98cf8934904a8077"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/lamp_expression-98cf8934904a8077",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "replay_cost",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/examples/replay_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/examples/replay_cost"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/examples/replay_cost",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "rest_cost",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/examples/rest_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/examples/rest_cost"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/examples/rest_cost",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "recent_playout_cost",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/examples/recent_playout_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/examples/recent_playout_cost"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/examples/recent_playout_cost",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "runtime",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/tests/runtime.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/runtime-4128ad189403a8f0"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/runtime-4128ad189403a8f0",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-expression",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/lamp-expression"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/lamp-expression",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-expression-fresh-setup/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/private/tmp/third-expression-fresh-setup/lampOS/crates/expression/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/it-200e45b1e2a11a8f"
+    ],
+    "executable": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6/debug/deps/it-200e45b1e2a11a8f",
+    "fresh": false
+  }
+]

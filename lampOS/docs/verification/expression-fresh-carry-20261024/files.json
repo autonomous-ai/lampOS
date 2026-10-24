@@ -1,0 +1,38 @@
+{
+  "focus-artifacts.json": {
+    "bytes": 17658,
+    "sha256": "1f1403d6b77ad39c2e2956c756b263fd8cd73e6f4658b5f5b77b9e02ee98471e"
+  },
+  "focus-clippy.json": {
+    "bytes": 713,
+    "sha256": "c1366b7bc8a37e410e8252375f6cf43957b21637aa5a10725c60ac4cbafc2007"
+  },
+  "assertion-tails.json": {
+    "bytes": 509,
+    "sha256": "24343ac4bf1098a395319f7ad98bbca84553a44080a5d377565641dfbeca5d8f"
+  },
+  "README.md": {
+    "bytes": 2125,
+    "sha256": "c01543d1beb464ae90b268facd11164367ca8dc6bf7e3b2ce7165f055277dd47"
+  },
+  "focus-gates.json": {
+    "bytes": 1362,
+    "sha256": "331da6f72c9cf5891a2c33cf59ca9d7b305cf7889338409f5c3de2dc39b434cb"
+  },
+  "focus-expression.txt": {
+    "bytes": 55717,
+    "sha256": "a53ef9f0862330f09e64a91feab793f8494c98429496737fcc28634b61cf1f87"
+  },
+  "focus-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "range-diff.txt": {
+    "bytes": 90,
+    "sha256": "6253fb85683e40eb066d37642b4c882e3255345ae80c5759bd67115948e319a4"
+  },
+  "focus-clippy.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

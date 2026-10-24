@@ -1,0 +1,26 @@
+{
+  "head": "8b1c91dffbd98128feaa5818bece5c8c83e5a109",
+  "argv": [
+    "cargo",
+    "clippy",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-expression",
+    "--all-targets",
+    "--message-format=short",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "target": "/private/tmp/third-expression-carry-focus-target-_b4wg6o6",
+  "exit": 0,
+  "seconds": 15.079,
+  "log": "/private/tmp/third-expression-carry-focus-clippy.txt",
+  "same_exclusive_checkout": true,
+  "source_hashes": {
+    "lampOS/crates/expression/tests/runtime.rs": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+    "lampOS/docs/expression.md": "3a430011794fb6fd1768a92beca373c4c8276d1273a0bc69a20b2c385d623bc8"
+  }
+}

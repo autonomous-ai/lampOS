@@ -1,0 +1,14 @@
+[
+  {
+    "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+    "assertion_tail_bytes": 1055,
+    "sha256": "ba0d69bdab5bcd3852a5507b573cd0b5057003b71c69c7210ce6e94fac0ad687",
+    "historical_authored_tail_equal": true
+  },
+  {
+    "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "assertion_tail_bytes": 274,
+    "sha256": "b246c67211cbd81ae29e60b187e6982762b847ffad9f9e8d73f5eb656b741798",
+    "historical_authored_tail_equal": true
+  }
+]
