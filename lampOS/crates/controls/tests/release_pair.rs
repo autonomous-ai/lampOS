@@ -5,6 +5,7 @@ mod fixture;
 
 #[test]
 fn current_cli_exercises_the_controls_pair_fixture() {
+    fixture::timeout_control();
     fixture::run(
         false,
         false,

@@ -1,6 +1,6 @@
 use rustix::{
     io::Errno,
-    process::{Pid, Signal, kill_process_group, test_kill_process_group},
+    process::{Pid, Signal, WaitOptions, kill_process_group, test_kill_process_group, waitpid},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -157,6 +157,122 @@ impl Drop for Owned {
             json!({"pid":self.child.id(),"reaped":reaped,"group_absent":self.absent()}).to_string(),
         );
     }
+}
+
+// The probe must clean up even when the guard under test regresses. This
+// independent fallback never changes the primary receipt or makes it pass.
+struct ProbeCleanup {
+    group: Pid,
+    receipt: PathBuf,
+    armed: bool,
+}
+impl Drop for ProbeCleanup {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        if test_kill_process_group(self.group) != Err(Errno::SRCH) {
+            let _ = kill_process_group(self.group, Signal::KILL);
+        }
+        let until = Instant::now() + STEP;
+        let mut reaped = false;
+        loop {
+            reaped |= match waitpid(Some(self.group), WaitOptions::NOHANG) {
+                Ok(Some(_)) => true,
+                Err(error) if error == Errno::CHILD => true,
+                _ => false,
+            };
+            let absent = test_kill_process_group(self.group) == Err(Errno::SRCH);
+            if (reaped && absent) || Instant::now() >= until {
+                let _ = fs::write(
+                    &self.receipt,
+                    json!({"reaped":reaped,"group_absent":absent}).to_string(),
+                );
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+}
+
+/// Ordinary fixture control only; never part of an actual released-pair case.
+pub fn timeout_control() {
+    let root = (0..100)
+        .find_map(|_| {
+            let path = std::env::temp_dir().join(format!(
+                "controls-timeout-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            match fs::DirBuilder::new().mode(0o700).create(&path) {
+                Ok(()) => Some(path),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => None,
+                Err(error) => panic!("cannot create timeout fixture: {error}"),
+            }
+        })
+        .expect("exclusive timeout fixture");
+    println!("Controls timeout evidence: {}", root.display());
+    let child = Command::new("/bin/sleep")
+        .arg("60")
+        .env_clear()
+        .current_dir(&root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .unwrap();
+    let mut owned = Owned {
+        child,
+        cleanup: root.join("primary.json"),
+        done: false,
+    };
+    let group = owned.group().expect("positive owned child process group");
+    let mut fallback = ProbeCleanup {
+        group,
+        receipt: root.join("fallback.json"),
+        armed: true,
+    };
+    let pid = owned.child.id();
+    write(
+        &root.join("started.json"),
+        &serde_json::to_vec_pretty(&json!({
+            "pid":pid,"program":"/bin/sleep","argv":["60"],"environment":{},"deadline_ms":25
+        }))
+        .unwrap(),
+    );
+    let began = Instant::now();
+    let error = owned
+        .wait(began + Duration::from_millis(25))
+        .expect_err("hanging child must time out");
+    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+    assert!(!owned.done);
+    assert!(
+        owned.child.try_wait().unwrap().is_none(),
+        "helper still runs at the deadline"
+    );
+    drop(owned);
+    let primary: Value =
+        serde_json::from_slice(&read(&root.join("primary.json"), MAX_FILE)).unwrap();
+    assert_eq!(primary["pid"], pid);
+    assert_eq!(primary["reaped"], true);
+    assert_eq!(primary["group_absent"], true);
+    assert_eq!(test_kill_process_group(group), Err(Errno::SRCH));
+    assert!(
+        matches!(waitpid(Some(group), WaitOptions::NOHANG), Err(error) if error == Errno::CHILD),
+        "the primary guard already reaped its child"
+    );
+    fallback.armed = false;
+    write(
+        &root.join("result.json"),
+        &serde_json::to_vec_pretty(&json!({
+            "result":"passed","pid":pid,"timed_out":true,"running_at_deadline":true,
+            "reaped":true,"group_absent":true,"already_reaped_independently_checked":true,
+            "elapsed_us":began.elapsed().as_micros(),"actual_released_pair":false,
+            "hardware_or_device_acceptance":false
+        }))
+        .unwrap(),
+    );
 }
 
 struct Binary {

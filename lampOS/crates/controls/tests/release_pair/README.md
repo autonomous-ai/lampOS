@@ -6,6 +6,15 @@ The ordinary test uses the current native CLI to test the fixture itself;
 it does not qualify a released pair. The two ignored tests require native
 Linux ARM64 and explicitly supplied, hash-pinned released executables.
 
+The ordinary test first runs one separate hanging-child control: a 60 s `/bin/sleep` helper remains alive when the original 25 ms deadline expires. Dropping the
+existing guard must kill and reap it, with its group absent and `waitpid`
+independently reporting no waitable child. A separate bounded fallback
+cleans up if that assertion fails; it cannot alter the primary receipt or
+make the test pass. This helper adds no child to either actual-release case,
+whose 18-command receipts and two-case/one-filtered selection stay unchanged.
+It tests one direct child, not descendant adoption, kernel hard deadlines
+or a live output-file quota. Its streams are discarded.
+
 Each case owns a private directory and executes 18 bounded commands. One
 release calibrates three synthetic electrodes into a new pins file. Both
 readers replay it; the opposite release recalibrates that file, both readers
