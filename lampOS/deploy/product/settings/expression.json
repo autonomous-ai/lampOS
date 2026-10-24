@@ -5,7 +5,7 @@
     "shoulder": 0.025,
     "elbow": 0.025,
     "head_roll": 0.065,
-    "head_pitch": 0.085
+    "head_pitch": 0.13
   },
   "postures": {
     "resting": {
@@ -20,21 +20,21 @@
       "shoulder": 0.0,
       "elbow": 0.0,
       "head_roll": 0.02,
-      "head_pitch": -0.025
+      "head_pitch": -0.05
     },
     "thinking": {
       "base_yaw": 0.0,
       "shoulder": 0.0,
       "elbow": 0.0,
       "head_roll": 0.02,
-      "head_pitch": -0.025
+      "head_pitch": -0.12
     },
     "speaking": {
       "base_yaw": 0.0,
       "shoulder": 0.0,
       "elbow": 0.0,
       "head_roll": 0.0,
-      "head_pitch": -0.015
+      "head_pitch": -0.04
     }
   },
   "face_levels": {
@@ -454,9 +454,9 @@
       "shoulder": 0.0,
       "elbow": 0.0,
       "head_roll": 0.0,
-      "head_pitch": 0.035
+      "head_pitch": 0.075
     },
-    "nod_us": 360000,
+    "nod_us": 450000,
     "nod_gap_us": 900000,
     "stress_level": 0.35,
     "stress_rise": 1.5,
