@@ -1,0 +1,119 @@
+[
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "."
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "disabled"
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "disabled/sleeping-kit"
+  },
+  {
+    "bytes": 107,
+    "mode": 292,
+    "path": "disabled/sleeping-kit/SKILL.md",
+    "sha256": "d3c594606c844096493a84c6a405ebb171a3289b91558afbe8e0162d255e35e7"
+  },
+  {
+    "bytes": 46,
+    "mode": 292,
+    "path": "disabled/sleeping-kit/notes.txt",
+    "sha256": "4bfc2936105f62f0e4af00190e9911f0488567177e6a623fd11bcdf69320231b"
+  },
+  {
+    "bytes": 148,
+    "mode": 292,
+    "path": "disabled/sleeping-kit/skill.toml",
+    "sha256": "7b15567b6e09eb5cec79c465933866e0d47e7f37aa726f921de5bfc37e429a65"
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "duplicate"
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "duplicate/duplicate-kit"
+  },
+  {
+    "bytes": 108,
+    "mode": 292,
+    "path": "duplicate/duplicate-kit/SKILL.md",
+    "sha256": "f7b9e0587b3b84b34c737f68d49d57329ebf5db620f79f19e68099da17bd6383"
+  },
+  {
+    "bytes": 47,
+    "mode": 292,
+    "path": "duplicate/duplicate-kit/notes.txt",
+    "sha256": "56079d8c8ad096e45dbd9a3609a574354ef49df7e257aa5f115ccc8a22ab0236"
+  },
+  {
+    "bytes": 147,
+    "mode": 292,
+    "path": "duplicate/duplicate-kit/skill.toml",
+    "sha256": "77565443e4f01b606fed80787eed4e41caaa66fdc0451dfe231b391a83c62757"
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "v1"
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "v1/pair-kit"
+  },
+  {
+    "bytes": 103,
+    "mode": 292,
+    "path": "v1/pair-kit/SKILL.md",
+    "sha256": "fd43ac28d196a269fa546738877fd424a2afb11ef6ecce2cb0b931fa0a1ed18e"
+  },
+  {
+    "bytes": 42,
+    "mode": 292,
+    "path": "v1/pair-kit/notes.txt",
+    "sha256": "5006ded3e01aa85742b8508a38000c1c2cac3b3046e26e22d71dcef3cd913a20"
+  },
+  {
+    "bytes": 148,
+    "mode": 292,
+    "path": "v1/pair-kit/skill.toml",
+    "sha256": "08ae8470de393ee93b3e0867cda2d5c61e6d483cb87fc688989633ce415718b1"
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "v2"
+  },
+  {
+    "directory": true,
+    "mode": 365,
+    "path": "v2/pair-kit"
+  },
+  {
+    "bytes": 103,
+    "mode": 292,
+    "path": "v2/pair-kit/SKILL.md",
+    "sha256": "fd43ac28d196a269fa546738877fd424a2afb11ef6ecce2cb0b931fa0a1ed18e"
+  },
+  {
+    "bytes": 42,
+    "mode": 292,
+    "path": "v2/pair-kit/notes.txt",
+    "sha256": "f8d10af77f743e993f6248835ea3abf6afb11b82124f7e46f725efc8f83d2748"
+  },
+  {
+    "bytes": 148,
+    "mode": 292,
+    "path": "v2/pair-kit/skill.toml",
+    "sha256": "50a5353e9360a02f7fd14f2fb2fc61013c18ee08255f5e4de743680977882267"
+  }
+]

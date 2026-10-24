@@ -1,0 +1,10 @@
+{
+  "run": 40073299525,
+  "artifact_id": 12552401599,
+  "artifact_name": "lampos-routine-state-pair-4f44e25b49dfec41d93454f95d5d5fc70696ebad",
+  "zip_bytes": 667777,
+  "api_digest": "sha256:2a3280326f5053ea9bde4b86b5e81c54cea6dbc15251d94bdd111ca3d2a5639d",
+  "download_sha256": "2a3280326f5053ea9bde4b86b5e81c54cea6dbc15251d94bdd111ca3d2a5639d",
+  "tar_sha256": "72e7dda00af9d1268579f64c00a3cec5f433d23a363a19ae43e5a048417110f7",
+  "download_matches_api_and_gh_archive": true
+}

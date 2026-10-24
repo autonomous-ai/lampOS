@@ -1,0 +1,110 @@
+[
+  {
+    "file": "rested/result.json",
+    "original_sha256": "6a3481003a65550983f3d6e8932deb703aeb62c641e9a09814fcbea9851c7bc6",
+    "published_sha256": "d2833c3c550a0b694eedc1a64e97abc46ae71fd6fc824fb5ff47ee43d7aa932c",
+    "private_home_replacements": 3
+  },
+  {
+    "file": "rested/fmt.txt",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "rested/clippy.txt",
+    "original_sha256": "83b33d8b5a4649c23117f5c66050febdf2ab4fd0f00b116c23a1084f18276d68",
+    "published_sha256": "83b33d8b5a4649c23117f5c66050febdf2ab4fd0f00b116c23a1084f18276d68",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "rested/tests.txt",
+    "original_sha256": "5ed33e9470f4998f4b86d3b24ee1cdd2ca7d39a163a249390040db23f8a29bfd",
+    "published_sha256": "546e3632a504d8be84adaade85b4bdbbbc104fb746854b995077baad1786eda8",
+    "private_home_replacements": 5
+  },
+  {
+    "file": "rested/source-before.json",
+    "original_sha256": "2a1f6076c18a32605776554e73f86e140c8b42e7307b00dcc73548cbc0cc104d",
+    "published_sha256": "2a1f6076c18a32605776554e73f86e140c8b42e7307b00dcc73548cbc0cc104d",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "rested/source-after.json",
+    "original_sha256": "2a1f6076c18a32605776554e73f86e140c8b42e7307b00dcc73548cbc0cc104d",
+    "published_sha256": "2a1f6076c18a32605776554e73f86e140c8b42e7307b00dcc73548cbc0cc104d",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "rested/linux-linux-fmt-current.json",
+    "original_sha256": "4cba13d1dc42b8d7a168dc3879a38457335f9b0bbbf1340247f9ae83cff316c8",
+    "published_sha256": "4cba13d1dc42b8d7a168dc3879a38457335f9b0bbbf1340247f9ae83cff316c8",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "rested/linux-linux-fmt-current.txt",
+    "original_sha256": "e15b1df727114576724bd8e82a4aead935c9c0325ebb8f8991d72dfa338ef8d0",
+    "published_sha256": "e15b1df727114576724bd8e82a4aead935c9c0325ebb8f8991d72dfa338ef8d0",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "rested/linux-linux-fmt-current-cleanup.json",
+    "original_sha256": "9c1ebb7afe3a8cfbd99c200e6d86efe8d4178a4b0c4a634d8adcd42ae24989f4",
+    "published_sha256": "9c1ebb7afe3a8cfbd99c200e6d86efe8d4178a4b0c4a634d8adcd42ae24989f4",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "package/result.json",
+    "original_sha256": "34e89106afd888139e1db679c91b4684f3c64ef6ec90f7e05af17ac58369586a",
+    "published_sha256": "8b301d493014aaf1772ea6e88decf23e48eeee3f853463c3bbed919e1256dea8",
+    "private_home_replacements": 3
+  },
+  {
+    "file": "package/fmt.txt",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "package/clippy.txt",
+    "original_sha256": "19d092127478a095c87154f890ae21bd85249572238733b8073f327ca953e1aa",
+    "published_sha256": "19d092127478a095c87154f890ae21bd85249572238733b8073f327ca953e1aa",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "package/tests.txt",
+    "original_sha256": "b33a5c164211aeed623b4590d733ffb9cfced459ddb13ece324d3f91d7ac02d7",
+    "published_sha256": "731a48c4ece85b3a762943113c925e13530b0d548bdc4fcaa2e57f6a3eb19be9",
+    "private_home_replacements": 5
+  },
+  {
+    "file": "package/source-before.json",
+    "original_sha256": "12dfd70729e3eef6fa87d52ba7d473cc90faadbfdd321894bb94be6e139774aa",
+    "published_sha256": "12dfd70729e3eef6fa87d52ba7d473cc90faadbfdd321894bb94be6e139774aa",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "package/source-after.json",
+    "original_sha256": "12dfd70729e3eef6fa87d52ba7d473cc90faadbfdd321894bb94be6e139774aa",
+    "published_sha256": "12dfd70729e3eef6fa87d52ba7d473cc90faadbfdd321894bb94be6e139774aa",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "package/linux-linux-fmt-current.json",
+    "original_sha256": "bcf8374c32021258533b6c8ca368a70ddc187ef2edb1e015c7d83f5ec03b749a",
+    "published_sha256": "bcf8374c32021258533b6c8ca368a70ddc187ef2edb1e015c7d83f5ec03b749a",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "package/linux-linux-fmt-current.txt",
+    "original_sha256": "c04c57b4c28ad5c9b2a232984a6e148b35efc8eb636035d633cb1981b781af36",
+    "published_sha256": "c04c57b4c28ad5c9b2a232984a6e148b35efc8eb636035d633cb1981b781af36",
+    "private_home_replacements": 0
+  },
+  {
+    "file": "package/linux-linux-fmt-current-cleanup.json",
+    "original_sha256": "9e75c4baac4ad10dc9ee68b6e75b66e356729f6a1697e659303dfe45f0adafeb",
+    "published_sha256": "9e75c4baac4ad10dc9ee68b6e75b66e356729f6a1697e659303dfe45f0adafeb",
+    "private_home_replacements": 0
+  }
+]

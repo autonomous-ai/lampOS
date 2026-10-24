@@ -1,0 +1,7 @@
+{
+  "code": 1,
+  "event": "reaped",
+  "pid": 10063,
+  "signal": null,
+  "stage": "negative-reader-1"
+}

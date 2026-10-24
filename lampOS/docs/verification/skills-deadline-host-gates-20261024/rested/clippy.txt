@@ -1,0 +1,2 @@
+    Checking lamp-skills v0.1.0 (/private/tmp/second-routine-rested-release-pair-20261024/lampOS/crates/skills)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.47s

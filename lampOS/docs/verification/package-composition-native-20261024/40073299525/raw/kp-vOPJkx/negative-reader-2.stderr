@@ -1,0 +1,1 @@
+lamp-skills: not installed: negative/provenance.tar: ".package.json": a skill's paths are at most 4 parts of letters, digits, -, _ and ., none beginning with a dot
