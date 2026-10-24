@@ -1,0 +1,7 @@
+# Common: reused-target Memory artifact mismatch
+
+The first recovered Linux run completed all eight stages but failed Memory **313 passed / 11 failed / 6 ignored**. Its current source includes the speakers schema; both cached Memory libraries lacked that SQL literal and came from earlier builds. Source files were older than cached outputs, and Cargo's package path identity was shared across worktrees. The full source map alone did not prove that Cargo recompiled the library.
+
+After exclusively reacquiring the released target, Root removed only generated `lamp-memory` package outputs, rebuilt and reran unchanged source: **324 passed / 0 failed / 6 ignored**. The rebuilt library now includes the speakers schema. Before/after artifact hashes, commands, source guards, raw output and container/process cleanup are retained here. No runtime, test, assertion, source mtime or permission changed. This diagnoses stale generated artifacts for those eleven failures; it does not explain the nine Mac Voice failures.
+
+Common was never marked ready from these partial passes. All earlier failures remain recorded. The next qualifying run will invalidate every local workspace package's generated outputs at a source switch, preserve third-party dependency caches, and compile the frozen current carry afresh. No source mtimes will be modified to force freshness. The voice freeze/physical holds remain.

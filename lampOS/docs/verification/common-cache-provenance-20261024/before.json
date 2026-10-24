@@ -1,0 +1,20 @@
+{
+  "source_schema_sha256": "d7e6266b614ea52b0e74104411861c569c915f123803e7ef4a497e9bf3b40ebd",
+  "source_contains_speakers_schema": true,
+  "libraries": [
+    {
+      "path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_memory-39e8737d9d9b9701.rlib",
+      "bytes": 8378532,
+      "sha256": "7ecebfbff23c0c9905d074ee787f7aa3b0cc6c594b66f9cec2bd4f10e38014a1",
+      "mtime_utc": "2026-10-24T08:14:03.025158+00:00",
+      "contains_current_speakers_schema_literal": false
+    },
+    {
+      "path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_memory-6e26196857beb5ec.rlib",
+      "bytes": 8378648,
+      "sha256": "204059fe135c300f014b37e9eb1ae81e8a4f9f2a44937f9fa2ff1f24345514e4",
+      "mtime_utc": "2026-10-24T08:05:14.095352+00:00",
+      "contains_current_speakers_schema_literal": false
+    }
+  ]
+}

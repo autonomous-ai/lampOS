@@ -1,0 +1,25 @@
+{
+  "source_unchanged": true,
+  "only_change": "Removed generated lamp-memory package outputs in its exclusively held Linux target, then rebuilt and reran full Memory",
+  "before_schema_literal_absent": true,
+  "after_libraries": [
+    {
+      "path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_memory-6e26196857beb5ec.rlib",
+      "bytes": 8540070,
+      "sha256": "5aafd2d180c2b8a487ce302623ca1c53d99934b1709c735d1466db152ae0abfb",
+      "mtime_utc": "2026-10-24T09:55:41.645605+00:00",
+      "contains_current_speakers_schema_literal": true
+    }
+  ],
+  "fresh_full_memory_counts": {
+    "passed": 324,
+    "failed": 0,
+    "ignored": 6
+  },
+  "old_full_memory_counts": {
+    "passed": 313,
+    "failed": 11,
+    "ignored": 6
+  },
+  "runtime_or_test_source_changed": false
+}

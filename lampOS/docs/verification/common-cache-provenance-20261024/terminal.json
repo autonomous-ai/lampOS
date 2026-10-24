@@ -1,0 +1,11 @@
+{
+  "diagnostic_only": true,
+  "exit": 0,
+  "prior_failed_gate_retained": "/private/tmp/fourth-common-recovery-checks-20261024/linux/attempt1/terminal.json",
+  "source_stable": true,
+  "source_unchanged": true,
+  "stages": 2,
+  "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+  "target_release_permitted": true,
+  "tree": "5191c66e97f7407fd136f9582454c3643be22cc1"
+}

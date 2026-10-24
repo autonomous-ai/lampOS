@@ -8501,3 +8501,9 @@ Memory #3333 landed in train 78 as part of lamp-voice c6dfe9809; Records #3329 p
 Common's fresh Mac/Linux first four stages pass: formatting, strict workspace/all-target Clippy, workspace build and full Eyes (Mac357/0/5, Linux360/0/5), including the Linux capture/private-proof control once. Both full Voice suites remain active. Current frozen source stays unchanged; later carry must resolve the sole verified docs/reuse-decisions.md conflict. Voice freeze and First's physical/compatible-pin holds still prohibit activation.
 
 Records cap-control candidate5328b0dce is staged in its own branch with persistent patch/source checkpoints. Isolated real-helper1/0 and intentional-mutant0/1 proof is published; full Records/native gates remain queued behind exclusive Common target ownership. No failed or unrun gate is called green.
+
+## 2026-10-24: Common failed gates and cache diagnosis
+
+The original Linux eight-stage gate ended101: Voice4171/0/24, Update388/0/4, Skills517/0/5, but Memory313/11/6. Mac Voice4101/9/21 remains failed while its later packages finish. [Cache diagnosis](verification/common-cache-provenance-20261024/README.md) shows stale Memory library artifacts despite newer source semantics: package-output removal plus unchanged-source rebuild yields324/0/6 and the missing schema literal appears. No code or test limit was weakened. This is a validation-method correction, not a runtime fix or waiver.
+
+The next complete carry run will invalidate local workspace outputs before compiling either host, preserving external dependency caches and source mtimes. Both original failures and new probe receipts remain separate. Records gate handoff must follow the most recent cache owner, not the obsolete first Common terminal.
