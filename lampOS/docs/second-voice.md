@@ -1847,7 +1847,8 @@ When the coordinator switches (below):
     and cancellation deny. The producer's generation persists across a later
     positive observation, so a missed revocation cannot revive an old request.
     A geometric passing face ID alone does not prove identity continuity.
-    Restoring the same file cannot revive the same request. Initial neutral preparation is not poisoned, and a new
+    After terminal loss, restoring the same file cannot revive the same request.
+    Initial neutral preparation is not poisoned, and a new
     request can independently prove its speaker. Scope, speaker, tool and write
     authorization are unchanged by this disclosure latch.
     `Pending` suppresses private bytes, memory RPC dispatch, HTTP fallback
@@ -1927,10 +1928,9 @@ When the coordinator switches (below):
     Voice/Eyes artifact pins and the new known-person lamp run remain owed.
     It adds no `LAMP_SECOND_FACE_NAME`, Photo or repair setting, and does not
     replace the separate name-activation gate below.
-  - **Product activation remains separate (#3014), draft and not ready.**
-    This source change does not enable `LAMP_SECOND_FACE_NAME` in the
-    product unit; the unit has no setting for it and the binary default
-    stays off. Its existing memory socket and
+  - **Product activation proposal (#3014), draft and not ready.**
+    This held branch enables `LAMP_SECOND_FACE_NAME` in the product unit;
+    the binary default stays off. Its existing memory socket and
     eyes who socket are prerequisites: the worker derives the known file
     beside the eyes socket only when a memory socket is configured. No
     separate core-memory switch is needed. The product also already sets
