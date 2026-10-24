@@ -1,0 +1,49 @@
+{
+  "source_bindings": {
+    "88b1ad796e5045490ad678eb240eea2dab010c81": {
+      "lampOS/crates/voice/src/second_provider/worker.rs": "b618f69620b3f90056d739ae6ca68cec39866f040990569f3bfadcc0f17e5293",
+      "lampOS/crates/voice/src/room_told.rs": "cdc957183f550c809afb6ae54cda0e7c79bea5be812a67614c30a4f2f30e0db3",
+      "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+    },
+    "ba7031f589611d1834c882d82ea8aed2c243fe34": {
+      "lampOS/crates/voice/src/second_provider/worker.rs": "b618f69620b3f90056d739ae6ca68cec39866f040990569f3bfadcc0f17e5293",
+      "lampOS/crates/voice/src/room_told.rs": "cdc957183f550c809afb6ae54cda0e7c79bea5be812a67614c30a4f2f30e0db3",
+      "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+    },
+    "4a84fa5ab6a9133aeec555ec4bc0636dd953f660": {
+      "lampOS/crates/voice/src/second_provider/worker.rs": "b618f69620b3f90056d739ae6ca68cec39866f040990569f3bfadcc0f17e5293",
+      "lampOS/crates/voice/src/room_told.rs": "cdc957183f550c809afb6ae54cda0e7c79bea5be812a67614c30a4f2f30e0db3",
+      "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f"
+    }
+  },
+  "original_log": {
+    "bytes": 2289392,
+    "sha256": "6154ef5670d7bf42aeb97aeb8f65de4c74c3971b93b497ef5c6f0fbcd3886c77"
+  },
+  "linked_library": {
+    "name": "liblamp_voice-c00ddfe05c8f80a2.rlib",
+    "sha256_before": "eff0b501879622d5c666a991f5f012d2eac071798df971391f50032a32af5415",
+    "limit": "Existing compiled Voice library; full build source identity not independently requalified by this narrow counter.",
+    "sha256_after": "eff0b501879622d5c666a991f5f012d2eac071798df971391f50032a32af5415"
+  },
+  "counter_sha256": "bae691f389260ef24c8a3259dd09e09eddac06e15fa56b1025caabadac96f347",
+  "scope": "Scratch-only actual RoomTold API counter. No Cargo or shared-tree edits. Rustc overflow checks off match the recorded release command.",
+  "execution": {
+    "command": [
+      "/private/tmp/second-room-quiet-uptime-20261024/counter",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.481546,
+    "log_sha256": "0d2458d6bedc4483028c6bd65a5f450b593d551c8524f43848106c15d6d24089",
+    "expected_result": "2 passed; original Quiet assertion at 300 seconds fails with Unknown"
+  },
+  "compiler": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "limits": [
+    "Deterministic RoomTold API arithmetic counter, not a replay of the full worker or ARM64 run.",
+    "Existing compiled library source was not independently rebuilt; source files at old base, failed head and latest base are separately hash-bound.",
+    "The original native log does not record host uptime; the 90-to-400-second uptime cause is proven reachable, but the actual historical uptime remains unmeasured.",
+    "No source worktree, shared target, Git state, or external CI was changed."
+  ]
+}
