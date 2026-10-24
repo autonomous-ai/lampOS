@@ -229,12 +229,19 @@ impl Mouths {
             eyes.sort_by(f32::total_cmp);
             eyes[eyes.len() / 2]
         });
-        let looks: Vec<_> = mouth
+        // In window order, a dropped look left as a gap: movement is only
+        // measured between looks that were next to each other, never joined
+        // across a dropped one as if 500 ms were one 250 ms step.
+        let kept: Vec<_> = mouth
             .looks
             .iter()
-            .copied()
-            .filter(|look| median.is_none_or(|m| (look.2 - m).abs() < OUTLIER_SHARE * m))
+            .map(|&look| {
+                median
+                    .is_none_or(|m| (look.2 - m).abs() < OUTLIER_SHARE * m)
+                    .then_some(look)
+            })
             .collect();
+        let looks: Vec<_> = kept.iter().flatten().copied().collect();
         let outliers = mouth.looks.len() - looks.len();
         let turned = turn_deg.is_none_or(|degrees| degrees > MOST_TURN_DEG);
         let mean_eyes = looks.iter().map(|look| look.2).sum::<f32>() / (looks.len().max(1) as f32);
@@ -254,10 +261,10 @@ impl Mouths {
             } else {
                 Reason::Turned
             })
-        } else if outliers > MOST_OUTLIERS {
-            Some(Reason::Outliers)
         } else if small {
             Some(Reason::Small)
+        } else if outliers > MOST_OUTLIERS {
+            Some(Reason::Outliers)
         } else if looks.len() < LEAST_LOOKS {
             Some(Reason::TooFewLooks)
         } else {
@@ -269,20 +276,24 @@ impl Mouths {
             }
             return UNKNOWN;
         }
-        let pairs = looks.iter().zip(looks.iter().skip(1));
-        let steps = (looks.len() - 1) as f32;
+        let pairs: Vec<_> = kept
+            .windows(2)
+            .filter_map(|two| Some((two[0]?, two[1]?)))
+            .collect();
+        let steps = pairs.len().max(1) as f32;
         // How much the eye line bends from look to look: turning, nodding
         // and coming closer leave its angle as it is, a tilting head bends
         // it only slowly, and speaking does not move the eyes, so this is
         // the marks' own jitter, in this window.
-        let bends = looks
-            .iter()
-            .zip(looks.iter().skip(1))
-            .zip(looks.iter().skip(2));
+        let bends: Vec<_> = kept
+            .windows(3)
+            .filter_map(|three| Some((three[0]?, three[1]?, three[2]?)))
+            .collect();
         let jitter = (bends
-            .map(|((a, b), c)| (a.3 - 2.0 * b.3 + c.3).powi(2))
+            .iter()
+            .map(|(a, b, c)| (a.3 - 2.0 * b.3 + c.3).powi(2))
             .sum::<f32>()
-            / (looks.len() - 2) as f32)
+            / bends.len().max(1) as f32)
             .sqrt();
         if let Some(detail) = diagnostic.as_deref_mut() {
             detail.jitter_rad = Some(jitter);
@@ -301,14 +312,13 @@ impl Mouths {
         mouth.rest = Some(rest);
         // The mesh read every look of the window: its inner lips, not the
         // corners, and its own steadiness is not the eye line's.
-        let opens: Option<Vec<f32>> = looks.iter().map(|look| look.4).collect();
-        if let Some(opens) = opens {
+        if looks.iter().all(|look| look.4.is_some()) {
             if let Some(detail) = diagnostic {
                 detail.reason = Reason::Mesh;
             }
-            let score = (opens
-                .windows(2)
-                .map(|two| (two[1] - two[0]).powi(2))
+            let score = (pairs
+                .iter()
+                .filter_map(|(a, b)| Some((b.4? - a.4?).powi(2)))
                 .sum::<f32>()
                 / steps)
                 .sqrt();
@@ -326,7 +336,7 @@ impl Mouths {
         if let Some(detail) = diagnostic {
             detail.reason = Reason::Corners;
         }
-        let change = pairs.map(|(a, b)| (b.1 - a.1).powi(2)).sum::<f32>() / steps;
+        let change = pairs.iter().map(|(a, b)| (b.1 - a.1).powi(2)).sum::<f32>() / steps;
         // What the jitter explains of the width's change is taken off.
         let score = (change - JITTER_TO_SHAPE * rest).max(0.0).sqrt();
         let state = if score >= SPEAKING_AT {
@@ -921,5 +931,233 @@ mod outlier_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod third_review_outlier {
+    use super::*;
+
+    fn marks(eyes: f32, angle: f32, width: f32) -> [(f32, f32); 5] {
+        [
+            (0.0, 0.0),
+            (eyes * angle.cos(), eyes * angle.sin()),
+            (eyes / 2.0, 10.0),
+            (0.0, 20.0),
+            (eyes * width, 20.0),
+        ]
+    }
+
+    fn run(
+        drop_outliers: bool,
+        looks: impl IntoIterator<Item = (f32, f32, f32, Option<f32>)>,
+    ) -> Vec<(Speaking, MouthDiagnostic)> {
+        let mut mouths = Mouths {
+            drop_outliers,
+            ..Mouths::default()
+        };
+        looks
+            .into_iter()
+            .enumerate()
+            .map(|(i, (eyes, angle, width, mesh))| {
+                mouths.judge_with_diagnostics(
+                    1,
+                    &marks(eyes, angle, width),
+                    Some(0.0),
+                    mesh,
+                    i as u64 * 250_000,
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn corners_and_high_outliers_retain_talking_and_still_answers() {
+        for mesh in [false, true] {
+            for talking in [false, true] {
+                for bad_eyes in [14.0, 50.0] {
+                    let input: Vec<_> = (0..9)
+                        .map(|i| {
+                            let (eyes, angle) = if i == 4 { (bad_eyes, 0.3) } else { (30.0, 0.0) };
+                            let change = if talking && i % 2 == 0 { 0.04 } else { 0.0 };
+                            (eyes, angle, 0.8 + change, mesh.then_some(0.02 + change))
+                        })
+                        .collect();
+                    let on = run(true, input.clone());
+                    let off = run(false, input);
+                    assert_eq!(off.last().unwrap().1.reason, Reason::Jitter);
+                    assert_eq!(
+                        on.last().unwrap().0.state,
+                        if talking {
+                            SpeakingState::Yes
+                        } else {
+                            SpeakingState::No
+                        }
+                    );
+                    assert_eq!(
+                        on.last().unwrap().1.reason,
+                        if mesh { Reason::Mesh } else { Reason::Corners }
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn distance_alone_and_one_missing_mesh_do_not_prove_unknown() {
+        for missing_mesh in [false, true] {
+            let input = (0..9).map(|i| {
+                let eyes = if i == 4 { 14.0 } else { 30.0 };
+                let open = if i % 2 == 0 { 0.04 } else { 0.08 };
+                (eyes, 0.0, 0.8, (!(missing_mesh && i == 4)).then_some(open))
+            });
+            let answers = run(false, input);
+            let (answer, diagnostic) = answers.last().unwrap();
+            assert_eq!(diagnostic.jitter_rad, Some(0.0));
+            assert_eq!(
+                answer.state,
+                if missing_mesh {
+                    SpeakingState::No
+                } else {
+                    SpeakingState::Yes
+                }
+            );
+            assert_eq!(
+                diagnostic.reason,
+                if missing_mesh {
+                    Reason::Corners
+                } else {
+                    Reason::Mesh
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn an_angular_outlier_at_constant_distance_is_still_refused() {
+        let input = (0..9).map(|i| {
+            (
+                30.0,
+                if i == 4 { 0.3 } else { 0.0 },
+                0.8,
+                Some(if i % 2 == 0 { 0.04 } else { 0.08 }),
+            )
+        });
+        let answers = run(true, input);
+        assert_eq!(answers.last().unwrap().0.state, SpeakingState::Unknown);
+        assert_eq!(answers.last().unwrap().1.reason, Reason::Jitter);
+    }
+
+    #[test]
+    fn two_outliers_report_outliers_and_real_scale_change_never_speaks() {
+        let input = (0..9).map(|i| {
+            (
+                if i == 3 || i == 6 { 14.0 } else { 30.0 },
+                0.0,
+                0.8,
+                Some(0.002),
+            )
+        });
+        let answers = run(true, input);
+        let (answer, diagnostic) = answers.last().unwrap();
+        assert_eq!(answer.state, SpeakingState::Unknown);
+        assert_eq!(diagnostic.reason, Reason::Outliers);
+        assert_eq!(diagnostic.window_looks, Some(9));
+        assert_eq!(diagnostic.mesh_window_looks, Some(7));
+        assert_eq!(
+            serde_json::to_value(diagnostic).unwrap()["reason"],
+            "outliers"
+        );
+        for mesh in [false, true] {
+            let input = (0..24).map(|i| {
+                (
+                    if i < 9 { 30.0 } else { 45.0 },
+                    0.0,
+                    0.8,
+                    mesh.then_some(0.002),
+                )
+            });
+            let answers = run(true, input);
+            assert!(
+                answers
+                    .iter()
+                    .all(|(answer, _)| answer.state != SpeakingState::Yes)
+            );
+            assert_eq!(answers[8].0.state, SpeakingState::No);
+            assert_eq!(answers[10].1.reason, Reason::Outliers);
+            assert_eq!(answers.last().unwrap().0.state, SpeakingState::No);
+        }
+    }
+
+    #[test]
+    fn a_far_face_with_two_outliers_reports_small_first() {
+        let input = (0..9).map(|i| {
+            (
+                if i == 3 || i == 6 { 10.0 } else { 20.0 },
+                0.0,
+                0.8,
+                Some(0.002),
+            )
+        });
+        let answers = run(true, input);
+        let (answer, diagnostic) = answers.last().unwrap();
+        assert_eq!(answer.state, SpeakingState::Unknown);
+        assert_eq!(diagnostic.reason, Reason::Small);
+    }
+
+    #[test]
+    fn dropping_a_look_does_not_accelerate_a_subthreshold_mesh_change() {
+        // The mesh itself remains regular: each 250 ms change is 0.0101,
+        // below MESH_SPEAKING_AT. Only one detector eye-distance is high.
+        let input: Vec<_> = (0..9)
+            .map(|i| {
+                (
+                    if i == 4 { 42.0 } else { 30.0 },
+                    0.0,
+                    0.8,
+                    Some(0.02 + i as f32 * 0.0101),
+                )
+            })
+            .collect();
+        let off = run(false, input.clone());
+        let on = run(true, input);
+        let off = off.last().unwrap();
+        let on = on.last().unwrap();
+        eprintln!("third_review mesh: off={:?} on={:?}", off.0, on.0);
+        assert_eq!(off.0.state, SpeakingState::No);
+        assert_eq!(
+            on.0.state,
+            SpeakingState::No,
+            "dropping a middle sample must not treat a 500 ms change as one 250 ms step: {:?}",
+            on.0
+        );
+    }
+
+    #[test]
+    fn dropping_a_look_does_not_accelerate_a_subthreshold_corner_change() {
+        // The normalized width changes by 0.018 every 250 ms; the same
+        // temporal-gap issue applies without mesh or angular jitter.
+        let input: Vec<_> = (0..9)
+            .map(|i| {
+                (
+                    if i == 4 { 42.0 } else { 30.0 },
+                    0.0,
+                    0.65 + i as f32 * 0.018,
+                    None,
+                )
+            })
+            .collect();
+        let off = run(false, input.clone());
+        let on = run(true, input);
+        let off = off.last().unwrap();
+        let on = on.last().unwrap();
+        eprintln!("third_review corners: off={:?} on={:?}", off.0, on.0);
+        assert_eq!(off.0.state, SpeakingState::No);
+        assert_eq!(
+            on.0.state,
+            SpeakingState::No,
+            "dropping a middle sample must not treat a 500 ms change as one 250 ms step: {:?}",
+            on.0
+        );
     }
 }
