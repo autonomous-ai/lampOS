@@ -1,0 +1,7 @@
+# #3218 persistent qualification
+
+Clean committed head `e63a86d0d470d95cceb8c6dea75015838207953a`: **7,250 passed / 2 failed / 34 ignored**, controller exit 1. All six planned independent gates finished once; every executable/case/ignored inventory binds actual output. All 1 authored cases are recorded. Failures remain failures pending the separate prescribed standalone/classification table. No target was incomplete or unrun.
+
+The full source map guards 10,313 tracked files, Git modes and literal symlinks; every stage preserved aggregate `fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3`. Fmt, strict twelve-package all-target Clippy, full Voice, eleven readers, workspace build and diff check retain their planned command scope. Test phases used default parallelism and no filters. New helper/storage identities, raw-stream parser controls and owned-process cleanup controls are retained. The matched earlier comparison and the ENOSPC/lost-path attempts stay distinct; none is relabelled as this run.
+
+The JSON files retain all actual rows/outcomes, every failed diagnostic with raw offsets/hashes, complete human streams, command/watchdog/cleanup receipts, source and executable identities, and exact helper source wrappers. Compiler messages, whole source maps and executables remain external; local paths are not a remote availability promise. Separate native ARM64/Linux Clippy and source-only Linux formatting receipts are required for their corresponding claims. No lamp, acoustic latency, motor behavior or local ARM build is shown here.

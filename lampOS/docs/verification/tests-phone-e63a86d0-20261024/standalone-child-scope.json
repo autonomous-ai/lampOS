@@ -1,0 +1,10 @@
+{
+  "scope": "Source-only audit before prescribed Update standalone observations; no executable invoked.",
+  "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+  "source_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+  "child_payloads": "Two exact test-owned /bin/sh scripts containing printf builtins, copied into the fixture tree and byte/mode/output checked.",
+  "CARGO_BIN_EXE_or_current_exe_dependency_in_this_module": false,
+  "full_workspace_build_binary_replacement_limit": "These selected tests do not consume a workspace sibling updater executable; their shell payload bytes come from the bound test executable constants.",
+  "timing_and_cleanup": "Existing two-second conditional child-exit watchdog, five-millisecond polling and kill/wait on unwind remain unchanged. Direct standalone uses the exact full-run Update test executable hash.",
+  "historical_cause_claim": false
+}

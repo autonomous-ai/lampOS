@@ -1,0 +1,31 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 616,
+      "sha256": "f702ec40e9a7017d14feef02f69c3f9ae5d72dd233b22ccef86f1ad29991ad3b"
+    },
+    {
+      "path": "exact-streams.json",
+      "bytes": 12776,
+      "sha256": "982cfe6a0c855b876f59beed4b2ed6d478a8cb6ba3a4f1be66dceee8399d2d97"
+    },
+    {
+      "path": "plan.json",
+      "bytes": 6288,
+      "sha256": "e2c4e844f1087e4c1dee0d3a1a261d59984d261850ab4b47d36d53b8fbfbef70"
+    },
+    {
+      "path": "results.json",
+      "bytes": 22041,
+      "sha256": "fcfd126b6b8c1c4f90001a297ac02b9ab540df6268589da09b0282ed1f061500"
+    },
+    {
+      "path": "runner-source.json",
+      "bytes": 5578,
+      "sha256": "6931c37a1374e1d4267cd815fb794678d365050b432ee6d9e0edf700f039c315"
+    }
+  ],
+  "scope": "Every payload except this manifest",
+  "total_payload_bytes": 47299
+}

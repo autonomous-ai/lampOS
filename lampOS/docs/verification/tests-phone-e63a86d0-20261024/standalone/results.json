@@ -1,0 +1,474 @@
+{
+  "status": "complete; all actual outcomes retained",
+  "observations": [
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:07:09.824557+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 81629,
+        "owned_process_group": 81629,
+        "timed_out": false,
+        "exit_code": 101,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 101,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 101,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 15.82394,
+        "finished_at": "2026-10-24T09:07:25.648507+00:00",
+        "stdout_sha256": "db141fe267ef3c15675728a0c53d4685ae8e0e2db7ad243968c2719b756ffa91",
+        "stdout_bytes": 2680,
+        "stderr_sha256": "c0bb8b626a8f06978bdaa70a22af864d65b0cbda41721ee11115639d073c0ac7",
+        "stderr_bytes": 107
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-1",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "FAILED"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:07:34.590241+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 86777,
+        "owned_process_group": 86777,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 27.221561,
+        "finished_at": "2026-10-24T09:08:01.811342+00:00",
+        "stdout_sha256": "a3c2f45397ba7acd5d78932c2a3429683c98c83ce4c22e967c2c34c156057e87",
+        "stdout_bytes": 209,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-2",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:08:06.750212+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 94515,
+        "owned_process_group": 94515,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 37.211483,
+        "finished_at": "2026-10-24T09:08:43.960979+00:00",
+        "stdout_sha256": "fdbd64f12fc7b5b321164ef6566be625e12b36c9472439e57a7b8b049470dbda",
+        "stdout_bytes": 209,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-3",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:08:52.252559+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 99790,
+        "owned_process_group": 99790,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 14.261236,
+        "finished_at": "2026-10-24T09:09:06.513704+00:00",
+        "stdout_sha256": "1a23292c9975c50f1940d1cbfba192974d6b5cf1da5674ced61df60b9301de8f",
+        "stdout_bytes": 206,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-1",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:09:12.693219+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 3572,
+        "owned_process_group": 3572,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 25.237758,
+        "finished_at": "2026-10-24T09:09:37.930597+00:00",
+        "stdout_sha256": "255ec70bf7b3185b9eb164ec258be6ee5fb64065ee98f6209e664dee99eed697",
+        "stdout_bytes": 206,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-2",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:09:43.455787+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 11665,
+        "owned_process_group": 11665,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 14.771045,
+        "finished_at": "2026-10-24T09:09:58.226666+00:00",
+        "stdout_sha256": "e2bbc2b7f011d2ca140a9b81dc4b170fa599f80fc40f1ab71531e931d6e3b3f3",
+        "stdout_bytes": 206,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-3",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:10:03.053171+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 16653,
+        "owned_process_group": 16653,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 27.842388,
+        "finished_at": "2026-10-24T09:10:30.895029+00:00",
+        "stdout_sha256": "e7e6f2a1bc3e453b137981977a96931e460d817fbd7d56d6b204fc9d810c196a",
+        "stdout_bytes": 208,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-1",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:10:35.895764+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 21902,
+        "owned_process_group": 21902,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 30.395162,
+        "finished_at": "2026-10-24T09:11:06.290369+00:00",
+        "stdout_sha256": "64e783f74d45b720d1e31be216aa6ab02c098aa016d4753e552d842925437f5a",
+        "stdout_bytes": 208,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-2",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+          "--exact",
+          "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update",
+        "started_at": "2026-10-24T09:11:11.475818+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 26541,
+        "owned_process_group": 26541,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 30.038813,
+        "finished_at": "2026-10-24T09:11:41.514058+00:00",
+        "stdout_sha256": "56d9b4cc90df524689f6d74a351afff88f6b482bcc63e56488c68b46d8f44943",
+        "stdout_bytes": 208,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-3",
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "outcome": "ok"
+    }
+  ],
+  "unrun": 0
+}

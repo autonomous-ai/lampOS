@@ -1,0 +1,85 @@
+{
+  "status": "passed",
+  "Cargo_executed": false,
+  "Rust_tests_executed": false,
+  "support_sha256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+  "controls": [
+    {
+      "mode": "normal",
+      "controller_pid": 96447,
+      "controller_pgid": 96447,
+      "controller_wait_status": 0,
+      "expected_status": 0,
+      "owned_leader_pid": 96475,
+      "owned_group": 96475,
+      "direct_wait_status": 0,
+      "owned_group_absent": true,
+      "descendant": null,
+      "descendant_pid_absent": null,
+      "descendant_reaping": "Direct leader explicitly waited by helper. Orphan descendant disappearance observed after OS reaping; not a waitpid claim.",
+      "seconds": 0.14188420700020288,
+      "helper_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/process-controls-v2/normal/owned.json"
+    },
+    {
+      "mode": "timeout",
+      "controller_pid": 96521,
+      "controller_pgid": 96521,
+      "controller_wait_status": 0,
+      "expected_status": 0,
+      "owned_leader_pid": 96544,
+      "owned_group": 96544,
+      "direct_wait_status": -15,
+      "owned_group_absent": true,
+      "descendant": {
+        "descendant_pid": 96557,
+        "pgid": 96544,
+        "leader_pid": 96544
+      },
+      "descendant_pid_absent": true,
+      "descendant_reaping": "Direct leader explicitly waited by helper. Orphan descendant disappearance observed after OS reaping; not a waitpid claim.",
+      "seconds": 5.633519471,
+      "helper_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/process-controls-v2/timeout/owned.json"
+    },
+    {
+      "mode": "exceptional",
+      "controller_pid": 96664,
+      "controller_pgid": 96664,
+      "controller_wait_status": 23,
+      "expected_status": 23,
+      "owned_leader_pid": 96665,
+      "owned_group": 96665,
+      "direct_wait_status": -15,
+      "owned_group_absent": true,
+      "descendant": {
+        "descendant_pid": 96666,
+        "pgid": 96665,
+        "leader_pid": 96665
+      },
+      "descendant_pid_absent": true,
+      "descendant_reaping": "Direct leader explicitly waited by helper. Orphan descendant disappearance observed after OS reaping; not a waitpid claim.",
+      "seconds": 5.175946720000411,
+      "helper_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/process-controls-v2/exceptional/owned.json"
+    },
+    {
+      "mode": "residual",
+      "controller_pid": 96786,
+      "controller_pgid": 96786,
+      "controller_wait_status": 24,
+      "expected_status": 24,
+      "owned_leader_pid": 96787,
+      "owned_group": 96787,
+      "direct_wait_status": 0,
+      "owned_group_absent": true,
+      "descendant": {
+        "descendant_pid": 96788,
+        "pgid": 96787,
+        "leader_pid": 96787
+      },
+      "descendant_pid_absent": true,
+      "descendant_reaping": "Direct leader explicitly waited by helper. Orphan descendant disappearance observed after OS reaping; not a waitpid claim.",
+      "seconds": 5.208899376999852,
+      "helper_record": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/process-controls-v2/residual/owned.json"
+    }
+  ],
+  "scope": "Owned process groups only, no claim about nested setsid escape. Outer controllers all explicitly waited; helper leaders explicitly waited; descendants confirmed absent after OS reaping."
+}

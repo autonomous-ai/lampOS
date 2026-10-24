@@ -1,0 +1,23 @@
+{
+  "status": "Unqualified; the full and failed standalone observation reached different boundaries",
+  "full": {
+    "case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+    "check": 3,
+    "caller": "self_cuts.rs:305",
+    "where": "prepared() -> boundary(), saved old back-executable",
+    "expected": "old",
+    "elapsed_seconds": 2.001010586,
+    "final_status": "Ok(None)",
+    "phase_limit": "Before the intended current-moves state prefix was reached."
+  },
+  "standalone_01_1": {
+    "check": 4,
+    "caller": "self_cuts.rs:314",
+    "where": "First new current executable after the interrupted current-switch prefix and sequence==2",
+    "expected": "new",
+    "elapsed_seconds": 2.002924,
+    "final_status": "Ok(None)",
+    "phase_limit": "After the intended prefix, before pending/confirm/put-back branches."
+  },
+  "qualification": "Both are failures of the unchanged fixture exit watchdog, but different actual boundaries; no same-phase equivalence or historical cause is inferred. Timeout does not establish whether stdout was already written."
+}

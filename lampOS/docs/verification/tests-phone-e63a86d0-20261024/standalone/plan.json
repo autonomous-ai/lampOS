@@ -1,0 +1,114 @@
+{
+  "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+  "source": {
+    "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone",
+    "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+    "base_tree": "5b01079ad7169ba816a607428971fba74a1c2b75",
+    "qualification_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+    "branch": "tests/1806-phone-news-start",
+    "tracked_paths": 10313,
+    "lampos_paths": 6967,
+    "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+    "owned_paths": [],
+    "combined_authored_paths": [
+      "lampOS/crates/voice/src/messages.rs",
+      "lampOS/docs/messages.md"
+    ],
+    "source_map_sha256": "319c422ac382494229a604dec3554f3beb62c3f8472104acba0fcf8255534e93",
+    "clean_committed_source": true
+  },
+  "full_run": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/run-2026-10-24T082040.214005Z",
+  "cases": [
+    {
+      "phase": "readers-default-parallel",
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "status": "FAILED",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d"
+    },
+    {
+      "phase": "readers-default-parallel",
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "status": "ok",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d"
+    },
+    {
+      "phase": "readers-default-parallel",
+      "package": "lamp-update",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "status": "ok",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d"
+    }
+  ],
+  "repetitions": 3,
+  "script_sha256": "491d8d76163d697111710c7cd129d2947abc31b41921ef6aedb66f94f3abad3f",
+  "environment": {
+    "PATH": "/Users/autonomous/.cargo/bin:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/usr/local/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/usr/local/go/bin:/Users/autonomous/.codex/tmp/arg0-macos/codex-arg0E4kYFd:/usr/local/Cellar/node/25.3.0/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/codex-path:/Users/autonomous/.harness/runtime/grid-0.3.59-darwin-x64/bin:/usr/local/Cellar/node/25.3.0/bin:/Users/autonomous/.grok/bin:/Users/autonomous/.local/bin:/Users/autonomous/.npm-global/bin:/Users/autonomous/.codeium/windsurf/bin:/Users/autonomous/.nvm/versions/node/v20.9.0/bin:/Users/d/opt/anaconda3/bin",
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "runtime_environment_limit": "Configured gate environment and package cwd retained. Cargo child-added loader/runtime variables were not captured byte-for-byte; executable inventory already proved direct invocation loads.",
+  "light_call_match": "Unchanged source and exact strict25ms assertion on frozen4a84base; original failure retained. No historical cause or latest-base equivalence claim.",
+  "rule": "Exactly three observations per historical/new failure not already matched. No retries."
+}

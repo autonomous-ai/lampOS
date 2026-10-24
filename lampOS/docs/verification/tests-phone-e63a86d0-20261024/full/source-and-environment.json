@@ -1,0 +1,88 @@
+{
+  "identity": {
+    "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone",
+    "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+    "base_tree": "5b01079ad7169ba816a607428971fba74a1c2b75",
+    "qualification_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+    "branch": "tests/1806-phone-news-start",
+    "tracked_paths": 10313,
+    "lampos_paths": 6967,
+    "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+    "owned_paths": [],
+    "combined_authored_paths": [
+      "lampOS/crates/voice/src/messages.rs",
+      "lampOS/docs/messages.md"
+    ],
+    "source_map_sha256": "319c422ac382494229a604dec3554f3beb62c3f8472104acba0fcf8255534e93",
+    "clean_committed_source": true
+  },
+  "source_unchanged": true,
+  "source_before_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+  "source_after_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+  "freshness": {
+    "mtime_ns": 1792830040313126000,
+    "paths": 10313,
+    "before_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+    "after_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+    "bytes_modes_symlinks_identical": true
+  },
+  "per_stage_source_guards": [
+    {
+      "step": "fmt",
+      "before": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "after": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3"
+    },
+    {
+      "step": "clippy",
+      "before": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "after": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3"
+    },
+    {
+      "step": "voice-default-parallel",
+      "before": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "after": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3"
+    },
+    {
+      "step": "readers-default-parallel",
+      "before": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "after": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3"
+    },
+    {
+      "step": "workspace-build",
+      "before": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "after": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3"
+    },
+    {
+      "step": "diff-check",
+      "before": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "after": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3"
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "source_map_metadata": {
+    "external_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/source-map.json",
+    "bytes": 2838185,
+    "sha256": "319c422ac382494229a604dec3554f3beb62c3f8472104acba0fcf8255534e93"
+  },
+  "platform": "Rusthost x86_64-apple-darwin, no local ARM build or lamp action."
+}

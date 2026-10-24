@@ -1,0 +1,2959 @@
+{
+  "records": [
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/probe_handover",
+      "sha256": "7b4d3a87e1bf666df2add8686a82e8835fa175484f6c9f130b0003625a0467cf",
+      "bytes": 12630040,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "probe_handover",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/probe_handover.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/reference_pace",
+      "sha256": "24b11089a1ab1c40114f41e2cb7de46f67a6d78a29e66d254804169158896ddc",
+      "bytes": 3775128,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "reference_pace",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/reference_pace.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "58fdb0aa364dae4e024498a04aac582e78f322f235d71a30b6c7606a39c71368",
+      "bytes": 1119920,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "98e409aad8046c080d7c10560a2f0ffb1360f750e29d3db6066dc6c75747ad6c",
+      "bytes": 2737048,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-voice",
+      "sha256": "fd6d54d9f26550015bc62819b5db3174251b7f6f294333d262145627af41903a",
+      "bytes": 40129096,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/head_qualification_operator",
+      "sha256": "3890297436b42d37d385b9ca98b58df9543d026bf518767b654361de6354a926",
+      "bytes": 1410568,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "head_qualification_operator",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/head_qualification_operator.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/admission_latency",
+      "sha256": "de2ee4c0311d07f3617c04bdcf01b9d5bedec09cd53f3826f089b571fd9f4af5",
+      "bytes": 895808,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "admission_latency",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/admission_latency.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "e264de174b1f73d44fc050f4bc83549f5a559f81a7c3649bff7e7abfee0d7fc5",
+      "bytes": 1435672,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/duplex_lab",
+      "sha256": "389a9f87c60333d47c4760fab5f6fbca612c018db97df88b219279dcf0bbbb84",
+      "bytes": 2898616,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "duplex_lab",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/duplex_lab.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/ring_process_probe",
+      "sha256": "e2e21235e5a1a93c65e0a76b0bd0a9f155115d26bd84940bcd6bbea682a0ffff",
+      "bytes": 5619544,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "ring_process_probe",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/ring_process_probe.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/hearing_replay",
+      "sha256": "7404389fc369c522527edc3c2dbe65100556ea07e89f78f78af4392ff3dec685",
+      "bytes": 1608456,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "hearing_replay",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/examples/hearing_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "135349d87b62e7852f4b7c0b47a393c623d60190fec139066618c1fccb01442f",
+      "bytes": 94222396,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "b9f7b6f3e67f3e8c83fc2b40e4c87c955f77a613706424fefece08a1b7057ba0",
+      "bytes": 113956920,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_peek-bb7b8ca29d47dc1f",
+      "sha256": "e5b27000ff1b55d47a399f9a0b8deeda8b5a8c20f304febc709b29610e9b3064",
+      "bytes": 941832,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-peek",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-peek",
+      "sha256": "8d2b0ff162a8bb342b52e9a2e07f28855406a381fd46f6df76fc0e7885f371bb",
+      "bytes": 5955456,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-peek",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/peek-c90c67e1b5376e51",
+      "sha256": "4e48a5b3d287fd97455469820ac9834b2cdcf195bcd07c97645548699705c4d2",
+      "bytes": 6825120,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "peek",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek/tests/peek.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-setup",
+      "sha256": "b3f5b4ad9e1cae38a461c62fa6edff5a326356ec601502fb31dbc1444ba91162",
+      "bytes": 15567184,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-setup",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/wake-1879b0f98b9c49a0",
+      "sha256": "1cfb0e04c485c1d4efffd3c0cabdd416f69a710a1720e4bd92638294646693a3",
+      "bytes": 1480288,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "wake",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup/tests/wake.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-c5f75c9d30c5f818",
+      "sha256": "aa55953c7bbdd31bfef9e0a4957f5507c3d41a78e5a662512ca86b8efb75a89a",
+      "bytes": 12499068,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/forgot-0205b773d3329302",
+      "sha256": "a2983846c1027c104f3808fcd2125ffbfac164d413e959276f2e0b1cc055b60e",
+      "bytes": 4141328,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "forgot",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/forgot.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_cloud-44d498984d4c09df",
+      "sha256": "20d2cdd3ae4846c362caa471cd28af8abb7e10f97d7e7d6985c2dbe464933478",
+      "bytes": 941832,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-cloud",
+      "sha256": "d87435eb7c87cdcc5fa99cc7917ce24fa620088b8a733b8beb59a93977702557",
+      "bytes": 23493912,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/functions-a019e8e3d9f18c56",
+      "sha256": "ad7545232a25dab4c54426f3ad2eebbc6f8124613f0d93c068e90dba55e43291",
+      "bytes": 18462392,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "functions",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/functions.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bed542c0cfe5e8a7",
+      "sha256": "2f5b83d5f20d9cb0ff953bfc4766ed78319226a5160ccbee70e7d3a968a28426",
+      "bytes": 1655392,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_observe-f06824b26415b941",
+      "sha256": "0fe56fa914eab05dfa5d0082f1d594b78532c1f5727f49e9b230ebe6106aade4",
+      "bytes": 8458484,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_observe",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_observe.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_update-aaea79408ab23117",
+      "sha256": "8ca372c7d8dc5e4f979c8859870eee3b05ba72f4a376510786fbedb5a122904d",
+      "bytes": 941840,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-baf52b4e33708f12",
+      "sha256": "6fef5f29b8974391a8c77e4227a2e5c1ecad9eb1fe504bc0f1e7bc6cdf7ed3ce",
+      "bytes": 15427956,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/health_control-ac8c12dcd2c7ad1a",
+      "sha256": "9013675e0b0488d5ee81774c91b88e3b0dc2c0175cbb32f2400a8bc7fd0e3051",
+      "bytes": 2012704,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "health_control",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/health_control.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_early_words-ac6d63cbcd0176af",
+      "sha256": "82f98fcba5e6a1a7b2cc90cc7e2607a6d975f1551918bc2d835b718e017fa8fa",
+      "bytes": 9251884,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_early_words",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_early_words.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "dce7b7fb07baf589a4e92364cd8a583051a3b403c2a4c59bea6ea962c66031fb",
+      "bytes": 14459132,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-2daae09844723b26",
+      "sha256": "ab38c497f74a5ab18dc22855a91010079ee39dd5218c8b4c25a3c4ba36072a61",
+      "bytes": 20863388,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/install-8ab651138ba2189d",
+      "sha256": "f2faa5b715f433d634bb11938528a6b02afef469b6495f456547bf40a4329c95",
+      "bytes": 13382604,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "install",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/install.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/render_relaxing_music",
+      "sha256": "415fa68842419fdddf7ebcf955d6f0846b4a947fb1739842e0a763dd5af63bb0",
+      "bytes": 548504,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_relaxing_music",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills/examples/render_relaxing_music.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/release_pair-e881b76de672edbd",
+      "sha256": "97d00dd63d2aae801a3a84fedf78fd6f538f6985c401d7df7230d4daebc1f514",
+      "bytes": 2799076,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_memory-3e6428a6ad440a7c",
+      "sha256": "721c0bc4019717b69df2eb15380df697c764a72cbc6697c8ea78be7709a7673c",
+      "bytes": 7763996,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_memory_eval-297b5b933d9c5e5c",
+      "sha256": "131320525e495d543c333105277264b0fcc67c9aa8a3ea3c18fb0937f521f773",
+      "bytes": 1785048,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory-eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/self_cli_exec-bc85a62cb2f27284",
+      "sha256": "61fb91665424db76a38946ae2172748ca2164d95891ecb58cead4186fa5bbca8",
+      "bytes": 474024,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "self-cli-exec",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/self_cli_exec.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_update-dda903a1250bc605",
+      "sha256": "2588b8cb591702c3a87cd416e4beb16688ab2ffc89ebb056fb6e5a7d3d168c24",
+      "bytes": 11214316,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_skills-e433beab2fb911b9",
+      "sha256": "d6b6d733c1f43ccd21d60aa923e10de9608a9e7804e971cc7dcd9fa87d7546c9",
+      "bytes": 13211548,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/same_voice_pairs",
+      "sha256": "600577097891c2bdaeafd3aa45f3342230ac5b697ca99864ea5501e0bae755ec",
+      "bytes": 75511632,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "same_voice_pairs",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval/examples/same_voice_pairs.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice_eval-390c3d26497b9ea4",
+      "sha256": "17b9833e4a57455f8552cfd6a9d7db6ac583bdb348dfefc8d1859b38f1425631",
+      "bytes": 6352908,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice-eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/turn_end_replay",
+      "sha256": "16678722907e3274852a151df7bcdbaa4a37cf30c868e0bae18f7002f45a6d47",
+      "bytes": 75422976,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "turn_end_replay",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval/examples/turn_end_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-f337388f4e72a80e",
+      "sha256": "cf382e8c906f315102a27eb75902334a18341a979c32f78782ff83a264c6b637",
+      "bytes": 15919488,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-voice-eval",
+      "sha256": "4656b44b8e6834d4d7be10f05398e819bf13be6cd7134f1e71248df9a593ca52",
+      "bytes": 28879104,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice-eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/forget_shared_exchange-14fe9e8e0d114920",
+      "sha256": "929da592b6c969f83fc285d524fb2fc5d290a0268ed32ffe25e6d6ceedb1bc72",
+      "bytes": 5544324,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "forget_shared_exchange",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/forget_shared_exchange.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/forget_person-8deb8a5a5a1bec4c",
+      "sha256": "e29eb66b34b46b9969f811582004e80925e5861d816d0f236f200274a405e6a2",
+      "bytes": 7893860,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "forget_person",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/forget_person.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/requested_audio-6d30f8c0024b0543",
+      "sha256": "76b9b8ecb8a5cbb631a7c00fa20361773daef84c5cbb4a2ce029266c0ceae9e6",
+      "bytes": 13134924,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "requested_audio",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills/tests/requested_audio.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_forget-74ce451f0225a361",
+      "sha256": "2e13cb3b7aaabd473176406917a6029edb3b0a1f5b80b5fbe97a33e219be53c9",
+      "bytes": 9441788,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_forget",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_forget.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+      "sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "bytes": 16352980,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-skills",
+      "sha256": "efd9d07a1832e0dfe35b0b52a076c1f6aa44feac80cfab74d19efff37dcb7fb3",
+      "bytes": 20174980,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_skills-b2f0ae0b3b02a39a",
+      "sha256": "fd1e95a80e1aa80583df1e0a57ed098fc3d052a923dbd749d075f506c315c5ac",
+      "bytes": 13776564,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills#lamp-skills@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_forget_about-8f04a42ed8e04aa3",
+      "sha256": "2a146817b06f55724143a5bb16da8b666e02ea96914f5f361fce708a6e6b7f92",
+      "bytes": 9029420,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_forget_about",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_forget_about.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_forget_named-b3b64eb830ff6b4b",
+      "sha256": "dd8b06a9918a0a5989f48861f2f180164d696b2b8d3b9ed8e27ac247393886ce",
+      "bytes": 9113660,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_forget_named",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_forget_named.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/paraphrase_fixture-18e0766b1f009ff2",
+      "sha256": "a90b3281f7cf102673fb19257be347639ed9bbfd5acc7e5e24a9b72bf9305a54",
+      "bytes": 1480240,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "paraphrase_fixture",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/paraphrase_fixture.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_since_until-4fd3a6b392a7d272",
+      "sha256": "54c07c3da4bca667acff9c89e64ee14b4b9bf064eb78ccb98a21f8429d29dbc1",
+      "bytes": 9037588,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_since_until",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_since_until.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_follows_face-2d49a4baff95c2cd",
+      "sha256": "9e78f6ccc6447549413807cf53051ddaf3a61e6c5d694110a45c4617f5f0d6b7",
+      "bytes": 9197588,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_follows_face",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_follows_face.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_memory-b9e503bdd61f7e70",
+      "sha256": "02ed03e635811b095b350df563f53b2de2d75d9a93733a30953dd03728f901fe",
+      "bytes": 9952540,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_memory",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/self_process_cuts-225e6342b519b0b0",
+      "sha256": "72da66f3abf7322c2d7347e3ffec4110c2ca72f4ef6a0d1bc557db722401d07c",
+      "bytes": 473944,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "self-process-cuts",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/tests/self_process_cuts.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_setup-7641d9289b7af3f6",
+      "sha256": "9a2fffb65103aab9ba27ec6cbed1fa4791ba2b745762f0c7e81ef37344b62304",
+      "bytes": 941832,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-setup",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/voice_link_used-caa8157749a15aa8",
+      "sha256": "b1d99c6263c20ead0431602f7f6aa5a774c91f3e33dd59efd466514ef9aa7a73",
+      "bytes": 9188740,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "voice_link_used",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/tests/voice_link_used.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_peek-2fa9472102c7793a",
+      "sha256": "19fcac4ed9e7b4821b9c654aa63479e85556ed274aa54a0baf274128e8d73204",
+      "bytes": 3251640,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek#lamp-peek@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_peek",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/peek/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_setup-b7eab6c6ff05712c",
+      "sha256": "9e18459abcce5b57b9af027dfc97d938f1aa2e9dc8252c5a6d8d88e7efb3cfd2",
+      "bytes": 10850456,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup#lamp-setup@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_setup",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/setup/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/recent_playout_cost",
+      "sha256": "defd9acba83fdcdb71ec38381fc5bbee01370d3affd213c56715fae3023da92a",
+      "bytes": 3953112,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "recent_playout_cost",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/examples/recent_playout_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice_eval-dbe254449ccce883",
+      "sha256": "4f92b857ec3334c40e11771dd4b43e5dc74f6b0313a1ceb2bb6842b5131948ac",
+      "bytes": 24511012,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/voice-eval/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-71b3c4366a177b0c",
+      "sha256": "52e099afc91100b2bc0006cd0dbd3badcfd60698906f0fae2a86f544cf35e297",
+      "bytes": 3124464,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/lean/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "bytes": 6631192,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/rest_cost",
+      "sha256": "11cabca920b0c668a8cb7268fb3addd48ea109a9d90ab0c8006d894b55da62ce",
+      "bytes": 3958856,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "rest_cost",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/examples/rest_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/check",
+      "sha256": "2c92476bc12b9849181f9cc3071648ee31d763f26cdcd4373b604ab3e2dd29ae",
+      "bytes": 2156648,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "check",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/lean/examples/check.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_expression-367629d2b98fd09c",
+      "sha256": "34287613fd3d6a6ce7e341dc8e67e0cc8ff1460b36175f012474630dc55c1ec7",
+      "bytes": 2443000,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_lean-bf9e165f7a87ea41",
+      "sha256": "44abcfe6641114b9f49709c85f63f32b0775ac8427602ef1b6f001d168e229e4",
+      "bytes": 1054320,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/lean#lamp-lean@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_lean",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/lean/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-expression",
+      "sha256": "7c2633a8bbc66e0538b0bebf122d456d304fb54b3ebcaa49d1a1b0c8f729c658",
+      "bytes": 8533056,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/replay_cost",
+      "sha256": "4dc32a6e57eaed39f818747173f57d7e0209d6352fa56f087a157b612e8fc1d6",
+      "bytes": 3940072,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "replay_cost",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/examples/replay_cost.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory",
+      "sha256": "bcc837356c4b865d483305f5a65869fd5171df3e8155fa076be00c79f90042f3",
+      "bytes": 7454660,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory-eval",
+      "sha256": "7d13c4a78686f470327ae0c494185022d5cb3fa7facefc01eb2ae87566b81dad",
+      "bytes": 4017004,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory-eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_body_mood-30267137783a16a9",
+      "sha256": "00ae69951be577363805fcb11bc35055693003f668525e290557543577b08054",
+      "bytes": 1031256,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-mood",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory-fixture",
+      "sha256": "52ea05994521e3f56d5848c617774b77ff54fa3c9f3fd40d6570ca2223554c88",
+      "bytes": 7712852,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory-fixture",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_cloud-14b8d1ecc993e2b4",
+      "sha256": "63a4383b444cdb4947cc278a7b2e33dbd0a91a92ca6fbe5d19844ec3357c6153",
+      "bytes": 29241080,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/cloud/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/expression_ask",
+      "sha256": "fa6126cb3ab2e4ae9f02e489840eb60d26aa4b073a2f70bb18c478f246b5408b",
+      "bytes": 1254816,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "expression_ask",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/examples/expression_ask.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-body-inspect",
+      "sha256": "df4008559fcaa066454cdfe4f8280e19342a274c23403bd797e89c0737f64f09",
+      "bytes": 597368,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-inspect",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_body_measure-7f0ba0e9571da263",
+      "sha256": "ed45deb78550ae2b4d740d173ad814f096b775d01f9718b5ddf79aa58e0189e1",
+      "bytes": 1296104,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-measure",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_body_inspect-637ece4159665738",
+      "sha256": "46579c8d51907200d18333914ad68efc50945046ed58478ddcec175b16ff1991",
+      "bytes": 1161944,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-inspect",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/head_plan",
+      "sha256": "c255a8275151d0f710e6ffb356273197faa4dd0126eb431329759977b29f3fe6",
+      "bytes": 1410832,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "head_plan",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/examples/head_plan.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_body_worker-29a1b45163b9be85",
+      "sha256": "03448e4578078bdde3c65dfa1a2e0d22e1bd3d632b5987421b5d33566182362a",
+      "bytes": 1179176,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-worker",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-body-mood",
+      "sha256": "ae2bcf2f7a24926170bcbbe7bb433fc9f5021bd655d1769b7821c3a89ee709eb",
+      "bytes": 473720,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-mood",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-body",
+      "sha256": "72bd704c2e0a9b9db27518e98cb84d2286e1326b3ed1de7e7148248aff31f764",
+      "bytes": 910384,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-d30071be32c9fc43",
+      "sha256": "65bc334c1a7a69e74b567b0fb19f6a77ac10a8c11dc7d89590e7597a83df288c",
+      "bytes": 12994888,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-body-measure",
+      "sha256": "ebc6fc28bbd6b62c2323fb7dfdc04fb912f7be072805aec7b2f3dcbb2d9231b5",
+      "bytes": 782320,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-measure",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-body-worker",
+      "sha256": "9473edeb39df876b052d9398467ecd60e2eb8c66a7c6d861c40c04763c2727b3",
+      "bytes": 634832,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-worker",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_keeper-a9f34008275109b0",
+      "sha256": "b3e72f4d7d0ccdcc8c8a9bf7504745671ad2969e1b5304f9a833598610c0a782",
+      "bytes": 1706112,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-keeper",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/keeper/src/main.rs",
+        "edition": "2024",
+        "required-features": [
+          "prepare"
+        ],
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default",
+        "prepare"
+      ],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_body-9ff199928743cc99",
+      "sha256": "f28da57d68122d1ef870421160fc4ec572f1cde7802f016434f0564037df910c",
+      "bytes": 2509280,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/bin/lamp-body.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_keeper-d493629e7c7f7339",
+      "sha256": "005a8804c0cfae449bcbd8b419693fca44eef0d3f64fa6282419525d10a5b2ca",
+      "bytes": 2590808,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_keeper",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/keeper/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [
+        "default",
+        "prepare"
+      ],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-8bf4d1aea99732a6",
+      "sha256": "11b9e549e838da411a9cb46e34b9b1db50b8a440c892d5e781c83c7c0dec2f7e",
+      "bytes": 5773896,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-update",
+      "sha256": "42b869da450a6ff886de38e08f3f2d27f788476e14b3ee666705277dee7d7b55",
+      "bytes": 10798748,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update#lamp-update@0.1.0",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/update/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_expression-9c5b6f2fc96ff8fb",
+      "sha256": "69aca520740aa12c88721d39a891f07bc54293d3bd68b29d36c4bf8d3e6f31fc",
+      "bytes": 6022288,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/expression/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    },
+    {
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_body-3bda0a619327d99b",
+      "sha256": "473bf0d06398dc12c105c1b33b79b306fe900ab9f849ac8906d645a9576cdd55",
+      "bytes": 116330256,
+      "source_aggregate_sha256": "fdd39ac1d1d2974d57e20b5ec1c12228d7feecaa4ad841fda22ad3dd0f1771d3",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/phone/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "missing_after_command": false
+    }
+  ],
+  "availability": "Captured actual compiler artifact records and executable digests; binaries not published and paths may change after exclusive target handoff."
+}

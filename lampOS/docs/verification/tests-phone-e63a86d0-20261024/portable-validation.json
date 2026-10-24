@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "new_executions": false,
+  "reports": [
+    {
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/prepared-public/3218",
+      "payload_hashes_verified": 15,
+      "manifest_sha256": "1b146cd32cebab890a6337dd9ee93ff451270e1cf0033c5e5dc34693302c159b",
+      "byte_wrappers_verified": {
+        "exact_wrappers": 69,
+        "projected_wrappers": 6,
+        "failed_diagnostic_ranges": 2
+      }
+    },
+    {
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/prepared-public/3218-standalone",
+      "payload_hashes_verified": 5,
+      "manifest_sha256": "5aa0db98a25a131a0d625d159ae63cab64319645eafdc423bde490de56e18291",
+      "byte_wrappers_verified": {
+        "exact_wrappers": 19,
+        "projected_wrappers": 0,
+        "failed_diagnostic_ranges": 0
+      }
+    },
+    {
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/prepared-public/controller-review",
+      "payload_hashes_verified": 10,
+      "manifest_sha256": "d1fd107a222a28b53c34e71e1ea7f77b8f7ea611ce34f87d42f2f96319219327",
+      "byte_wrappers_verified": {
+        "exact_wrappers": 2,
+        "projected_wrappers": 0,
+        "failed_diagnostic_ranges": 0
+      }
+    }
+  ]
+}

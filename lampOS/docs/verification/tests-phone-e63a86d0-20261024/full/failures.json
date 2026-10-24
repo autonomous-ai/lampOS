@@ -1,0 +1,41 @@
+{
+  "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+  "count": 2,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "135349d87b62e7852f4b7c0b47a393c623d60190fec139066618c1fccb01442f",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/run-2026-10-24T082040.214005Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 711936,
+        "original_stream_sha256": "62f856f0403654c553295ba4ab2e911b7ff947c2726c5dbf6fecf53b5555c283",
+        "byte_offset": 709534,
+        "bytes": 1216,
+        "sha256": "cc4a14e8fe7f47046b3b922422150cb77a7ef1e579623b10ac999e56f2e89f08",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [2.942224ms, 3.086082ms, 3.159879ms, 3.184597ms, 3.359535ms, 19.632825ms, 22.421103ms, 36.246159ms, 52.491477ms, 56.370482ms, 56.790411ms, 56.858923ms, 61.285507ms, 73.025919ms, 73.376376ms, 93.26129ms, 99.42341ms, 100.134893ms, 109.584642ms, 112.871014ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (624456) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.942224ms, 3.086082ms, 3.159879ms, 3.184597ms, 3.359535ms, 19.632825ms, 22.421103ms, 36.246159ms, 52.491477ms, 56.370482ms, 56.790411ms, 56.858923ms, 61.285507ms, 73.025919ms, 73.376376ms, 93.26129ms, 99.42341ms, 100.134893ms, 109.584642ms, 112.871014ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-update:test:round",
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "actual_status": "FAILED",
+      "binary_sha256": "7c95ae6d1ec3e9fa4150a4233a82f5ede3690feeaa76e9bae7f827cf39a8055d",
+      "diagnostic": {
+        "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/run-2026-10-24T082040.214005Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 752028,
+        "original_stream_sha256": "04d45f2fe3bc7a2b0aabbdadf9c8bea32d0edc0344ef80188786bcb6592d5a5d",
+        "byte_offset": 685765,
+        "bytes": 1201,
+        "sha256": "92138966080217d3f46c600781aabb60db1698903df74ae7c6ffd9839a848d15",
+        "utf8": "---- self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back stdout ----\n\nthread 'self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back' (1013562) panicked at crates/update/tests/round/self_cuts.rs:305:24:\nupdater fixture did not exit: check=3 caller=crates/update/tests/round/self_cuts.rs:305:24 path=/var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmpwImDlY/usr/local/lib/lampos/lamp-update-back expected=old sha256=464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7; pid=27860 elapsed=2.001010586s polls=357 last_poll=2.001006993s..2.001009476s final_status=Ok(None) (diagnostic only; timeout still fails)\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::executable\n   3: round::self_cuts::boundary\n   4: round::self_cuts::prepared\n   5: round::self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back\n   6: round::self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. Classification/standalone outcomes are separate; no historical-cause claim."
+    }
+  ],
+  "failure_policy": "Every original observation remains bound to its own source. No unrecorded retry, failure waiver or historical-cause claim."
+}

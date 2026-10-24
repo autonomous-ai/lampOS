@@ -1,0 +1,15 @@
+{
+  "new_execution_during_sealing": false,
+  "all_selected_cases_bound": true,
+  "complete_binding": true,
+  "source_unchanged": true,
+  "actual_failure_diagnostics": 2,
+  "no_unrun_stages": true,
+  "case_counts": {
+    "passed": 7250,
+    "failed": 2,
+    "ignored": 34,
+    "measured": 0,
+    "filtered_out": 0
+  }
+}

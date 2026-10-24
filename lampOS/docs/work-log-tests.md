@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-24 16:26 +0700 — phone rule unresolved; C6 clock carry starts
+
+Ready for lamp-voice: no for the new clock carry and phone candidate.
+
+[Phone current evidence](verification/tests-phone-e63a86d0-20261024/) retains the complete **7,250/2/34** run, all target/case bindings and nine fixed standalone observations **8/1**. The changed phone case passes, but the new Update case is **2/3**, so local qualification stays unresolved. Its full and failed standalone observations reached different exit-watchdog boundaries; source equality and later passes establish no cause or waiver. The binary and all records are frozen before target reuse; a separate source audit is preparing the next bounded diagnostic.
+
+Train 77/78 introduced a second real conflict before the unused 802 carry ran. The new clock head is **42cf24d5a on c6dfe9809**; its single test-hunk resolution retains upstream ready-and-spare **>=2** and the owned fixture-clock samples. Eight per-file authored patches remain equal; stop_words differs by that upstream context, so no whole-patch equality is claimed. Exact-source Linux amd64 formatting passed, full source/archive/Git fingerprints stayed unchanged and owned container absence is verified. Its one full local gate has now been launched; no new result is claimed. The unused 802 plan remains historical preparation only.
+
+The voice freeze is applied: test-only clock/phone/Expression work continues; the sign-in runtime correction stays unoffered. No local ARM build or lamp action ran.
+
 ## 2026-10-24 15:49 +0700 — equal conflict carry; phone dependent suites active
 
 Ready for lamp-voice: no for #3190's new carry; its qualified 414b2df34 remains archived.

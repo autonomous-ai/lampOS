@@ -1,0 +1,164 @@
+[
+  {
+    "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-1/exact.stdout.txt",
+    "original_bytes": 2680,
+    "original_sha256": "db141fe267ef3c15675728a0c53d4685ae8e0e2db7ad243968c2719b756ffa91",
+    "utf8": "\nrunning 1 test\ntest self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back ... FAILED\n\nfailures:\n\n---- self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back stdout ----\n\nthread 'self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back' (1241453) panicked at crates/update/tests/round/self_cuts.rs:167:17:\nBox<dyn Any>\nstack backtrace:\n   0: std::panicking::begin_panic\n   1: std::panic::panic_any\n   2: round::self_cuts::stop_at::{{closure}}::{{closure}}\n   3: round::Lamp::round_observing::{{closure}}\n   4: lamp_update::round::Run::say\n   5: lamp_update::round::Run::own_switch\n   6: lamp_update::round::Run::own\n   7: lamp_update::round::round\n   8: round::Lamp::round_observing\n   9: round::self_cuts::stop_at::{{closure}}\n  10: core::ops::function::FnOnce::call_once\n  11: <core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once\n  12: std::panicking::catch_unwind::do_call\n  13: ___rust_try\n  14: std::panic::catch_unwind\n  15: round::self_cuts::stop_at\n  16: round::self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back\n  17: round::self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back::{{closure}}\n  18: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\nthread 'self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back' (1241453) panicked at crates/update/tests/round/self_cuts.rs:314:9:\nupdater fixture did not exit: check=4 caller=crates/update/tests/round/self_cuts.rs:314:9 path=/var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmp7bHOkb/opt/lampOS/update/current/lamp-update expected=new sha256=00f9a6da8d109db3cd028e8cfd8c96c4cf446ddf493fccac42fe4aa84f3135c2; pid=84420 elapsed=2.002924069s polls=348 last_poll=2.002920864s..2.002923122s final_status=Ok(None) (diagnostic only; timeout still fails)\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::executable\n   3: round::self_cuts::boundary\n   4: round::self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back\n   5: round::self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\nfailures:\n    self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 156 filtered out; finished in 15.78s\n\n"
+  },
+  {
+    "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-1/exact.stderr.txt",
+    "original_bytes": 107,
+    "original_sha256": "c0bb8b626a8f06978bdaa70a22af864d65b0cbda41721ee11115639d073c0ac7",
+    "utf8": "updater fixture cleanup: pid=84420 kill=Ok(()) reap=Ok(ExitStatus(unix_wait_status(9))) elapsed=120.755\u00b5s\n"
+  },
+  {
+    "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-2/exact.stdout.txt",
+    "original_bytes": 209,
+    "original_sha256": "a3c2f45397ba7acd5d78932c2a3429683c98c83ce4c22e967c2c34c156057e87",
+    "utf8": "\nrunning 1 test\ntest self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 27.15s\n\n"
+  },
+  {
+    "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-3/exact.stdout.txt",
+    "original_bytes": 209,
+    "original_sha256": "fdbd64f12fc7b5b321164ef6566be625e12b36c9472439e57a7b8b049470dbda",
+    "utf8": "\nrunning 1 test\ntest self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 37.15s\n\n"
+  },
+  {
+    "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/01-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-1/exact.stdout.txt",
+    "original_bytes": 206,
+    "original_sha256": "1a23292c9975c50f1940d1cbfba192974d6b5cf1da5674ced61df60b9301de8f",
+    "utf8": "\nrunning 1 test\ntest self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 14.18s\n\n"
+  },
+  {
+    "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-2/exact.stdout.txt",
+    "original_bytes": 206,
+    "original_sha256": "255ec70bf7b3185b9eb164ec258be6ee5fb64065ee98f6209e664dee99eed697",
+    "utf8": "\nrunning 1 test\ntest self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 25.12s\n\n"
+  },
+  {
+    "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-3/exact.stdout.txt",
+    "original_bytes": 206,
+    "original_sha256": "e2bbc2b7f011d2ca140a9b81dc4b170fa599f80fc40f1ab71531e931d6e3b3f3",
+    "utf8": "\nrunning 1 test\ntest self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 14.72s\n\n"
+  },
+  {
+    "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/02-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-1/exact.stdout.txt",
+    "original_bytes": 208,
+    "original_sha256": "e7e6f2a1bc3e453b137981977a96931e460d817fbd7d56d6b204fc9d810c196a",
+    "utf8": "\nrunning 1 test\ntest self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 27.77s\n\n"
+  },
+  {
+    "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-2/exact.stdout.txt",
+    "original_bytes": 208,
+    "original_sha256": "64e783f74d45b720d1e31be216aa6ab02c098aa016d4753e552d842925437f5a",
+    "utf8": "\nrunning 1 test\ntest self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 30.30s\n\n"
+  },
+  {
+    "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-3/exact.stdout.txt",
+    "original_bytes": 208,
+    "original_sha256": "56d9b4cc90df524689f6d74a351afff88f6b482bcc63e56488c68b46d8f44943",
+    "utf8": "\nrunning 1 test\ntest self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 29.94s\n\n"
+  },
+  {
+    "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3218/standalone/03-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  }
+]

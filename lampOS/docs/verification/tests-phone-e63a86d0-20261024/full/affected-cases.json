@@ -1,0 +1,25 @@
+{
+  "source_selection": {
+    "names": [
+      "messages::tests::a_text_never_waits_on_the_news_for_the_phone"
+    ],
+    "package": "lamp-voice",
+    "stage": "voice-default-parallel",
+    "source_bindings": [
+      {
+        "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+        "path": "lampOS/crates/voice/src/messages.rs",
+        "current_file_sha256": "e0b3d7b167ff6c8d5c805cd4a990c2e8ed2956b31c0eb0eb8ad9fb0881f3d0de"
+      }
+    ]
+  },
+  "actual": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "messages::tests::a_text_never_waits_on_the_news_for_the_phone",
+      "status": "ok"
+    }
+  ],
+  "compiled_inventory_is_execution": false
+}

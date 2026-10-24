@@ -1,0 +1,3 @@
+# #3218 prescribed standalone observations
+
+Source `e63a86d0d470d95cceb8c6dea75015838207953a`: 8 passed, 1 failed, 0 unrun. Each selected case received exactly three observations using its hashed full-run executable, with source and executable guards before and after. All actual outcomes and exact streams are retained. No retries or historical-cause claims. The matched light-call failure and all original full-run failures remain separate; these observations do not relabel the earlier base as the current integration source. Runtime-environment limits are recorded in the plan. No lamp or ARM build ran locally.
