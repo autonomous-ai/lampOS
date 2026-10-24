@@ -626,6 +626,12 @@ What changed, tests only:
   the expiry after input loss (`wall + 2_000`), the restart that must not
   reuse old joints, and the pause's one-second look are all as before.
 
+The no-pause equivalence fixture publishes the optional keeper setting and
+constructs its service before `populate`, then steps immediately with the
+returned wall clock. This keeps setup work before the fresh input batch;
+it does not remove the publication-time window below or change any expiry,
+freshness, clock-set or no-pause equivalence checks.
+
 The limit that remains: a stall inside a fixture's own publications, after
 an input with a short limit and before the clock read, longer than that
 limit (200 to 500 ms), still fails. Two injected 1.3 s delays at
