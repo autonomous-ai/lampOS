@@ -1,0 +1,53 @@
+{
+  "status": "Prepared only; explicit root artifact-restore-and33grant required",
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "frozen_33_plan_sha256": "11289c006ec3db64370749a3df0234173f493362feec3a07d97d52b4b4d78829",
+  "controller_sha256": "3e3e344e9b9a9e0a84255201e1570bc86f5b2fa9d7175fc416b1c76d9ec91d4d",
+  "controller": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/run-approved-33-with-restore.py",
+  "helper_hashes": {
+    "run.py": "b4e5a28eff498140e959397e053a2ce1d268b58e897186d76a43f8393d0cc555",
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+  },
+  "paths": [
+    {
+      "primary": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory",
+      "reader_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-reader",
+      "reader_sha256": "27ae888a70d70be4b4b8d0890829a1edd926b898151697bc376ec3c1aa6edba3",
+      "reader_captured_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "reader_captured_features": [],
+      "workspace_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-workspace-after",
+      "workspace_sha256": "26bebadb3fac640cc6bee4916568e85cd28ec8f1c999a6f89fd89f8fc0b5af4c",
+      "original_mode": 493
+    },
+    {
+      "primary": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory-fixture",
+      "reader_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-fixture-reader",
+      "reader_sha256": "17d0e568e291ed4b9978ab3206db55d4a6512eced60fac067dab10313778918f",
+      "reader_captured_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "reader_captured_features": [],
+      "workspace_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-fixture-workspace-after",
+      "workspace_sha256": "2fb36e77f5adac0a2d8a123fd27b16efb290b040cd392fdaf1dcc5dc1cda9fba",
+      "original_mode": 493
+    }
+  ],
+  "scope": "Only two generated top-level Memory child paths, no source or compiler changes. Exact reader bytes installed atomically, checked before/after every observation; saved workspace bytes/modes restored in finally.",
+  "observation_count": 33,
+  "outer_case_watchdog_seconds": 600,
+  "normal_nonzero_test": "Record ordinary failure and finish each planned3once; does not qualify case.",
+  "invalid_setup_source_storage_census_timeout": "Stop without retry, then restore both saved workspace paths.",
+  "interruption": "SIGINT/SIGTERM trigger owned-command cleanup and final restoration; signals blocked during final restore. SIGKILL/host crash can prevent finally; saved snapshots/journal permit explicit recovery, no unconditional crash-safety claim.",
+  "not_started": true
+}

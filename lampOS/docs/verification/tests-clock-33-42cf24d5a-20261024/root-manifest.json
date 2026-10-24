@@ -1,0 +1,79 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 1790,
+      "sha256": "604db10a740657adcb17cbd7d64d3767f7ec7f01d149674ad4b72e40377f4966"
+    },
+    {
+      "path": "artifact-restore-plan.json",
+      "bytes": 3524,
+      "sha256": "a7eaeaac7fe144f06fd4768860d7dc591f100868a0b0968f57559c908c43a732"
+    },
+    {
+      "path": "controller-source.json",
+      "bytes": 8673,
+      "sha256": "1cdbebf42176b7e53c505dcbff56a19198b5b65abf20d3d5406a766991f388e2"
+    },
+    {
+      "path": "controller-state-and-restoration.json",
+      "bytes": 86579,
+      "sha256": "4fd19c6cf6b6890b5a329cced0a59e5864ae723c54c1f82833d134bbaf1131e5"
+    },
+    {
+      "path": "exact-reuse-review.json",
+      "bytes": 6118,
+      "sha256": "73edacea75ebbfbef8b2fe889bbcfbf9181427ee79df8050eef45ddd7905cdc7"
+    },
+    {
+      "path": "exact-streams.json",
+      "bytes": 38253,
+      "sha256": "ffebfc876fb6fdf85f0485ac1ffa0c94e27b35237c358f7ca36de0182166d5ce"
+    },
+    {
+      "path": "frozen-33-plan.json",
+      "bytes": 19604,
+      "sha256": "11289c006ec3db64370749a3df0234173f493362feec3a07d97d52b4b4d78829"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 1499,
+      "sha256": "27acc5662e6697fc3b6cb5a4635386b66bf8a60a76e22aaba4d9a3a050866748"
+    },
+    {
+      "path": "original-seven-results.json",
+      "bytes": 3390,
+      "sha256": "f60543519c18bf1d0cdd400133e9b95129f4a6fbb8fb5987811825c75830808f"
+    },
+    {
+      "path": "package-label-note.json",
+      "bytes": 3336,
+      "sha256": "d9503a81dcff93cbcf3d248f9801639fb2b59bc736a59d8e0870a54f1c5c8c6f"
+    },
+    {
+      "path": "qualification-table.json",
+      "bytes": 15048,
+      "sha256": "4b3b2513025b282fb8afb06e970fa44a9eaf74790a9e98c6f9629394d1cf7a29"
+    },
+    {
+      "path": "results.json",
+      "bytes": 82377,
+      "sha256": "288c7d4ef82d0f6d8cb4f466df8377859b4e168f58662c232f186c33acde085a"
+    },
+    {
+      "path": "root-review.json",
+      "bytes": 587,
+      "sha256": "82631b9c47b9fe8d47f88edc750f2a55a2c95ec0761e5f132ee77129589c26e1"
+    },
+    {
+      "path": "root-review.md",
+      "bytes": 2021,
+      "sha256": "fad3ec030c60e6aba40f383b0584c29aa118190d4b72dc143b85e39dc039a5ba"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 357,
+      "sha256": "72058e4771a5a5b6dc9fcef1f7b4770da29b795e0c442d53aae397bb8baa6bb6"
+    }
+  ]
+}

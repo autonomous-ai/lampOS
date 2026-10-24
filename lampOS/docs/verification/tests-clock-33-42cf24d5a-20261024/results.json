@@ -1,0 +1,1755 @@
+{
+  "status": "complete; all33actualoutcomes retained",
+  "observations": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "--exact",
+          "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice",
+        "started_at": "2026-10-24T11:14:44.995095+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 29101,
+        "owned_process_group": 29101,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.39568,
+        "finished_at": "2026-10-24T11:14:45.391845+00:00",
+        "stdout_sha256": "8d58df7481295584483e2e326a5cd3ad221d95de5d9ab4489dcb3a856354b345",
+        "stdout_bytes": 194,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "--exact",
+          "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice",
+        "started_at": "2026-10-24T11:14:51.751141+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 29628,
+        "owned_process_group": 29628,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.322914,
+        "finished_at": "2026-10-24T11:14:52.074224+00:00",
+        "stdout_sha256": "8d58df7481295584483e2e326a5cd3ad221d95de5d9ab4489dcb3a856354b345",
+        "stdout_bytes": 194,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "--exact",
+          "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice",
+        "started_at": "2026-10-24T11:14:58.330744+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 29692,
+        "owned_process_group": 29692,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.322937,
+        "finished_at": "2026-10-24T11:14:58.653823+00:00",
+        "stdout_sha256": "8d58df7481295584483e2e326a5cd3ad221d95de5d9ab4489dcb3a856354b345",
+        "stdout_bytes": 194,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "--exact",
+          "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice",
+        "started_at": "2026-10-24T11:15:04.999425+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 29833,
+        "owned_process_group": 29833,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.874445,
+        "finished_at": "2026-10-24T11:15:07.874046+00:00",
+        "stdout_sha256": "01338cf73fb1378d81129eceb15f030cda419def0e4b30ad3412607a2287c00d",
+        "stdout_bytes": 212,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "--exact",
+          "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice",
+        "started_at": "2026-10-24T11:15:14.327396+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 30185,
+        "owned_process_group": 30185,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.838494,
+        "finished_at": "2026-10-24T11:15:17.166018+00:00",
+        "stdout_sha256": "968c8910c35fe5e017acbdaa3acc9c47b78fcb1cb44d1b8487b0e19301f234f0",
+        "stdout_bytes": 212,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "--exact",
+          "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice",
+        "started_at": "2026-10-24T11:15:23.482152+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 30474,
+        "owned_process_group": 30474,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.827292,
+        "finished_at": "2026-10-24T11:15:26.309524+00:00",
+        "stdout_sha256": "968c8910c35fe5e017acbdaa3acc9c47b78fcb1cb44d1b8487b0e19301f234f0",
+        "stdout_bytes": 212,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+          "--exact",
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression",
+        "started_at": "2026-10-24T11:15:32.651921+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 30728,
+        "owned_process_group": 30728,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.100246,
+        "finished_at": "2026-10-24T11:15:32.752298+00:00",
+        "stdout_sha256": "4837173628b2d1f8bb2a2cb7d4eba4c672824d9378ebcc30db05193006ea2c3c",
+        "stdout_bytes": 203,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+          "--exact",
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression",
+        "started_at": "2026-10-24T11:15:39.316624+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 30892,
+        "owned_process_group": 30892,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.103975,
+        "finished_at": "2026-10-24T11:15:39.420772+00:00",
+        "stdout_sha256": "4837173628b2d1f8bb2a2cb7d4eba4c672824d9378ebcc30db05193006ea2c3c",
+        "stdout_bytes": 203,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+          "--exact",
+          "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression",
+        "started_at": "2026-10-24T11:15:46.053812+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 31007,
+        "owned_process_group": 31007,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.101051,
+        "finished_at": "2026-10-24T11:15:46.155031+00:00",
+        "stdout_sha256": "4837173628b2d1f8bb2a2cb7d4eba4c672824d9378ebcc30db05193006ea2c3c",
+        "stdout_bytes": 203,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+          "--exact",
+          "without_a_pause_said_expression_asks_exactly_as_before"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression",
+        "started_at": "2026-10-24T11:15:53.363045+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 32256,
+        "owned_process_group": 32256,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.15935,
+        "finished_at": "2026-10-24T11:15:53.522588+00:00",
+        "stdout_sha256": "256ddf1846cd2889b6e6381b468beb9005934372140d716de30a82f625623bb7",
+        "stdout_bytes": 180,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+          "--exact",
+          "without_a_pause_said_expression_asks_exactly_as_before"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression",
+        "started_at": "2026-10-24T11:16:00.147828+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 32525,
+        "owned_process_group": 32525,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.106491,
+        "finished_at": "2026-10-24T11:16:00.254475+00:00",
+        "stdout_sha256": "9a92250b34deecd9471f26fb4cb875f9a0afefe92a4f3d70e73cbd4718001027",
+        "stdout_bytes": 180,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+          "--exact",
+          "without_a_pause_said_expression_asks_exactly_as_before"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression",
+        "started_at": "2026-10-24T11:16:06.844412+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 32679,
+        "owned_process_group": 32679,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 0.102508,
+        "finished_at": "2026-10-24T11:16:06.947063+00:00",
+        "stdout_sha256": "9a92250b34deecd9471f26fb4cb875f9a0afefe92a4f3d70e73cbd4718001027",
+        "stdout_bytes": 180,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:16:13.519654+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 32813,
+        "owned_process_group": 32813,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.363337,
+        "finished_at": "2026-10-24T11:16:15.883080+00:00",
+        "stdout_sha256": "240dabcb872c8fff99dbf8aadd34839d06e592c0ae64aaf5a0a978011581b692",
+        "stdout_bytes": 202,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:16:22.443524+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 33025,
+        "owned_process_group": 33025,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.587482,
+        "finished_at": "2026-10-24T11:16:24.031119+00:00",
+        "stdout_sha256": "fbb4f4cfdd0c59005042b90bdacb36593fe9485d6e91776005c963ef68754edb",
+        "stdout_bytes": 202,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:16:30.416655+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 33106,
+        "owned_process_group": 33106,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.668202,
+        "finished_at": "2026-10-24T11:16:32.087918+00:00",
+        "stdout_sha256": "8485ba1b4851fc34957b5ef86fcd14f0dd094e001e4b5f43b8a61523af272b14",
+        "stdout_bytes": 202,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:16:38.365696+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 33199,
+        "owned_process_group": 33199,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.937205,
+        "finished_at": "2026-10-24T11:16:40.304999+00:00",
+        "stdout_sha256": "4bb16309af03d2282e7f6ec35a6f6a57c9bc6ae99739c80d4e9c11108f841523",
+        "stdout_bytes": 201,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:16:46.800525+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 33308,
+        "owned_process_group": 33308,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.395351,
+        "finished_at": "2026-10-24T11:16:48.196895+00:00",
+        "stdout_sha256": "1892bc26b7bb7556ac99e6d06aa50bf26f26b622bf7a18e56aa80f0c390a4ffa",
+        "stdout_bytes": 201,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:16:54.913845+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 33500,
+        "owned_process_group": 33500,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.333808,
+        "finished_at": "2026-10-24T11:16:56.248249+00:00",
+        "stdout_sha256": "d1cf661c8d99dadb6d5be5436b0edec47de1d01bb7ea4449dc5b466ce49fd20e",
+        "stdout_bytes": 201,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:17:02.831004+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 34145,
+        "owned_process_group": 34145,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.209284,
+        "finished_at": "2026-10-24T11:17:06.041007+00:00",
+        "stdout_sha256": "78a0179b5b1bb7192cfee1afe5c10aea79dc3c1636e00685bb72bcb2fc9be4fd",
+        "stdout_bytes": 213,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:17:12.605591+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 34317,
+        "owned_process_group": 34317,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.161068,
+        "finished_at": "2026-10-24T11:17:15.767185+00:00",
+        "stdout_sha256": "d599f98ada650d897a50bbd9fccc58bb5cea8a35bdd3defd61a88a2fe8efe2bc",
+        "stdout_bytes": 213,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:17:22.241446+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 34499,
+        "owned_process_group": 34499,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.185042,
+        "finished_at": "2026-10-24T11:17:25.426760+00:00",
+        "stdout_sha256": "3ebf8f2959341fb1f0bfee7bda5fff9cd26c8173449d257a2e50884f4fb6acd9",
+        "stdout_bytes": 213,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:17:31.934210+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 34596,
+        "owned_process_group": 34596,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.988695,
+        "finished_at": "2026-10-24T11:17:33.923056+00:00",
+        "stdout_sha256": "8399f068a12888b0c73199d66bd192ae7f57c54fc2f0d6dcd649b3cc636dd560",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:17:40.634845+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 35625,
+        "owned_process_group": 35625,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.002455,
+        "finished_at": "2026-10-24T11:17:42.637465+00:00",
+        "stdout_sha256": "bdff3ac4e7a9cc8dc8a6844bd01f1fcaf336a377a281bdcea544b796f29ea598",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:17:49.123597+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 35725,
+        "owned_process_group": 35725,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 2.093776,
+        "finished_at": "2026-10-24T11:17:51.217495+00:00",
+        "stdout_sha256": "65dad0a1e8d30dd15dd0ad771fe411e8c5737ad78ba06b76eb344066bd8e5ecd",
+        "stdout_bytes": 196,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:17:57.693578+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 35829,
+        "owned_process_group": 35829,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.330917,
+        "finished_at": "2026-10-24T11:18:01.024561+00:00",
+        "stdout_sha256": "792bb521cdfc6b0d8cbf0c1a6f0d57eab0a5b115670030ef8b455468299f6fe3",
+        "stdout_bytes": 200,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:18:07.718478+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 36593,
+        "owned_process_group": 36593,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.423004,
+        "finished_at": "2026-10-24T11:18:11.141557+00:00",
+        "stdout_sha256": "8bf29677c5d9327560e3d367fcc546b41c64e58f7f6355d294c0aa58579d37c8",
+        "stdout_bytes": 200,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:18:17.960398+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 36905,
+        "owned_process_group": 36905,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.371725,
+        "finished_at": "2026-10-24T11:18:21.332201+00:00",
+        "stdout_sha256": "d8c1e2d37ac2433cba7f1c84f7e590e452de2d62b2c7dce5a8962d58e8dc6fc3",
+        "stdout_bytes": 200,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:18:28.012968+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 37200,
+        "owned_process_group": 37200,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.599882,
+        "finished_at": "2026-10-24T11:18:31.612906+00:00",
+        "stdout_sha256": "aa752fd2651d91f56eab4977ae12b6a1d4c31e13d17fc94b5836a369da41be47",
+        "stdout_bytes": 198,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:18:38.397599+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 37707,
+        "owned_process_group": 37707,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 3.696306,
+        "finished_at": "2026-10-24T11:18:42.093955+00:00",
+        "stdout_sha256": "53888e26d2d3a0af99733c7b9ca8ea445d0b1b65482bc2abe9030a32e93d654c",
+        "stdout_bytes": 198,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:18:48.722360+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 37967,
+        "owned_process_group": 37967,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 4.114433,
+        "finished_at": "2026-10-24T11:18:52.836842+00:00",
+        "stdout_sha256": "d283da0658a71677fe8738150ed1cfe47b4b868297d837ec0b309dee32151a34",
+        "stdout_bytes": 198,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+      "repetition": 1,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:18:59.284978+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 39121,
+        "owned_process_group": 39121,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.922949,
+        "finished_at": "2026-10-24T11:19:01.208004+00:00",
+        "stdout_sha256": "f3f8a0c5467eeea141a2be486ff94ba6f724fb4e8273af1b04fca9aaf719b31a",
+        "stdout_bytes": 205,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-1",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+      "repetition": 2,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:19:07.831459+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 39779,
+        "owned_process_group": 39779,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.748698,
+        "finished_at": "2026-10-24T11:19:09.580290+00:00",
+        "stdout_sha256": "90e4236274f6b15c6390f3b65beaa56b2dde51ada642ad053c222ea37bce654c",
+        "stdout_bytes": 205,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-2",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+      "repetition": 3,
+      "command": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+          "--exact",
+          "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory",
+        "started_at": "2026-10-24T11:19:16.448700+00:00",
+        "timeout_seconds": 600,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 39927,
+        "owned_process_group": 39927,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.821844,
+        "finished_at": "2026-10-24T11:19:18.270638+00:00",
+        "stdout_sha256": "321d6dc20e537d5af413c21e147125414e9a2f13680cec84e19e309b27dfafae",
+        "stdout_bytes": 205,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-3",
+      "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "reader_child_paths_verified": true,
+      "outcome": "ok"
+    }
+  ],
+  "unrun": 0
+}

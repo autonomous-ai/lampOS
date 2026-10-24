@@ -1,0 +1,53 @@
+{
+  "scope": "Display-name correction only; original approved report retained. Cargo path IDs sometimes use a version-only fragment.",
+  "corrections": [
+    {
+      "record_index": 6,
+      "reported_fragment_label": "0.2.0",
+      "declared_package_name": "sonora",
+      "package_id_unchanged": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora#0.2.0",
+      "target_name": "sonora",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora/Cargo.toml",
+      "manifest_sha256": "1e4ee33b416b79c0d03f009ae2252d14f9bdec5e9846e355a944c8b7331bf50d"
+    },
+    {
+      "record_index": 54,
+      "reported_fragment_label": "0.2.0",
+      "declared_package_name": "sonora",
+      "package_id_unchanged": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora#0.2.0",
+      "target_name": "sonora",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora/Cargo.toml",
+      "manifest_sha256": "1e4ee33b416b79c0d03f009ae2252d14f9bdec5e9846e355a944c8b7331bf50d"
+    },
+    {
+      "record_index": 78,
+      "reported_fragment_label": "0.2.0",
+      "declared_package_name": "sonora",
+      "package_id_unchanged": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora#0.2.0",
+      "target_name": "sonora",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora/Cargo.toml",
+      "manifest_sha256": "1e4ee33b416b79c0d03f009ae2252d14f9bdec5e9846e355a944c8b7331bf50d"
+    },
+    {
+      "record_index": 129,
+      "reported_fragment_label": "0.2.0",
+      "declared_package_name": "sonora",
+      "package_id_unchanged": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora#0.2.0",
+      "target_name": "sonora",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora/Cargo.toml",
+      "manifest_sha256": "1e4ee33b416b79c0d03f009ae2252d14f9bdec5e9846e355a944c8b7331bf50d"
+    },
+    {
+      "record_index": 153,
+      "reported_fragment_label": "0.24.0",
+      "declared_package_name": "tough",
+      "package_id_unchanged": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/vendor/tough#0.24.0",
+      "target_name": "tough",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/vendor/tough/Cargo.toml",
+      "manifest_sha256": "1980c850b72070031a2e6f639ad804a841ac5adb135a527bd50e7033effba5bb"
+    }
+  ],
+  "lineage_identity_keys_unchanged": true,
+  "explanation": "Every compilation/reuse comparison used full raw package_id, source root/path, target, profile, features and filenames; the fragment label was not used for lineage identity.",
+  "new_execution": false
+}

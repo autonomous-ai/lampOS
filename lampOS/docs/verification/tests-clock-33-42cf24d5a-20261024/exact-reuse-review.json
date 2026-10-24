@@ -1,0 +1,124 @@
+{
+  "status": "passed",
+  "links": [
+    {
+      "reuse_index": 77,
+      "compile_index": 53,
+      "package": "lamp-camera",
+      "compile_step": "voice-default-parallel",
+      "reuse_step": "readers-default-parallel",
+      "all_package_source_profile_feature_exact_filenames_equal": true,
+      "fields": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/camera#lamp-camera@0.1.0",
+        "package_source_root": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/camera",
+        "target_src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/camera/build.rs",
+        "target_kind": [
+          "custom-build"
+        ],
+        "target_name": "build-script-build",
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/build/lamp-camera-3b932f7397b2694a/build-script-build"
+        ],
+        "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+      }
+    },
+    {
+      "reuse_index": 78,
+      "compile_index": 54,
+      "package": "0.2.0",
+      "compile_step": "voice-default-parallel",
+      "reuse_step": "readers-default-parallel",
+      "all_package_source_profile_feature_exact_filenames_equal": true,
+      "fields": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora#0.2.0",
+        "package_source_root": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora",
+        "target_src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/third_party/sonora/src/lib.rs",
+        "target_kind": [
+          "lib"
+        ],
+        "target_name": "sonora",
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rmeta"
+        ],
+        "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+      }
+    },
+    {
+      "reuse_index": 86,
+      "compile_index": 65,
+      "package": "lamp-voice-processes",
+      "compile_step": "voice-default-parallel",
+      "reuse_step": "readers-default-parallel",
+      "all_package_source_profile_feature_exact_filenames_equal": true,
+      "fields": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+        "package_source_root": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice-processes",
+        "target_src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice-processes/src/lib.rs",
+        "target_kind": [
+          "lib"
+        ],
+        "target_name": "lamp_voice_processes",
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rmeta"
+        ],
+        "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+      }
+    },
+    {
+      "reuse_index": 124,
+      "compile_index": 53,
+      "package": "lamp-camera",
+      "compile_step": "voice-default-parallel",
+      "reuse_step": "workspace-build",
+      "all_package_source_profile_feature_exact_filenames_equal": true,
+      "fields": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/camera#lamp-camera@0.1.0",
+        "package_source_root": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/camera",
+        "target_src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/camera/build.rs",
+        "target_kind": [
+          "custom-build"
+        ],
+        "target_name": "build-script-build",
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/build/lamp-camera-3b932f7397b2694a/build-script-build"
+        ],
+        "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4"
+      }
+    }
+  ],
+  "no_new_execution": true
+}

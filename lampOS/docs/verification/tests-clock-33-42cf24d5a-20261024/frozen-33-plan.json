@@ -1,0 +1,450 @@
+{
+  "status": "FROZEN list; execution HOLD until child-path restoration is explicitly reviewed/granted",
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "source_aggregate_sha256": "2006828ace2a2fa58f668befbb4a7ef5469a33041bbbc1224c5878d22b807fd4",
+  "cases": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "status": "FAILED",
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "status": "FAILED",
+      "phase": "voice-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7"
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a"
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+      "status": "FAILED",
+      "phase": "readers-default-parallel",
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a"
+    }
+  ],
+  "repetitions": 3,
+  "observation_count": 33,
+  "test_executable_bindings": [
+    {
+      "original_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-bea5362949cbd257",
+      "saved_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/test-1",
+      "sha256": "4148c0a9dbbb2f404917ed16d28bad3a0bdc31152bf511e6d543ea20bc7e6a1a",
+      "bytes": 14786724,
+      "original_mode_octal": "0o755",
+      "saved_mode_octal": "0o555",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory#lamp-memory@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "original_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "saved_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/test-2",
+      "sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d",
+      "bytes": 114408336,
+      "original_mode_octal": "0o755",
+      "saved_mode_octal": "0o555",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice#lamp-voice@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "original_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/runtime-8ba534de81614d18",
+      "saved_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/test-3",
+      "sha256": "bb3c9527997614bda38982ee77046aaab0ade4babf53f1446a282d4ef8fe35a7",
+      "bytes": 6631192,
+      "original_mode_octal": "0o755",
+      "saved_mode_octal": "0o555",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression#lamp-expression@0.1.0",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    }
+  ],
+  "memory_child_bindings": [
+    {
+      "target": "lamp-memory",
+      "full_reader_primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory",
+      "full_reader_sha256": "27ae888a70d70be4b4b8d0890829a1edd926b898151697bc376ec3c1aa6edba3",
+      "captured_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "captured_features": [],
+      "exact_retained_matches": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_memory-f54159a8caacc470",
+          "sha256": "27ae888a70d70be4b4b8d0890829a1edd926b898151697bc376ec3c1aa6edba3",
+          "bytes": 7504660,
+          "mode_octal": "0o755"
+        }
+      ],
+      "frozen_reader_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-reader",
+      "frozen_reader_sha256": "27ae888a70d70be4b4b8d0890829a1edd926b898151697bc376ec3c1aa6edba3",
+      "saved_workspace_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-workspace-after",
+      "workspace_sha256": "26bebadb3fac640cc6bee4916568e85cd28ec8f1c999a6f89fd89f8fc0b5af4c",
+      "primary_original_mode_octal": "0o755",
+      "primary_unchanged_during_freeze": true
+    },
+    {
+      "target": "lamp-memory-fixture",
+      "full_reader_primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory-fixture",
+      "full_reader_sha256": "17d0e568e291ed4b9978ab3206db55d4a6512eced60fac067dab10313778918f",
+      "captured_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "captured_features": [],
+      "exact_retained_matches": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_memory_fixture-b5078389ce1900d0",
+          "sha256": "17d0e568e291ed4b9978ab3206db55d4a6512eced60fac067dab10313778918f",
+          "bytes": 7762820,
+          "mode_octal": "0o755"
+        }
+      ],
+      "frozen_reader_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-fixture-reader",
+      "frozen_reader_sha256": "17d0e568e291ed4b9978ab3206db55d4a6512eced60fac067dab10313778918f",
+      "saved_workspace_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/3190-current-full-witness/lamp-memory-fixture-workspace-after",
+      "workspace_sha256": "2fb36e77f5adac0a2d8a123fd27b16efb290b040cd392fdaf1dcc5dc1cda9fba",
+      "primary_original_mode_octal": "0o755",
+      "primary_unchanged_during_freeze": true
+    }
+  ],
+  "approved_helper_hashes": {
+    "run.py": "b4e5a28eff498140e959397e053a2ce1d268b58e897186d76a43f8393d0cc555",
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+  },
+  "no_source_change_or_recompile": true,
+  "target_rewrite": false,
+  "body_motion_and_expression": "Selected cases run in-process on real temporary buses; runtime.rs process-spawning sleep_name module is not selected.",
+  "memory_voice_and_voice_people": "Selected fixtures bind actual Store/Server on sockets in threads, no executable launch in their fixture definitions.",
+  "memory_health": "sqlite_reports uses controlled lamp-memory-fixture; environment-alone uses ordinary lamp-memory. Both compile-time primary paths currently hold workspace-build replacements and require a reviewed atomic restore/restore-back plan before same-artifact observations.",
+  "voice_push_once": "Rig run() creates cooperative_ready_fixture workers, which spawn PATH-resolved cat and exercise actual process shutdown/reaping. No CARGO_BIN_EXE/current_exe path is used by that selected fixture.",
+  "system_cat": {
+    "requested": "cat",
+    "resolved_path": "/bin/cat",
+    "bytes": 118800,
+    "sha256": "2b6e8f3f90c42a9d8d1e5471efb4173ad3499fc8ca4039b39327b394616cf39e",
+    "mode_octal": "0o755"
+  },
+  "child_scope_sources": [
+    {
+      "path": "lampOS/crates/voice/src/body_motion.rs",
+      "sha256": "1c4798c6a5a2ed5b9849dc59434fca2ee978ac5bcebcc3f4e61eb2656a1ed2fd"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4"
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "sha256": "8eddd365fd7d0857cca5ffb9439c595543ec7bd1026bda917ccd81fec729c593"
+    },
+    {
+      "path": "lampOS/crates/expression/tests/runtime.rs",
+      "sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice.rs",
+      "sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice_people.rs",
+      "sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9"
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/health.rs",
+      "sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60"
+    }
+  ]
+}

@@ -4228,3 +4228,9 @@ Prepared the own isolated e63 diagnostic branch and applied only the reviewed ti
 Ready for lamp-voice: no
 
 Frozen `42cf24d5a` completed: 7,267 passed / 17 failed / 50 ignored; all 88 authored cases passed. Every target and case is bound, with unchanged source bytes/modes/symlinks. Fmt, strict Clippy, workspace build and diff checks passed. Resolved all 171 local compiler records, independently verifying raw messages, four exact-path reuses and four byte-equal promoted rlibs; the source-mtime refresh remains disclosed. Six failures match complete frozen-base phases; eleven require 33 planned standalone observations. Exact old Memory child programs were frozen because the workspace build replaced their paths; no standalone has run pending bounded artifact restoration review. [Complete run and all failures](verification/tests-clock-current-42cf24d5a-20261024/root-review.md).
+
+## 24 October, 18:24 — Current carry pushed after 33 exact passes
+
+Ready for lamp-voice: no
+
+Pushed `42cf24d5a` with an exact lease after all 33 prescribed observations passed, three per unresolved case. Root independently checked their outcomes, source/artifact/mode guards, all 66 streams and restoration of both compiled Memory child paths. All seven originally requested Voice cases passed in the full parallel run; all 88 authored cases passed. The complete full run still records 17 failures, classified by six retained base phases and eleven three-pass categories; no cause or full-suite-green claim. Fresh current-head Linux checks and reader are next, with #3190 remaining draft. [Exact observations, restoration and original seven cases](verification/tests-clock-33-42cf24d5a-20261024/root-review.md).

@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "test_executable_hash_mode_bindings": 3,
+  "exact_observation_rows": 33,
+  "source_guards_uniform": true,
+  "groups_absent_and_direct_waits": 33,
+  "workspace_child_paths_restored": 2,
+  "raw_stream_wrappers": 66,
+  "observations": {
+    "passed": 33,
+    "failed": 0,
+    "unrun": 0
+  },
+  "new_execution_during_sealing": false
+}

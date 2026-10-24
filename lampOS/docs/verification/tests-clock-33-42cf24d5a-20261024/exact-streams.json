@@ -1,0 +1,596 @@
+[
+  {
+    "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-1/exact.stdout.txt",
+    "original_bytes": 194,
+    "original_sha256": "8d58df7481295584483e2e326a5cd3ad221d95de5d9ab4489dcb3a856354b345",
+    "utf8": "\nrunning 1 test\ntest body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3730 filtered out; finished in 0.27s\n\n"
+  },
+  {
+    "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-2/exact.stdout.txt",
+    "original_bytes": 194,
+    "original_sha256": "8d58df7481295584483e2e326a5cd3ad221d95de5d9ab4489dcb3a856354b345",
+    "utf8": "\nrunning 1 test\ntest body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3730 filtered out; finished in 0.27s\n\n"
+  },
+  {
+    "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-3/exact.stdout.txt",
+    "original_bytes": 194,
+    "original_sha256": "8d58df7481295584483e2e326a5cd3ad221d95de5d9ab4489dcb3a856354b345",
+    "utf8": "\nrunning 1 test\ntest body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3730 filtered out; finished in 0.27s\n\n"
+  },
+  {
+    "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/01-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-1/exact.stdout.txt",
+    "original_bytes": 212,
+    "original_sha256": "01338cf73fb1378d81129eceb15f030cda419def0e4b30ad3412607a2287c00d",
+    "utf8": "\nrunning 1 test\ntest coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3730 filtered out; finished in 2.83s\n\n"
+  },
+  {
+    "case": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-2/exact.stdout.txt",
+    "original_bytes": 212,
+    "original_sha256": "968c8910c35fe5e017acbdaa3acc9c47b78fcb1cb44d1b8487b0e19301f234f0",
+    "utf8": "\nrunning 1 test\ntest coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3730 filtered out; finished in 2.78s\n\n"
+  },
+  {
+    "case": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-3/exact.stdout.txt",
+    "original_bytes": 212,
+    "original_sha256": "968c8910c35fe5e017acbdaa3acc9c47b78fcb1cb44d1b8487b0e19301f234f0",
+    "utf8": "\nrunning 1 test\ntest coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3730 filtered out; finished in 2.78s\n\n"
+  },
+  {
+    "case": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/02-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-1/exact.stdout.txt",
+    "original_bytes": 203,
+    "original_sha256": "4837173628b2d1f8bb2a2cb7d4eba4c672824d9378ebcc30db05193006ea2c3c",
+    "utf8": "\nrunning 1 test\ntest only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.06s\n\n"
+  },
+  {
+    "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-2/exact.stdout.txt",
+    "original_bytes": 203,
+    "original_sha256": "4837173628b2d1f8bb2a2cb7d4eba4c672824d9378ebcc30db05193006ea2c3c",
+    "utf8": "\nrunning 1 test\ntest only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.06s\n\n"
+  },
+  {
+    "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-3/exact.stdout.txt",
+    "original_bytes": 203,
+    "original_sha256": "4837173628b2d1f8bb2a2cb7d4eba4c672824d9378ebcc30db05193006ea2c3c",
+    "utf8": "\nrunning 1 test\ntest only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.06s\n\n"
+  },
+  {
+    "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/03-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "without_a_pause_said_expression_asks_exactly_as_before",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-1/exact.stdout.txt",
+    "original_bytes": 180,
+    "original_sha256": "256ddf1846cd2889b6e6381b468beb9005934372140d716de30a82f625623bb7",
+    "utf8": "\nrunning 1 test\ntest without_a_pause_said_expression_asks_exactly_as_before ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.07s\n\n"
+  },
+  {
+    "case": "without_a_pause_said_expression_asks_exactly_as_before",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "without_a_pause_said_expression_asks_exactly_as_before",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-2/exact.stdout.txt",
+    "original_bytes": 180,
+    "original_sha256": "9a92250b34deecd9471f26fb4cb875f9a0afefe92a4f3d70e73cbd4718001027",
+    "utf8": "\nrunning 1 test\ntest without_a_pause_said_expression_asks_exactly_as_before ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.06s\n\n"
+  },
+  {
+    "case": "without_a_pause_said_expression_asks_exactly_as_before",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "without_a_pause_said_expression_asks_exactly_as_before",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-3/exact.stdout.txt",
+    "original_bytes": 180,
+    "original_sha256": "9a92250b34deecd9471f26fb4cb875f9a0afefe92a4f3d70e73cbd4718001027",
+    "utf8": "\nrunning 1 test\ntest without_a_pause_said_expression_asks_exactly_as_before ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.06s\n\n"
+  },
+  {
+    "case": "without_a_pause_said_expression_asks_exactly_as_before",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/04-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-1/exact.stdout.txt",
+    "original_bytes": 202,
+    "original_sha256": "240dabcb872c8fff99dbf8aadd34839d06e592c0ae64aaf5a0a978011581b692",
+    "utf8": "\nrunning 1 test\ntest health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 2.32s\n\n"
+  },
+  {
+    "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-2/exact.stdout.txt",
+    "original_bytes": 202,
+    "original_sha256": "fbb4f4cfdd0c59005042b90bdacb36593fe9485d6e91776005c963ef68754edb",
+    "utf8": "\nrunning 1 test\ntest health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.52s\n\n"
+  },
+  {
+    "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-3/exact.stdout.txt",
+    "original_bytes": 202,
+    "original_sha256": "8485ba1b4851fc34957b5ef86fcd14f0dd094e001e4b5f43b8a61523af272b14",
+    "utf8": "\nrunning 1 test\ntest health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.59s\n\n"
+  },
+  {
+    "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/05-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-1/exact.stdout.txt",
+    "original_bytes": 201,
+    "original_sha256": "4bb16309af03d2282e7f6ec35a6f6a57c9bc6ae99739c80d4e9c11108f841523",
+    "utf8": "\nrunning 1 test\ntest health::the_environment_alone_does_not_enable_reporting_or_create_bus_data ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.90s\n\n"
+  },
+  {
+    "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-2/exact.stdout.txt",
+    "original_bytes": 201,
+    "original_sha256": "1892bc26b7bb7556ac99e6d06aa50bf26f26b622bf7a18e56aa80f0c390a4ffa",
+    "utf8": "\nrunning 1 test\ntest health::the_environment_alone_does_not_enable_reporting_or_create_bus_data ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.35s\n\n"
+  },
+  {
+    "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-3/exact.stdout.txt",
+    "original_bytes": 201,
+    "original_sha256": "d1cf661c8d99dadb6d5be5436b0edec47de1d01bb7ea4449dc5b466ce49fd20e",
+    "utf8": "\nrunning 1 test\ntest health::the_environment_alone_does_not_enable_reporting_or_create_bus_data ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.27s\n\n"
+  },
+  {
+    "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/06-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-1/exact.stdout.txt",
+    "original_bytes": 213,
+    "original_sha256": "78a0179b5b1bb7192cfee1afe5c10aea79dc3c1636e00685bb72bcb2fc9be4fd",
+    "utf8": "\nrunning 1 test\ntest voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.14s\n\n"
+  },
+  {
+    "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-2/exact.stdout.txt",
+    "original_bytes": 213,
+    "original_sha256": "d599f98ada650d897a50bbd9fccc58bb5cea8a35bdd3defd61a88a2fe8efe2bc",
+    "utf8": "\nrunning 1 test\ntest voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.12s\n\n"
+  },
+  {
+    "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-3/exact.stdout.txt",
+    "original_bytes": 213,
+    "original_sha256": "3ebf8f2959341fb1f0bfee7bda5fff9cd26c8173449d257a2e50884f4fb6acd9",
+    "utf8": "\nrunning 1 test\ntest voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.15s\n\n"
+  },
+  {
+    "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/07-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-1/exact.stdout.txt",
+    "original_bytes": 196,
+    "original_sha256": "8399f068a12888b0c73199d66bd192ae7f57c54fc2f0d6dcd649b3cc636dd560",
+    "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.93s\n\n"
+  },
+  {
+    "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-2/exact.stdout.txt",
+    "original_bytes": 196,
+    "original_sha256": "bdff3ac4e7a9cc8dc8a6844bd01f1fcaf336a377a281bdcea544b796f29ea598",
+    "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.96s\n\n"
+  },
+  {
+    "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-3/exact.stdout.txt",
+    "original_bytes": 196,
+    "original_sha256": "65dad0a1e8d30dd15dd0ad771fe411e8c5737ad78ba06b76eb344066bd8e5ecd",
+    "utf8": "\nrunning 1 test\ntest voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 2.01s\n\n"
+  },
+  {
+    "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/08-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-1/exact.stdout.txt",
+    "original_bytes": 200,
+    "original_sha256": "792bb521cdfc6b0d8cbf0c1a6f0d57eab0a5b115670030ef8b455468299f6fe3",
+    "utf8": "\nrunning 1 test\ntest voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.25s\n\n"
+  },
+  {
+    "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-2/exact.stdout.txt",
+    "original_bytes": 200,
+    "original_sha256": "8bf29677c5d9327560e3d367fcc546b41c64e58f7f6355d294c0aa58579d37c8",
+    "utf8": "\nrunning 1 test\ntest voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.36s\n\n"
+  },
+  {
+    "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-3/exact.stdout.txt",
+    "original_bytes": 200,
+    "original_sha256": "d8c1e2d37ac2433cba7f1c84f7e590e452de2d62b2c7dce5a8962d58e8dc6fc3",
+    "utf8": "\nrunning 1 test\ntest voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.29s\n\n"
+  },
+  {
+    "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/09-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-1/exact.stdout.txt",
+    "original_bytes": 198,
+    "original_sha256": "aa752fd2651d91f56eab4977ae12b6a1d4c31e13d17fc94b5836a369da41be47",
+    "utf8": "\nrunning 1 test\ntest voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.52s\n\n"
+  },
+  {
+    "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-2/exact.stdout.txt",
+    "original_bytes": 198,
+    "original_sha256": "53888e26d2d3a0af99733c7b9ca8ea445d0b1b65482bc2abe9030a32e93d654c",
+    "utf8": "\nrunning 1 test\ntest voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.65s\n\n"
+  },
+  {
+    "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-3/exact.stdout.txt",
+    "original_bytes": 198,
+    "original_sha256": "d283da0658a71677fe8738150ed1cfe47b4b868297d837ec0b309dee32151a34",
+    "utf8": "\nrunning 1 test\ntest voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 4.04s\n\n"
+  },
+  {
+    "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/10-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+    "repetition": 1,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-1/exact.stdout.txt",
+    "original_bytes": 205,
+    "original_sha256": "f3f8a0c5467eeea141a2be486ff94ba6f724fb4e8273af1b04fca9aaf719b31a",
+    "utf8": "\nrunning 1 test\ntest voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.84s\n\n"
+  },
+  {
+    "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+    "repetition": 1,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-1/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+    "repetition": 2,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-2/exact.stdout.txt",
+    "original_bytes": 205,
+    "original_sha256": "90e4236274f6b15c6390f3b65beaa56b2dde51ada642ad053c222ea37bce654c",
+    "utf8": "\nrunning 1 test\ntest voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.67s\n\n"
+  },
+  {
+    "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+    "repetition": 2,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-2/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  },
+  {
+    "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+    "repetition": 3,
+    "direction": "stdout",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-3/exact.stdout.txt",
+    "original_bytes": 205,
+    "original_sha256": "321d6dc20e537d5af413c21e147125414e9a2f13680cec84e19e309b27dfafae",
+    "utf8": "\nrunning 1 test\ntest voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 1.76s\n\n"
+  },
+  {
+    "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+    "repetition": 3,
+    "direction": "stderr",
+    "external_source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/3190-current-c6dfe/standalone-approved-33/11-3/exact.stderr.txt",
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "utf8": ""
+  }
+]

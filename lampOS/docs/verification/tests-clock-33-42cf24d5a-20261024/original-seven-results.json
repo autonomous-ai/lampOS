@@ -1,0 +1,58 @@
+{
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "source_record_sha256": "48329072ee06ebae388f90ceb376487bd84b88aba5bbde5ee994f88db7d6bf74",
+  "requested_count": 7,
+  "actual_passed": 7,
+  "cases": [
+    {
+      "requested_identity": "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "actual_status": "ok",
+      "executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "requested_identity": "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "actual_status": "ok",
+      "executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "requested_identity": "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "actual_status": "ok",
+      "executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "requested_identity": "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked",
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked",
+      "actual_status": "ok",
+      "executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "requested_identity": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+      "actual_status": "ok",
+      "executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "requested_identity": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+      "actual_status": "ok",
+      "executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    },
+    {
+      "requested_identity": "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "target": "lamp-voice:lib:lamp_voice",
+      "case": "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "actual_status": "ok",
+      "executable_sha256": "00bfd2c9a0abae68ba37d5fc1cd6d8f6e3fbb9605836affa83c97360b4b5888d"
+    }
+  ],
+  "limit": "Allseven pass in this complete default-parallel Voice phase. Other full-suite failures and standalone qualification remain separate; not a historical-cause finding."
+}

@@ -1,0 +1,463 @@
+{
+  "head": "42cf24d5a965abbc386e61672b15a4591a338607",
+  "full_counts": {
+    "passed": 7267,
+    "failed": 17,
+    "ignored": 50
+  },
+  "full_run_exit": 1,
+  "matched_phase_failures": 6,
+  "additional_failures_with_exact_three_passes": 11,
+  "standalone_total": 33,
+  "local_classification_rule_satisfied": true,
+  "native_ARM64_and_Linux_Clippy": "Separate current-head gates required before ready.",
+  "rows": [
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "target_name": "lamp-voice:lib:lamp_voice",
+      "name": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "phase": "voice-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "target_name": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "phase": "voice-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "reviewed same-case/source/assertion-phase failure on the frozen base",
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "target_name": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "phase": "voice-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "target_name": "lamp-voice:lib:lamp_voice",
+      "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "phase": "voice-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "reviewed same-case/source/assertion-phase failure on the frozen base",
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "target_name": "lamp-voice:lib:lamp_voice",
+      "name": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "phase": "voice-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "reviewed same-case/source/assertion-phase failure on the frozen base",
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-voice",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "phase": "voice-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "reviewed same-case/source/assertion-phase failure on the frozen base",
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-expression:test:runtime",
+      "name": "enabled_output_uses_a_new_session_and_expires_after_input_loss",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "reviewed same-case/source/assertion-phase failure on the frozen base",
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-expression:test:runtime",
+      "name": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-expression:test:runtime",
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-expression:test:runtime",
+      "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "reviewed same-case/source/assertion-phase failure on the frozen base",
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-memory:test:it",
+      "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-memory:test:it",
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-memory:test:it",
+      "name": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-memory:test:it",
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-memory:test:it",
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-memory:test:it",
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    },
+    {
+      "package": "lamp-memory",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/voice/lampOS/crates/memory/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "target_name": "lamp-memory:test:it",
+      "name": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused",
+      "phase": "readers-default-parallel",
+      "full_run_status": "FAILED",
+      "disposition": "three prescribed standalone passes on this exact head/artifact set",
+      "standalone_outcomes": [
+        "ok",
+        "ok",
+        "ok"
+      ],
+      "historical_cause_claim": false
+    }
+  ],
+  "limits": "Original full-run failures remain failures; the accepted local classification is not a historical cause finding or an all-green suite claim."
+}

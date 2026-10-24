@@ -1,0 +1,18 @@
+{
+  "actual_observations": 33,
+  "actual_passed": 33,
+  "cases": 11,
+  "each_case_observations": 3,
+  "unrun": 0,
+  "workspace_paths_restored_independently_verified": true,
+  "test_executables_and_saved_reader_program_hashes_independently_verified": true,
+  "state_sha256": "4fd19c6cf6b6890b5a329cced0a59e5864ae723c54c1f82833d134bbaf1131e5",
+  "results_sha256": "288c7d4ef82d0f6d8cb4f466df8377859b4e168f58662c232f186c33acde085a",
+  "qualification_rule_satisfied": true,
+  "full_run_remains_failed": {
+    "passed": 7267,
+    "failed": 17,
+    "ignored": 50
+  },
+  "cause_claim": false
+}
