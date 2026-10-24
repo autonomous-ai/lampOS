@@ -1,0 +1,83 @@
+{
+  "identity": "shared-bus-fixture-clock-scope-source-proposal-v1",
+  "scope_decision_pending": true,
+  "execution_or_real_API_implementation_authorized": false,
+  "pinned_remote_source": "419d6f64b0244ed62547f7f697f808bc994a79e5",
+  "proposal_patch_sha256": "dd827f9dbf70afb64176c12c2c033e295b62802dd3e9aeb27a3738522240b4ae",
+  "scope_domains_sha256": "ab38b7f92658db821625880a65ae9dcbaecc2b2c4edc18ae5bad64998aec75db",
+  "conservative_reverse_closure_count": 31,
+  "conservative_reverse_closure": [
+    "lamp-actions",
+    "lamp-addons",
+    "lamp-air",
+    "lamp-body",
+    "lamp-bus",
+    "lamp-cloud",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-health",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-mood",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-peek",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-schedule",
+    "lamp-selftest",
+    "lamp-settings",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-station",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "new_controls": {
+    "Bus": [
+      "ordinary_constructors_stay_system_while_an_explicit_bus_and_its_clones_share_time",
+      "expiry_and_grace_still_end_at_the_same_logical_boundaries",
+      "late_and_source_gone_require_their_original_logical_time_and_presence_changes",
+      "retained_rescan_uses_owned_time_and_guarded_header_stamps_use_that_wall"
+    ],
+    "Expression": [
+      "sleep_name::fixture_wall_preserves_future_and_joint_admission_boundaries",
+      "sleep_name::explicit_logical_publication_time_retains_the_1198_order_bridge"
+    ]
+  },
+  "all_controls_uncompiled_unexecuted": true,
+  "positive_counterfactual_plan_after_scope_decision": [
+    "Freeze exactold419 andapprovedcandidate source/artifacts/featureprofiles, compile/inventory oncepervariant only underfuturegrant. Applysameownedpostjoint/prewall1100mschannelhook toexactexistingclock-set case; preserveoriginalcountassertions andactualphase. Existingrootnegative18840isretained, not resampled bythisproposal. Root mustapproveactualnewobservationcounts explicitly beforeanycounterfactualexecute.",
+    "Predictoldrefused2/stalejoints fromretainedcontrol andcandidateaccepts samehostpause while allsemanticclocksfrozen. Originalnegative data does notproveARMhistory; candidate hasnoresultyet. No retryuntilgreen."
+  ],
+  "negative_mutation_controls_after_scope_decision": [
+    "Removeoneclockroute (normal/guardedheader,subscriberadmit/latest,Bus.latest,cadence,presence)\u2192relevantpositive/age/late/sourcegonecontrol mustfail.",
+    "WidenTTL/grace orfuture/jointbound\u2192100/101,50/51,500/501control mustfail; no productionboundsourcechanges inproposal.",
+    "FreezeSourceGoneindefinitely\u2192logical3000/3001presence/sourcegonecontrol mustfail; restorepublication mustrestoreactualpresenceentry.",
+    "Remove#1198excessbridge\u2192350mslogicalpublicationcontrol mustfailoriginalrejected-count assertion/order; preserveallnobody/name/speech/ClockSomeFalse/Nonecases."
+  ],
+  "future_gate_plan_not_granted": [
+    "AfterrequirednarrowFirstscopedecision, rootappliesonlyapprovedfiles onownbranch/currentbase andnewsourcefreeze. ExistingREC/privacy7filedraft remainsreference; no silentmerge or approvalcarry.",
+    "Resolve actualfeaturegraph/offlinelockedmetadataONCE afterfeaturemanifestedits. Currentstatic31packageclosure isconservative allnormal/dev/build/target/optional localpaths; not claimedactualcompiler graph.",
+    "Exactsourcefmt,strictalltargetClippy,fulltests/actualtargetcaseignoredcensus ofactualBusclosure,ordinaryworkspacebuild withfreshcurrentlocaloutputs (excludefixturefeature inactualBus productioncompilerartifactfeaturelists,not printedtreeonly).",
+    "Scope-specificnewclock/counterfactual/mutationcontrols keeprealdeadlinecleanup/socketwatchdogbounds and originalfailures. NativeLinuxClippy/ARMCI aftercommit/push separate; nolocalARMbuild/device/settingschange."
+  ],
+  "source_controls_unchanged": {
+    "wire_Header_expired_at_and_schema": true,
+    "Expression_product_runtime": true,
+    "originalSleeping_assertion_lines": true,
+    "normalconstructor_signatures": true,
+    "normalBusDebugshape": true,
+    "real_socket_started_elapsed_waits": true,
+    "boot_identity_real": true
+  },
+  "residual_real_domains": "See scope-and-domains.md: realIO/sockettimeouts/cleanup/childwatchdogs maystillfail; no semanticagefailure predicted solelyforpostpub1100mspause. MixedordinaryactoronfixtureRoot isoutsideoneclockdomaincontract. Logger/CLIcrossprocess clockprotocol notadded.",
+  "no_scope_question_sent": true,
+  "no_source_WT_Cargo_container_test_target_operation": true
+}

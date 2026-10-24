@@ -1,0 +1,61 @@
+{
+  "remote_verified_head": "419d6f64b0244ed62547f7f697f808bc994a79e5",
+  "remote_read": "git ls-remote origin refs/heads/lamp-voice matchedlocalorigin",
+  "sources": [
+    {
+      "path": "lampOS/crates/bus/Cargo.toml",
+      "git_blob": "b0e6e0b65c67ca8ab5d286f63e06fca87d728c14",
+      "sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+      "bytes": 568
+    },
+    {
+      "path": "lampOS/crates/bus/src/lib.rs",
+      "git_blob": "481c493ec637b959974d7810299727c321ca408e",
+      "sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+      "bytes": 17782
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "bytes": 32256
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "bytes": 38012
+    },
+    {
+      "path": "lampOS/crates/bus/src/live.rs",
+      "git_blob": "d0cdfbcccd2d232544310d51a42cba715b56c58f",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "bytes": 5990
+    },
+    {
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "bytes": 13555
+    },
+    {
+      "path": "lampOS/crates/expression/Cargo.toml",
+      "git_blob": "9f180e0e1f52e1c8dad3bcd915d97026acb805e1",
+      "sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+      "bytes": 745
+    },
+    {
+      "path": "lampOS/crates/expression/tests/runtime.rs",
+      "git_blob": "0d05d426aed9572917283762101d6ae9cc26a04e",
+      "sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+      "bytes": 47670
+    },
+    {
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "git_blob": "6fe2dc265f24a5209c9e09a357c5971b7501d92a",
+      "sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "bytes": 51319
+    }
+  ],
+  "proposal_only_not_applied": true
+}

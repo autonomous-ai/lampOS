@@ -1,0 +1,86 @@
+{
+  "base": "419d6f64b0244ed62547f7f697f808bc994a79e5",
+  "patch_sha256": "dd827f9dbf70afb64176c12c2c033e295b62802dd3e9aeb27a3738522240b4ae",
+  "files": [
+    {
+      "path": "lampOS/crates/bus/Cargo.toml",
+      "original_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+      "proposed_sha256": "2256d11e724a32b74d14aaba487959a46d3db9b20e7f8131c6097efa842b3e15",
+      "original_bytes": 568,
+      "proposed_bytes": 612
+    },
+    {
+      "path": "lampOS/crates/bus/src/clock.rs",
+      "original_sha256": null,
+      "proposed_sha256": "1db1ad6173519efb1b7bd75d5fa3c4349a47000f748e11b103d6a9e6ec505642",
+      "original_bytes": 0,
+      "proposed_bytes": 2557
+    },
+    {
+      "path": "lampOS/crates/bus/src/fixture_clock_tests.rs",
+      "original_sha256": null,
+      "proposed_sha256": "1428f988bb6a099d52cd81f1c0cae0ba554729593b77b9311b4bb02bdf0db61d",
+      "original_bytes": 0,
+      "proposed_bytes": 6444
+    },
+    {
+      "path": "lampOS/crates/bus/src/lib.rs",
+      "original_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+      "proposed_sha256": "3eeda3678e17c99654277b8dfa6a980e5b1db31ddfd755d62c1329577a40e279",
+      "original_bytes": 17782,
+      "proposed_bytes": 19114
+    },
+    {
+      "path": "lampOS/crates/bus/src/live.rs",
+      "original_sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "proposed_sha256": "c2f53ca942bf71a2b91d3a7ac5f1daa83bb6a03c67c7ffc1ff3a6baf9d6b2f3e",
+      "original_bytes": 5990,
+      "proposed_bytes": 6474
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "original_sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "proposed_sha256": "c5ae553a8245e023790d34a4dbcde1fc944b382da51777c2792b375ba2fde0d9",
+      "original_bytes": 32256,
+      "proposed_bytes": 32444
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "original_sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "proposed_sha256": "2fe22581b9542a1825e1b4f3eb1e2d58aef17c11891c9499822d864be9780e7d",
+      "original_bytes": 38012,
+      "proposed_bytes": 38135
+    },
+    {
+      "path": "lampOS/crates/expression/Cargo.toml",
+      "original_sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+      "proposed_sha256": "9a3507505f70c3d632ce2e29810753e9479dca16f22c7a7f226aebb02f9119f3",
+      "original_bytes": 745,
+      "proposed_bytes": 884
+    },
+    {
+      "path": "lampOS/crates/expression/tests/runtime.rs",
+      "original_sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+      "proposed_sha256": "989d70e4dca58fbb9c6928cc3ab0ba472d8524e23959eb1b92200f92a4c2a114",
+      "original_bytes": 47670,
+      "proposed_bytes": 51143
+    }
+  ],
+  "new_control_tests": {
+    "Bus": 4,
+    "Expression": 2
+  },
+  "no_source_WT_modified": true,
+  "no_Cargo_or_execution": true,
+  "no_API_implementation_applied": true,
+  "3315draft_untouched": true,
+  "wire_rs_and_Expression_product_runtime_unchanged": true,
+  "all_originalSleeping_assertlines_retained": true,
+  "public_existing_signature_changes": 0,
+  "new_default_off_API": [
+    "FixtureClock::{now,wall_ms}",
+    "Bus::with_fixture_clock(Arc<dynFixtureClock>)->Bus"
+  ],
+  "ordinary_Bus_new_System_even_when_feature_enabled": true,
+  "ordinary_debug_shape_preserved": true
+}

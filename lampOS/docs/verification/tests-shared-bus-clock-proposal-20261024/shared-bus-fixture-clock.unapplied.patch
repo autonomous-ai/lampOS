@@ -1,0 +1,733 @@
+--- a/lampOS/crates/bus/Cargo.toml
++++ b/lampOS/crates/bus/Cargo.toml
+@@ -13,6 +13,10 @@
+ name = "lamp-bus"
+ path = "src/main.rs"
+ 
++[features]
++default = []
++fixture-clock = []
++
+ [dependencies]
+ serde.workspace = true
+ serde_json.workspace = true
+--- /dev/null
++++ b/lampOS/crates/bus/src/clock.rs
+@@ -0,0 +1,66 @@
++//! Shared semantic time for explicitly opted-in, single-root fixtures only.
++use crate::{Source, live, wire};
++use std::{fmt, io, path::Path, time::{Duration, Instant}};
++#[cfg(any(test, feature = "fixture-clock"))]
++use std::{sync::Arc, time::{SystemTime, UNIX_EPOCH}};
++
++/// Pure, non-advancing reads in one owner-controlled domain. All participants
++/// under an opted-in root must share this clock; never mix ordinary actors there.
++/// Real socket waits, filesystem I/O completion and cleanup watchdogs are not time here.
++#[cfg(any(test, feature = "fixture-clock"))]
++pub trait FixtureClock: Send + Sync + 'static {
++    fn now(&self) -> Instant;
++    fn wall_ms(&self) -> u64;
++}
++
++#[derive(Clone, Default)]
++pub(crate) enum ClockSource {
++    #[default]
++    System,
++    #[cfg(any(test, feature = "fixture-clock"))]
++    Fixture(Arc<dyn FixtureClock>),
++}
++impl fmt::Debug for ClockSource {
++    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
++        formatter.write_str(match self {
++            Self::System => "System",
++            #[cfg(any(test, feature = "fixture-clock"))]
++            Self::Fixture(_) => "Fixture",
++        })
++    }
++}
++impl ClockSource {
++    pub(crate) fn now(&self) -> Instant {
++        match self {
++            Self::System => Instant::now(),
++            #[cfg(any(test, feature = "fixture-clock"))]
++            Self::Fixture(clock) => clock.now(),
++        }
++    }
++    pub(crate) fn wall_ms(&self) -> u64 {
++        match self {
++            Self::System => wire::unix_ms(),
++            #[cfg(any(test, feature = "fixture-clock"))]
++            Self::Fixture(clock) => clock.wall_ms(),
++        }
++    }
++    pub(crate) fn touch(&self, path: &Path) -> io::Result<()> {
++        match self {
++            Self::System => live::touch(path),
++            #[cfg(any(test, feature = "fixture-clock"))]
++            Self::Fixture(clock) => live::touch_with(path, || fixture_wall(clock.as_ref())),
++        }
++    }
++    pub(crate) fn sources(&self, path: &Path, lease: Duration) -> io::Result<Vec<Source>> {
++        match self {
++            Self::System => live::list(path, lease),
++            #[cfg(any(test, feature = "fixture-clock"))]
++            Self::Fixture(clock) => live::list_with(path, lease, || fixture_wall(clock.as_ref())),
++        }
++    }
++}
++#[cfg(any(test, feature = "fixture-clock"))]
++fn fixture_wall(clock: &dyn FixtureClock) -> io::Result<SystemTime> {
++    UNIX_EPOCH.checked_add(Duration::from_millis(clock.wall_ms()))
++        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "fixture wall outside SystemTime"))
++}
+--- /dev/null
++++ b/lampOS/crates/bus/src/fixture_clock_tests.rs
+@@ -0,0 +1,132 @@
++//! Proposed controls; not compiled or executed. Each root has exactly one time domain.
++use super::*;
++use std::sync::{Arc, Mutex};
++
++struct Root(PathBuf);
++impl Root {
++    fn new() -> Self {
++        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
++        let path = std::env::temp_dir().join(format!("lbf-{}-{}", std::process::id(),
++            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
++        std::fs::create_dir(&path).unwrap();
++        Self(path)
++    }
++}
++impl Drop for Root {
++    fn drop(&mut self) { std::fs::remove_dir_all(&self.0).unwrap(); }
++}
++struct Clock(Mutex<(Instant, u64)>);
++impl Clock {
++    fn new() -> Arc<Self> { Arc::new(Self(Mutex::new((Instant::now(), 1_000)))) }
++    fn advance(&self, ms: u64) {
++        let mut clock = self.0.lock().unwrap();
++        clock.0 = clock.0.checked_add(Duration::from_millis(ms)).unwrap();
++        clock.1 = clock.1.checked_add(ms).unwrap();
++    }
++}
++impl FixtureClock for Clock {
++    fn now(&self) -> Instant { self.0.lock().unwrap().0 }
++    fn wall_ms(&self) -> u64 { self.0.lock().unwrap().1 }
++}
++fn declared() -> Declaration {
++    Declaration::new("fixture/Value", 1, Kind::Latest)
++        .every(Duration::from_millis(10)).lasting(Duration::from_millis(50))
++}
++
++#[test]
++fn ordinary_constructors_stay_system_while_an_explicit_bus_and_its_clones_share_time() {
++    let ordinary_root = Root::new();
++    let fixture_root = Root::new();
++    let ordinary = Bus::new(&ordinary_root.0).unwrap();
++    assert!(matches!(ordinary.clock, clock::ClockSource::System));
++    let clock = Clock::new();
++    let fixture = Bus::new(&fixture_root.0).unwrap().with_fixture_clock(clock.clone());
++    let subscriber_bus = fixture.clone();
++    let mut subscriber = subscriber_bus.subscribe_typed("fixture", "typed", "fixture/Value").unwrap();
++    let mut publisher = fixture.publisher_declared("fixture", &declared(), "source").unwrap();
++    publisher.publish_json(1, &1).unwrap();
++    let message = subscriber.recv(Duration::ZERO).unwrap().unwrap();
++    assert_eq!(message.header.at_unix_ms, 1_000);
++    assert!(!message.expired);
++    assert_eq!(fixture.latest("fixture").unwrap().unwrap().header.at_unix_ms, 1_000);
++    let before = wire::unix_ms();
++    let mut ordinary_publisher = ordinary.publisher("plain", Kind::Latest, "source").unwrap();
++    ordinary_publisher.publish_json(1, &1).unwrap();
++    let ordinary_wall = ordinary.latest("plain").unwrap().unwrap().header.at_unix_ms;
++    assert!(before <= ordinary_wall && ordinary_wall <= wire::unix_ms());
++    // The untyped constructor also inherits only an explicitly opted-in Bus.
++    let mut untyped = fixture.subscribe("fixture", "untyped").unwrap();
++    let kept = untyped.latest().unwrap().unwrap();
++    assert_eq!(kept.header.at_unix_ms, 1_000);
++    assert!(!kept.expired);
++}
++
++#[test]
++fn expiry_and_grace_still_end_at_the_same_logical_boundaries() {
++    let root = Root::new();
++    let clock = Clock::new();
++    let bus = Bus::new(&root.0).unwrap().with_fixture_clock(clock.clone());
++    let mut publisher = bus.publisher_declared("fixture", &declared(), "source").unwrap();
++    publisher.publish_json(1, &1).unwrap();
++    let mut subscriber = bus.subscribe_typed("fixture", "reader", "fixture/Value").unwrap();
++    clock.advance(100); // original 50 ms lifespan plus original 50 ms grace
++    assert!(!bus.latest("fixture").unwrap().unwrap().expired);
++    assert!(!subscriber.latest().unwrap().unwrap().expired);
++    clock.advance(1);
++    assert!(bus.latest("fixture").unwrap().unwrap().expired);
++    assert!(subscriber.latest().unwrap().unwrap().expired);
++}
++
++#[test]
++fn late_and_source_gone_require_their_original_logical_time_and_presence_changes() {
++    let root = Root::new();
++    let clock = Clock::new();
++    let bus = Bus::new(&root.0).unwrap().with_fixture_clock(clock.clone());
++    let mut subscriber = bus.subscribe_typed("fixture", "reader", "fixture/Value").unwrap();
++    let mut publisher = bus.publisher_declared("fixture", &declared(), "source").unwrap();
++    publisher.publish_json(1, &1).unwrap();
++    assert!(subscriber.recv(Duration::ZERO).unwrap().is_some());
++    clock.advance(20);
++    assert!(!subscriber.is_late());
++    clock.advance(1);
++    assert!(subscriber.is_late());
++    assert!(!subscriber.source_gone());
++    // At the original 3 s presence lease a publisher still exists, without sleeping.
++    clock.advance(2_979);
++    assert!(!subscriber.source_gone());
++    assert_eq!(bus.publishers("fixture").unwrap().len(), 1);
++    clock.advance(1);
++    assert!(subscriber.source_gone());
++    assert!(bus.publishers("fixture").unwrap().is_empty());
++    // A new publication uses the same owner clock, restores presence, and ends Gone.
++    publisher.publish_json(2, &2).unwrap();
++    assert!(subscriber.recv(Duration::ZERO).unwrap().is_some());
++    assert!(!subscriber.source_gone());
++    assert_eq!(bus.publishers("fixture").unwrap().len(), 1);
++    assert!(subscriber.notices().contains(&Notice::SourceBack));
++}
++
++#[test]
++fn retained_rescan_uses_owned_time_and_guarded_header_stamps_use_that_wall() {
++    let root = Root::new();
++    let clock = Clock::new();
++    let bus = Bus::new(&root.0).unwrap().rescan_every(Duration::from_millis(5))
++        .with_fixture_clock(clock.clone());
++    // Scan with no subscriber, then keep only; no hidden delivered datagrams.
++    let cadence = clock.clone();
++    let mut publisher = bus.clone().rescan_every(Duration::from_secs(3_600))
++        .publisher_declared_with_cadence_clock("fixture", &declared(), "source", move || cadence.now())
++        .unwrap();
++    assert_eq!(publisher.publish_json(1, &1).unwrap().delivered, 0);
++    let mut subscriber = bus.subscribe_typed("fixture", "reader", "fixture/Value").unwrap();
++    assert_eq!(subscriber.recv(Duration::ZERO).unwrap().unwrap().header.seq, 1);
++    assert_eq!(publisher.publish_json(2, &2).unwrap().delivered, 0);
++    assert!(subscriber.recv(Duration::ZERO).unwrap().is_none());
++    clock.advance(5);
++    assert_eq!(subscriber.recv(Duration::ZERO).unwrap().unwrap().header.seq, 2);
++    let event = Declaration::new("fixture/Event", 1, Kind::Event);
++    let mut event_publisher = bus.publisher_declared("event", &event, "source").unwrap();
++    let mut events = bus.subscribe_typed("event", "reader", "fixture/Event").unwrap();
++    event_publisher.publish_bytes_guarded(1, JSON, b"{}", || true).unwrap();
++    assert_eq!(events.recv(Duration::ZERO).unwrap().unwrap().header.at_unix_ms, 1_005);
++}
+--- a/lampOS/crates/bus/src/lib.rs
++++ b/lampOS/crates/bus/src/lib.rs
+@@ -57,6 +57,7 @@
+ //! }
+ //! # Ok::<(), std::io::Error>(())
+ //! ```
++mod clock;
+ mod declare;
+ mod live;
+ pub mod logging;
+@@ -65,6 +66,8 @@
+ mod subscribe;
+ mod wire;
+ 
++#[cfg(any(test, feature = "fixture-clock"))]
++pub use clock::FixtureClock;
+ pub use declare::Declaration;
+ pub use live::Source;
+ pub use name::MOST_TOPIC_BYTES;
+@@ -100,12 +103,25 @@
+ /// Sockets and the `latest` file: the owner and the group, nobody else.
+ const FILE_MODE: u32 = 0o660;
+ 
+-#[derive(Clone, Debug)]
++#[derive(Clone)]
+ pub struct Bus {
++    clock: clock::ClockSource,
+     root: PathBuf,
+     directory_mode: u32,
+     rescan_every: Duration,
+     lease: Duration,
++}
++
++// Preserve the existing public Debug shape; the fixture clock is internal configuration.
++impl std::fmt::Debug for Bus {
++    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        formatter.debug_struct("Bus")
++            .field("root", &self.root)
++            .field("directory_mode", &self.directory_mode)
++            .field("rescan_every", &self.rescan_every)
++            .field("lease", &self.lease)
++            .finish()
++    }
+ }
+ 
+ /// One subscriber's socket as a topic's `subs/` shows it.
+@@ -146,11 +162,21 @@
+             ));
+         }
+         Ok(Self {
++            clock: clock::ClockSource::System,
+             root,
+             directory_mode: 0o770,
+             rescan_every: Duration::from_millis(200),
+             lease: DEFAULT_LEASE,
+         })
++    }
++
++    /// Explicit fixture time for all actors constructed through this Bus and its clones.
++    /// One clock domain owns the root. Ordinary Bus::new instances stay on System.
++    /// Socket waits and I/O/cleanup deadlines remain real; presence mtimes use fixture time.
++    #[cfg(any(test, feature = "fixture-clock"))]
++    pub fn with_fixture_clock(mut self, clock: std::sync::Arc<dyn FixtureClock>) -> Self {
++        self.clock = clock::ClockSource::Fixture(clock);
++        self
+     }
+ 
+     /// The bus under `LAMP_BUS_ROOT`, or under `/run/lampos-bus`.
+@@ -200,8 +226,10 @@
+     /// A publisher with an explicit clock for subscriber rescans and
+     /// presence refreshes in a local fixture. Reads must be pure and in one
+     /// nondecreasing Instant domain; the caller alone advances the clock.
+-    /// Construction does not sample it. Header UTC, filesystem lease times
+-    /// and real delivery keep their ordinary clocks and behavior.
++    /// Construction does not sample it. This override alone does not change
++    /// header UTC or presence leases: they use this Bus's System clock unless
++    /// with_fixture_clock explicitly selected a shared fixture domain.
++    /// Actual delivery and socket waits remain real.
+     pub fn publisher_with_cadence_clock(
+         &self,
+         topic: &str,
+@@ -269,7 +297,7 @@
+         name::topic(topic)?;
+         let kept = wire::kept(&self.root.join(topic).join("latest"), topic)?;
+         Ok(kept.map(|(header, payload)| Message {
+-            expired: header.expired_at(wire::unix_ms()),
++            expired: header.expired_at(self.clock.wall_ms()),
+             header,
+             payload,
+             gap: 0,
+@@ -287,7 +315,7 @@
+     /// the lease. Looking removes the entry of one that has not.
+     pub fn publishers(&self, topic: &str) -> io::Result<Vec<Source>> {
+         name::topic(topic)?;
+-        live::list(&self.root.join(topic).join("pubs"), self.lease)
++        self.clock.sources(&self.root.join(topic).join("pubs"), self.lease)
+     }
+ 
+     /// The topic's subscribers, by socket, and whether each has a process
+@@ -440,3 +468,7 @@
+         std::fs::remove_dir_all(&root).unwrap();
+     }
+ }
++
++#[cfg(test)]
++#[path = "fixture_clock_tests.rs"]
++mod fixture_clock_tests;
+--- a/lampOS/crates/bus/src/live.rs
++++ b/lampOS/crates/bus/src/live.rs
+@@ -12,6 +12,8 @@
+ //! that is stepped by more than the lease makes every publisher look dead
+ //! until its next refresh, at most a second later, when it puts its file
+ //! back.
++//! Explicit fixture-clock Bus roots instead supply one owned time for both
++//! stamping and evaluation. Never mix fixture and ordinary actors under that root.
+ use crate::{FILE_MODE, name};
+ use std::{
+     fs, io,
+@@ -59,6 +61,10 @@
+ /// there: a publisher that was taken for dead finds its entry removed, and
+ /// this puts it back. Fails with `NotFound` when `pubs/` itself is missing.
+ pub(crate) fn touch(path: &Path) -> io::Result<()> {
++    touch_with(path, || Ok(SystemTime::now()))
++}
++
++pub(crate) fn touch_with(path: &Path, now: impl FnOnce() -> io::Result<SystemTime>) -> io::Result<()> {
+     let file = match fs::OpenOptions::new().write(true).open(path) {
+         Ok(file) => file,
+         Err(error) if error.kind() == io::ErrorKind::NotFound => {
+@@ -74,7 +80,7 @@
+         }
+         Err(error) => return Err(error),
+     };
+-    file.set_modified(SystemTime::now())
++    file.set_modified(now()?)
+ }
+ 
+ /// The publishers in `pubs` that showed themselves within `lease`, by name.
+@@ -82,13 +88,19 @@
+ /// ahead than the lease, which only a clock set back can leave: its
+ /// publisher, if it lives, puts it back within a second.
+ pub(crate) fn list(pubs: &Path, lease: Duration) -> io::Result<Vec<Source>> {
++    list_with(pubs, lease, || Ok(SystemTime::now()))
++}
++
++pub(crate) fn list_with(
++    pubs: &Path, lease: Duration, now: impl FnOnce() -> io::Result<SystemTime>,
++) -> io::Result<Vec<Source>> {
+     let entries = match fs::read_dir(pubs) {
+         Ok(entries) => entries,
+         // Nobody has published yet.
+         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+         Err(error) => return Err(error),
+     };
+-    let now = SystemTime::now();
++    let now = now()?;
+     let mut found = Vec::new();
+     for entry in entries {
+         let entry = entry?;
+--- a/lampOS/crates/bus/src/publish.rs
++++ b/lampOS/crates/bus/src/publish.rs
+@@ -232,6 +232,7 @@
+ }
+ 
+ pub struct Publisher {
++    clock: crate::clock::ClockSource,
+     header: wire::Header,
+     seq: u64,
+     directory: PathBuf,
+@@ -283,7 +284,8 @@
+ 
+ impl Publisher {
+     pub(crate) fn new(bus: &Bus, topic: &str, kind: wire::Kind, source: &str) -> io::Result<Self> {
+-        Self::new_with_cadence_clock(bus, topic, kind, source, Instant::now)
++        let clock = bus.clock.clone();
++        Self::new_with_cadence_clock(bus, topic, kind, source, move || clock.now())
+     }
+ 
+     pub(crate) fn new_with_cadence_clock(
+@@ -299,6 +301,7 @@
+         let boot = boot();
+         let pubs = directory.join("pubs");
+         Ok(Self {
++            clock: bus.clock.clone(),
+             subs: directory.join("subs"),
+             latest: directory.join("latest"),
+             // No topic's directory begins with a dot, and no two publishers
+@@ -348,7 +351,8 @@
+         declaration: &Declaration,
+         source: &str,
+     ) -> io::Result<Self> {
+-        Self::declared_with_cadence_clock(bus, topic, declaration, source, Instant::now)
++        let clock = bus.clock.clone();
++        Self::declared_with_cadence_clock(bus, topic, declaration, source, move || clock.now())
+     }
+ 
+     pub(crate) fn declared_with_cadence_clock(
+@@ -435,11 +439,11 @@
+     /// Give the entry a new time, creating it and `pubs/` if need be.
+     fn show(&mut self, now: Instant) -> io::Result<()> {
+         self.shown = Some(now);
+-        let done = match live::touch(&self.entry) {
++        let done = match self.clock.touch(&self.entry) {
+             // The first publisher of the topic.
+             Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                 crate::make_directory(&self.pubs, self.directory_mode)
+-                    .and_then(|()| live::touch(&self.entry))
++                    .and_then(|()| self.clock.touch(&self.entry))
+             }
+             done => done,
+         };
+@@ -565,7 +569,7 @@
+         header.enc = enc.into();
+         header.seq = sequence;
+         header.at_us = at_us;
+-        header.at_unix_ms = wire::unix_ms();
++        header.at_unix_ms = self.clock.wall_ms();
+         let mut datagram = SensitiveDatagram::new();
+         datagram.encode(&header, bytes)?;
+         if !authorized() {
+@@ -629,7 +633,7 @@
+         // refused one must not look like a lost one.
+         self.header.seq = self.seq + 1;
+         self.header.at_us = at_us;
+-        self.header.at_unix_ms = wire::unix_ms();
++        self.header.at_unix_ms = self.clock.wall_ms();
+         let mut datagram = std::mem::take(&mut self.datagram);
+         datagram.clear();
+         let done = serde_json::to_writer(&mut datagram, &self.header)
+--- a/lampOS/crates/bus/src/subscribe.rs
++++ b/lampOS/crates/bus/src/subscribe.rs
+@@ -114,6 +114,7 @@
+ }
+ 
+ pub struct Subscriber {
++    clock: crate::clock::ClockSource,
+     topic: String,
+     path: PathBuf,
+     latest: PathBuf,
+@@ -249,8 +250,9 @@
+                     ));
+                 }
+             }
+-            let now = Instant::now();
++            let now = bus.clock.now();
+             return Ok(Self {
++                clock: bus.clock.clone(),
+                 topic: topic.into(),
+                 path,
+                 latest: directory.join("latest"),
+@@ -358,7 +360,7 @@
+     /// the lease, as `pubs/` has them now. Looking removes the entry of one
+     /// that has not.
+     pub fn sources(&self) -> io::Result<Vec<Source>> {
+-        live::list(&self.pubs, self.lease)
++        self.clock.sources(&self.pubs, self.lease)
+     }
+ 
+     /// What has changed about the topic since this was last asked: its
+@@ -378,21 +380,21 @@
+     /// socket either, and a silence found afterwards is measured between
+     /// the times two messages were sent, not the times they were read.
+     pub fn notices(&mut self) -> Vec<Notice> {
+-        self.judge(Instant::now());
++        self.judge(self.clock.now());
+         self.notices.drain(..).collect()
+     }
+ 
+     /// Whether the topic declares a period and nothing has come for more
+     /// than twice as long. False for a topic that promises no period.
+     pub fn is_late(&mut self) -> bool {
+-        self.judge(Instant::now());
++        self.judge(self.clock.now());
+         self.late
+     }
+ 
+     /// Whether the topic has no source: no publisher alive within the
+     /// lease, and no message for as long.
+     pub fn source_gone(&mut self) -> bool {
+-        self.judge(Instant::now());
++        self.judge(self.clock.now());
+         self.gone
+     }
+ 
+@@ -462,7 +464,7 @@
+             .is_none_or(|at| now.saturating_duration_since(at) >= self.look_every)
+         {
+             self.sought = Some(now);
+-            self.found = live::list(&self.pubs, self.lease).is_ok_and(|found| !found.is_empty());
++            self.found = self.clock.sources(&self.pubs, self.lease).is_ok_and(|found| !found.is_empty());
+         }
+         self.found
+     }
+@@ -526,8 +528,8 @@
+     /// from the topic's `latest` file: only that shows a publisher alive
+     /// now, and only that has a time of arrival.
+     fn admit(&mut self, mut message: Message, sent: bool) -> Option<Message> {
+-        let now = Instant::now();
+-        let wall = wire::unix_ms();
++        let now = self.clock.now();
++        let wall = self.clock.wall_ms();
+         if sent {
+             self.heard_from(now);
+         }
+@@ -666,7 +668,7 @@
+                         }
+                         Ok(_) => {
+                             self.repeated += 1;
+-                            self.heard_from(Instant::now());
++                            self.heard_from(self.clock.now());
+                         }
+                         Err(_) => self.malformed += 1,
+                     }
+@@ -699,12 +701,12 @@
+     /// that is worth anything is the caller's to say. A value of another
+     /// type than this subscriber asked for is not returned.
+     pub fn latest(&mut self) -> io::Result<Option<Message>> {
+-        self.looked = Some(Instant::now());
++        self.looked = Some(self.clock.now());
+         let Some((header, payload)) = wire::kept(&self.latest, &self.topic)? else {
+             return Ok(None);
+         };
+         let other = self.other_type(&header);
+-        let expired = header.expired_at(wire::unix_ms());
++        let expired = header.expired_at(self.clock.wall_ms());
+         if !self.kept_is_news(&header) {
+             return Ok((!other).then_some(Message {
+                 header,
+@@ -757,7 +759,7 @@
+     /// What the topic keeps, if this subscriber has not had it and has not
+     /// looked a moment ago.
+     fn kept_news(&mut self) -> Option<(wire::Header, Vec<u8>)> {
+-        let now = Instant::now();
++        let now = self.clock.now();
+         if self
+             .looked
+             .is_some_and(|at| now.saturating_duration_since(at) < self.look_every)
+@@ -834,7 +836,7 @@
+         // It may have declared the topic anew: the period and the lifespan
+         // are the newest publisher's to say.
+         if new {
+-            self.learn(Instant::now());
++            self.learn(self.clock.now());
+         }
+         Message {
+             header,
+--- a/lampOS/crates/expression/Cargo.toml
++++ b/lampOS/crates/expression/Cargo.toml
+@@ -20,6 +20,8 @@
+ toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
+ 
+ [dev-dependencies]
++# Explicit fixture-only Bus time; ordinary builds keep default System clocks.
++lamp-bus = { path = "../bus", features = ["fixture-clock"] }
+ jiff = "0.2"
+ 
+ [lints]
+--- a/lampOS/crates/expression/tests/runtime.rs
++++ b/lampOS/crates/expression/tests/runtime.rs
+@@ -495,7 +495,34 @@
+         }
+     }
+ 
++    /// Only the fixture owner advances semantic time; reads never advance it.
++    struct FrameClock(std::sync::Mutex<(std::time::Instant, u64)>);
++    impl FrameClock {
++        fn new(wall_ms: u64) -> Self {
++            Self(std::sync::Mutex::new((std::time::Instant::now(), wall_ms)))
++        }
++        fn wall(&self) -> u64 {
++            self.0.lock().unwrap().1
++        }
++        fn advance(&self, by_us: u64) {
++            assert_eq!(by_us % 1_000, 0, "fixture wall precision");
++            let mut frame = self.0.lock().unwrap();
++            frame.0 = frame.0.checked_add(std::time::Duration::from_micros(by_us))
++                .expect("fixture Instant overflow");
++            frame.1 = frame.1.checked_add(by_us / 1_000).expect("fixture wall overflow");
++        }
++    }
++    impl lamp_bus::FixtureClock for FrameClock {
++        fn now(&self) -> std::time::Instant {
++            self.0.lock().unwrap().0
++        }
++        fn wall_ms(&self) -> u64 {
++            self.wall()
++        }
++    }
++
+     struct SleepingService {
++        clock: std::sync::Arc<FrameClock>,
+         service: runtime::Service,
+         voice: Publisher,
+         joints: Publisher,
+@@ -545,16 +572,17 @@
+             mood: Option<(f32, f32)>,
+         ) -> Self {
+             let root = Root::new();
+-            let bus = Bus::new(&root.0).unwrap();
++            let clock = std::sync::Arc::new(FrameClock::new(runtime::unix_ms()));
++            let bus = Bus::new(&root.0).unwrap().with_fixture_clock(clock.clone());
+             let mut catalogue =
+                 Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+             let sleep = catalogue.alive.as_mut().unwrap().sleep.as_mut().unwrap();
+             sleep.nobody_us = 60 * SECOND_US;
+             sleep.name_requires_speech = true;
+             catalogue.check().unwrap();
+-            // The bus still supplies real publication wall times. Select a
+-            // night-time offset without changing those envelope timestamps.
+-            let offset = 23 * 60 + 30 - i32::from(runtime::minute_of_day(runtime::unix_ms(), 0));
++            // Bus actors and the service share one explicit fixture wall.
++            // Select night time from it without rewriting envelope timestamps.
++            let offset = 23 * 60 + 30 - i32::from(runtime::minute_of_day(clock.wall(), 0));
+             let mut service = runtime::Service::new(&bus, catalogue, true, "test")
+                 .unwrap()
+                 .with_local_time(offset);
+@@ -570,6 +598,7 @@
+                 .publish_json(987_654_321, &Light::new(true, "warm", 1).unwrap())
+                 .unwrap();
+             Self {
++                clock,
+                 service,
+                 voice: bus
+                     .publisher_declared(
+@@ -693,12 +722,17 @@
+         }
+ 
+         fn step(&mut self) -> Output {
+-            self.now_us += TICK_US;
++            self.step_with_after_room(|_| {})
++        }
++
++        fn step_with_after_room(&mut self, after_room: impl FnOnce(&FrameClock)) -> Output {
++            self.now_us = self.now_us.checked_add(TICK_US).expect("fixture monotonic overflow");
++            self.clock.advance(TICK_US);
+             let mut timing = voice(self.now_us);
+             timing.stamp.sequence = self.now_us + 1;
+             timing.state = self.state;
+-            // No envelope published below is older than this.
+-            let publishing = runtime::unix_ms();
++            // No envelope below precedes this owned wall sample. Host stalls do not advance it.
++            let publishing = self.clock.wall();
+             if let Some((mood, phase, energy)) = self.mood.as_mut() {
+                 let state = lamp_msgs::MoodState {
+                     stamp: ClockStamp {
+@@ -726,6 +760,7 @@
+             self.room
+                 .publish_json(987_654_321, &RoomState { state: Room::Quiet })
+                 .unwrap();
++            after_room(&self.clock);
+             self.voice
+                 .publish_json(
+                     987_654_321,
+@@ -753,13 +788,16 @@
+                     },
+                 )
+                 .unwrap();
+-            // The wall clock just after publishing, as `populate` gives it.
+-            let wall = runtime::unix_ms();
++            // The SAME owned wall after publishing; neither a host stall nor a read advances it.
++            let wall = self.clock.wall();
+             // The service places each bus input at `now` less its wall age.
+-            // A host stall of more than a tick while publishing would place
+-            // this step's room before the last one's, refused as out of
+-            // order (#1196). Like a lamp's, this clock then keeps up with the wall.
+-            self.now_us += (wall.saturating_sub(publishing) * 1_000).saturating_sub(TICK_US);
++            // Retain #1198's excess-over-tick bridge for explicitly advanced
++            // logical publication time, preserving order and freshness limits.
++            // The normal frame freezes this wall until the step completes.
++            let publication_us = wall.saturating_sub(publishing).checked_mul(1_000)
++                .expect("fixture publication time overflow");
++            self.now_us = self.now_us.checked_add(publication_us.saturating_sub(TICK_US))
++                .expect("fixture catch-up overflow");
+             let output = self.service.step(|| self.now_us, wall);
+             assert_eq!(self.service.counts.refused, 0);
+             assert_eq!(self.service.counts.input_errors, 0);
+@@ -952,6 +990,39 @@
+                 "lamp-expression: ignored sleeping name (1): no validated person speech within +/-2 s"
+             ]
+         );
++    }
++
++    #[test]
++    fn fixture_wall_preserves_future_and_joint_admission_boundaries() {
++        let root = Root::new();
++        let clock = std::sync::Arc::new(FrameClock::new(1_000));
++        let bus = Bus::new(&root.0).unwrap().with_fixture_clock(clock);
++        let mut publisher = bus.publisher_declared(
++            JointState::TOPIC, &JointState::declaration(), "body",
++        ).unwrap();
++        publisher.publish_json(987_654_321, &JointState {
++            name: vec!["base_yaw".into()], position: vec![0.0],
++            velocity: vec![], effort: vec![], commanded: vec![],
++        }).unwrap();
++        let message = bus.latest(JointState::TOPIC).unwrap().unwrap();
++        assert_eq!(message.header.at_unix_ms, 1_000);
++        // Same actual fixture envelope, unchanged product 50 ms future allowance.
++        assert!(runtime::input_from_message(&message, START_US, 950, "test", 1).is_ok());
++        assert!(runtime::input_from_message(&message, START_US, 949, "test", 1).is_err());
++        // Joint transport admission remains 500 ms, distinct from engine freshness.
++        assert!(runtime::input_from_message(&message, START_US, 1_500, "test", 1).is_ok());
++        assert!(runtime::input_from_message(&message, START_US, 1_501, "test", 1).is_err());
++    }
++
++    #[test]
++    fn explicit_logical_publication_time_retains_the_1198_order_bridge() {
++        let mut lamp = SleepingService::new();
++        lamp.step();
++        let before = lamp.now_us;
++        lamp.step_with_after_room(|clock| clock.advance(350_000));
++        assert_eq!(lamp.now_us, before.checked_add(350_000).unwrap());
++        // Both step calls kept every original refused/input-error assertion.
++        // Without the excess-over-tick bridge, this room is placed before the last.
+     }
+ }
+ 

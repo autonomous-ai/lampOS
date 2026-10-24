@@ -4300,3 +4300,9 @@ Addressed the reader’s provenance finding by adding unchanged primary compile 
 Ready for lamp-voice: no
 
 [Complete qualification evidence](verification/tests-update-parent-qualification-20261024/) retains the failed 7,300/10/52 full result separately from ten matched-parent passes and thirty original-current standalone passes. Root independently checked the thirty exact rows/summaries, stream hashes, frozen witnesses and restored Memory binaries/modes. No cause or full-green claim. The four test/docs files were committed as 4e96727d7, then rebased with an equal range-diff onto current 4270083a2 as fb8d2f71b and pushed. New-base local gates and native Linux/ARM64 CI remain pending; the PR stays draft. NoPause’s fixed nine-observation qualification is now running on its original saved executables, with no rebuild.
+
+## 25 October, 01:07 — Concrete shared-clock scope proposal
+
+Ready for lamp-voice: no
+
+The [unapplied proposal](verification/tests-shared-bus-clock-proposal-20261024/) makes the shared publisher/subscriber/latest/presence clock scope concrete before an API decision. Root read the entire patch, time-domain audit and six proposed controls; nothing was applied or executed. Default constructors remain System and all product bounds/privacy checks remain. First’s narrow scope decision is needed for this broader API while current-base test-only gates continue. Update draft #3403 is pushed on current427; native ARM40118324976 and LinuxClippy40118324982 are pending. NoPause’s nine saved-witness observations all passed; its exact two-file source is committed/rebased20874923d on427 with an equal range-diff, and publication follows.

@@ -1,0 +1,30 @@
+[
+  {
+    "file": "README.md",
+    "sha256": "9ca985f7a4fa08f3d5fb4b11d981809e110cfb8d0f328c65f27a3d9a04c1857a"
+  },
+  {
+    "file": "proposal-receipt.json",
+    "sha256": "9bb84c456aa32bf945bc104dcf3f86667cf6d1ae4befdf6bd8a5541f29f9e899"
+  },
+  {
+    "file": "reverse-closure.json",
+    "sha256": "85e4274ab79751d4203ddb9cd2f66c97d35ade2331e55c4c45b3688f2b92b609"
+  },
+  {
+    "file": "scope-and-domains.md",
+    "sha256": "ab38b7f92658db821625880a65ae9dcbaecc2b2c4edc18ae5bad64998aec75db"
+  },
+  {
+    "file": "scope-control-gate-plan.json",
+    "sha256": "6d59612ea557de9c82ef1648dec53318adc75a79bef021c7803d2a1866702e7d"
+  },
+  {
+    "file": "shared-bus-fixture-clock.unapplied.patch",
+    "sha256": "dd827f9dbf70afb64176c12c2c033e295b62802dd3e9aeb27a3738522240b4ae"
+  },
+  {
+    "file": "source-pin.json",
+    "sha256": "e74420004f8490156d5a3a0ae21a4ae5f0e32e52f6ca20790be259fefd772fce"
+  }
+]
