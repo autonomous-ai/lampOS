@@ -1,0 +1,56 @@
+{"argv":["lamp-voice","schedule-consumer"],"at_us":10200323558,"event":"spawn","executable_sha256":"af7cd0d1e384ebddcca2b58eea94176c80aba573a5f47f4cd95cc8ce1a7ad084","pid":13006,"release":6408,"stage":"writer"}
+{"at_us":10200323861,"event":"claim_received","stage":"writer"}
+{"at_us":10200323885,"event":"consumer_packet","message":{"kind":"idle"},"stage":"writer"}
+{"at_us":10200392161,"event":"schedule_request","request":{"id":1,"op":"get"}}
+{"at_us":10200392214,"event":"schedule_reply","reply":{"item":{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"},"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10200396572,"event":"consumer_packet","message":{"kind":"offer","offer":{"expires_at_us":10201141039,"late":false,"late_by_ms":0,"observed_at_us":10200391039,"text":"Fixture reminder","token":{"attempt":1,"correlation":{"consumer_session":"32205c1f2777a3f8394c62990c548379","sequence":1},"key":{"delivery":1,"id":1,"store_id":"0123456789abcdef0123456789abcdef"}}}},"stage":"writer"}
+{"at_us":10200396686,"event":"authored_completion","message":{"kind":"complete","proof":{"correlation":{"consumer_session":"32205c1f2777a3f8394c62990c548379","sequence":1},"final_epoch":0,"final_frame":4800,"microphone_generation":2,"owner_boot":[7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7],"playback_sequence":4,"provider_session":3,"retired_generations":2,"turn":1},"token":{"attempt":1,"correlation":{"consumer_session":"32205c1f2777a3f8394c62990c548379","sequence":1},"key":{"delivery":1,"id":1,"store_id":"0123456789abcdef0123456789abcdef"}}},"stage":"writer"}
+{"at_us":10200403006,"event":"consumer_packet","message":{"kind":"settled","token":{"attempt":1,"correlation":{"consumer_session":"32205c1f2777a3f8394c62990c548379","sequence":1},"key":{"delivery":1,"id":1,"store_id":"0123456789abcdef0123456789abcdef"}}},"stage":"writer"}
+{"at_us":10200599746,"event":"schedule_request","request":{"id":1,"op":"get"}}
+{"at_us":10200599799,"event":"schedule_reply","reply":{"item":{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"},"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10200604179,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10200609338,"event":"killed_reaped_claim_closed","exit_signal":9,"pid":13006,"release":6408,"stage":"writer"}
+{"argv":["lamp-voice","schedule-consumer"],"at_us":10200753551,"event":"spawn","executable_sha256":"67ab7d3fd77bca2b6e5cf962bc0ec7a7db3520de1de3620f25e3899cb3a5a1f2","pid":13007,"release":6498,"stage":"reader"}
+{"at_us":10200754431,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10200754510,"event":"claim_received","stage":"reader"}
+{"at_us":10200756607,"event":"schedule_request","request":{"op":"status"}}
+{"at_us":10200756634,"event":"schedule_reply","reply":{"items":1,"last_receipt":null,"max_items":128,"ok":true,"pending":1,"revision":2,"store_id":"0123456789abcdef0123456789abcdef","waiting_for_clock":0,"wall_trusted":true,"zone":"Etc/UTC"}}
+{"at_us":10200758839,"event":"schedule_request","request":{"id":1,"op":"get"}}
+{"at_us":10200758878,"event":"schedule_reply","reply":{"item":{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"},"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10200761267,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10200763405,"event":"schedule_request","request":{"after_id":0,"limit":8,"op":"list","pending_only":true}}
+{"at_us":10200763446,"event":"schedule_reply","reply":{"items":[{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"}],"next_after_id":null,"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10200765736,"event":"consumer_packet","message":{"kind":"idle"},"stage":"reader"}
+{"at_us":10200966329,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10200968475,"event":"schedule_request","request":{"op":"status"}}
+{"at_us":10200968500,"event":"schedule_reply","reply":{"items":1,"last_receipt":null,"max_items":128,"ok":true,"pending":1,"revision":2,"store_id":"0123456789abcdef0123456789abcdef","waiting_for_clock":0,"wall_trusted":true,"zone":"Etc/UTC"}}
+{"at_us":10200970719,"event":"schedule_request","request":{"id":1,"op":"get"}}
+{"at_us":10200970758,"event":"schedule_reply","reply":{"item":{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"},"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10200973032,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10200975167,"event":"schedule_request","request":{"after_id":0,"limit":8,"op":"list","pending_only":true}}
+{"at_us":10200975214,"event":"schedule_reply","reply":{"items":[{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"}],"next_after_id":null,"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10200977504,"event":"consumer_packet","message":{"kind":"idle"},"stage":"reader"}
+{"at_us":10201178251,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10201180401,"event":"schedule_request","request":{"op":"status"}}
+{"at_us":10201180431,"event":"schedule_reply","reply":{"items":1,"last_receipt":null,"max_items":128,"ok":true,"pending":1,"revision":2,"store_id":"0123456789abcdef0123456789abcdef","waiting_for_clock":0,"wall_trusted":true,"zone":"Etc/UTC"}}
+{"at_us":10201182641,"event":"schedule_request","request":{"id":1,"op":"get"}}
+{"at_us":10201182675,"event":"schedule_reply","reply":{"item":{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"},"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10201184962,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10201187117,"event":"schedule_request","request":{"after_id":0,"limit":8,"op":"list","pending_only":true}}
+{"at_us":10201187162,"event":"schedule_reply","reply":{"items":[{"delivery":1,"due_unix_ms":1761000000000,"id":1,"kind":"timer","late":false,"late_by_ms":0,"local":"2025-10-20T22:40:00+00:00","original_due_unix_ms":1761000000000,"remaining_ms":0,"repeat":null,"request_id":"fixture-set","snoozed":false,"state":"pending","text":"Fixture reminder"}],"next_after_id":null,"ok":true,"revision":2,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10201189450,"event":"consumer_packet","message":{"kind":"idle"},"stage":"reader"}
+{"at_us":10201390299,"event":"schedule_request","request":{"delivery":1,"guard":{"request_id":"due.32205c1f2777a3f8394c62990c548379.1","revision":2,"store_id":"0123456789abcdef0123456789abcdef"},"id":1,"op":"ack"}}
+{"at_us":10201390368,"event":"schedule_reply","reply":{"acknowledged":true,"delivery":1,"id":1,"ok":true,"revision":3,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10201394609,"event":"schedule_request","request":{"after_id":0,"limit":8,"op":"list","pending_only":true}}
+{"at_us":10201394655,"event":"schedule_reply","reply":{"items":[],"next_after_id":null,"ok":true,"revision":3,"store_id":"0123456789abcdef0123456789abcdef"}}
+{"at_us":10201396845,"event":"consumer_packet","message":{"kind":"idle"},"stage":"reader"}
+{"at_us":10201601603,"event":"consumer_packet","message":{"kind":"idle"},"stage":"reader"}
+{"at_us":10201804155,"event":"consumer_packet","message":{"kind":"idle"},"stage":"reader"}
+{"at_us":10201809298,"event":"killed_reaped_claim_closed","exit_signal":9,"pid":13007,"release":6498,"stage":"reader"}
+{"argv":["lamp-voice","schedule-consumer"],"at_us":10201954312,"event":"spawn","executable_sha256":"af7cd0d1e384ebddcca2b58eea94176c80aba573a5f47f4cd95cc8ce1a7ad084","pid":13008,"release":6408,"stage":"return-reader"}
+{"at_us":10201955123,"event":"claim_received","stage":"return-reader"}
+{"at_us":10201955157,"event":"consumer_packet","message":{"kind":"idle"},"stage":"return-reader"}
+{"at_us":10202017661,"event":"consumer_packet","message":{"kind":"idle"},"stage":"return-reader"}
+{"at_us":10202220093,"event":"consumer_packet","message":{"kind":"idle"},"stage":"return-reader"}
+{"at_us":10202225236,"event":"killed_reaped_claim_closed","exit_signal":9,"pid":13008,"release":6408,"stage":"return-reader"}
+{"ack_commits":1,"at_us":10202377395,"cut":"ack-intent","event":"passed","ledger_id":"32205c1f2777a3f8394c62990c548379","reader":6498,"writer":6408}

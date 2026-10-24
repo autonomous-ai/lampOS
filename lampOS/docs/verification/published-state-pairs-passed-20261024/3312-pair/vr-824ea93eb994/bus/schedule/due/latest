@@ -1,0 +1,2 @@
+{"topic":"schedule/due","kind":"latest","enc":"json","type":"lamp_msgs/ScheduleDue","source":"schedule","boot":"937718d822fe2f90","seq":33,"at_us":10202215304,"at_unix_ms":1792809446100,"expires_ms":3000}
+{"stamp":{"clock_id":"d899564b-c670-4395-a071-885ff9c865c4","at_us":10202215304,"sequence":33},"store_id":"0123456789abcdef0123456789abcdef","revision":3,"enabled":true,"ready":true,"pending":0,"waiting_for_clock":0}

@@ -1,0 +1,497 @@
+{
+  "excluded_count": 70,
+  "excluded_files": [
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-70eiN2/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "d5f27869c7fc6aee03a97d0cc2ff2317414b9d64aae30c04ae3bc799b1c26101"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-70eiN2/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "57dcf05f09bfb2f5ecfd1f45c8748d8616c057797b07cebace733fb0d2978dde"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-70eiN2/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "57dcf05f09bfb2f5ecfd1f45c8748d8616c057797b07cebace733fb0d2978dde"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-70eiN2/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "d5f27869c7fc6aee03a97d0cc2ff2317414b9d64aae30c04ae3bc799b1c26101"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-70eiN2/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "d5f27869c7fc6aee03a97d0cc2ff2317414b9d64aae30c04ae3bc799b1c26101"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-BK6jll/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "39528feed71a42125aadfbdbea522e363183c8a866a79215c4f864f42fa355fe"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-BK6jll/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "bd4449e70632736e153b8c90b62cc8f12f1c94f37a158775c38ff5cd6620909e"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-BK6jll/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "bd4449e70632736e153b8c90b62cc8f12f1c94f37a158775c38ff5cd6620909e"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-BK6jll/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "39528feed71a42125aadfbdbea522e363183c8a866a79215c4f864f42fa355fe"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-BK6jll/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "39528feed71a42125aadfbdbea522e363183c8a866a79215c4f864f42fa355fe"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-N4dWEl/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "0cd92f951a073f950bed063021e4762186d244d8b87a5b35f6287ae7ea087084"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-N4dWEl/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "79c0039c84dc84ed490ef8b0799b46ea071d35f7f40802bd7628c452622b2f00"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-N4dWEl/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "79c0039c84dc84ed490ef8b0799b46ea071d35f7f40802bd7628c452622b2f00"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-N4dWEl/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "0cd92f951a073f950bed063021e4762186d244d8b87a5b35f6287ae7ea087084"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-N4dWEl/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "0cd92f951a073f950bed063021e4762186d244d8b87a5b35f6287ae7ea087084"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-RqPcZd/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "4a0c4454ef820c15e66ab661fdc7f450266a6465511f54418533443112f26044"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-RqPcZd/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "d1957d89319826cf24f98666887f1d516a4719535af360bb8f9285834d79aef1"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-RqPcZd/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "d1957d89319826cf24f98666887f1d516a4719535af360bb8f9285834d79aef1"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-RqPcZd/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "4a0c4454ef820c15e66ab661fdc7f450266a6465511f54418533443112f26044"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-RqPcZd/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "4a0c4454ef820c15e66ab661fdc7f450266a6465511f54418533443112f26044"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-dQ8HDJ/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "10b20ca86226d328152b0727ab6f5890a0e013c3100edbd9a1d355f8adbeb57d"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-dQ8HDJ/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "7578eb9e5daf99b5f8b9d5b4db2c538b7547d010d4d295fd8a5246a2a2515d37"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-dQ8HDJ/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "7578eb9e5daf99b5f8b9d5b4db2c538b7547d010d4d295fd8a5246a2a2515d37"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-dQ8HDJ/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "10b20ca86226d328152b0727ab6f5890a0e013c3100edbd9a1d355f8adbeb57d"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-dQ8HDJ/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "10b20ca86226d328152b0727ab6f5890a0e013c3100edbd9a1d355f8adbeb57d"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-kVR24C/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "08405e260c59ee1eba045b2108137893332b8313fe4fc99991871c2a80cac8ff"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-kVR24C/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "2ae1f4167c52375c2e90fce33fd079a35a03390f95fe9e7f20e7d5e9c5d75c1a"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-kVR24C/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "2ae1f4167c52375c2e90fce33fd079a35a03390f95fe9e7f20e7d5e9c5d75c1a"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-kVR24C/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "08405e260c59ee1eba045b2108137893332b8313fe4fc99991871c2a80cac8ff"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-kVR24C/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "08405e260c59ee1eba045b2108137893332b8313fe4fc99991871c2a80cac8ff"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-qeD5YD/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "f5ca4301c79662adab78b50f49f0547d36d4dee6881485c12986c0377ce30cfb"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-qeD5YD/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "2203c42cf18f1af7e4f5beefe4ed1926ef65912f0d763d5d01415d9abf6660dd"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-qeD5YD/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "2203c42cf18f1af7e4f5beefe4ed1926ef65912f0d763d5d01415d9abf6660dd"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-qeD5YD/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "f5ca4301c79662adab78b50f49f0547d36d4dee6881485c12986c0377ce30cfb"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-qeD5YD/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "f5ca4301c79662adab78b50f49f0547d36d4dee6881485c12986c0377ce30cfb"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-tf8ihG/store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "95afcae8573315a66f00fa1a90491a719e161a9037e17413df087ff72d41defd"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-tf8ihG/store-after-1/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "4a3f74a7be12cf49a0764bdc432fa4521c469c68815c373fd5d09c5d9ba3cfc8"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-tf8ihG/store-after-2/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "4a3f74a7be12cf49a0764bdc432fa4521c469c68815c373fd5d09c5d9ba3cfc8"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-tf8ihG/store-after-3/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "95afcae8573315a66f00fa1a90491a719e161a9037e17413df087ff72d41defd"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "sr-tf8ihG/store-after-4/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "95afcae8573315a66f00fa1a90491a719e161a9037e17413df087ff72d41defd"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 49152,
+      "path": "tasks-6408-to-6498-5nlhVM/claude/store/tasks.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "23062b1dd2f99d94a2def1035bd1a49af610bdb87eea98f03ea5826ff40a12f5"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 24576,
+      "path": "tasks-6408-to-6498-5nlhVM/devin/store/tasks.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "c69413a3220098696a598866b3c157beaab4ca8ef05dc08bd4a27d341ddc1374"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 24576,
+      "path": "tasks-6408-to-6498-5nlhVM/devin-cloud/store/tasks.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "6399a66987004e016ad62042554c81efa230444d7142738addf5f369ae319ea4"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 24576,
+      "path": "tasks-6498-to-6408-SA6WKn/claude/store/tasks.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "d7566c4997b9de0538e4dc1c8dfbc8c0f17bac4fd471a32e1d2b9c06335f9d05"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 24576,
+      "path": "tasks-6498-to-6408-SA6WKn/devin/store/tasks.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "b4301ad8d5bf38c70c20af5aa6942955829bd8c38ad42817dbd97f3a64d1dd60"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 24576,
+      "path": "tasks-6498-to-6408-SA6WKn/devin-cloud/store/tasks.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "be7429c5d1c0117a2961f38c72602972348e6290f560eeb4eb5cad6c0ccd923d"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-1201d92164cc/cut-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "a83882f1026450204c8eb9274fff0774ae0dda9033cb52630dfb3c4a425205f2"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-1201d92164cc/ledger/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "73ce6c6e7d2b7f4e6900b9876bf3dc61d4688166b7cb36a6be7fec0b1d4b317b"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-1201d92164cc/recovered-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "73ce6c6e7d2b7f4e6900b9876bf3dc61d4688166b7cb36a6be7fec0b1d4b317b"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-1201d92164cc/returned-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "73ce6c6e7d2b7f4e6900b9876bf3dc61d4688166b7cb36a6be7fec0b1d4b317b"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-78be34f7b770/cut-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "7a4f552f5d2cffcc78bea36329d8d49760a8e4fba74dd1c41d9a373097e2c623"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-78be34f7b770/ledger/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "3d423574c020533ef0eb333359df5bfa8bf2ab3892d11ef14239e354cc20c0b8"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-78be34f7b770/recovered-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "3d423574c020533ef0eb333359df5bfa8bf2ab3892d11ef14239e354cc20c0b8"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-78be34f7b770/returned-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "3d423574c020533ef0eb333359df5bfa8bf2ab3892d11ef14239e354cc20c0b8"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-824ea93eb994/cut-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "7dddbede485e92796f3c0139ac36691f1c14986f049a520bb720c24acb9e5fc5"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-824ea93eb994/ledger/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "9fca259c50a80d5fb9086b8f52af0ade4c3807f0c4bf5db93c31348d6fe5d7db"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-824ea93eb994/recovered-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "9fca259c50a80d5fb9086b8f52af0ade4c3807f0c4bf5db93c31348d6fe5d7db"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-824ea93eb994/returned-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "9fca259c50a80d5fb9086b8f52af0ade4c3807f0c4bf5db93c31348d6fe5d7db"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-9757f40e0636/cut-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "84041172a7ad0d514f0b1e8322667faef8ae010e6d24b9635734bf347e83c584"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-9757f40e0636/ledger/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "93d54c88d60a8e3bdf8c84f37aa055f17d35f1853469b92e2c87019ea4aad8c0"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-9757f40e0636/recovered-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "93d54c88d60a8e3bdf8c84f37aa055f17d35f1853469b92e2c87019ea4aad8c0"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-9757f40e0636/returned-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "93d54c88d60a8e3bdf8c84f37aa055f17d35f1853469b92e2c87019ea4aad8c0"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-c8aff854ae10/cut-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "69258066bf425d6e05774a08c0a6cc041030156baeb952817c0cfa242a907835"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-c8aff854ae10/ledger/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "9474dbfc06dfcd8776789f0f8ee74825023f944a525ad45fde33b6bf1137109b"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-c8aff854ae10/recovered-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "9474dbfc06dfcd8776789f0f8ee74825023f944a525ad45fde33b6bf1137109b"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-c8aff854ae10/returned-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "9474dbfc06dfcd8776789f0f8ee74825023f944a525ad45fde33b6bf1137109b"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-e435c548a1e2/cut-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "4d615b3155a74e27d00ff98967548d0ab87421b1428313873c9b8e7ef976e436"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-e435c548a1e2/ledger/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "c13646167a3f361b37503d86de7bdf186157f1f2e1ffdde0f6016606dd102959"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-e435c548a1e2/recovered-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "c13646167a3f361b37503d86de7bdf186157f1f2e1ffdde0f6016606dd102959"
+    },
+    {
+      "artifact": "3312-pair",
+      "bytes": 8192,
+      "path": "vr-e435c548a1e2/returned-store/schedule.sqlite3",
+      "reason": "non-UTF-8 binary content; includes stopped databases and bus storage",
+      "sha256": "c13646167a3f361b37503d86de7bdf186157f1f2e1ffdde0f6016606dd102959"
+    }
+  ],
+  "format": 1,
+  "note": "Raw binary files remain bound by the verified private artifact archives. Top-level full source maps and tool metadata are represented by safe hashes in ci.json."
+}

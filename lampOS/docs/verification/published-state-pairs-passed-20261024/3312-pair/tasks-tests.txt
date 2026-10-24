@@ -1,0 +1,18 @@
+   Compiling serde_core v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling serde v1.0.229
+   Compiling lamp-bus v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/bus)
+   Compiling lamp-ipc v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/ipc)
+   Compiling lamp-msgs v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/msgs)
+   Compiling lamp-tasks v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/tasks)
+    Finished `release` profile [optimized] target(s) in 18.65s
+     Running tests/release_pair.rs (target/release/deps/release_pair-e60f849321032823)
+
+running 2 tests
+test release_6408_reads_writes_and_reopens_release_6498_tasks ... Tasks release-pair evidence: /tmp/pair-output/tasks-6498-to-6408-SA6WKn
+ok
+test release_6498_reads_writes_and_reopens_release_6408_tasks ... Tasks release-pair evidence: /tmp/pair-output/tasks-6408-to-6498-5nlhVM
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.27s
+

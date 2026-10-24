@@ -1,0 +1,843 @@
+{
+  "binary_pins": {
+    "schedule": {
+      "6408": [
+        "10ff8a223ad58da2afba2fa798bf9b07199c6af05fa0ffc678b8d714e49b7570",
+        4493144
+      ],
+      "6498": [
+        "10ff8a223ad58da2afba2fa798bf9b07199c6af05fa0ffc678b8d714e49b7570",
+        4493144
+      ]
+    },
+    "skills": {
+      "6408": [
+        "2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5",
+        8807104
+      ],
+      "6498": [
+        "87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984",
+        8786048
+      ]
+    },
+    "tasks": {
+      "6408": [
+        "7286dde761ab03155d0f867c3c8965759a010c5434e52df7d16756b32bbea003",
+        4723536
+      ],
+      "6498": [
+        "385d06c433a474ded979fc5953a8e6cc4aec254f37f7ebe32eb86b3bf027a371",
+        4728024
+      ]
+    },
+    "voice": {
+      "6408": [
+        "af7cd0d1e384ebddcca2b58eea94176c80aba573a5f47f4cd95cc8ce1a7ad084",
+        28375944
+      ],
+      "6498": [
+        "67ab7d3fd77bca2b6e5cf962bc0ec7a7db3520de1de3620f25e3899cb3a5a1f2",
+        28403184
+      ]
+    }
+  },
+  "export_scope": "Compact derived qualification; individual case files are byte-identical copies. No API object or downloaded executable is included.",
+  "limits": [
+    "Receipts qualify only the named heads and tested merges on base 59c4ac795; they do not qualify the later squash/rebase onto 090847e59.",
+    "Schedule 6408 and 6498 binaries are byte-identical, so these cases do not establish a Schedule implementation delta.",
+    "Tasks uses fake Harness and Voice endpoints; completion remains unverified. The six explicit cut records prove Tasks and its blocked owned backend were killed and reaped; they do not independently enumerate every transient subprocess.",
+    "Voice uses the actual released delivery-ledger consumer with authored Schedule API/completion events; no physical speech/audio is tested.",
+    "Skills covers daily claims and on/off state; rested state, Policy approval, actuators, updater installation and physical power-loss durability are excluded.",
+    "Ordinary ARM64 release payload metadata was checked, but those large payloads were not downloaded. The dedicated evidence ZIP payloads and captured state-file hashes were verified.",
+    "Source before/after manifests are unchanged and fixture files match the recorded PR heads; this audit did not independently rebuild or download every published executable.",
+    "Nextest summary counts are authoritative; captured nested test output after its summary is not counted again. Skipped test names are not emitted in these logs."
+  ],
+  "qualification_source_sha256": "db229703d95e4c5a0135e886886cff28ed34ea444a54c3580878778dd1120ba7",
+  "release_source_commits": {
+    "6408": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb",
+    "6498": "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+  },
+  "runs": {
+    "3312-arm": {
+      "artifact_metadata": [
+        {
+          "digest": "sha256:cee4e12e4d2c7151d9e54ce2a1db6496a17cf006867542970793c6e438c16b36",
+          "expired": false,
+          "id": 12544263743,
+          "name": "lampos-arm64-cec3372b7f26a728d0b96e0e681d257d191ff7fb",
+          "size_in_bytes": 115918294
+        }
+      ],
+      "artifact_payload_verification": "metadata only; ordinary ARM64 build payload was not downloaded",
+      "conclusion": "success",
+      "doctests": {
+        "failed": 0,
+        "passed": 4
+      },
+      "head": "cec3372b7f26a728d0b96e0e681d257d191ff7fb",
+      "nextest": {
+        "failed": 0,
+        "leak_rows": [
+          {
+            "line": 9646,
+            "text": "LEAK [   0.224s] ( 8963/11129) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+          }
+        ],
+        "leaky_passes": 1,
+        "passed": 11129,
+        "seconds": 201.988,
+        "skipped": 83,
+        "summary_line": 11814
+      },
+      "process_harness": {
+        "failed": 0,
+        "passed": 12
+      },
+      "publication": "skipped",
+      "python_publisher_artifact_cli": [
+        {
+          "failed": 0,
+          "line": 333,
+          "passed": 35,
+          "seconds": 0.237
+        },
+        {
+          "failed": 0,
+          "line": 403,
+          "passed": 12,
+          "seconds": 0.698
+        },
+        {
+          "failed": 0,
+          "line": 632,
+          "passed": 7,
+          "seconds": 0.374
+        }
+      ],
+      "raw_sha256": {
+        "artifacts.json": "7354d3f080daa32c8b59c6ebf6b548cdad5e083b436139f4afff112d5467efe4",
+        "run.api.json": "23ab3bebbae0bef9a285c6175751697de845fb2986fea5a68381d139f239c224",
+        "run.json": "80aef739a0cfef4770e26eb53d83affde107718277e78cc79efe8660b7cf3f89",
+        "run.log": "df29bafc61315c18f9f35e97b6764171f46602e4396c4f423158d985e1b049fd"
+      },
+      "relay_signals": "passed",
+      "run_id": 40054409431,
+      "tested_base": "59c4ac7959bfe4709e85c2be4799f58bbefe2736",
+      "tested_merge": "084a5c57d30f8d2018e9167b049ff03fd77595c1",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40054409431",
+      "warnings": [
+        {
+          "line": 135,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 420,
+          "text": "(node:9169) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 423,
+          "text": "(node:9169) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 508,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 513,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 518,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 523,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 655,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 660,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 665,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 670,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 12565,
+          "text": "(node:54104) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 12571,
+          "text": "(node:54104) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 12607,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    "3312-pair": {
+      "archive": {
+        "bytes": 704678,
+        "exit": 0,
+        "file": "artifact.zip",
+        "label": "3312-pair",
+        "members": 1,
+        "seconds": 3.129,
+        "sha256": "7ae4c87e5a8a1d5c7e2939d81f8fd676ce2087c595e63628c1558c34072a4fbb",
+        "stderr": "",
+        "uncompressed_bytes": 706752
+      },
+      "artifact_metadata": [
+        {
+          "digest": "sha256:7ae4c87e5a8a1d5c7e2939d81f8fd676ce2087c595e63628c1558c34072a4fbb",
+          "expired": false,
+          "id": 12545355488,
+          "name": "lampos-state-pair-cec3372b7f26a728d0b96e0e681d257d191ff7fb",
+          "size_in_bytes": 704678
+        }
+      ],
+      "cases": {
+        "schedule": [
+          {
+            "case": "sr-70eiN2",
+            "changed_boot_identity": true,
+            "clean_exits": 4,
+            "first": "6498",
+            "last_receipt": "ack"
+          },
+          {
+            "case": "sr-BK6jll",
+            "changed_boot_identity": false,
+            "clean_exits": 4,
+            "first": "6498",
+            "last_receipt": "snooze"
+          },
+          {
+            "case": "sr-N4dWEl",
+            "changed_boot_identity": true,
+            "clean_exits": 4,
+            "first": "6408",
+            "last_receipt": "snooze"
+          },
+          {
+            "case": "sr-RqPcZd",
+            "changed_boot_identity": true,
+            "clean_exits": 4,
+            "first": "6408",
+            "last_receipt": "ack"
+          },
+          {
+            "case": "sr-dQ8HDJ",
+            "changed_boot_identity": true,
+            "clean_exits": 4,
+            "first": "6498",
+            "last_receipt": "snooze"
+          },
+          {
+            "case": "sr-kVR24C",
+            "changed_boot_identity": false,
+            "clean_exits": 4,
+            "first": "6408",
+            "last_receipt": "ack"
+          },
+          {
+            "case": "sr-qeD5YD",
+            "changed_boot_identity": false,
+            "clean_exits": 4,
+            "first": "6498",
+            "last_receipt": "ack"
+          },
+          {
+            "case": "sr-tf8ihG",
+            "changed_boot_identity": false,
+            "clean_exits": 4,
+            "first": "6408",
+            "last_receipt": "snooze"
+          }
+        ],
+        "tasks": [
+          {
+            "accepted_tasks": 2,
+            "companions_unchanged": true,
+            "completion": "unverified",
+            "cut": {
+              "held_cli": {
+                "pid": 7352,
+                "reaped": true,
+                "signal": 9,
+                "starttime": 990653
+              },
+              "tasks_pid": 7336,
+              "tasks_reaped": true,
+              "tasks_signal": 9
+            },
+            "engine": "claude",
+            "launch_calls": 3,
+            "observations": 2,
+            "old_escaped_prompt_preserved": true,
+            "opposite": 6498,
+            "opposite_write_reopened": true,
+            "replayed_launches": 0,
+            "schema": 1,
+            "seconds": 0.679897034,
+            "store_id_preserved": true,
+            "writer": 6408
+          },
+          {
+            "accepted_tasks": 2,
+            "companions_unchanged": true,
+            "completion": "unverified",
+            "cut": {
+              "held_cli": {
+                "pid": 7387,
+                "reaped": true,
+                "signal": 9,
+                "starttime": 990722
+              },
+              "tasks_pid": 7371,
+              "tasks_reaped": true,
+              "tasks_signal": 9
+            },
+            "engine": "devin",
+            "launch_calls": 3,
+            "observations": 2,
+            "old_escaped_prompt_preserved": false,
+            "opposite": 6498,
+            "opposite_write_reopened": true,
+            "replayed_launches": 0,
+            "schema": 2,
+            "seconds": 0.733213818,
+            "store_id_preserved": true,
+            "writer": 6408
+          },
+          {
+            "accepted_tasks": 2,
+            "companions_unchanged": true,
+            "completion": "unverified",
+            "cut": {
+              "held_cli": {
+                "pid": 7422,
+                "reaped": true,
+                "signal": 9,
+                "starttime": 990795
+              },
+              "tasks_pid": 7406,
+              "tasks_reaped": true,
+              "tasks_signal": 9
+            },
+            "engine": "devin-cloud",
+            "launch_calls": 3,
+            "observations": 2,
+            "old_escaped_prompt_preserved": false,
+            "opposite": 6498,
+            "opposite_write_reopened": true,
+            "replayed_launches": 0,
+            "schema": 3,
+            "seconds": 0.646881683,
+            "store_id_preserved": true,
+            "writer": 6408
+          },
+          {
+            "accepted_tasks": 2,
+            "companions_unchanged": true,
+            "completion": "unverified",
+            "cut": {
+              "held_cli": {
+                "pid": 7246,
+                "reaped": true,
+                "signal": 9,
+                "starttime": 990450
+              },
+              "tasks_pid": 7230,
+              "tasks_reaped": true,
+              "tasks_signal": 9
+            },
+            "engine": "claude",
+            "launch_calls": 3,
+            "observations": 2,
+            "old_escaped_prompt_preserved": false,
+            "opposite": 6408,
+            "opposite_write_reopened": true,
+            "replayed_launches": 0,
+            "schema": 1,
+            "seconds": 0.723044263,
+            "store_id_preserved": true,
+            "writer": 6498
+          },
+          {
+            "accepted_tasks": 2,
+            "companions_unchanged": true,
+            "completion": "unverified",
+            "cut": {
+              "held_cli": {
+                "pid": 7281,
+                "reaped": true,
+                "signal": 9,
+                "starttime": 990513
+              },
+              "tasks_pid": 7265,
+              "tasks_reaped": true,
+              "tasks_signal": 9
+            },
+            "engine": "devin",
+            "launch_calls": 3,
+            "observations": 2,
+            "old_escaped_prompt_preserved": false,
+            "opposite": 6408,
+            "opposite_write_reopened": true,
+            "replayed_launches": 0,
+            "schema": 2,
+            "seconds": 0.637976499,
+            "store_id_preserved": true,
+            "writer": 6498
+          },
+          {
+            "accepted_tasks": 2,
+            "companions_unchanged": true,
+            "completion": "unverified",
+            "cut": {
+              "held_cli": {
+                "pid": 7316,
+                "reaped": true,
+                "signal": 9,
+                "starttime": 990577
+              },
+              "tasks_pid": 7300,
+              "tasks_reaped": true,
+              "tasks_signal": 9
+            },
+            "engine": "devin-cloud",
+            "launch_calls": 3,
+            "observations": 2,
+            "old_escaped_prompt_preserved": false,
+            "opposite": 6408,
+            "opposite_write_reopened": true,
+            "replayed_launches": 0,
+            "schema": 3,
+            "seconds": 0.638167687,
+            "store_id_preserved": true,
+            "writer": 6498
+          }
+        ],
+        "voice": [
+          {
+            "ack_commits": 1,
+            "case": "vr-1201d92164cc",
+            "cut": "completed",
+            "recovered_and_returned_entries": 0,
+            "signal_9_reaped_children": 3,
+            "writer": 6408
+          },
+          {
+            "ack_commits": 1,
+            "case": "vr-78be34f7b770",
+            "cut": "unfinished",
+            "recovered_and_returned_entries": 0,
+            "signal_9_reaped_children": 3,
+            "writer": 6498
+          },
+          {
+            "ack_commits": 1,
+            "case": "vr-824ea93eb994",
+            "cut": "ack-intent",
+            "recovered_and_returned_entries": 0,
+            "signal_9_reaped_children": 3,
+            "writer": 6408
+          },
+          {
+            "ack_commits": 1,
+            "case": "vr-9757f40e0636",
+            "cut": "unfinished",
+            "recovered_and_returned_entries": 0,
+            "signal_9_reaped_children": 3,
+            "writer": 6408
+          },
+          {
+            "ack_commits": 1,
+            "case": "vr-c8aff854ae10",
+            "cut": "completed",
+            "recovered_and_returned_entries": 0,
+            "signal_9_reaped_children": 3,
+            "writer": 6498
+          },
+          {
+            "ack_commits": 1,
+            "case": "vr-e435c548a1e2",
+            "cut": "ack-intent",
+            "recovered_and_returned_entries": 0,
+            "signal_9_reaped_children": 3,
+            "writer": 6498
+          }
+        ]
+      },
+      "conclusion": "success",
+      "head": "cec3372b7f26a728d0b96e0e681d257d191ff7fb",
+      "platform": "Linux aarch64",
+      "raw_sha256": {
+        "artifacts.json": "c00b0b2247acb3778abed39419ae2b8d7fc43aeacde74c70ac9889841cc91b33",
+        "run.api.json": "89d1ba4cce3b746559a2a60445ff64a89daf52f7f63184ab6b91c6db5d0afffa",
+        "run.json": "9ad99ec9c272528223cb13da4a37e634f995e5d9a15e0429978ea6ada0f0cf6f",
+        "run.log": "f78c02f700a359165de43138a6571f87373d1d87543ae73c4635d240d8954915"
+      },
+      "run_id": 40054409458,
+      "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+      "source_manifest": {
+        "count": 6973,
+        "fixture_files_verified_against_head": {
+          "lampOS/crates/schedule/tests/release_pair.rs": "5c7ad16de34efafc0226f3a4d12c1eed40a5b0e0546b8f0641c3f1ccb8600968",
+          "lampOS/crates/schedule/tests/release_pair/driver.rs": "a2cd56bac355b98ff0888c47a9ea505be3bdbd2e665588809d46ba743967b8e6",
+          "lampOS/crates/tasks/tests/release_pair.rs": "da2987d45edf9aaabcea3b9c808f531dcaf891deee77484576c3cd510c72230e",
+          "lampOS/crates/tasks/tests/release_pair/harness.sh": "923709be9041b2a1b6cecd19ae2796e23d3357e9debeed582436283fe6acbc3e",
+          "lampOS/crates/tasks/tests/release_pair/linux.rs": "47a476d0f744b3d4813737aad4f4165fe6a113d1bd051b07559aabe748f8a45f",
+          "lampOS/crates/update/tests/release_pair.rs": "6ff8c240b6064654ab3640e6bee009ae0f9c5c13a8ef2d3569e17d79df7a1812",
+          "lampOS/crates/update/tests/release_pair/run.sh": "9ec752bf75d942ed16ee35372513db659a6bf20026ff4a70f7ece3ba737c582d",
+          "lampOS/crates/update/tests/release_pair/systemctl.sh": "8b2a06b747aa406caed9beb6ca475bf2e75a3c895a8298ce6dc1f81bc2d13e77",
+          "lampOS/crates/voice/tests/release_pair.rs": "40fdc2fe7bf92b7cee67bba5eb2c9c7aba45acfb82befb374c9f1f01952bcba9",
+          "lampOS/crates/voice/tests/release_pair/README.md": "d0ab1927d59fd0f0cf8589f3dd15927b3b8dca930ab90d9be6d40d90cd26b1b5",
+          "lampOS/crates/voice/tests/release_pair/fixture.rs": "8acdf89d3fbd2d2adfa8bed9aa8c72665bd88ddce6b7398b89bd7facd774b986"
+        },
+        "sha256": "f5392be57885988b6d19fafa604fd346147c4a5975ccc9b827a4987594f98673",
+        "unchanged": true
+      },
+      "tested_base": "59c4ac7959bfe4709e85c2be4799f58bbefe2736",
+      "tested_merge": "084a5c57d30f8d2018e9167b049ff03fd77595c1",
+      "tests": {
+        "schedule": {
+          "failed": 0,
+          "ignored": 0,
+          "log_sha256": "2c2093b889ca387d23ff3cd9674da3fc558a1f01775053a28ccf8e327af1ac15",
+          "passed": 4,
+          "seconds": 11.82
+        },
+        "tasks": {
+          "failed": 0,
+          "ignored": 0,
+          "log_sha256": "55a18ad88230662290aff9c075e06c9930695da4ff21b4f58c939a29d5172a43",
+          "passed": 2,
+          "seconds": 4.27
+        },
+        "voice": {
+          "failed": 0,
+          "ignored": 0,
+          "log_sha256": "98464102df777e5f1f2e77edddd70f7374d77abe6d19d4c95b9a227617f7042f",
+          "passed": 6,
+          "seconds": 15.03
+        }
+      },
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40054409458",
+      "warnings": [
+        {
+          "line": 334,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 378,
+          "text": "(node:5422) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 1161,
+          "text": "(node:13036) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 1167,
+          "text": "(node:13036) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 1195,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    "3323-arm": {
+      "artifact_metadata": [
+        {
+          "digest": "sha256:921b7e4f83fdb074a0dc5d1eda85f2807507744383aee27353689a0bb4e60b22",
+          "expired": false,
+          "id": 12544991656,
+          "name": "lampos-arm64-561c6a21b1ea8e8d717561183c1f8d0714eba068",
+          "size_in_bytes": 115918294
+        }
+      ],
+      "artifact_payload_verification": "metadata only; ordinary ARM64 build payload was not downloaded",
+      "conclusion": "success",
+      "doctests": {
+        "failed": 0,
+        "passed": 4
+      },
+      "head": "561c6a21b1ea8e8d717561183c1f8d0714eba068",
+      "nextest": {
+        "failed": 0,
+        "leak_rows": [
+          {
+            "line": 9645,
+            "text": "LEAK [   0.219s] ( 8963/11129) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+          }
+        ],
+        "leaky_passes": 1,
+        "passed": 11129,
+        "seconds": 201.472,
+        "skipped": 75,
+        "summary_line": 11813
+      },
+      "process_harness": {
+        "failed": 0,
+        "passed": 12
+      },
+      "publication": "skipped",
+      "python_publisher_artifact_cli": [
+        {
+          "failed": 0,
+          "line": 333,
+          "passed": 35,
+          "seconds": 0.232
+        },
+        {
+          "failed": 0,
+          "line": 403,
+          "passed": 12,
+          "seconds": 0.697
+        },
+        {
+          "failed": 0,
+          "line": 633,
+          "passed": 7,
+          "seconds": 0.398
+        }
+      ],
+      "raw_sha256": {
+        "artifacts.json": "dffc34a038d756f53b9ef303ff82ad38bad05c5307946be6b3a102fe398b6572",
+        "run.api.json": "868553a6054e7b7b30cee98da6919d016702560cace54c788c53685fd30d700b",
+        "run.json": "a31ca17e3d6d32fe2803cc718cd17fb165ddbd1947a2a52ac5b71e54d2a826fe",
+        "run.log": "a6dcad97faaf3a919a0f873f3bb98f0f1ae8ceb2ed1b5db1bcc739c206c972bb"
+      },
+      "relay_signals": "passed",
+      "run_id": 40054631836,
+      "tested_base": "59c4ac7959bfe4709e85c2be4799f58bbefe2736",
+      "tested_merge": "bf2b03555b68eb94c7b30ca966e617fa8a7471c5",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40054631836",
+      "warnings": [
+        {
+          "line": 135,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 420,
+          "text": "(node:8762) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 423,
+          "text": "(node:8762) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 509,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 514,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 519,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 524,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 656,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 661,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 666,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 671,
+          "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 12564,
+          "text": "(node:53692) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 12570,
+          "text": "(node:53692) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 12606,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    "3323-clippy": {
+      "artifact_metadata": [],
+      "conclusion": "success",
+      "head": "561c6a21b1ea8e8d717561183c1f8d0714eba068",
+      "raw_sha256": {
+        "artifacts.json": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c",
+        "run.api.json": "cd1c650a6203ef983b2ff519b56b22f9d2b25909d21f31594882420c90901297",
+        "run.json": "918e5ffd07e3e1ccc4e32ce2fc76a00601d16117b2689b7c3d0b6c5cefb42da0",
+        "run.log": "fe8d19fe52f15adbbc490471ba060f410aa14fddfa98ff4ef81f6dbcebfef165"
+      },
+      "run_id": 40054631774,
+      "tested_base": "59c4ac7959bfe4709e85c2be4799f58bbefe2736",
+      "tested_merge": "bf2b03555b68eb94c7b30ca966e617fa8a7471c5",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40054631774",
+      "warnings": [
+        {
+          "line": 181,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 382,
+          "text": "(node:8271) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 385,
+          "text": "(node:8271) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 465,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    "3323-pair": {
+      "archive": {
+        "bytes": 620309,
+        "exit": 0,
+        "file": "artifact.zip",
+        "label": "3323-pair",
+        "members": 1,
+        "seconds": 3.101,
+        "sha256": "2493b41514591da006aa21c8891740af33e70e3094f464bb72b7172d0d4e8b47",
+        "stderr": "",
+        "uncompressed_bytes": 620419
+      },
+      "artifact_metadata": [
+        {
+          "digest": "sha256:2493b41514591da006aa21c8891740af33e70e3094f464bb72b7172d0d4e8b47",
+          "expired": false,
+          "id": 12544703173,
+          "name": "lampos-routine-state-pair-561c6a21b1ea8e8d717561183c1f8d0714eba068",
+          "size_in_bytes": 620309
+        }
+      ],
+      "cases": [
+        {
+          "case": "kr-WKgNZ2",
+          "kind": "daily",
+          "normal_exits": 0,
+          "persisted_refusals": 2,
+          "reaped_children": 3,
+          "signal_9_reaped": 3,
+          "snapshot_manifests_verified": 3,
+          "writer": 6408
+        },
+        {
+          "case": "kr-bf7lR0",
+          "kind": "on-off",
+          "normal_exits": 6,
+          "persisted_refusals": 1,
+          "reaped_children": 8,
+          "signal_9_reaped": 2,
+          "snapshot_manifests_verified": 5,
+          "writer": 6408
+        },
+        {
+          "case": "kr-ecSiQD",
+          "kind": "on-off",
+          "normal_exits": 6,
+          "persisted_refusals": 1,
+          "reaped_children": 8,
+          "signal_9_reaped": 2,
+          "snapshot_manifests_verified": 5,
+          "writer": 6498
+        },
+        {
+          "case": "kr-ytK164",
+          "kind": "daily",
+          "normal_exits": 0,
+          "persisted_refusals": 2,
+          "reaped_children": 3,
+          "signal_9_reaped": 3,
+          "snapshot_manifests_verified": 3,
+          "writer": 6498
+        }
+      ],
+      "conclusion": "success",
+      "head": "561c6a21b1ea8e8d717561183c1f8d0714eba068",
+      "platform": "Linux aarch64",
+      "raw_sha256": {
+        "artifacts.json": "4be55a2dde474724dde7aaf91b1f2c5a8ae14c3d34c0fdb670272b40c255a13a",
+        "run.api.json": "4a40e756c16a0a89a4da51131db3d50d33bcec7f9cf544710ed53a1ae8189238",
+        "run.json": "921ccd81d5ed780fc89a33ecbc17cef5907517482e9f000d590c54eaabd40c6b",
+        "run.log": "3899350eb02c7ee0508d0e8a732383d68fd34d09d6ce6c802717004560a3e392"
+      },
+      "run_id": 40054631773,
+      "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+      "source_manifest": {
+        "count": 6968,
+        "fixture_files_verified_against_head": {
+          "lampOS/crates/skills/tests/release_pair.rs": "603ed22178b337e46533a0487266534e7d5529e9e6ad594bb1922210271cc68e",
+          "lampOS/crates/skills/tests/release_pair/README.md": "d5dcb92f9ca0f46f294b884c517b1aa33d04d35e2b12c52190e1c9014364690b",
+          "lampOS/crates/skills/tests/release_pair/fixture.rs": "63df02e8851898709d6db6b6ec7529fa6f508bcdc3c101a233ebf39b53ddff49",
+          "lampOS/crates/update/tests/release_pair.rs": "6ff8c240b6064654ab3640e6bee009ae0f9c5c13a8ef2d3569e17d79df7a1812",
+          "lampOS/crates/update/tests/release_pair/run.sh": "9ec752bf75d942ed16ee35372513db659a6bf20026ff4a70f7ece3ba737c582d",
+          "lampOS/crates/update/tests/release_pair/systemctl.sh": "8b2a06b747aa406caed9beb6ca475bf2e75a3c895a8298ce6dc1f81bc2d13e77"
+        },
+        "sha256": "627187f45ff304af7b4342c7a39b162b34879f5f02b5c87984c0169ccafbdda9",
+        "unchanged": true
+      },
+      "tested_base": "59c4ac7959bfe4709e85c2be4799f58bbefe2736",
+      "tested_merge": "bf2b03555b68eb94c7b30ca966e617fa8a7471c5",
+      "tests": {
+        "skills": {
+          "failed": 0,
+          "ignored": 0,
+          "log_sha256": "02b5780549f72db6905fa174d9c743a84472ccb7f4094165ff2f21a29cf1f551",
+          "passed": 4,
+          "seconds": 1.88
+        }
+      },
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40054631773",
+      "warnings": [
+        {
+          "line": 335,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 379,
+          "text": "(node:5422) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 932,
+          "text": "(node:10123) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 938,
+          "text": "(node:10123) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 966,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    }
+  },
+  "status": "qualified only at the recorded pre-rebase heads"
+}

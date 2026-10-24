@@ -1,0 +1,137 @@
+info: syncing channel updates for 1.96.0-aarch64-unknown-linux-gnu
+info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+info: downloading component clippy
+    Updating crates.io index
+    Updating git repository `https://github.com/RustAudio/cpal.git`
+ Downloading crates ...
+  Downloaded cfg-if v1.0.5
+  Downloaded bitflags v2.13.2
+  Downloaded block-buffer v0.10.4
+  Downloaded bitflags v1.3.2
+  Downloaded cpufeatures v0.2.17
+  Downloaded cc v1.7.0
+  Downloaded thiserror v2.0.21
+  Downloaded fastrand v2.5.0
+  Downloaded fallible-streaming-iterator v0.1.9
+  Downloaded itoa v1.0.18
+  Downloaded crypto-common v0.1.7
+  Downloaded defmt-parser v1.0.0
+  Downloaded cfg_aliases v0.2.2
+  Downloaded jiff-static v0.2.38
+  Downloaded generic-array v0.14.7
+  Downloaded version_check v0.9.5
+  Downloaded signal-hook-registry v1.4.8
+  Downloaded shlex v2.0.1
+  Downloaded errno v0.3.14
+  Downloaded quote v1.0.47
+  Downloaded thiserror-impl v2.0.21
+  Downloaded zmij v1.0.23
+  Downloaded pkg-config v0.3.34
+  Downloaded foldhash v0.2.0
+  Downloaded unicode-ident v1.0.26
+  Downloaded smallvec v1.16.3
+  Downloaded serde_core v1.0.229
+  Downloaded tempfile v3.27.0
+  Downloaded jiff-tzdb v0.1.9
+  Downloaded getrandom v0.4.3
+  Downloaded serde v1.0.229
+  Downloaded serde_derive v1.0.229
+  Downloaded typenum v1.20.1
+  Downloaded memchr v2.8.3
+  Downloaded serde_json v1.0.151
+  Downloaded hashbrown v0.17.1
+  Downloaded rusqlite v0.40.2
+  Downloaded jiff-core v0.1.1
+  Downloaded vcpkg v0.2.15
+  Downloaded proc-macro2 v1.0.107
+  Downloaded log v0.4.34
+  Downloaded hashlink v0.12.2
+  Downloaded syn v2.0.119
+  Downloaded syn v3.0.7
+  Downloaded nix v0.29.0
+  Downloaded defmt-macros v1.1.1
+  Downloaded signal-hook v0.4.4
+  Downloaded once_cell v1.21.4
+  Downloaded find-msvc-tools v0.1.14
+  Downloaded rustix v1.1.5
+  Downloaded fallible-iterator v0.3.0
+  Downloaded digest v0.10.7
+  Downloaded sha2 v0.10.9
+  Downloaded defmt v1.1.1
+  Downloaded jiff v0.2.38
+  Downloaded libc v0.2.190
+  Downloaded linux-raw-sys v0.12.1
+  Downloaded libsqlite3-sys v0.38.2
+   Compiling libc v0.2.190
+   Compiling serde_core v1.0.229
+   Compiling version_check v0.9.5
+   Compiling proc-macro2 v1.0.107
+   Compiling generic-array v0.14.7
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling zmij v1.0.23
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.5
+   Compiling shlex v2.0.1
+   Compiling serde_json v1.0.151
+   Compiling find-msvc-tools v0.1.14
+   Compiling bitflags v2.13.2
+   Compiling cc v1.7.0
+   Compiling syn v3.0.7
+   Compiling serde v1.0.229
+   Compiling itoa v1.0.18
+   Compiling cfg_aliases v0.2.2
+   Compiling pkg-config v0.3.34
+   Compiling memchr v2.8.3
+   Compiling vcpkg v0.2.15
+   Compiling rustix v1.1.5
+   Compiling nix v0.29.0
+   Compiling libsqlite3-sys v0.38.2
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling foldhash v0.2.0
+   Compiling linux-raw-sys v0.12.1
+   Compiling getrandom v0.4.3
+   Compiling hashbrown v0.17.1
+   Compiling serde_derive v1.0.229
+   Compiling digest v0.10.7
+   Compiling cpufeatures v0.2.17
+   Compiling errno v0.3.14
+   Compiling jiff-tzdb v0.1.9
+   Compiling jiff-core v0.1.1
+   Compiling signal-hook v0.4.4
+   Compiling lamp-bus v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/bus)
+   Compiling jiff v0.2.38
+   Compiling signal-hook-registry v1.4.8
+   Compiling sha2 v0.10.9
+   Compiling hashlink v0.12.2
+   Compiling fallible-iterator v0.3.0
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling smallvec v1.16.3
+   Compiling lamp-ipc v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/ipc)
+   Compiling lamp-msgs v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/msgs)
+   Compiling lamp-local-time v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/local-time)
+   Compiling fastrand v2.5.0
+   Compiling once_cell v1.21.4
+   Compiling tempfile v3.27.0
+   Compiling rusqlite v0.40.2
+   Compiling lamp-schedule v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/schedule)
+    Finished `release` profile [optimized] target(s) in 1m 01s
+     Running tests/release_pair.rs (target/release/deps/release_pair-f2e6f3fc7ef54fc4)
+
+running 4 tests
+test schedule_6408_to_6498_to_6408_changed_boot_identity ... Schedule release-pair evidence: /tmp/pair-output/sr-RqPcZd
+Schedule release-pair evidence: /tmp/pair-output/sr-N4dWEl
+ok
+test schedule_6408_to_6498_to_6408_same_boot ... Schedule release-pair evidence: /tmp/pair-output/sr-kVR24C
+Schedule release-pair evidence: /tmp/pair-output/sr-tf8ihG
+ok
+test schedule_6498_to_6408_to_6498_changed_boot_identity ... Schedule release-pair evidence: /tmp/pair-output/sr-70eiN2
+Schedule release-pair evidence: /tmp/pair-output/sr-dQ8HDJ
+ok
+test schedule_6498_to_6408_to_6498_same_boot ... Schedule release-pair evidence: /tmp/pair-output/sr-qeD5YD
+Schedule release-pair evidence: /tmp/pair-output/sr-BK6jll
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.82s
+
