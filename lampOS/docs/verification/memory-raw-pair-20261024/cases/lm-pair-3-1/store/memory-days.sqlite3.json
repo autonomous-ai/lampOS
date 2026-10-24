@@ -1,0 +1,153 @@
+{
+  "original_bytes": 114688,
+  "original_sha256": "305b6b72de4fc9e2b83220b1cc1a885b19f09ad969280f3aaa18e0734cf27661",
+  "integrity_check": [
+    [
+      "ok"
+    ]
+  ],
+  "user_version": [
+    [
+      1
+    ]
+  ],
+  "foreign_key_check": [],
+  "tables": [
+    [
+      "entries",
+      "table",
+      "CREATE TABLE entries (\n    rid INTEGER PRIMARY KEY AUTOINCREMENT,\n    person TEXT NOT NULL REFERENCES people(person),\n    id INTEGER NOT NULL,\n    kind TEXT NOT NULL CHECK(kind IN ('exchange','kept','observation')),\n    at_unix_ms INTEGER NOT NULL,\n    day TEXT NOT NULL,\n    heard TEXT NOT NULL DEFAULT '',\n    said TEXT NOT NULL DEFAULT '',\n    text TEXT NOT NULL DEFAULT '',\n    category TEXT,\n    used_unix_ms INTEGER NOT NULL,\n    active INTEGER NOT NULL DEFAULT 1,\n    UNIQUE(person,id)\n)"
+    ],
+    [
+      "entries_person_day",
+      "index",
+      "CREATE INDEX entries_person_day ON entries(person,day)"
+    ],
+    [
+      "entries_person_kind",
+      "index",
+      "CREATE INDEX entries_person_kind ON entries(person,kind,id)"
+    ],
+    [
+      "event_days",
+      "table",
+      "CREATE TABLE event_days (\n    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    day TEXT NOT NULL\n)"
+    ],
+    [
+      "follow_up_offers",
+      "table",
+      "CREATE TABLE follow_up_offers (\n    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    person TEXT NOT NULL,\n    offers INTEGER NOT NULL,\n    offered_unix_ms INTEGER NOT NULL\n)"
+    ],
+    [
+      "follow_ups",
+      "table",
+      "CREATE TABLE follow_ups (\n    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    person TEXT NOT NULL,\n    asked_unix_ms INTEGER NOT NULL\n)"
+    ],
+    [
+      "jobs",
+      "table",
+      "CREATE TABLE jobs (\n    job INTEGER PRIMARY KEY AUTOINCREMENT,\n    person TEXT NOT NULL REFERENCES people(person),\n    conversation TEXT NOT NULL,\n    generation INTEGER NOT NULL,\n    at_unix_ms INTEGER NOT NULL,\n    state TEXT NOT NULL CHECK(state IN ('pending','done')),\n    input TEXT NOT NULL DEFAULT '',\n    result TEXT NOT NULL DEFAULT '[]',\n    UNIQUE(person,conversation)\n)"
+    ],
+    [
+      "people",
+      "table",
+      "CREATE TABLE people (\n    person TEXT PRIMARY KEY,\n    next_id INTEGER NOT NULL DEFAULT 1,\n    generation INTEGER NOT NULL DEFAULT 0,\n    skipped INTEGER NOT NULL DEFAULT 0\n)"
+    ],
+    [
+      "replacements",
+      "table",
+      "CREATE TABLE replacements (\n    newer INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,\n    older INTEGER NOT NULL UNIQUE REFERENCES entries(rid) ON DELETE CASCADE\n)"
+    ],
+    [
+      "search",
+      "table",
+      "CREATE VIRTUAL TABLE search USING fts5(\n    body, tokenize='unicode61 remove_diacritics 2'\n)"
+    ],
+    [
+      "search_config",
+      "table",
+      "CREATE TABLE 'search_config'(k PRIMARY KEY, v) WITHOUT ROWID"
+    ],
+    [
+      "search_content",
+      "table",
+      "CREATE TABLE 'search_content'(id INTEGER PRIMARY KEY, c0)"
+    ],
+    [
+      "search_data",
+      "table",
+      "CREATE TABLE 'search_data'(id INTEGER PRIMARY KEY, block BLOB)"
+    ],
+    [
+      "search_docsize",
+      "table",
+      "CREATE TABLE 'search_docsize'(id INTEGER PRIMARY KEY, sz BLOB)"
+    ],
+    [
+      "search_idx",
+      "table",
+      "CREATE TABLE 'search_idx'(segid, term, pgno, PRIMARY KEY(segid, term)) WITHOUT ROWID"
+    ],
+    [
+      "sessions",
+      "table",
+      "CREATE TABLE sessions (\n    person TEXT NOT NULL REFERENCES people(person),\n    session TEXT NOT NULL,\n    opened_unix_ms INTEGER NOT NULL,\n    generation INTEGER NOT NULL,\n    max_bytes INTEGER NOT NULL,\n    note TEXT NOT NULL,\n    ids TEXT NOT NULL,\n    invalidated INTEGER NOT NULL DEFAULT 0,\n    PRIMARY KEY(person,session)\n)"
+    ],
+    [
+      "settings",
+      "table",
+      "CREATE TABLE settings (\n    key TEXT PRIMARY KEY,\n    value INTEGER NOT NULL\n)"
+    ],
+    [
+      "sources",
+      "table",
+      "CREATE TABLE sources (\n    child INTEGER NOT NULL REFERENCES entries(rid) ON DELETE CASCADE,\n    parent INTEGER NOT NULL REFERENCES entries(rid) ON DELETE CASCADE,\n    PRIMARY KEY(child,parent),\n    CHECK(child != parent)\n)"
+    ],
+    [
+      "sources_parent",
+      "index",
+      "CREATE INDEX sources_parent ON sources(parent)"
+    ],
+    [
+      "sqlite_autoindex_entries_1",
+      "index",
+      null
+    ],
+    [
+      "sqlite_autoindex_jobs_1",
+      "index",
+      null
+    ],
+    [
+      "sqlite_autoindex_people_1",
+      "index",
+      null
+    ],
+    [
+      "sqlite_autoindex_replacements_1",
+      "index",
+      null
+    ],
+    [
+      "sqlite_autoindex_sessions_1",
+      "index",
+      null
+    ],
+    [
+      "sqlite_autoindex_settings_1",
+      "index",
+      null
+    ],
+    [
+      "sqlite_autoindex_sources_1",
+      "index",
+      null
+    ],
+    [
+      "sqlite_sequence",
+      "table",
+      "CREATE TABLE sqlite_sequence(name,seq)"
+    ]
+  ],
+  "note": "Logical SQL export from retained raw SQLite bytes; original binary is not committed."
+}

@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-memory-pair-7195d43369054572-manual-pair"
+  ],
+  "container": "fourth-memory-pair-7195d43369054572-manual-pair",
+  "container_removal_confirmed": true,
+  "elapsed_seconds": 0.187061526812613,
+  "exit": 0,
+  "pid": 25097,
+  "process_group": 25097,
+  "timeout_seconds": 20
+}

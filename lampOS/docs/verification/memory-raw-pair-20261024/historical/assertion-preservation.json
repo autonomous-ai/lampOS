@@ -1,0 +1,7 @@
+{
+  "old_assertions": 48,
+  "new_assertions": 51,
+  "all_old_assertion_macro_invocations_byte_exact": true,
+  "added_only": "2known-ID predicate assertions + exact rules mapping assertion",
+  "deadline_constants_unchanged": true
+}

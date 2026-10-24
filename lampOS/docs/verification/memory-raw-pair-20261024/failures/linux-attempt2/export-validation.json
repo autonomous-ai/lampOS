@@ -1,0 +1,12 @@
+{
+  "archive_bytes": 2048000,
+  "archive_sha256": "117c02cf78d93f7f723bbc95aa93b1e1f4f0f60b3a4b534bc1601144b9539242",
+  "errors": [
+    "Export did not complete successfully",
+    "Archive validation: unexpected end of data"
+  ],
+  "export.exit": 124,
+  "passing_manual_expected": false,
+  "test.exit": 101,
+  "valid": false
+}

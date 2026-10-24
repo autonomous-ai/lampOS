@@ -1,0 +1,20 @@
+
+running 2 tests
+test current_reads_release_6408_days_and_forget_survives_release_6408_reopen ... ok
+test release_6408_reads_current_days_and_forget_survives_current_reopen ... ok
+
+successes:
+
+---- current_reads_release_6408_days_and_forget_survives_release_6408_reopen stdout ----
+memory release-pair evidence: /tmp/lm-pair-3-0
+
+---- release_6408_reads_current_days_and_forget_survives_current_reopen stdout ----
+memory release-pair evidence: /tmp/lm-pair-3-1
+
+
+successes:
+    current_reads_release_6408_days_and_forget_survives_release_6408_reopen
+    release_6408_reads_current_days_and_forget_survives_current_reopen
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.48s
+

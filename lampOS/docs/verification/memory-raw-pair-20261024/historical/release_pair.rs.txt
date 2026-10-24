@@ -1,0 +1,454 @@
+//! Explicit actual-release checks for #2809, never a rebuild of old source.
+//! The two public labels currently contain identical Memory bytes. Both inputs
+//! are still required and verified; this does not invent a changed-reader claim.
+//! Run the ignored cases only on Linux with native/binfmt AArch64 execution.
+use rusqlite::{Connection, OpenFlags};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::BTreeSet,
+    fs::{self, DirBuilder, File},
+    io::{self, BufRead, BufReader, Read, Write},
+    os::unix::{fs::DirBuilderExt, fs::PermissionsExt, net::UnixStream},
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    sync::atomic::{AtomicU64, Ordering},
+    thread,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
+
+const SHA: &str = "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb";
+const BINARY_BYTES: u64 = 4_738_136;
+const CASE_BOUND: Duration = Duration::from_secs(120);
+const START_BOUND: Duration = Duration::from_secs(10);
+const RPC_BOUND: Duration = Duration::from_secs(5);
+const STOP_BOUND: Duration = Duration::from_secs(5);
+const MAX_REPLY: u64 = 65_536;
+const A: &str = "p-1111111111111111";
+const B: &str = "p-2222222222222222";
+const RULES: &str = "r-1111111111111111";
+static NEXT: AtomicU64 = AtomicU64::new(0);
+
+struct Fixture {
+    root: PathBuf,
+    until: Instant,
+    at: u64,
+}
+impl Fixture {
+    fn new() -> Self {
+        assert_eq!(
+            std::env::consts::OS,
+            "linux",
+            "manual release pair requires Linux; an unsupported host is not a passing observation"
+        );
+        let root = (0..100)
+            .find_map(|_| {
+                let path = std::env::temp_dir().join(format!(
+                    "lm-pair-{}-{}",
+                    std::process::id(),
+                    NEXT.fetch_add(1, Ordering::Relaxed)
+                ));
+                match DirBuilder::new().mode(0o700).create(&path) {
+                    Ok(()) => Some(path),
+                    Err(error) if error.kind() == io::ErrorKind::AlreadyExists => None,
+                    Err(error) => panic!("cannot create private evidence directory: {error}"),
+                }
+            })
+            .expect("cannot allocate an exclusive evidence directory");
+        println!("memory release-pair evidence: {}", root.display());
+        for (release, variable) in [
+            ("6408", "LAMP_PAIR_6408_MEMORY"),
+            ("6449", "LAMP_PAIR_CURRENT_MEMORY"),
+        ] {
+            let input = std::env::var_os(variable)
+                .unwrap_or_else(|| panic!("manual fixture requires {variable}"));
+            let mut bytes = Vec::new();
+            File::open(input)
+                .unwrap()
+                .take(BINARY_BYTES + 1)
+                .read_to_end(&mut bytes)
+                .unwrap();
+            assert_eq!(bytes.len() as u64, BINARY_BYTES, "{release}: asset size");
+            assert_eq!(
+                format!("{:x}", Sha256::digest(&bytes)),
+                SHA,
+                "{release}: asset digest"
+            );
+            assert!(bytes.starts_with(b"\x7fELF\x02\x01"), "ELF64 little endian");
+            assert_eq!(bytes.get(18..20), Some(&[0xb7, 0][..]), "AArch64");
+            let copy = root.join(format!("memory-{release}"));
+            fs::write(&copy, bytes).unwrap();
+            fs::set_permissions(copy, fs::Permissions::from_mode(0o555)).unwrap();
+        }
+        let at = u64::try_from(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
+        )
+        .unwrap();
+        Self {
+            root,
+            until: Instant::now() + CASE_BOUND,
+            at,
+        }
+    }
+
+    fn left(&self, cap: Duration) -> Duration {
+        let left = self
+            .until
+            .saturating_duration_since(Instant::now())
+            .min(cap);
+        assert!(!left.is_zero(), "original release-pair deadline exhausted");
+        left
+    }
+
+    fn start(&self, release: &str, phase: &str) -> Process {
+        let stderr = File::create(self.root.join(format!("{phase}.stderr"))).unwrap();
+        let child = Command::new(self.root.join(format!("memory-{release}")))
+            .args(["--dir", self.root.join("store").to_str().unwrap(), "--socket", self.root.join("memory.sock").to_str().unwrap(), "--memory-days", "--utc-offset-minutes", "0"])
+            .stdin(Stdio::null()).stdout(Stdio::null()).stderr(stderr).spawn()
+            .unwrap_or_else(|error| panic!("release {release} cannot execute: {error}; native/binfmt AArch64 support must be established, never silently skipped"));
+        let mut process = Process {
+            child,
+            ended: false,
+        };
+        let until = Instant::now() + self.left(START_BOUND);
+        loop {
+            assert!(
+                process.child.try_wait().unwrap().is_none(),
+                "release {release} exited before readiness; see {phase}.stderr"
+            );
+            if self.root.join("ready").is_file()
+                && UnixStream::connect(self.root.join("memory.sock")).is_ok()
+            {
+                break;
+            }
+            assert!(
+                Instant::now() < until,
+                "release {release} did not become ready"
+            );
+            thread::sleep(
+                Duration::from_millis(5).min(until.saturating_duration_since(Instant::now())),
+            );
+        }
+        // A complete semantic response, not the stale ready pathname alone,
+        // establishes this process can serve the reopened store.
+        self.ask(phase, json!({"op":"status"}));
+        process
+    }
+
+    fn ask(&self, phase: &str, request: Value) -> Value {
+        let began = Instant::now();
+        let stream = UnixStream::connect(self.root.join("memory.sock")).unwrap();
+        let until = Instant::now() + self.left(RPC_BOUND);
+        stream.set_read_timeout(Some(self.left(RPC_BOUND))).unwrap();
+        stream
+            .set_write_timeout(Some(self.left(RPC_BOUND)))
+            .unwrap();
+        let mut reader = BufReader::new(stream);
+        writeln!(reader.get_mut(), "{request}").unwrap();
+        // Bound bytes and the whole reply, including a peer that dribbles
+        // partial records. Socket timeouts alone restart after each read.
+        let mut line = Vec::new();
+        loop {
+            let remaining = until.saturating_duration_since(Instant::now());
+            assert!(!remaining.is_zero(), "reply exceeded original RPC deadline");
+            reader.get_mut().set_read_timeout(Some(remaining)).unwrap();
+            let bytes = reader.fill_buf().unwrap();
+            assert!(!bytes.is_empty(), "reply closed before newline");
+            let count = bytes
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map_or(bytes.len(), |index| index + 1);
+            assert!(
+                (line.len() + count) as u64 <= MAX_REPLY,
+                "oversized release reply"
+            );
+            line.extend_from_slice(&bytes[..count]);
+            reader.consume(count);
+            if line.last() == Some(&b'\n') {
+                break;
+            }
+        }
+        let response: Value = serde_json::from_slice(&line).unwrap();
+        let elapsed_us = began.elapsed().as_micros();
+        let mut log = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.root.join("rpc.jsonl"))
+            .unwrap();
+        writeln!(
+            log,
+            "{}",
+            json!({"phase":phase,"request":request,"response":response,"elapsed_us":elapsed_us})
+        )
+        .unwrap();
+        assert_eq!(
+            response["ok"], true,
+            "actual release refused a fixture operation: {response}"
+        );
+        response
+    }
+
+    fn add(&self, phase: &str, op: &str, person: &str, text: &str, sources: &[u64]) -> u64 {
+        let mut request =
+            json!({"op":op,"person":person,"at_unix_ms":self.at,"source_ids":sources});
+        if op == "remember" {
+            request["text"] = json!(text);
+        } else {
+            request["heard"] = json!(text);
+            request["said"] = json!("pair reply");
+        }
+        if op == "append" {
+            request.as_object_mut().unwrap().remove("source_ids");
+        }
+        self.ask(phase, request)["id"].as_u64().unwrap()
+    }
+
+    fn entries(&self, phase: &str, person: &str) -> Vec<Value> {
+        self.ask(
+            phase,
+            json!({"op":"search","person":person,"query":"pair","limit":50,"max_bytes":16384}),
+        )["entries"]
+            .as_array()
+            .unwrap()
+            .clone()
+    }
+
+    fn snapshot(&self, phase: &str, person: &str) -> Value {
+        self.ask(
+            phase,
+            json!({"op":"session_open","person":person,"session":"pair-session","max_bytes":1200}),
+        )["snapshot"]
+            .clone()
+    }
+
+    fn audit_database(&self, remaining: usize) {
+        let db = Connection::open_with_flags(
+            self.root.join("store/memory-days.sqlite3"),
+            OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let integrity: String = db
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(integrity, "ok");
+        let version: u64 = db
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 1);
+        let entries: usize = db
+            .query_row("SELECT count(*) FROM entries", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(entries, remaining);
+        let orphans: u64 = db.query_row("SELECT count(*) FROM sources s LEFT JOIN entries c ON c.rid=s.child LEFT JOIN entries p ON p.rid=s.parent WHERE c.rid IS NULL OR p.rid IS NULL", [], |row| row.get(0)).unwrap();
+        assert_eq!(orphans, 0);
+        assert!(
+            !db.prepare("PRAGMA foreign_key_check")
+                .unwrap()
+                .exists([])
+                .unwrap()
+        );
+        assert!(
+            fs::read_dir(self.root.join("store"))
+                .unwrap()
+                .all(|entry| !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains("newer-db")),
+            "a compatible store must not be archived or replaced"
+        );
+        assert_eq!(
+            fs::metadata(self.root.join("store"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o7777,
+            0o700
+        );
+        assert_eq!(
+            fs::metadata(self.root.join("store/memory-days.sqlite3"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o7777,
+            0o600
+        );
+    }
+}
+
+struct Process {
+    child: Child,
+    ended: bool,
+}
+impl Process {
+    fn finish(mut self) {
+        assert!(
+            self.child.try_wait().unwrap().is_none(),
+            "release exited before the requested acknowledged-stop boundary"
+        );
+        self.stop().unwrap();
+    }
+    fn stop(&mut self) -> io::Result<()> {
+        if self.ended {
+            return Ok(());
+        }
+        if self.child.try_wait()?.is_none() {
+            self.child.kill()?;
+        }
+        let until = Instant::now() + STOP_BOUND;
+        while self.child.try_wait()?.is_none() {
+            if Instant::now() >= until {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "owned release process did not reap",
+                ));
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        self.ended = true;
+        Ok(())
+    }
+}
+impl Drop for Process {
+    fn drop(&mut self) {
+        if let Err(error) = self.stop() {
+            let _ = writeln!(io::stderr(), "memory release-pair cleanup failed: {error}");
+        }
+    }
+}
+
+fn ids(entries: &[Value]) -> BTreeSet<u64> {
+    entries
+        .iter()
+        .map(|entry| entry["id"].as_u64().unwrap())
+        .collect()
+}
+
+fn pair(writer: &str, reader: &str) {
+    assert!(lamp_msgs::known::is_person_id(A));
+    assert!(lamp_msgs::known::is_person_id(B));
+    assert_eq!(
+        lamp_memory::store::Person::new(A)
+            .unwrap()
+            .rules()
+            .unwrap()
+            .as_str(),
+        RULES
+    );
+    let fixture = Fixture::new();
+    let process = fixture.start(writer, "write");
+    let source = fixture.add("write", "append", A, "pair erase evidence", &[]);
+    let kept = fixture.add("write", "remember", A, "pair erase fact", &[source]);
+    let linked = fixture.add(
+        "write",
+        "append_linked",
+        A,
+        "pair erase descendant",
+        &[kept],
+    );
+    let unrelated = fixture.add("write", "remember", A, "pair unrelated fact", &[]);
+    let other = fixture.add("write", "remember", B, "pair other scope", &[]);
+    let room = fixture.add("write", "remember", "everyone", "pair room scope", &[]);
+    let rule = fixture.add("write", "remember", RULES, "pair rule scope", &[]);
+    assert_eq!([source, kept, linked, unrelated], [1, 2, 3, 4]);
+    assert_eq!([other, room, rule], [1, 1, 1]);
+    let before = fixture.entries("write", A);
+    assert_eq!(
+        ids(&before),
+        BTreeSet::from([source, kept, linked, unrelated])
+    );
+    assert!(before.iter().all(|entry| entry["person"] == A));
+    assert_eq!(
+        before.iter().find(|entry| entry["id"] == kept).unwrap()["source_ids"],
+        json!([source])
+    );
+    assert_eq!(
+        before.iter().find(|entry| entry["id"] == linked).unwrap()["source_ids"],
+        json!([kept])
+    );
+    let note = fixture.snapshot("write", A);
+    assert!(note["note"].as_str().unwrap().contains("pair erase fact"));
+    assert!(!note["note"].as_str().unwrap().contains("pair other scope"));
+    let other_note = fixture.snapshot("write", B);
+    process.finish();
+    fixture.audit_database(7);
+
+    let process = fixture.start(reader, "opposite");
+    assert_eq!(
+        fixture.entries("opposite", A),
+        before,
+        "actual opposite release must preserve every record field and order"
+    );
+    assert_eq!(
+        fixture.snapshot("opposite", A),
+        note,
+        "persisted session snapshot"
+    );
+    assert_eq!(fixture.snapshot("opposite", B), other_note);
+    assert_eq!(
+        fixture.ask("opposite", json!({"op":"forget","person":A,"id":kept}))["removed"],
+        3
+    );
+    assert_eq!(
+        ids(&fixture.entries("opposite", A)),
+        BTreeSet::from([unrelated])
+    );
+    let invalidated = fixture.snapshot("opposite", A);
+    assert_eq!(invalidated["invalidated"], true);
+    assert_eq!(invalidated["note"], "");
+    assert_eq!(invalidated["source_ids"], json!([]));
+    assert_eq!(
+        fixture.snapshot("opposite", B),
+        other_note,
+        "forget cannot invalidate another person's snapshot"
+    );
+    let fresh = fixture.add("opposite", "remember", A, "pair fresh after forget", &[]);
+    assert!(fresh > unrelated, "successful IDs cannot be reused");
+    assert_eq!(
+        fixture.ask("opposite", json!({"op":"forget_person","person":A})),
+        json!({"ok":true,"removed":2,"rules":1})
+    );
+    process.finish();
+    fixture.audit_database(2);
+
+    let process = fixture.start(writer, "return");
+    assert!(
+        fixture.entries("return", A).is_empty(),
+        "forgotten person cannot reappear after changing readers"
+    );
+    assert!(
+        fixture.entries("return", RULES).is_empty(),
+        "forgotten rules cannot reappear"
+    );
+    assert_eq!(fixture.snapshot("return", A)["invalidated"], true);
+    assert_eq!(fixture.snapshot("return", A)["note"], "");
+    assert_eq!(fixture.snapshot("return", B), other_note);
+    assert_eq!(ids(&fixture.entries("return", B)), BTreeSet::from([other]));
+    assert_eq!(
+        ids(&fixture.entries("return", "everyone")),
+        BTreeSet::from([room])
+    );
+    let final_id = fixture.add("return", "remember", A, "pair final fresh fact", &[]);
+    assert!(
+        final_id > fresh,
+        "forget_person and reopen must keep the high water mark"
+    );
+    process.finish();
+    fixture.audit_database(3);
+    fs::write(fixture.root.join("terminal.json"), serde_json::to_vec_pretty(&json!({"writer":writer,"opposite_reader":reader,"return_reader":writer,"release_6408_sha256":SHA,"release_6449_sha256":SHA,"identical_release_payloads":true,"result":"passed","processes_reaped":3,"physical_or_signature_acceptance":false})).unwrap()).unwrap();
+}
+
+#[test]
+#[ignore = "manual actual ARM64 release inputs and exclusive Linux execution required"]
+fn release_6408_reads_current_days_and_forget_survives_current_reopen() {
+    pair("6449", "6408");
+}
+
+#[test]
+#[ignore = "manual actual ARM64 release inputs and exclusive Linux execution required"]
+fn current_reads_release_6408_days_and_forget_survives_release_6408_reopen() {
+    pair("6408", "6449");
+}

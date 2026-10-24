@@ -8437,3 +8437,9 @@ Published Records #3329 and folded two workflow fixes into `38a8d5651`, retainin
 Ready for lamp-voice: no (fresh native gates and renewed reads pending).
 
 Pushed Records #3329 `6f79d33d6` with both P2 fixes, Linux 193/0/5 and Mac 182/0/1; published Memory #3333 `4f8e95111` with current Mac/Linux 314/0/8 and separately retained actual binary pair 2/0. [Evidence and raw historical native receipts](verification/records-pair-progress-20261024/README.md) preserve all failed/cancelled attempts and their limits. Both PRs directly parent current `9ed44f88c`. Common's current enrollment carry is in full Linux qualification; its independent Mac packet follows the released target. No physical or readiness hold is waived.
+
+## 2026-10-24 13:25 +07: Records landed; Memory survivor repair
+
+Records #3329 landed in train 71, with dedicated native 3/0, full ARM 11,169 PASS plus one Voice journal LEAK, strict Clippy and two READ-OKs. No redundant rebase is needed after merge. Memory #3333 remains held for survivor records compared only by IDs; full-record checks are authored and a fresh actual-pair run is next. [Historical raw RPC/source evidence](verification/memory-raw-pair-20261024/README.md) publishes the requested streams, terminal/cleanup/source receipts and complete logical SQL database exports. Binary databases remain local under the repository's binary-artifact rule.
+
+Common's frozen Linux gate passed all eight stages; Mac completed all stages with Voice failures, which remain unwaived. Both released their targets after unchanged-source and cleanup checks. Latest process decisions remove holds solely for a stale base; genuine conflicts and changed-source checks still require repair. No lamp is assigned.

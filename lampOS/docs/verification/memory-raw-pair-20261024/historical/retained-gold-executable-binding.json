@@ -1,0 +1,9 @@
+{
+  "source_head": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "source_tree": "db30c396c9ad1ebb88b84714265809cd1c22054f",
+  "manual_result": "2/0/0",
+  "copy": "/private/tmp/fourth-memory-release-pair-corrected-checks-20261024/retained-release_pair-db30",
+  "sha256": "7ee58d5b1e49c94382f717f6c73bef5525d61b0abd0130f138064854664aeb2e",
+  "bytes": 4409944,
+  "reason": "preserve exact qualified driver before current-source dependency relink"
+}

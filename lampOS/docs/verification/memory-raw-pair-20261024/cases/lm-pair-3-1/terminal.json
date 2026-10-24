@@ -1,0 +1,11 @@
+{
+  "identical_release_payloads": true,
+  "opposite_reader": "6408",
+  "physical_or_signature_acceptance": false,
+  "processes_reaped": 3,
+  "release_6408_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+  "release_6449_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+  "result": "passed",
+  "return_reader": "6449",
+  "writer": "6449"
+}

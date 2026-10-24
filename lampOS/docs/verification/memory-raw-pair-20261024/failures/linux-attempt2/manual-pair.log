@@ -1,0 +1,35 @@
+
+running 2 tests
+test current_reads_release_6408_days_and_forget_survives_release_6408_reopen ... FAILED
+test release_6408_reads_current_days_and_forget_survives_current_reopen ... FAILED
+
+successes:
+
+successes:
+
+failures:
+
+---- current_reads_release_6408_days_and_forget_survives_release_6408_reopen stdout ----
+memory release-pair evidence: /tmp/lm-pair-3-0
+
+thread 'current_reads_release_6408_days_and_forget_survives_release_6408_reopen' (4) panicked at crates/memory/tests/release_pair.rs:187:9:
+assertion `left == right` failed: actual release refused a fixture operation: {"error":"bad_person","message":"forget_person takes the id of one person the eyes know","ok":false}
+  left: Bool(false)
+ right: true
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- release_6408_reads_current_days_and_forget_survives_current_reopen stdout ----
+memory release-pair evidence: /tmp/lm-pair-3-1
+
+thread 'release_6408_reads_current_days_and_forget_survives_current_reopen' (11) panicked at crates/memory/tests/release_pair.rs:187:9:
+assertion `left == right` failed: actual release refused a fixture operation: {"error":"bad_person","message":"forget_person takes the id of one person the eyes know","ok":false}
+  left: Bool(false)
+ right: true
+
+
+failures:
+    current_reads_release_6408_days_and_forget_survives_release_6408_reopen
+    release_6408_reads_current_days_and_forget_survives_current_reopen
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.42s
+

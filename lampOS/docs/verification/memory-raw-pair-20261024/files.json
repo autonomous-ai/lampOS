@@ -1,0 +1,227 @@
+[
+  {
+    "path": "cases/lm-pair-3-0/write.stderr",
+    "bytes": 780,
+    "sha256": "5cc48c75352b12d8ee20f232449384a3811ad32347c0ecea36fc20e78d5c97ec"
+  },
+  {
+    "path": "cases/lm-pair-3-0/opposite.stderr",
+    "bytes": 735,
+    "sha256": "9600ca53f0022457359cbfaae30ad5a75113f9a39786f7218dc568f630d2d64d"
+  },
+  {
+    "path": "cases/lm-pair-3-0/return.stderr",
+    "bytes": 653,
+    "sha256": "6a52a2a33db4885c8aefb4e670963b12af48456681d1eca884eb737ea8836510"
+  },
+  {
+    "path": "cases/lm-pair-3-0/rpc.jsonl",
+    "bytes": 10433,
+    "sha256": "40fecf0dd1f5b17d263f7c338163e686c5b2b1fcb9d47604cd7e162105daa63c"
+  },
+  {
+    "path": "cases/lm-pair-3-0/terminal.json",
+    "bytes": 394,
+    "sha256": "773e1a8eff4bdace010d8781a0ad5764c517a8ca64d1ae719430cde1366add5d"
+  },
+  {
+    "path": "cases/lm-pair-3-0/ready",
+    "bytes": 6,
+    "sha256": "ed1a545bb85e55816bbf9566b028b2a0bc456b88f49f6f266c0401048824194b"
+  },
+  {
+    "path": "cases/lm-pair-3-0/store/memory-days.sqlite3.sql",
+    "bytes": 6089,
+    "sha256": "98b40dc9b46600e74b364e6cd25aac226cf2cafbecd9f4a152edb3c72bf0c107"
+  },
+  {
+    "path": "cases/lm-pair-3-0/store/memory-days.sqlite3.json",
+    "bytes": 5059,
+    "sha256": "882b59c4568ca78e97604a6c480efa29b1cd13c112c6db2251c84d9874cdaa59"
+  },
+  {
+    "path": "cases/lm-pair-3-1/write.stderr",
+    "bytes": 780,
+    "sha256": "5cc48c75352b12d8ee20f232449384a3811ad32347c0ecea36fc20e78d5c97ec"
+  },
+  {
+    "path": "cases/lm-pair-3-1/opposite.stderr",
+    "bytes": 735,
+    "sha256": "9600ca53f0022457359cbfaae30ad5a75113f9a39786f7218dc568f630d2d64d"
+  },
+  {
+    "path": "cases/lm-pair-3-1/return.stderr",
+    "bytes": 653,
+    "sha256": "6a52a2a33db4885c8aefb4e670963b12af48456681d1eca884eb737ea8836510"
+  },
+  {
+    "path": "cases/lm-pair-3-1/rpc.jsonl",
+    "bytes": 10431,
+    "sha256": "b82d66931365d363853dc4984e4b8271f96ecbdc1de3648926ba9f9af0106a57"
+  },
+  {
+    "path": "cases/lm-pair-3-1/terminal.json",
+    "bytes": 394,
+    "sha256": "494dd9a4d10d52ad648272eddbaa8e4fb82ebb0e7a25619a9fbf3c87f6b3cfc3"
+  },
+  {
+    "path": "cases/lm-pair-3-1/ready",
+    "bytes": 6,
+    "sha256": "ed1a545bb85e55816bbf9566b028b2a0bc456b88f49f6f266c0401048824194b"
+  },
+  {
+    "path": "cases/lm-pair-3-1/store/memory-days.sqlite3.sql",
+    "bytes": 6089,
+    "sha256": "6c3c144daf3c0a321f288160e8cb6709bf3dde48ea78c318eeb936bc94ad4e18"
+  },
+  {
+    "path": "cases/lm-pair-3-1/store/memory-days.sqlite3.json",
+    "bytes": 5059,
+    "sha256": "e432ab6d98dbb6cb1cc4da09b9cdd9825b6d54283256fa909e1a24a75a6248ed"
+  },
+  {
+    "path": "historical/frozen.json",
+    "bytes": 2509092,
+    "sha256": "5f6c27bce057171a387de5f1fdbe596aa5958b6b0d3e58bff37af0816b72d717"
+  },
+  {
+    "path": "historical/linux-attempt1/terminal.json",
+    "bytes": 16806,
+    "sha256": "ce5fa3113ceb4c578d7b37c27184d7604b8154071a3ea5a67e11d22744bbd3b4"
+  },
+  {
+    "path": "historical/linux-attempt1/initial-guard.json",
+    "bytes": 298,
+    "sha256": "6d9a51e6fb70bf1132a83fa26bfd8fea222e543d51ea30c719165ac01af464b1"
+  },
+  {
+    "path": "historical/linux-attempt1/terminal-guard.json",
+    "bytes": 298,
+    "sha256": "991cfb69437fba2a5a53c6e01e4e9045f69d7ba289495d98db8da7b13e91a948"
+  },
+  {
+    "path": "historical/linux-attempt1/compiler-artifact.json",
+    "bytes": 290,
+    "sha256": "3cb87fed94ad1241ffa04d510e82a3c9df771bac6444bcfabc3e9fc5555a9c82"
+  },
+  {
+    "path": "historical/linux-attempt1/manual-pair-before-guard.json",
+    "bytes": 298,
+    "sha256": "865fc4e06705958f8e9d09e85625d97dc4593a030dddfa0c019ed5cd925db780"
+  },
+  {
+    "path": "historical/linux-attempt1/manual-pair-after-guard.json",
+    "bytes": 298,
+    "sha256": "642e13731aaedc978ae980b81e37e8bf5716b0d9c67c5cd8cceaf1099792b0bf"
+  },
+  {
+    "path": "historical/linux-attempt1/manual-pair-process.json",
+    "bytes": 2546,
+    "sha256": "1d5a818b79c047a1c1f70260b6553786abfd55c46ce9c348ff438463c1e37256"
+  },
+  {
+    "path": "historical/linux-attempt1/manual-pair-container-cleanup.json",
+    "bytes": 365,
+    "sha256": "14df7ce1d89ef6dd639480614e995f59449f20e85bdd16cc94a34dc532fe4465"
+  },
+  {
+    "path": "historical/linux-attempt1/manual-pair.log",
+    "bytes": 717,
+    "sha256": "2bece8e7c5a1e785614702297c1c441d13b6ad8a0c4fe10afe5a9ea9e9028255"
+  },
+  {
+    "path": "historical/linux-attempt1/export-validation.json",
+    "bytes": 2008,
+    "sha256": "aea06151bf0c48034595e4a0d2cae9b3e4a703ed78eb2cae750a501584dff17e"
+  },
+  {
+    "path": "historical/retained-gold-executable-binding.json",
+    "bytes": 446,
+    "sha256": "490a073ae412b0e7be877d94f2a9840b7e117f6304b092fc1dd531b6b15a150a"
+  },
+  {
+    "path": "historical/runtime-evidence/corrected-export/omitted-inputs.jsonl",
+    "bytes": 544,
+    "sha256": "22f2fc0e8ef27ca3ddf2746133dde6a7ba2adcea4347f9767ba60e7f8b720832"
+  },
+  {
+    "path": "historical/runtime-evidence/corrected-export/excluded-node-types.txt",
+    "bytes": 4,
+    "sha256": "9800741ab575df25bd614623635b1c6516e599eb5524efffe852e9254ed3f794"
+  },
+  {
+    "path": "historical/assertion-preservation.json",
+    "bytes": 231,
+    "sha256": "a3132aa9555c62ffef18482a9995429071a999f63137ded6e628d3f2cd97615a"
+  },
+  {
+    "path": "historical/release_pair.rs.txt",
+    "bytes": 17001,
+    "sha256": "321113c0513df44ebec303b8fb6be8f1c434ffc558aaf00393f639efa6b66a72"
+  },
+  {
+    "path": "failures/linux-attempt1/manual-pair.log",
+    "bytes": 1229,
+    "sha256": "3e363db2475d984c5d1a5e57f883ed81675818d1d35c3de82f34689d08248036"
+  },
+  {
+    "path": "failures/linux-attempt1/manual-pair-process.json",
+    "bytes": 2252,
+    "sha256": "2f2d8cad6f8bc0340cf4322aabe708a6275823ae800c5edc4bb442fd3fef82f2"
+  },
+  {
+    "path": "failures/linux-attempt1/manual-pair-container-cleanup.json",
+    "bytes": 369,
+    "sha256": "de64a2b041b42fcac4b60645e27248ca6113d5f561aed33d2de4e5af42a853c0"
+  },
+  {
+    "path": "failures/linux-attempt1/terminal.json",
+    "bytes": 5133,
+    "sha256": "aac3276ebf8c2113a5ec53d9e4f359c44dd8c835403201604cbc04ad5cdc64a9"
+  },
+  {
+    "path": "failures/linux-attempt1/initial-guard.json",
+    "bytes": 298,
+    "sha256": "b0a1ffcb77233ac03ba5e69b6885c3ee2f61f757bdbb9270c951a64580991e61"
+  },
+  {
+    "path": "failures/linux-attempt1/terminal-guard.json",
+    "bytes": 298,
+    "sha256": "b3bf0aa3675d6195618bd4f5b71a18b72a1a2852d7cb400abc31b4d371adedab"
+  },
+  {
+    "path": "failures/linux-attempt2/manual-pair.log",
+    "bytes": 1531,
+    "sha256": "9e8b5e65a7b5aea083c983b198f7050ed9d92b9b614eacadfc736ff6f19d023d"
+  },
+  {
+    "path": "failures/linux-attempt2/manual-pair-process.json",
+    "bytes": 2525,
+    "sha256": "474377f624193cef31d80994cd48c0bf5060e04eb6d8ca3230f2629e8cf49631"
+  },
+  {
+    "path": "failures/linux-attempt2/manual-pair-container-cleanup.json",
+    "bytes": 367,
+    "sha256": "fc6ac5355c14c60928f5353f420f27a181d7b182cb3c3e081a1c7a52411631c9"
+  },
+  {
+    "path": "failures/linux-attempt2/terminal.json",
+    "bytes": 3359,
+    "sha256": "be9dc6d1e5473dc7dc01fae37869f1d012fd5aff49365e6ac3ca287190d4f6fe"
+  },
+  {
+    "path": "failures/linux-attempt2/initial-guard.json",
+    "bytes": 298,
+    "sha256": "247cc4ab5a9e80cd5e895f3b2384251fa0735245b1d581ab308c916a8d479353"
+  },
+  {
+    "path": "failures/linux-attempt2/terminal-guard.json",
+    "bytes": 298,
+    "sha256": "83140a64a065df31cd95e0adde7997697751a16b36e064d259a9d32496c5fad4"
+  },
+  {
+    "path": "failures/linux-attempt2/export-validation.json",
+    "bytes": 327,
+    "sha256": "9b35bb053d957d57777ad1afff09730fd9bfa461c36e9a3ff45a93f3d70882ee"
+  }
+]
