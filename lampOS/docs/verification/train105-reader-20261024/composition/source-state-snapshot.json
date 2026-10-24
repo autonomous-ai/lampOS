@@ -1,0 +1,27 @@
+{
+  "headRefOid": "a6e780f86c4d5ab725ef9c9de7cc1c73726ad0a9",
+  "isDraft": false,
+  "state": "OPEN",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "0001-01-01T00:00:00Z",
+      "conclusion": "",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/40135344218/job/120995579218",
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "startedAt": "2026-10-24T21:41:47Z",
+      "status": "IN_PROGRESS",
+      "workflowName": "lampOS on ARM64"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-24T21:44:33Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/40135344209/job/120995578432",
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "startedAt": "2026-10-24T21:41:44Z",
+      "status": "COMPLETED",
+      "workflowName": "lampOS clippy"
+    }
+  ]
+}

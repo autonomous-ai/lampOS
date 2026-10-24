@@ -1,0 +1,5 @@
+{
+  "head": "b467ddd72dc88cd0a123cbc1f8169bc8f7400984",
+  "base": "fc31e012334cda59eb3c489560454c515fb86386",
+  "scope": "Comment-only source/train original native read. No new local build or behavioral test; immutable scope of earlier formatter read retained."
+}

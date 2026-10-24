@@ -1,0 +1,22 @@
+{
+  "composition.json": {
+    "original_sha256": "a87ac9a1e8c114fb9fcbfbfd8499a883080f330798a563b793f2d4afc32d3048",
+    "published_sha256": "a87ac9a1e8c114fb9fcbfbfd8499a883080f330798a563b793f2d4afc32d3048"
+  },
+  "source-state-snapshot.json": {
+    "original_sha256": "dc07579ef3a8efb9018b04efd62fee9b8a1c2d0bae7a38a3a49b527f258dc813",
+    "published_sha256": "dc07579ef3a8efb9018b04efd62fee9b8a1c2d0bae7a38a3a49b527f258dc813"
+  },
+  "reviewed.diff": {
+    "original_sha256": "19fbbf3614f2bca6dac523f52024c545248a73151cf0fd9ac37e7798ca6553f5",
+    "published_sha256": "19fbbf3614f2bca6dac523f52024c545248a73151cf0fd9ac37e7798ca6553f5"
+  },
+  "head.json": {
+    "original_sha256": "cb851655452f7d1d14df9934b2380dde68988725bc48bfc3aca13323b508b849",
+    "published_sha256": "cb851655452f7d1d14df9934b2380dde68988725bc48bfc3aca13323b508b849"
+  },
+  "ci-runs.json": {
+    "original_sha256": "1cd21254d9b9864ed1831504200b8cb0719a20921f9ae181763b4cff1eef1bb8",
+    "published_sha256": "1cd21254d9b9864ed1831504200b8cb0719a20921f9ae181763b4cff1eef1bb8"
+  }
+}

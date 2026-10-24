@@ -1,0 +1,9 @@
+{
+  "snapshot_file_written_at": "2026-10-25T04:58:49.722203+07:00",
+  "meaning": "Client snapshot file completion time, not an atomic or future pre-merge readiness guarantee.",
+  "premerge_requirements": [
+    "Refresh current source head and author non-draft state.",
+    "Require applicable original native gates terminal green.",
+    "Check current train HOLD/reviewer dispositions; do not infer a lift from a composition read."
+  ]
+}

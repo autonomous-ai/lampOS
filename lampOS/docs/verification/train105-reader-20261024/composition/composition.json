@@ -1,0 +1,19 @@
+{
+  "source": "a6e780f86c4d5ab725ef9c9de7cc1c73726ad0a9",
+  "train": "b467ddd72dc88cd0a123cbc1f8169bc8f7400984",
+  "base": "fc31e012334cda59eb3c489560454c515fb86386",
+  "whole_trees": {
+    "a6e780f86c4d5ab725ef9c9de7cc1c73726ad0a9": "c5b58fe5507007068a15d7bec0a83b6ee453ea98",
+    "b467ddd72dc88cd0a123cbc1f8169bc8f7400984": "c5b58fe5507007068a15d7bec0a83b6ee453ea98"
+  },
+  "whole_trees_equal": true,
+  "author_date_full_message_equal": true,
+  "author_metadata_sha256": {
+    "a6e780f86c4d5ab725ef9c9de7cc1c73726ad0a9": "4997e8c5237cc959abbceb5e670f1f9568d9828e9b173e114aefeccbb621edff",
+    "b467ddd72dc88cd0a123cbc1f8169bc8f7400984": "4997e8c5237cc959abbceb5e670f1f9568d9828e9b173e114aefeccbb621edff"
+  },
+  "exact_patch_equal": true,
+  "patch_sha256": "19fbbf3614f2bca6dac523f52024c545248a73151cf0fd9ac37e7798ca6553f5",
+  "comment_only_read_proof": "111c8cec4041ac9644fae49f3f95b74a349b7b49",
+  "scope": "Current state snapshot is not future pre-merge authorization; refresh source head/draft/HOLD states immediately before merge. Original source/train ARM pending."
+}
