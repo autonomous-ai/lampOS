@@ -264,8 +264,12 @@ only. The nods move the head's pitch and the sway turns the base,
 within the catalogue's limits, in any room
 (it is the lamp's own speech). None runs while the body is held, while
 concentrating, asleep, or once someone has cut in, and nothing is owed after.
-- **A nod on a stressed word.** A dip of `nod` (0.035 rad of head pitch, about
-  2°) over `nod_us` (0.36 s), in and out smoothly. It comes when the level is
+- **A nod on a stressed word.** A dip of `nod` (0.075 rad of head pitch, about
+  4°) over `nod_us` (0.45 s), in and out smoothly. Until 24 Oct it was 0.035
+  over 0.36 s, which the body's 15-count downward reach and its pose speed
+  left at about 1°; the speaking posture now holds the head 0.04 up, so the
+  dip comes down from there (with the body's `--speed 300`, #3385: three to
+  six head swings of 3 to 7° an answer on lamp-4ace, against two at 120). It comes when the level is
   at least `stress_level` (0.35) and `stress_rise` (1.5) times the recent
   level, which follows the sound with a 0.25 s time constant, and at least
   0.15 (about 5 dB) over its own sentence's mean level so far
