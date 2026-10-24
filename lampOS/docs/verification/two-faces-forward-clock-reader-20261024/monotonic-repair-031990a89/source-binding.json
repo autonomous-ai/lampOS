@@ -1,0 +1,15 @@
+{
+  "head": "031990a89093ae5e205c65156f32a1b79d2eb934",
+  "source_hashes": {
+    "lampOS/crates/voice/src/second_provider/worker.rs": "43cc424172c52c75f52bf9ab3d83499a1faaaedab595de7d6b408ece32d7a48c",
+    "lampOS/crates/eyes/src/main.rs": "15fcd743ceff1eeff95ac27482c92b5c1703378ec12dd88b0056249b0c740434",
+    "lampOS/crates/eyes/src/bus_out.rs": "1c73a8571845e0d2aa1855adc24208c1fc684dea3cc48b69b2a29494de7901fd",
+    "lampOS/crates/ipc/src/lib.rs": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+    "lampOS/crates/bus/src/wire.rs": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920"
+  },
+  "helper_sha256": "ced30d5b09344353e172da819fb9f8f68ef3bed05a1d85ce3f302b2286de8783",
+  "helper_unmodified": true,
+  "controls_sha256": "f3109c3a1efa9128867a702be64ebc6a45f5eacf42d0b15b3b5c7141f2cf6ed3",
+  "shim": "EXPIRY_GRACE_MS=50 matches production",
+  "no_real_clock_change": true
+}
