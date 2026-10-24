@@ -1765,13 +1765,29 @@ fn start_tasks(tools: &crate::tools::Settings) {
     }
 }
 
+/// The two boots a second worker runs under, named so neither can stand in
+/// for the other: the coordinator's, whose authority snapshots its gate
+/// takes (`run`, `Gate::new`), and its own, a fresh one per spawn
+/// (`process.rs`, `spawn_with_tick`), which stamps its requested-audio
+/// offers and keys its memory scope, so the coordinator, which knows the
+/// worker by that boot (`rig.provider.boot`), takes them. With the
+/// coordinator's on both, every offer on the second route was refused as
+/// "from another worker boot" (lamp-4ace, 24 Oct, #2793); with the worker's
+/// on both, the gate would refuse the coordinator's authority (reviewer-two's
+/// P1 on #3319).
+#[derive(Clone, Copy, Debug)]
+pub struct WorkerBoots {
+    pub coordinator: BootId,
+    pub own: BootId,
+}
+
 /// The second route's worker process until Stop. `files` are the Live
 /// provider worker's flags; this route uses the thread's file and the
 /// tools (the memory among them), and has no use yet for the rest. With
 /// `route.only_voice` (`--only-voice`) it is the lamp's only voice.
 pub fn serve(
     channels: WorkerChannels,
-    boot: BootId,
+    boots: WorkerBoots,
     provider_config: &Path,
     second_config: &Path,
     files: crate::provider_worker::Files,
@@ -2282,7 +2298,7 @@ pub fn serve(
         },
         runner.clone(),
     )
-    .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
+    .with_memory_scope(boots.own, face_cache.clone(), scoped_runner, scoped_system)
     .reading_the_lease_for_the_name(lease_system)
     .checking_sounds(checked)
     .telling_cut_ins(files.cut_in_told)
@@ -2349,7 +2365,7 @@ pub fn serve(
         engine = engine.noting_how_they_seem(note, heard);
     }
     if let Some(runner) = audio_runner {
-        engine = engine.requesting_audio(boot, runner);
+        engine = engine.requesting_audio(boots.own, runner);
     }
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
@@ -3316,7 +3332,7 @@ pub fn serve(
                 }
             })
         });
-        let result = run(channels, boot, engine, thread, probe_targets).await;
+        let result = run(channels, boots.coordinator, engine, thread, probe_targets).await;
         if let Some(refresh) = refresh {
             refresh.abort();
         }
