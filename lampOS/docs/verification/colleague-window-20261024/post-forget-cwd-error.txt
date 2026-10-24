@@ -1,0 +1,12 @@
+error: failed to run custom build command for `lamp-camera v0.1.0 (/private/tmp/third-carry-colleague-window/lampOS/crates/camera)`
+
+Caused by:
+  process didn't exit successfully: `/private/tmp/third-carry-window-target-ld637ldg/debug/build/lamp-camera-dcc87b5747c1e7b4/build-script-build` (exit status: 101)
+  --- stdout
+  cargo::rerun-if-env-changed=V4L2R_VIDEODEV2_H_PATH
+
+  --- stderr
+
+  thread 'main' (248453829) panicked at crates/camera/build.rs:32:9:
+  camera UAPI build input check failed: V4L2R_VIDEODEV2_H_PATH is missing or invalid; build from the lampOS workspace root so .cargo/config.toml is loaded
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

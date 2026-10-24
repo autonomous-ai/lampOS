@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap' (248383403) panicked at /private/tmp/third-window-final-cap-removed-geqiseaq/carry_window.rs:110:13:
+assertion failed: !window.extra_allows(deadline + 1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap ... FAILED
+
+failures:
+
+failures:
+    carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+

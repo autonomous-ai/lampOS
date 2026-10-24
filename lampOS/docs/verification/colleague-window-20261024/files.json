@@ -1,7 +1,7 @@
 {
   "README.md": {
-    "bytes": 3121,
-    "sha256": "bcdab2548b8d9a6bbd93ea0df1d6e5355452e8bb778721ba43fe4542145edee2"
+    "bytes": 5114,
+    "sha256": "a55139a39cdb67684f2f2caeb6a632bc576de75125543dd39d18b36d2b0f112e"
   },
   "attempt1-clippy.txt": {
     "bytes": 316090,
@@ -23,6 +23,62 @@
     "bytes": 1460457,
     "sha256": "6cb8262a3a4912f5a769c0625b2e89b6484dff1a4c5b4a2e1f1787d5a10fe15f"
   },
+  "attempt2-build.txt": {
+    "bytes": 364632,
+    "sha256": "51b116fb122298c58964acb95c7f1663907621e5683035abaeed4b14d46c7a67"
+  },
+  "attempt2-clippy.txt": {
+    "bytes": 348292,
+    "sha256": "35ee3834a6e27268194b215c8a06b52ae107111af42e9696b1e9c0e3cbfdce09"
+  },
+  "attempt2-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "attempt2-gates.json": {
+    "bytes": 2999,
+    "sha256": "41231f1fb61cabd528c9f4df54115bea9afb65cdf316997fa4caf97ad29e205a"
+  },
+  "attempt2-source-after.json": {
+    "bytes": 1460457,
+    "sha256": "7f660e5a0467d45544c52c873d752cc7d1be916ce55f3a03b1e4c7ba3c13ed1d"
+  },
+  "attempt2-source-before.json": {
+    "bytes": 1460457,
+    "sha256": "7f660e5a0467d45544c52c873d752cc7d1be916ce55f3a03b1e4c7ba3c13ed1d"
+  },
+  "attempt2-tests.txt": {
+    "bytes": 326302,
+    "sha256": "d5a8f8b2482432c49c67fedfd014ec9e539f069e1ccdbdfd1c10812a4af8a477"
+  },
+  "completed-expression-cache-cleanup.json": {
+    "bytes": 462,
+    "sha256": "4525a8f1802bce77b51a90e3a91f080608621ae127d714ea63d22d91d031a4ab"
+  },
+  "final-cap-removed-compile.txt": {
+    "bytes": 300,
+    "sha256": "df991f93664e10b30718acef9d49ff6a59c7ae327bc154e8e9ceb451be03c333"
+  },
+  "final-cap-removed-test.txt": {
+    "bytes": 640,
+    "sha256": "0a213a194c7a0768f0b80c12810d7578b4fa4ad6bb41228d0c450b37fd65df37"
+  },
+  "final-helper-latency.txt": {
+    "bytes": 128,
+    "sha256": "7bcf52a7069ac73f8d98d2fd89495dd3a2c177114f8445d66a38fd9ad824d84a"
+  },
+  "final-mutations.json": {
+    "bytes": 1576,
+    "sha256": "5c9eb74603265b32d8cddc05d8f5a6d7278683cc3002692ac0bd484adef20ef9"
+  },
+  "final-once-removed-compile.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "final-once-removed-test.txt": {
+    "bytes": 638,
+    "sha256": "128d87c879ebbe0c2ee5e4f274eab1c3685b0b761f6f5e6a4215073e86079186"
+  },
   "focused-final.txt": {
     "bytes": 136,
     "sha256": "36f8ca4e5e22a688cab9094008b0be031849aa4822c80c99d2313bd203d0f7a4"
@@ -34,6 +90,10 @@
   "focused-fixture-id-error.txt": {
     "bytes": 1897,
     "sha256": "edb23ac1f17de99bb83b8a5dbe017299d73ba8ef846b2b9e5add57228015de6d"
+  },
+  "fresh-call-initial-control.txt": {
+    "bytes": 116,
+    "sha256": "6c8a4f3e330b4c7d5db2dfc168618c32739b0a1d964dc9de6ccbba393ad0f554"
   },
   "initial-fmt-cwd-error.txt": {
     "bytes": 909,
@@ -54,6 +114,14 @@
   "original-range-diff.txt": {
     "bytes": 332,
     "sha256": "4f75fb30df1d1aa69e2dda94e98f90562ed5e0bd1005a5195cd6f7be2ae3e77a"
+  },
+  "post-forget-cwd-error.txt": {
+    "bytes": 694,
+    "sha256": "b2ae2bafb7c77e9232e0ff76c8a602bb0d481468c77ea550524504e3074952ab"
+  },
+  "post-forget-unaddressed-held.txt": {
+    "bytes": 1347,
+    "sha256": "30ee64bc7da78d0fd437622c104aa5a2f3ad7090db86d1f3744f5bc6115a0593"
   },
   "pre-clippy-cap-removed-compile.txt": {
     "bytes": 294,

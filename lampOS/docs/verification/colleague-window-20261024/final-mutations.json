@@ -1,0 +1,42 @@
+[
+  {
+    "mutation": "cap-removed",
+    "source_sha256": "3befac06f4dd70e4a126bc07ef13928570bfe1d99c9069f46063e84688e88548",
+    "mutated_sha256": "c3ed9c92e2d3b8ffa34b25f01a97dc5ec619e810b6f2709435a3b85584d0c358",
+    "compile_argv": [
+      "rustc",
+      "+1.96.0",
+      "--edition=2024",
+      "--test",
+      "/private/tmp/third-window-final-cap-removed-geqiseaq/main.rs",
+      "-o",
+      "/private/tmp/third-window-final-cap-removed-geqiseaq/control"
+    ],
+    "compile_exit": 0,
+    "test_case": "actual_end_sets_an_inclusive_deadline_and_forty_second_cap",
+    "test_exit": 101,
+    "expected_assertion_failure": true,
+    "compile_log": "/private/tmp/third-window-final-cap-removed-compile.txt",
+    "test_log": "/private/tmp/third-window-final-cap-removed-test.txt"
+  },
+  {
+    "mutation": "once-removed",
+    "source_sha256": "3befac06f4dd70e4a126bc07ef13928570bfe1d99c9069f46063e84688e88548",
+    "mutated_sha256": "e844b0d490f6b959d19a38681c5ae96d0f79a063dfaa392352666b93f9539729",
+    "compile_argv": [
+      "rustc",
+      "+1.96.0",
+      "--edition=2024",
+      "--test",
+      "/private/tmp/third-window-final-once-removed-egsmukgs/main.rs",
+      "-o",
+      "/private/tmp/third-window-final-once-removed-egsmukgs/control"
+    ],
+    "compile_exit": 0,
+    "test_case": "repeated_or_late_classification_cannot_renew_the_allowance",
+    "test_exit": 101,
+    "expected_assertion_failure": true,
+    "compile_log": "/private/tmp/third-window-final-once-removed-compile.txt",
+    "test_log": "/private/tmp/third-window-final-once-removed-test.txt"
+  }
+]

@@ -1,0 +1,24 @@
+
+running 1 test
+second_provider::worker::tests::a_new_actual_answer_after_forget_can_start_a_new_bounded_window --- FAILED
+
+failures:
+
+---- second_provider::worker::tests::a_new_actual_answer_after_forget_can_start_a_new_bounded_window stdout ----
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice second: request 2: no conversation going on: it was never heard saying words, to their end,, it was last called 60 s ago, 0 lines left alone since it last spoke
+
+thread 'second_provider::worker::tests::a_new_actual_answer_after_forget_can_start_a_new_bounded_window' (248483655) panicked at crates/voice/src/second_provider/worker.rs:10368:9:
+assertion `left == right` failed
+  left: Some("nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on")
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::worker::tests::a_new_actual_answer_after_forget_can_start_a_new_bounded_window
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3752 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

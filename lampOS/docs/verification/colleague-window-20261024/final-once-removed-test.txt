@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance' (248383627) panicked at /private/tmp/third-window-final-once-removed-egsmukgs/carry_window.rs:125:9:
+assertion failed: !window.extra_allows(85 * S + 1)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance ... FAILED
+
+failures:
+
+failures:
+    carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+

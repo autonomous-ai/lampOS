@@ -1,0 +1,8 @@
+{
+  "removed": "/private/tmp/third-expression-combined-target-q5ll7cfx",
+  "reason": "completed published Expression gate; no active job uses this target; recover disk for ongoing own carry gate",
+  "preserved_dependency_archive": "/private/tmp/third-expression-combined-dep-info.tar.gz",
+  "archive_sha256": "20086c149a86accb2105194cba68c7b41904d3d75a03eec7d6f3ef409a5a4c8d",
+  "dependency_text_files": 1129,
+  "source_and_published_evidence_untouched": true
+}
