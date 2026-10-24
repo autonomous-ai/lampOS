@@ -1,0 +1,24 @@
+diff --git a/lampOS/docs/build-rows.md b/lampOS/docs/build-rows.md
+index fdb6bd26b..647c73386 100644
+--- a/lampOS/docs/build-rows.md
++++ b/lampOS/docs/build-rows.md
+@@ -1,8 +1,8 @@
+ # Where V2 is: the build rows and the quality rows
+ 
+-Written by the first builder from the team's review page at 2026-10-25 00:16 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
++Written by the first builder from the team's review page at 2026-10-25 06:02 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+ 
+-**Build 92.9% over 70 rows. Quality 61.9% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
++**Build 92.9% over 70 rows. Quality 62.5% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+ 
+ **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
+ 
+@@ -90,7 +90,7 @@ Written by the first builder from the team's review page at 2026-10-25 00:16 (+0
+ | Row | Now | Target | Where it is |
+ |---|---|---|---|
+ | Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
+-| Knows when you have finished | 0.45 | 0.85 | 24 Oct 15:5x, down from 0.5: the owner’s own test on lamp-4ace: every “Lamp, … question” with a natural pause after the name was split at the pause, and the first word after it was lost (“What time is it…” heard as “Time… |
++| Knows when you have finished | 0.55 | 0.85 | 25 Oct 06:0x, up from 0.45: the product now keeps 300 ms more of a line’s sound before its first word (#3418, train 106). |
+ | Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
+ | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
+ | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |

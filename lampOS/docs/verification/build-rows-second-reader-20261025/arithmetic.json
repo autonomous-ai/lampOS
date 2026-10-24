@@ -1,0 +1,47 @@
+{
+  "head": "207f301b44c3c293afcae7ea9f291bc4b3a2bd88",
+  "parent": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+  "results": {
+    "base": {
+      "shipping": {
+        "count": 70,
+        "sum": "65.02",
+        "mean_percent": "92.88571428571428571428571429",
+        "rounded_percent": "92.9"
+      },
+      "mood": {
+        "count": 2,
+        "sum": "1.17",
+        "mean_percent": "58.500",
+        "rounded_percent": "58.5"
+      },
+      "quality": {
+        "count": 16,
+        "sum": "9.90",
+        "mean_percent": "61.87500",
+        "rounded_percent": "61.9"
+      }
+    },
+    "head": {
+      "shipping": {
+        "count": 70,
+        "sum": "65.02",
+        "mean_percent": "92.88571428571428571428571429",
+        "rounded_percent": "92.9"
+      },
+      "mood": {
+        "count": 2,
+        "sum": "1.17",
+        "mean_percent": "58.500",
+        "rounded_percent": "58.5"
+      },
+      "quality": {
+        "count": 16,
+        "sum": "10.00",
+        "mean_percent": "62.500",
+        "rounded_percent": "62.5"
+      }
+    }
+  },
+  "scope": "Markdown static arithmetic/base/path review, no runtime execution"
+}
