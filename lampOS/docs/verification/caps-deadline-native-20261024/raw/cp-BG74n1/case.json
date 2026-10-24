@@ -1,0 +1,23 @@
+{
+  "artifact_bytes": 4517592,
+  "boundary": "actual released Actions RPC and durable cap storage; no output owner",
+  "case_deadline_seconds": 90,
+  "excluded": [
+    "hardware confirmation",
+    "unknown clock",
+    "expiry",
+    "newer schemas",
+    "power loss",
+    "signature trust"
+  ],
+  "identical_release_binaries": true,
+  "reader": 6498,
+  "reader_source": "846b3d203fc00ec3886d71f7673d8cc29cc4a634",
+  "return_reader": 6408,
+  "rpc_timeout_seconds": 2,
+  "sha256": "b5359557611b4fa3aa09709b659c7243f77c9ae945c326937f55adbc928903d6",
+  "step_deadline_seconds": 10,
+  "test": "release_6498_keeps_6408_caps_and_6408_reads_its_changes",
+  "writer": 6408,
+  "writer_source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb"
+}

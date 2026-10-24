@@ -1,0 +1,2 @@
+{"topic":"output/caps","kind":"latest","enc":"json","type":"lamp_msgs/OutputCaps","source":"actions","boot":"2ec35a24483e8ba5","seq":4,"at_us":553553477,"at_unix_ms":1792823965892,"expires_ms":3000}
+{"stamp":{"clock_id":"9daef4d3-d3a3-4b03-8d22-720950eca2c9","at_us":553553477,"sequence":4},"session_id":"2ec35a24483e8ba5","revision":3,"entries":[{"source":"pair-primary","token":"first","issued_unix_ms":1792823965888,"valid_until_unix_ms":1792827565888,"light_channel_max":72,"volume_raw_max":60}]}
