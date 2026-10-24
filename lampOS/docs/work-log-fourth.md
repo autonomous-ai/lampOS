@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 05:50: Name Linux completes failed; Skills repair slot offered
+
+- [Selected Name Linux failure](verification/name-d60-linux-failed-selected-20261025/README.md): all five stages observed, Voice 4207/4/24, Update 398/0/4, six required controls/fresh 46/source/cleanup/release verified; overall 101 remains. Four existing capture timing boundaries handed to Tests. Public NoPause baseline49 contains no Voice case and gives no pass transfer. Initial driver launch hash is unobserved; later private capture is explicitly qualified.
+- Released Linux slot offered for Tests' existing declared Skills baseline/candidate controls once its frozen source and commands are supplied. No competing fixture edit or threshold change. Name Mac continues, callback/Photo stay prepared and held.
+- Current #3107 carry preserves its author's commit and Common final-send checks. Test-only deterministic dispatch-attempt controls and bounded test-server cleanup are being prepared; no executed mutant, Cargo, native or privacy acceptance claimed for that source. No lamp action.
+
 ## 2026-10-25 05:39: Common Mac complete; Name takes released slot
 
 - [Selected Common Mac result](verification/common-9df-mac-selected-20261025/README.md): eight stages pass, Eyes 357/0/5, Voice 4153/0/21, Update 396/0/6, Skills 516/0/9 and Memory 324/0/8; five controls, fresh 46 and source/cleanup/release verified. Linux full Skills and three direct failures remain failed; Tests owns repair. No source epoch, native or readiness credit transfers.

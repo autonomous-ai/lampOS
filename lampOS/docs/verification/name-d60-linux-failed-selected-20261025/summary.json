@@ -1,0 +1,67 @@
+{
+  "format": "Name-d60-Linux-failed-count-hash-boolean/1",
+  "head": "d60b75ac8a36483404c54a3141fb6b543a353be1",
+  "tree": "88d5059caa8e570755eefec59b6b841a5269451d",
+  "platform": "linux",
+  "exit": 101,
+  "required_stages": 5,
+  "observed_stages": 5,
+  "stage_results": [
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "workspace-build",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "full-voice",
+      "exit": 101,
+      "counts": {
+        "failed": 4,
+        "ignored": 24,
+        "passed": 4207
+      }
+    },
+    {
+      "stage": "full-update",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 4,
+        "passed": 398
+      }
+    }
+  ],
+  "required_controls": 6,
+  "all_required_controls_observed_once_passed": true,
+  "fresh_workspace_members": 46,
+  "source_stable": true,
+  "cleanup_and_target_release": true,
+  "terminal_sha256": "4180234e24084c765e76c511327f065a03afb2f23349b2fc90bbde86d90f255b",
+  "source_binding_sha256": "849e048c0876bc8b94b9222f223ceaa7388d892536d74111bc532d4777628148",
+  "current_native_qualification": false,
+  "ready_for_lamp_voice": false,
+  "failure_waived_or_cause_claimed": false,
+  "raw_publication_authorized": false
+}
