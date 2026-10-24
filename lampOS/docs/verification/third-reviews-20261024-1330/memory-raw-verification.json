@@ -1,0 +1,49 @@
+{
+  "publication": "c189a237e63c09070314100b3ceb586bb8bcf354",
+  "files_size_hash_verified": 45,
+  "historical_driver_equals_current": true,
+  "driver_sha256": "321113c0513df44ebec303b8fb6be8f1c434ffc558aaf00393f639efa6b66a72",
+  "cases": [
+    {
+      "case": "lm-pair-3-0",
+      "rpc": 30,
+      "terminal": {
+        "identical_release_payloads": true,
+        "opposite_reader": "6449",
+        "physical_or_signature_acceptance": false,
+        "processes_reaped": 3,
+        "release_6408_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "release_6449_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "result": "passed",
+        "return_reader": "6408",
+        "writer": "6408"
+      },
+      "reported_database_integrity": [
+        [
+          "ok"
+        ]
+      ]
+    },
+    {
+      "case": "lm-pair-3-1",
+      "rpc": 30,
+      "terminal": {
+        "identical_release_payloads": true,
+        "opposite_reader": "6408",
+        "physical_or_signature_acceptance": false,
+        "processes_reaped": 3,
+        "release_6408_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "release_6449_sha256": "9f595301253679a6c9a1aea232d14b081147fe966d87b6776899ede19ccb8deb",
+        "result": "passed",
+        "return_reader": "6449",
+        "writer": "6449"
+      },
+      "reported_database_integrity": [
+        [
+          "ok"
+        ]
+      ]
+    }
+  ],
+  "limits": "Historical source predates full survivor-record assertions. Original DB/archive bytes unavailable. Attempted SQL dump restore returned nonzero; no full SQL reconstruction claim. No fresh actual-pair execution by Third."
+}

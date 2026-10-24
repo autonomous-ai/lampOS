@@ -1,0 +1,29 @@
+{
+  "pr": 3328,
+  "train": 3332,
+  "landed": "d7b85b1dd5f67e5d862e4970e1ec60c6eef30c22",
+  "own_commits": [
+    "21bc18933",
+    "6c5c092bb"
+  ],
+  "range_diff": "Both original commits equal; all five authored files byte-identical in landed tree.",
+  "arm64_run": 40059944256,
+  "clippy_run": 40059944420,
+  "conclusion": "success",
+  "checkout": {
+    "parents": [
+      "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "572d46eb8b34ba61643d540abd98b3e5307e2476"
+    ],
+    "sha": "21ece3086a44706e0bd6a3c59fae17662e44c0b9",
+    "tree": "22addd2a8b0442eaac9d44356af860302bd6ba4b"
+  },
+  "preview_equals_landed_tree": true,
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T04:03:38.4876414Z         LEAK [   0.234s] ( 8999/11171) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T04:04:08.7043224Z      Summary [ 201.929s] 11171 tests run: 11171 passed (1 leaky), 75 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T04:04:22.8168626Z test result: 12 passed; 0 failed"
+  ],
+  "log_sha256": "d9c013bbc80094df9925c1b97173867865e4bcdb667a5430b9a7be0cc8f94241",
+  "limits": "Software integration; physical classifier/hand/latency qualification remains unrun, switch off."
+}

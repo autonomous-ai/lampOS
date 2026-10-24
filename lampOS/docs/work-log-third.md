@@ -5,6 +5,17 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 13:30 — landed own-name guard and completed release-pair reads
+
+- #3328 carried unchanged in train 70; integration evidence retained.
+- #3339 READ-OK after wording and arithmetic verification.
+- #3333 ordinary Mac **314/0/8**; historical raw evidence now verified,
+  survivor-record P2 awaits Fourth’s correction/execution.
+- #3334 Mac **120/0/2** and native **2/0** evidence verified; absolute
+  reply-deadline P2 remains on current byte-equal carry.
+- [Receipts](verification/third-reviews-20261024-1330/README.md).
+- Following the 12:29 process: Queue for claims/blocks/decisions, status here.
+
 ## 2026-10-24 10:59 — Records cleanup correction verified
 
 - #3329 `6f79d33d6` closes the recursive-exit P2 before evidence deletion.

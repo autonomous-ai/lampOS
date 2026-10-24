@@ -1,0 +1,21 @@
+{
+  "head": "4f8e95111da56fd45ac0024df4b75e173f2616b7",
+  "run": 40060301254,
+  "clippy_run": 40060301479,
+  "conclusion": "success",
+  "checkout": {
+    "parents": [
+      "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "4f8e95111da56fd45ac0024df4b75e173f2616b7"
+    ],
+    "sha": "402f311722d05973bb2571eaf6ee24816623d1fd",
+    "tree": "f684aed6729cbff55a3ac4135d43b7f20863b4db"
+  },
+  "preview_equals_authored_tree": true,
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:58:57.0057733Z      Summary [  34.096s] 1520 tests run: 1520 passed, 14 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:59:10.3779458Z test result: 12 passed; 0 failed"
+  ],
+  "log_sha256": "2a8aac9cea51d0694b1346eb398e069219d62cecb159d88aa61e0c94f2e69130",
+  "limits": "Ordinary native CI compiles the two manual pair tests but does not execute them; no actual-pair or lamp claim."
+}

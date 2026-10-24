@@ -1,0 +1,100 @@
+{
+  "base": "65e7b57fa785acc37196d4b5a110f576d3741926",
+  "source_before": {
+    "lampOS/.cargo/config.toml": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+    "lampOS/Cargo.lock": "0b5c62b8477de47e9d9a6bf7d7f8b1a546f9fb354bdf7247753b60ee8fb5f67d",
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/crates/actions/Cargo.toml": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+    "lampOS/crates/actions/src/caps.rs": "634fa61888f79099f9bb5daf35db7666196d3cabde30eb582351a80587c10648",
+    "lampOS/crates/actions/src/caps_service.rs": "c7a59e3951bf20afb9a139f81c320ba0323a47ca384a42a417ff45b9ff53b884",
+    "lampOS/crates/actions/src/lib.rs": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+    "lampOS/crates/actions/src/light.rs": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+    "lampOS/crates/actions/src/main.rs": "f8ce8e950e6c6517cdcd02c551f3a972502f1e084f7057fcf6db05abbb519ec0",
+    "lampOS/crates/actions/src/schedule.rs": "770ab9f09ca1267ac87f3808fb2c8d10086eccde270d929ea19bee6867e6efc8",
+    "lampOS/crates/actions/src/server.rs": "f11bf44fc9f00b70695387abf1c2f3927ee6cfdf7ac5086262f5b0780680f58b",
+    "lampOS/crates/actions/src/sound.rs": "8251258895bb5dce813569bfd3f07d629b8419161f5e52b5b9f3318d9347e089",
+    "lampOS/crates/actions/src/speaker_state.rs": "1c3454941a5a3324d3cc5a59a61553c5d324107d6daec566e54a207f7f7d8c5c",
+    "lampOS/crates/actions/tests/it/caps.rs": "53ec7160a33e0eba01eb995c690dd80c68fef2a3b5e746047e8cca6b55177488",
+    "lampOS/crates/actions/tests/it/main.rs": "cd9420aac036de672f209a4782486e49f8d562c3c210e958c2576434f8a8ee1b",
+    "lampOS/crates/actions/tests/it/schedule.rs": "3c139f74c78af62ab05d15797213d38daa5c1578022866af7bcf1d52eb590d9f",
+    "lampOS/crates/actions/tests/it/server.rs": "5f22c68477d13ca46b2a02b8f3c3abc4b1815a5db51303b77ef8db3eb55d79dd",
+    "lampOS/crates/actions/tests/release_pair.rs": "79914cc7dffae2114e0f72550018a537252f29c63d9ffd6b32548d4ce5d72e82",
+    "lampOS/crates/actions/tests/release_pair/README.md": "73a7db990329c5cd090a26f2494506ddad03b5bc3ea853419fab416c8cb634d3",
+    "lampOS/crates/actions/tests/release_pair/fixture.rs": "39938659e19860e8a632c5d3d9d917f08512f86206d6bff3f330a5fc36e7d1b1",
+    "lampOS/crates/actions/tests/speaker_state.rs": "beb154c0d7f573797a683a8b09aca5dd32de610975bafec4c25fb17055d0b177"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 12.001,
+      "log": "/private/tmp/third-3334-fmt.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 14.289,
+      "log": "/private/tmp/third-3334-clippy.log"
+    },
+    {
+      "name": "actions-tests",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-actions",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 72.275,
+      "log": "/private/tmp/third-3334-actions-tests.log"
+    }
+  ],
+  "source_after": {
+    "lampOS/.cargo/config.toml": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+    "lampOS/Cargo.lock": "0b5c62b8477de47e9d9a6bf7d7f8b1a546f9fb354bdf7247753b60ee8fb5f67d",
+    "lampOS/Cargo.toml": "8e1abe32c895f39e61cb17447943997c6b3c00fb0494ba82a19007506f3a42a7",
+    "lampOS/crates/actions/Cargo.toml": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+    "lampOS/crates/actions/src/caps.rs": "634fa61888f79099f9bb5daf35db7666196d3cabde30eb582351a80587c10648",
+    "lampOS/crates/actions/src/caps_service.rs": "c7a59e3951bf20afb9a139f81c320ba0323a47ca384a42a417ff45b9ff53b884",
+    "lampOS/crates/actions/src/lib.rs": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+    "lampOS/crates/actions/src/light.rs": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+    "lampOS/crates/actions/src/main.rs": "f8ce8e950e6c6517cdcd02c551f3a972502f1e084f7057fcf6db05abbb519ec0",
+    "lampOS/crates/actions/src/schedule.rs": "770ab9f09ca1267ac87f3808fb2c8d10086eccde270d929ea19bee6867e6efc8",
+    "lampOS/crates/actions/src/server.rs": "f11bf44fc9f00b70695387abf1c2f3927ee6cfdf7ac5086262f5b0780680f58b",
+    "lampOS/crates/actions/src/sound.rs": "8251258895bb5dce813569bfd3f07d629b8419161f5e52b5b9f3318d9347e089",
+    "lampOS/crates/actions/src/speaker_state.rs": "1c3454941a5a3324d3cc5a59a61553c5d324107d6daec566e54a207f7f7d8c5c",
+    "lampOS/crates/actions/tests/it/caps.rs": "53ec7160a33e0eba01eb995c690dd80c68fef2a3b5e746047e8cca6b55177488",
+    "lampOS/crates/actions/tests/it/main.rs": "cd9420aac036de672f209a4782486e49f8d562c3c210e958c2576434f8a8ee1b",
+    "lampOS/crates/actions/tests/it/schedule.rs": "3c139f74c78af62ab05d15797213d38daa5c1578022866af7bcf1d52eb590d9f",
+    "lampOS/crates/actions/tests/it/server.rs": "5f22c68477d13ca46b2a02b8f3c3abc4b1815a5db51303b77ef8db3eb55d79dd",
+    "lampOS/crates/actions/tests/release_pair.rs": "79914cc7dffae2114e0f72550018a537252f29c63d9ffd6b32548d4ce5d72e82",
+    "lampOS/crates/actions/tests/release_pair/README.md": "73a7db990329c5cd090a26f2494506ddad03b5bc3ea853419fab416c8cb634d3",
+    "lampOS/crates/actions/tests/release_pair/fixture.rs": "39938659e19860e8a632c5d3d9d917f08512f86206d6bff3f330a5fc36e7d1b1",
+    "lampOS/crates/actions/tests/speaker_state.rs": "beb154c0d7f573797a683a8b09aca5dd32de610975bafec4c25fb17055d0b177"
+  }
+}
