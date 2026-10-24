@@ -1,0 +1,16 @@
+{
+  "previous_source_map": "/private/tmp/second-phone-current-43ac6c843-20261024/source-after.json",
+  "current_head": "674ed47a86dff0269df4e28c762c171f24289755",
+  "compared_files": 7023,
+  "changed_files": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/crates/body/src/bus_out.rs",
+    "lampOS/deploy/lamp-4ace/lamp-body.service",
+    "lampOS/deploy/product/lamp-body.service",
+    "lampOS/docs/body.md",
+    "lampOS/docs/install.md"
+  ],
+  "whole_tree_equal": false,
+  "Mac_scope": "Body body/bus_out modules cfg(any(target_os=linux,test)); the Voice dependency library is not cfg(test). Remaining changes are units/docs. Current compiler target/profile audit and native checks required; full results stay bound to old sources."
+}
