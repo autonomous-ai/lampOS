@@ -1,0 +1,30 @@
+{
+  "head": "f3f49646e592adf124b21e6732f8ea2b55a009b2",
+  "preview": "edf2b11d61fbd7b272b00a90c094498a582bc056",
+  "parents": [
+    "419d6f64b0244ed62547f7f697f808bc994a79e5",
+    "f3f49646e592adf124b21e6732f8ea2b55a009b2"
+  ],
+  "whole_trees_equal": false,
+  "all_six_carried_paths_identical": true,
+  "owned_blob_ids": {
+    "lampOS/crates/voice/src/attention.rs": "e6ab0238f1076b12d23a8ab62295ae5e4f0d3562",
+    "lampOS/crates/voice/src/room_told.rs": "a982c8ec0a056e5375579c94ce787384069df8b2",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "85ca4e5b45cdf0b557838172abcb141e9bddd6d9",
+    "lampOS/crates/voice/src/second_provider/worker/carry_window.rs": "c408a7cc0d5955d2ee3e276c297d6758f3402f4c",
+    "lampOS/docs/second-voice.md": "95bfd337ad0b63c963e97173f90fadd31a237bf1",
+    "lampOS/docs/switches.md": "6199579c5761caf402fbcafa887581e5f886ddc1"
+  },
+  "later_base_paths": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/crates/body/src/bus_out.rs",
+    "lampOS/crates/voice/src/second_provider/net/chat.rs",
+    "lampOS/deploy/lamp-4ace/lamp-body.service",
+    "lampOS/deploy/product/lamp-body.service",
+    "lampOS/docs/body.md",
+    "lampOS/docs/install.md",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "execution_checkout_binding": "pending original CI primary logs; current ref is not assumed to be the executed checkout"
+}

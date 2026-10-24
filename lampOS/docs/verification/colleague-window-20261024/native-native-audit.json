@@ -1,0 +1,73 @@
+{
+  "head": "f3f49646e592adf124b21e6732f8ea2b55a009b2",
+  "executed_preview": "edf2b11d61fbd7b272b00a90c094498a582bc056",
+  "preview_base": "419d6f64b0244ed62547f7f697f808bc994a79e5",
+  "whole_authored_preview_tree_equal": false,
+  "all_six_carried_paths_identical": true,
+  "later_base_paths": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/crates/body/src/bus_out.rs",
+    "lampOS/crates/voice/src/second_provider/net/chat.rs",
+    "lampOS/deploy/lamp-4ace/lamp-body.service",
+    "lampOS/deploy/product/lamp-body.service",
+    "lampOS/docs/body.md",
+    "lampOS/docs/install.md",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "arm_run": 40112159957,
+  "linux_run": 40112159925,
+  "logs": {
+    "arm": {
+      "checkout": "edf2b11d61fbd7b272b00a90c094498a582bc056",
+      "raw_log_sha256": "5e45d6fb5ace440b258d8b78d9cb5d883a27df0120a4b722982a527635b5f65f",
+      "run_conclusion": "success"
+    },
+    "linux": {
+      "checkout": "edf2b11d61fbd7b272b00a90c094498a582bc056",
+      "raw_log_sha256": "9d78e694811c17a5addee48aeede9bc1783361f98a8d95dd808b85232d326df8",
+      "run_conclusion": "success"
+    }
+  },
+  "arm_ordinary_pass": 11243,
+  "arm_leaky_pass": 1,
+  "arm_skipped": 106,
+  "arm_failed": 0,
+  "arm_selected_unrun": 0,
+  "arm_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:41.0913444Z      Summary [ 201.107s] 11244 tests run: 11244 passed (1 leaky), 106 skipped",
+  "process_controls": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:54.6530035Z test result: 12 passed; 0 failed",
+  "eight_named_pass_rows": {
+    "second_provider::worker::carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:17.1625328Z         PASS [   0.005s] ( 9683/11244) lamp-voice second_provider::worker::carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap"
+    ],
+    "second_provider::worker::carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:17.1777923Z         PASS [   0.005s] ( 9689/11244) lamp-voice second_provider::worker::carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance"
+    ],
+    "second_provider::worker::carry_window::tests::missing_future_and_stale_ends_do_not_create_an_extension": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:17.1741345Z         PASS [   0.006s] ( 9687/11244) lamp-voice second_provider::worker::carry_window::tests::missing_future_and_stale_ends_do_not_create_an_extension"
+    ],
+    "second_provider::worker::carry_window::tests::clearing_cannot_be_undone_by_an_old_answer_or_print": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:17.1680208Z         PASS [   0.005s] ( 9685/11244) lamp-voice second_provider::worker::carry_window::tests::clearing_cannot_be_undone_by_an_old_answer_or_print"
+    ],
+    "second_provider::worker::carry_window::tests::delayed_evidence_storage_is_bounded_and_older_ends_expire": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:17.1726106Z         PASS [   0.005s] ( 9686/11244) lamp-voice second_provider::worker::carry_window::tests::delayed_evidence_storage_is_bounded_and_older_ends_expire"
+    ],
+    "second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:18.4982809Z         PASS [   0.006s] ( 9746/11244) lamp-voice second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap"
+    ],
+    "second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:20.1612360Z         PASS [   0.006s] ( 9833/11244) lamp-voice second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget"
+    ],
+    "second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:18.4924034Z         PASS [   0.006s] ( 9745/11244) lamp-voice second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window"
+    ]
+  },
+  "leaky_rows": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T16:54:10.2993814Z         LEAK [   0.243s] ( 9048/11244) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+  ],
+  "actual_linux_fmt": true,
+  "strict_workspace_all_target_linux_clippy": true,
+  "device_acceptance": false,
+  "activation": false,
+  "historical_failure_cause_inferred": false
+}
