@@ -820,8 +820,12 @@ A shoulder or an elbow that reads over its load bound (`--arm-load`, 950
 and 950 without it) for six steps, is more than 160 counts from its goal for
 half a second, or reads 62 or warmer for a second sends the lamp back down
 the way it came. It rests there for a minute whatever it is told, and after
-the third time for the rest of the run; the report lists each time
-(`retreats`). Only an arm still over its load or off its goal two seconds
+the third time inside half an hour (`Standing::RETREAT_WINDOW`) for half an
+hour (`Standing::LONG_REST`), and then it may rise again; the report lists
+each time (`retreats`). Until 24 Oct the third time was for the rest of the
+run: lamp-4ace sat down for three strains of the elbow (loads 572, 573 and
+586 against 560) in half an hour on 20 Oct and never stood again in a
+five-day run, its gestures all dropped as "not standing". Only an arm still over its load or off its goal two seconds
 later ends the run, held where it is. The load bound is high on purpose:
 the old runtime's notes say these two joints read 830 to 1,000 in free
 motion on another lamp, so following and warmth are the real guards.
