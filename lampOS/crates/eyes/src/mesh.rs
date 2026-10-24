@@ -99,6 +99,39 @@ pub fn mouth_open(landmarks: &[f32]) -> Option<f32> {
     (tall.is_finite() && gap.is_finite() && tall > 1e-3).then(|| gap / tall)
 }
 
+/// `on` exactly meshes up to [`MOST_MESHED_FACES`] faces a look, largest
+/// first, instead of the largest only, so a second face's speaking reads its
+/// inner lips too (the first builder's 08:49 on Queue #3126). Off: the
+/// largest only, as before.
+pub const ALL_FACES_ENVIRONMENT: &str = "LAMP_EYES_SPEAKING_ALL_FACES";
+/// The faces meshed a look with [`ALL_FACES_ENVIRONMENT`] on.
+pub const MOST_MESHED_FACES: usize = 3;
+/// A face after the largest is meshed only if the look's meshing so far
+/// plus the last mesh's time stays within this: under tract on lamp-52e6's
+/// big core (85 ms a face) two faces, under ONNX Runtime (33 ms) three, on a
+/// small core (290 ms) the largest only. Every face meshed is meshed on every
+/// look, never in turn: a speaking window reads the mesh only when every one
+/// of its looks has it (`speaking.rs`), so faces meshed alternately would be
+/// judged on the corners. A face the budget skips on a look is judged on the
+/// corners until its window is all mesh again.
+pub const EXTRA_MESH_BUDGET_MS: u64 = 200;
+
+/// The indices of the faces to mesh this look, largest first: the largest
+/// only unless `all_faces`, then up to [`MOST_MESHED_FACES`]. Each after the
+/// first is meshed only while [`more_faces`] allows.
+pub fn meshed_order(heights: &[f32], all_faces: bool) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..heights.len()).collect();
+    order.sort_by(|a, b| heights[*b].total_cmp(&heights[*a]));
+    order.truncate(if all_faces { MOST_MESHED_FACES } else { 1 });
+    order
+}
+
+/// Whether one more face is meshed this look: `spent` meshing so far, and
+/// `last` the last mesh's time, as the next one's estimate.
+pub fn more_faces(spent: std::time::Duration, last: std::time::Duration) -> bool {
+    (spent + last).as_millis() <= u128::from(EXTRA_MESH_BUDGET_MS)
+}
+
 /// With `--mouth-on-heard on`: the mesh runs only while the voice hears a
 /// line (`voice/heard`), from its first words until [`AFTER_LINE_US`] after
 /// it is finished, so a quiet room costs it nothing (#705's heat). A line
@@ -282,6 +315,90 @@ mod tests {
             width: side,
             height: side,
             marks: [eyes[0], eyes[1], (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
+        }
+    }
+
+    #[test]
+    fn off_meshes_the_largest_face_only_and_on_up_to_the_most_largest_first() {
+        let heights = [40.0, 90.0, 60.0, 20.0];
+        assert_eq!(meshed_order(&heights, false), vec![1]);
+        assert_eq!(meshed_order(&heights, true), vec![1, 2, 0]);
+        assert_eq!(meshed_order(&[50.0], true), vec![0]);
+        assert!(meshed_order(&[], true).is_empty());
+    }
+
+    /// The budget as measured on lamp-52e6: tract's big core meshes two
+    /// faces, ONNX Runtime three, a small core the largest only.
+    #[test]
+    fn extra_faces_are_meshed_within_the_budget() {
+        let count = |each_ms: u64| {
+            let each = std::time::Duration::from_millis(each_ms);
+            let mut spent = each;
+            let mut meshed = 1;
+            while meshed < MOST_MESHED_FACES && more_faces(spent, each) {
+                spent += each;
+                meshed += 1;
+            }
+            meshed
+        };
+        assert_eq!(count(85), 2);
+        assert_eq!(count(33), 3);
+        assert_eq!(count(290), 1);
+        // Within a look's pace (250 ms), so the 2 s window keeps its five
+        // looks at the following rate.
+        let look_ms = 250;
+        assert!(EXTRA_MESH_BUDGET_MS < look_ms);
+        assert!(
+            (crate::speaking::WINDOW_US / 1_000 / look_ms) as usize >= crate::speaking::LEAST_LOOKS
+        );
+    }
+
+    /// Two faces, the smaller one talking: with every face meshed its
+    /// speaking reads the mesh's `yes`; with the largest only it is never
+    /// read from the mesh and never `yes` (its corners hold still). The
+    /// largest face's read is the same either way.
+    #[test]
+    fn a_second_face_talking_reads_speaking_only_with_all_faces_meshed() {
+        use crate::speaking::{LEAST_LOOKS, Mouths};
+        use lamp_msgs::{SpeakingFrom, SpeakingState};
+        // Still corners, 40 px between the eyes, level and facing.
+        let marks = |x: f32| -> [(f32, f32); 5] {
+            [
+                (x, 100.0),
+                (x + 40.0, 100.0),
+                (x + 20.0, 120.0),
+                (x + 6.0, 140.0),
+                (x + 34.0, 140.0),
+            ]
+        };
+        let heights = [120.0, 80.0];
+        let run = |all_faces: bool| {
+            let mut mouths = Mouths::default();
+            let mut reads = Vec::new();
+            for look in 0..12u64 {
+                let order = meshed_order(&heights, all_faces);
+                let gap = |index: usize| match index {
+                    0 => 0.01,
+                    _ => 0.04 + 0.03 * (look as f32 * 1.7).sin(),
+                };
+                let open = |index: usize| order.contains(&index).then(|| gap(index));
+                let now = look * 250_000;
+                let largest = mouths.judge(1, &marks(40.0), Some(0.0), open(0), now);
+                let second = mouths.judge(2, &marks(180.0), Some(0.0), open(1), now);
+                if look + 1 >= LEAST_LOOKS as u64 {
+                    reads.push((largest, second));
+                }
+            }
+            reads
+        };
+        let (on, off) = (run(true), run(false));
+        for ((largest_on, second_on), (largest_off, second_off)) in on.iter().zip(&off) {
+            assert_eq!(second_on.state, SpeakingState::Yes, "{second_on:?}");
+            assert_eq!(second_on.from, Some(SpeakingFrom::Mesh));
+            assert_ne!(second_off.state, SpeakingState::Yes, "{second_off:?}");
+            assert_ne!(second_off.from, Some(SpeakingFrom::Mesh));
+            assert_eq!(largest_on, largest_off);
+            assert_eq!(largest_on.state, SpeakingState::No);
         }
     }
 
