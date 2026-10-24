@@ -1,0 +1,21 @@
+# Frozen local gate
+
+{
+  "gate_start_head": "aab1344e33a41b5831e5483866680596ee0cc406",
+  "head": "348697e74b786022956f8cbb5dc7f6738438407f",
+  "tree": "1b533a05042587ed6374fb175b8c27a4e0abf2f0",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "source_count": 7028,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "summaries": 11,
+    "passed": 4664,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "private held-print helper and worker ownership verdict only; no public API, dependency, schema or default change; full Voice/Eval tests plus workspace build; rebased onto latest 42f parent source; new full composition gate, with inherited Soft/Name/fixture/Expression paths kept; recent-call forget P2 corrected by closing active carry with forgotten scope; full new-source gate, no prior execution transferred"
+}
+
+All four command exits and complete before/after source maps are retained. Every frozen source hash/mode was checked against the committed Git blob/mode after qualification. Targets were exclusive to their own worktrees and reused within each worktree; not an all-fresh build claim. Native runs, old failed epochs, reader failures and latest-base ancestry remain separately scoped. No hardware, acoustic or calibration claim.

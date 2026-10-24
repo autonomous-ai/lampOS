@@ -1,0 +1,101 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "carried_head": "aab1344e33a41b5831e5483866680596ee0cc406",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+  "target_scope": "new empty target exclusive to this child worktree after completed owned cache removal; debug information/incremental off, debug assertions retained; no cross-worktree reuse",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "private held-print helper and worker ownership verdict only; no public API, dependency, schema or default change; full Voice/Eval tests plus workspace build; rebased onto latest 42f parent source; new full composition gate, with inherited Soft/Name/fixture/Expression paths kept; recent-call forget P2 corrected by closing active carry with forgotten scope; full new-source gate, no prior execution transferred",
+  "source_count": 7028,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 12.767,
+      "log": "/private/tmp/third-held-forget-fix-full-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 66.64,
+      "log": "/private/tmp/third-held-forget-fix-full-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 60.528,
+      "log": "/private/tmp/third-held-forget-fix-full-build.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 863.39,
+      "log": "/private/tmp/third-held-forget-fix-full-tests.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

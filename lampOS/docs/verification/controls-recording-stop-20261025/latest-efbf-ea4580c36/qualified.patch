@@ -1,0 +1,111 @@
+diff --git a/lampOS/crates/controls/src/record.rs b/lampOS/crates/controls/src/record.rs
+index 05331f89ff..e5cee8d904 100644
+--- a/lampOS/crates/controls/src/record.rs
++++ b/lampOS/crates/controls/src/record.rs
+@@ -422,6 +422,42 @@ mod tests {
+         assert!((overflow(u64::MAX, false, true).unwrap().len() as u64) < TERMINAL_BYTES);
+     }
+ 
++    #[test]
++    fn finish_reports_acknowledged_pending_and_disconnected_writers_truthfully() {
++        for outcome in ["acknowledged", "pending", "disconnected"] {
++            let (sender, _receiver) = mpsc::sync_channel(1);
++            let (finish, done) = mpsc::sync_channel(1);
++            let recorder = Recorder {
++                sender,
++                done,
++                counters: Arc::new(Counters::default()),
++                gap: false,
++                touch: false,
++            };
++            let finish = if outcome == "disconnected" {
++                drop(finish);
++                None
++            } else {
++                Some(finish)
++            };
++            if outcome == "acknowledged" {
++                finish.as_ref().unwrap().send(()).unwrap();
++            }
++            // A zero-duration observation needs neither a scheduling sleep
++            // nor an assumption about disk latency. Keep a pending peer alive.
++            let stats = if outcome == "acknowledged" {
++                // Preserve the real default finish path's positive guarantee
++                // with an acknowledgement already queued, independent of I/O.
++                recorder.finish()
++            } else {
++                recorder.finish_within(Duration::ZERO)
++            };
++            assert_eq!(stats.finished, outcome == "acknowledged", "{outcome}");
++            assert!(!stats.failed, "{outcome}");
++            drop(finish);
++        }
++    }
++
+     #[test]
+     fn recording_formats_cannot_be_mixed_silently() {
+         let (mut legacy, _) = recorder(1);
+diff --git a/lampOS/crates/controls/tests/it/program.rs b/lampOS/crates/controls/tests/it/program.rs
+index c73f47a5b7..4cc1499ed7 100644
+--- a/lampOS/crates/controls/tests/it/program.rs
++++ b/lampOS/crates/controls/tests/it/program.rs
+@@ -301,7 +301,7 @@ impl Drop for Running {
+ }
+ 
+ #[test]
+-fn sigterm_finishes_recording_and_releases_the_actual_serve_owner() {
++fn sigterm_reports_bounded_recording_and_releases_the_actual_serve_owner() {
+     let root = Root::new();
+     let bus = Bus::new(root.0.join("bus")).unwrap();
+     let mut reports = bus
+@@ -355,15 +355,23 @@ fn sigterm_finishes_recording_and_releases_the_actual_serve_owner() {
+     assert_eq!(summary["physical_stop_verified"], false);
+     assert!(summary["counts"]["reader_errors"].as_u64().unwrap() > 0);
+     assert_eq!(summary["recording"]["failed"], false);
+-    assert_eq!(summary["recording"]["finished"], true);
++    let finished = summary["recording"]["finished"]
++        .as_bool()
++        .expect("the optional writer must report completion truthfully");
+     assert_eq!(summary["recording"]["dropped"], 0);
+-    let records = replay::read(fs::File::open(record).unwrap()).unwrap();
+-    assert!(!records.is_empty());
+-    assert!(
+-        records
+-            .iter()
+-            .all(|row| row.observation.is_none() && row.fault == Some(ControlFault::Missing))
+-    );
++    // Product shutdown waits only 100 ms for the optional disk writer.
++    // A truthful incomplete report is allowed; a parseable prefix is not
++    // evidence of a fully drained/synced recording. Complete replay has its
++    // separate five-second, test-only roundtrip control in runtime.rs.
++    if finished {
++        let records = replay::read(fs::File::open(record).unwrap()).unwrap();
++        assert!(!records.is_empty());
++        assert!(
++            records
++                .iter()
++                .all(|row| row.observation.is_none() && row.fault == Some(ControlFault::Missing))
++        );
++    }
+     let mut restarted = Service::new(&bus, Config::default(), MissingPins, CLOCK).unwrap();
+     let after = restarted.step(lamp_ipc::monotonic_us);
+     assert_ne!(after.state.session_id, before.session_id);
+diff --git a/lampOS/docs/controls.md b/lampOS/docs/controls.md
+index bfc27ac87a..4bbb1b2ce0 100644
+--- a/lampOS/docs/controls.md
++++ b/lampOS/docs/controls.md
+@@ -1635,6 +1635,14 @@ timeout are reported; a recording with any of these is incomplete evidence.
+ Shutdown gives the optional writer 100 ms to finish; disk synchronization is
+ not a hard userspace bound. Replay output errors are returned, never called a
+ complete replay. Keep the printed summary with a real recording.
++The real CLI SIGTERM test verifies bounded exit, reader accounting and release
++of the actual serve owner. It accepts either truthful `recording.finished`
++outcome within that unchanged product window; only a finished recording is
++used as complete replay evidence. Deterministic recorder controls cover an
++acknowledged, pending and disconnected writer without sleeps. Complete GPIO
++and privacy replay roundtrips retain their separate five-second **test-only**
++finish window; this does not extend the product's 100 ms deadline.
++
+ 
+ ## Qualification and evidence
+ 
