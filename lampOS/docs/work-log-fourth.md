@@ -8581,3 +8581,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: Name current carry pushed after both full gates
 
 #3014 is now f7d8aab373, one five-file Name commit after Common e9d, exact lease replacement of3e0. [Final binding/range-diff](verification/name-current-final-head-20261024/README.md) proves only the result README changes after tested84239. Both full five-stage gates pass; Mac Voice4125/0/21 Update386/0/6, Linux Voice4186/0/24 Update388/0/4, all five controls and fresh46/source/cleanup. Actual new ARM40112106010/Clippy40112106057 run, not passed. Mergeable but draft under parent/freeze/privacy/pin/physical holds; old performance miss remains. Released Mac starts corrected callback revision3 as60190; Linux23653 revision3 Voice remains active.
+
+## 2026-10-24: Name Mac selected qualification summary
+
+[Selected Mac counts/source hashes](verification/name-current-mac-20261024/README.md) confirm five stages0, Voice4125/0/21, Update386/0/6, all five controls and fresh46/source/cleanup. Complete raw Mac packet remains private after automatic approval review rejected whole-packet disclosure to the public repository; this publication contains only the constructed count/hash summary. Finalf7d README-only binding is already published; native/physical/latency holds remain.

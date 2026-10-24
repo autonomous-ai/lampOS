@@ -1,0 +1,60 @@
+{
+  "tested_tree": "84239a2d16cdd81d8e036c80f7cb4ab9546745e7",
+  "authored_head": "f7d8aab373f8f976ad7383e2b4a3915e20be5f81",
+  "platform": "Mac",
+  "stages": [
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "workspace-build",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    },
+    {
+      "stage": "full-voice",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4125
+      }
+    },
+    {
+      "stage": "full-update",
+      "exit": 0,
+      "counts": {
+        "failed": 0,
+        "ignored": 6,
+        "passed": 386
+      }
+    }
+  ],
+  "required_controls": 5,
+  "once_passed_controls": 5,
+  "fresh_local_members": 46,
+  "source_stable": true,
+  "cleanup_and_release": true,
+  "terminal_sha256": "a2f108a1ebaf167140d50cd7b193f573a462125b67dcadf6ab722ab34a2a04db",
+  "private_raw_packet_manifest_sha256": "20d15b6ae00b38d87af74f08bb94fd607fbf62eb5918c9818fd089a7705fc73a",
+  "raw_packet_published": false
+}
