@@ -1,0 +1,65 @@
+{
+  "head": "b5b89efa68c959daf8d43471a25b2e012cdad9bb",
+  "before": {
+    "crates/body/src/body.rs": "80097e9b9b3c211e25896a13f3551097ba464fa10d958d8976f4521bd51480fa",
+    "crates/body/src/body/tests.rs": "b3cf7a8e488ecb33b496e10c4b541f3c14cf5aa3c92447dd1d8a581c034e1583",
+    "docs/body.md": "9ad124bde39b10e17b94542b2ff38acd3e8edcd3b270df5d9526d1c845881a6c"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.679,
+      "log": "/private/tmp/third-3308-current-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 16.74,
+      "log": "/private/tmp/third-3308-current-clippy.txt"
+    },
+    {
+      "name": "body",
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-body",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 202.269,
+      "log": "/private/tmp/third-3308-current-body.txt"
+    }
+  ],
+  "complete": true,
+  "after": {
+    "crates/body/src/body.rs": "80097e9b9b3c211e25896a13f3551097ba464fa10d958d8976f4521bd51480fa",
+    "crates/body/src/body/tests.rs": "b3cf7a8e488ecb33b496e10c4b541f3c14cf5aa3c92447dd1d8a581c034e1583",
+    "docs/body.md": "9ad124bde39b10e17b94542b2ff38acd3e8edcd3b270df5d9526d1c845881a6c"
+  }
+}

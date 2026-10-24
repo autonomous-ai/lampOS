@@ -1,0 +1,27 @@
+{
+  "head": "b5b89efa68c959daf8d43471a25b2e012cdad9bb",
+  "old_tested_body_blobs_equal": true,
+  "range_diff": "1:  072d22fd4 = 1:  1f1d3a8a9 lampOS: a joint resting inside its deadband never reports body/hand pushed, whichever lamp's calibration (06c1's joint 0)\n2:  a4a4d9e42 = 2:  b5b89efa6 lampOS: an admitted hand keeps renewing its hold at an eased load, a resting joint keeps the full bound (#3248 carry)\n",
+  "preview": "8b26b2ed422ad6e12440a9203699d1a4994fbd83",
+  "parents": [
+    "761aa62d369961183dcb98ba708dd338bf16028f",
+    "b5b89efa68c959daf8d43471a25b2e012cdad9bb"
+  ],
+  "three_owned_files_match_preview": {
+    "lampOS/crates/body/src/body.rs": true,
+    "lampOS/crates/body/src/body/tests.rs": true,
+    "lampOS/docs/body.md": true
+  },
+  "whole_tree_equal": true,
+  "base_different_paths": [],
+  "local_totals": [
+    607,
+    0,
+    0
+  ],
+  "native_log_sha256": "ed66285b0f6adab43e1b2dc42aa22e18e988590bdca31a6375e23c0002077a4e",
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T06:09:26.2182091Z      Summary [ 148.335s] 7339 tests run: 7339 passed (1 leaky), 45 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T06:09:39.9442365Z test result: 12 passed; 0 failed"
+  ]
+}

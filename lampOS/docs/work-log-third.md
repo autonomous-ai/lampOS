@@ -5,6 +5,18 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 16:52 — current Body carry read complete
+
+- #3308 `b5b89efa6`: both equal range-diffs, Body/test/doc bytes unchanged
+  from corrected read; fresh Mac fmt/strict Clippy/Body **607/0** pass.
+- [Read evidence](verification/body-carry-read-20261024/README.md).
+  Current original native **7,338 PASS plus 1 LEAK / 45 skipped**,
+  process **12/0**, Linux Clippy green; exact authored preview tree.
+- No new source P1/P2 or base-only HOLD. Existing slow-lean P3 and First's
+  physical integration remain separate; no device or motion by Third.
+- #3353 source READ-OK posted; new history/alias hearing P2 repairs remain
+  with Sixth/First and their readers. Incoming-head/Queue watch continues.
+
 ## 2026-10-24 16:35 — heard-cut-in note read complete
 
 - #3353 `64a912417`: no source P1/P2, independent scoped Worker **201/0**,
