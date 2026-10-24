@@ -72,6 +72,8 @@ pub struct LineSeen {
     pub request: u64,
     pub speakers: Speakers,
     pub known: Option<(String, String)>,
+    /// Exact audio interval and words for opt-in requested enrollment.
+    pub enrollment: Option<crate::remember_speaker::Proof>,
 }
 
 /// Far more lines than run at once: an older answer still running keeps
@@ -86,22 +88,92 @@ static LINES_SEEN: Mutex<VecDeque<LineSeen>> = Mutex::new(VecDeque::new());
 /// Keeps what the eyes saw saying a line, for its calls ([`line_seen`]).
 pub fn saw_line(seen: LineSeen) {
     if let Ok(mut lines) = LINES_SEEN.lock() {
-        lines.retain(|line| line.request != seen.request);
-        lines.push_back(seen);
-        while lines.len() > MOST_LINES_SEEN {
-            lines.pop_front();
-        }
+        keep_line(&mut lines, seen);
     }
+}
+
+fn keep_line(lines: &mut VecDeque<LineSeen>, seen: LineSeen) {
+    lines.retain(|line| line.request != seen.request);
+    lines.push_back(seen);
+    while lines.len() > MOST_LINES_SEEN {
+        lines.pop_front();
+    }
+}
+
+/// Publish enrollment under the same lock used when a request is revoked.
+/// Revocation marks the lease inactive before it takes this lock: either
+/// the proof is refused here, or the revoker removes it after insertion.
+pub fn saw_line_scoped(mut seen: LineSeen, lease: &crate::memory_scope::ScopeLease) -> bool {
+    if seen.request != lease.key().request {
+        return false;
+    }
+    let Ok(mut lines) = LINES_SEEN.lock() else {
+        return false;
+    };
+    if !lease.is_current() {
+        return false;
+    }
+    if seen
+        .enrollment
+        .as_ref()
+        .is_some_and(|proof| !proof.is_current(lamp_ipc::monotonic_us()))
+    {
+        seen.enrollment.take();
+    }
+    keep_line(&mut lines, seen);
+    true
 }
 
 /// What the eyes saw saying request `request`'s line, if it was read.
 pub fn line_seen(request: u64) -> Option<LineSeen> {
+    expire_enrollment(lamp_ipc::monotonic_us());
     LINES_SEEN
         .lock()
         .ok()?
         .iter()
         .find(|line| line.request == request)
         .cloned()
+}
+
+/// The reader also calls this during idle time, so expired enrollment
+/// words and ids do not stay in the bounded line store indefinitely.
+pub fn expire_enrollment(now_us: u64) {
+    if let Ok(mut lines) = LINES_SEEN.lock() {
+        for line in lines.iter_mut() {
+            if line
+                .enrollment
+                .as_ref()
+                .is_some_and(|proof| !proof.is_current(now_us))
+            {
+                line.enrollment.take();
+            }
+        }
+    }
+}
+
+pub(crate) fn clear_enrollment(generation: crate::remember_speaker::Generation) {
+    if let Ok(mut lines) = LINES_SEEN.lock() {
+        for line in lines.iter_mut() {
+            if line
+                .enrollment
+                .as_ref()
+                .is_some_and(|proof| proof.generation.same_epoch(generation))
+                && let Some(proof) = line.enrollment.take()
+            {
+                proof.cancel();
+            }
+        }
+    }
+}
+
+/// A stopped request cannot lend its evidence to a later tool call.
+pub fn cancel_enrollment(request: u64) {
+    if let Ok(mut lines) = LINES_SEEN.lock()
+        && let Some(line) = lines.iter_mut().find(|line| line.request == request)
+        && let Some(proof) = line.enrollment.take()
+    {
+        proof.cancel();
+    }
 }
 
 /// Who the eyes saw speaking through a line: the passing ids, none when no
@@ -271,6 +343,43 @@ impl SpeakingFaces {
                 .map(|id| format!("{}/{id}", look.boot))
                 .collect()
         })
+    }
+
+    /// One face seen speaking this line, for requested enrollment. A brief
+    /// competitor still refuses it; a majority is insufficient for saving
+    /// someone's face. Unknown looks never count as positive evidence.
+    pub fn enrollment_speaker(&self, from: Instant, to: Instant) -> Option<String> {
+        if to < from || to.duration_since(from) > KEPT {
+            return None;
+        }
+        let looks = self.looks.lock().ok()?;
+        let during: Vec<_> = looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= from && look.at <= to)
+            .collect();
+        let mut boot = None;
+        let mut speaker = None;
+        let mut positive = 0;
+        for look in &during {
+            if !look.boot.is_empty() {
+                if boot.is_some_and(|boot| boot != &look.boot) {
+                    return None;
+                }
+                boot = Some(&look.boot);
+            }
+            for id in &look.speaking {
+                if look.boot.is_empty() || speaker.is_some_and(|speaker| speaker != id) {
+                    return None;
+                }
+                speaker = Some(id);
+            }
+            positive += usize::from(!look.speaking.is_empty());
+        }
+        if positive < FEWEST_LOOKS || positive * 2 < during.len() {
+            return None;
+        }
+        Some(format!("{}/{}", boot?, speaker?))
     }
 
     /// Forget every look: the camera closed or the microphone was muted,
@@ -470,6 +579,7 @@ pub fn read_from(eyes: std::sync::Arc<SpeakingFaces>, root: &Path) -> Option<Rea
         .spawn(move || {
             while !stopped.load(std::sync::atomic::Ordering::Acquire) {
                 std::thread::sleep(EVERY);
+                expire_enrollment(lamp_ipc::monotonic_us());
                 let frame = bus
                     .latest(Faces::TOPIC)
                     .ok()
@@ -588,6 +698,44 @@ mod tests {
     }
 
     use SpeakingState::{No, Unknown, Yes};
+
+    #[test]
+    fn remember_speaker_rejects_a_competitor_seen_once() {
+        let (eyes, from, to) = seen(&[
+            &[("f1", Yes)],
+            &[("f1", Yes)],
+            &[("f1", Yes), ("f2", Yes)],
+            &[("f1", Yes)],
+            &[("f1", Yes)],
+        ]);
+        assert_eq!(eyes.speakers_with_boot(from, to), ["b/f1"]);
+        assert_eq!(eyes.enrollment_speaker(from, to), None);
+    }
+
+    #[test]
+    fn remember_speaker_requires_positive_evidence_in_one_boot_and_the_whole_window() {
+        let (eyes, from, to) = seen(&[
+            &[("f1", Yes)],
+            &[("f1", Yes)],
+            &[("f1", Yes)],
+            &[("f1", No)],
+        ]);
+        assert_eq!(eyes.enrollment_speaker(from, to), Some("b/f1".into()));
+        for looks in [
+            vec![&[("f1", Unknown)][..]; 4],
+            vec![&[("f1", No)][..]; 4],
+            vec![&[("f1", Yes)][..]; 2],
+            vec![&[][..]; 4],
+        ] {
+            let (eyes, from, to) = seen(&looks);
+            assert_eq!(eyes.enrollment_speaker(from, to), None);
+        }
+        assert_eq!(eyes.enrollment_speaker(from, from + KEPT + EVERY), None);
+        eyes.look(to, Some((("restarted", 1), &faces(&[("f1", No)]))));
+        assert_eq!(eyes.enrollment_speaker(from, to), None);
+        eyes.forget();
+        assert_eq!(eyes.enrollment_speaker(from, to), None);
+    }
 
     /// #2287's follow-up: of the faces speaking, only those turned to the
     /// lamp in at least half the looks are its own person's; one turned away,

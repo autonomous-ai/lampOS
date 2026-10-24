@@ -838,6 +838,7 @@ async fn a_lines_end_records_who_was_seen_saying_it() {
                 request,
                 speakers: vec![format!("eyes/{speaker}")],
                 known: Some(("A".to_owned(), "eyes/f1".to_owned())),
+                enrollment: None,
             }),
         )
     };

@@ -1461,6 +1461,70 @@ and the ask's two new lines (the eyes);
 exercised: a played name in a busy room on a lamp, and how often the
 service writes a name said once right.
 
+### Remember only the person who spoke (`LAMP_REMEMBER_SPEAKER=on`)
+
+Off by default in both Voice and Eyes. Eyes needs its recognizer and who
+socket, `LAMP_BUS=on` and `LAMP_EYES_SPEAKING=on`; Voice also needs
+`LAMP_EYES_SPEAKING=on` and the bus. With `LAMP_NAMES=checked`, the second
+voice route binds `remember_my_face` to the current microphone line, its
+monotonic audio interval, and exactly one face positively seen speaking.
+A different face speaking even briefly refuses the request. At least three
+distinct looks must positively show that speaker, at least half the looks
+in the line must be positive, and all must share one Eyes boot. Unknown
+looks do not count as positive evidence. The complete audio interval is
+at most 30 seconds. Short or missed camera evidence therefore refuses.
+The name must be supported by that line's words: earlier exchanges and model-supplied
+face identifiers are not evidence. With no eyes, missing or stale evidence,
+or an unsupported route, nothing is saved. Guarded `replace=true` is refused:
+the earlier confirmation is not yet bound to the same speaker. Ordinary
+enrollment with the switch off keeps its existing behavior.
+
+Voice refuses enrollment evidence above 4 KiB of transcript or a 128-byte
+face identifier rather than truncating away a correction. Its existing
+64-line store bounds the number of proofs; expiry, stop and privacy
+invalidation discard their enrollment words and identity.
+
+Voice sends a distinct internal operation on the existing who socket:
+
+```json
+{"remember_speaker":{"name":"Fixture Speaker","face":"boot/f3","began_us":1000000,"ended_us":3000000,"replace":false,"apart":false}}
+```
+
+The proof is built by Voice, never accepted as model tool arguments. Old
+Eyes refuses this unknown operation; Voice never retries it as a plain
+remember. New Eyes with the switch off also refuses it. With the switch on,
+Eyes refuses legacy live `remember` operations with `speaker_required`, so
+an older Voice cannot silently bypass the check. Photo enrollment retains
+its separate confirmation path.
+
+Eyes reuses its already-computed SFace prints, only when exactly one near
+face is seen speaking in that same look. At most 16 prints, less than
+30 seconds old, stay in RAM under one camera permission hold. No image is
+kept and no background inference is added. The anchor must have the driver's
+capture time inside the spoken interval; missing history after capacity
+eviction is a refusal. Closing/reopening the camera clears these anchors,
+and a buffered frame from before the new hold cannot refill them. A request
+spanning a camera-hold reset or forget is refused even if the same tracking
+ID has a later print.
+
+Five distinct fresh frames captured after the request must show the same
+face, each matching the immutable anchor at the existing SFace threshold
+0.363. A passing tracking ID alone is insufficient: another person can
+inherit it. A missing, ambiguous, unreadable or different face terminates
+the capture. Forget clears both anchors and a pending guarded capture even
+if the subsequent file removal fails. Caller closure, permission, expiry
+and capture failure are checked again immediately before the People write.
+Voice closes its connection on cancellation, privacy loss or lease loss;
+only Eyes' actual success may be reported as remembered.
+
+Latency target: add no wait or inference to the microphone path or the
+background recognition cadence. The existing four-second Eyes capture
+limit and six-second tool deadline remain; absent proof refuses immediately.
+Software tests cover the protocol, collector, identity replacement, stale
+and buffered frames, cancellation and legacy behavior. Physical first-use,
+repeated-use and slow-dependency latency, and speaking-classifier accuracy
+in a room, still need a lamp trial. The switch remains off pending that trial.
+
 ## On the bus
 
 With `LAMP_BUS=on` in its unit the eyes also publish every face the

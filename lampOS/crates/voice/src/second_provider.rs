@@ -301,6 +301,7 @@ struct SpokenTurn {
     session: u64,
     privacy_generation: u64,
     captured: bool,
+    enrollment_generation: crate::remember_speaker::Generation,
 }
 
 fn audio_scope_current(
@@ -994,6 +995,8 @@ struct Shared {
         Arc<crate::speaking_faces::SpeakingFaces>,
         std::path::PathBuf,
     )>,
+    remember_speaker: bool,
+    enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
 }
 
 /// How long after its end a line whose words end before a name waits for
@@ -1486,7 +1489,7 @@ fn soft(mut clip: Vec<i16>) -> Vec<i16> {
 /// `LAMP_SECOND_EARLY_FINALIZE`).
 enum LinePart {
     /// The flag distinguishes this request's input from an older carried piece.
-    Sound(Vec<i16>, bool),
+    Sound(Vec<i16>, bool, u64),
     Pause,
 }
 
@@ -1830,6 +1833,8 @@ impl Engine {
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
                 forget_sight: None,
+                remember_speaker: false,
+                enrollment_sight: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -1866,6 +1871,12 @@ impl Engine {
     /// [`Self::forgetting_on_privacy`]'s hook.
     pub(crate) fn privacy(&mut self, now: (bool, u64, bool, u64)) {
         if self.privacy.replace(now).is_some_and(|was| was != now) {
+            if self.shared.remember_speaker {
+                crate::remember_speaker::forget();
+                if let Some(eyes) = &self.shared.enrollment_sight {
+                    eyes.forget();
+                }
+            }
             if let Some(forget) = self.on_privacy.as_mut() {
                 forget();
             }
@@ -2056,6 +2067,19 @@ impl Engine {
     ) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.forget_sight = Some((eyes, known));
+        self
+    }
+
+    /// Opt-in enrollment uses only the face seen speaking the exact audio
+    /// interval. Missing eyes leaves it enabled but unable to save a face.
+    pub fn remembering_speaker(
+        mut self,
+        on: bool,
+        eyes: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
+    ) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.remember_speaker = on;
+        shared.enrollment_sight = on.then_some(eyes).flatten();
         self
     }
 
@@ -3168,6 +3192,7 @@ impl Engine {
                             let _ = audio.try_send(LinePart::Sound(
                                 kept.samples.iter().copied().collect(),
                                 false,
+                                0,
                             ));
                         }
                         // The line began with the sound carried: the name
@@ -3210,6 +3235,7 @@ impl Engine {
                             session,
                             privacy_generation,
                             captured: false,
+                            enrollment_generation: crate::remember_speaker::generation(),
                         },
                         lease,
                         marks.clone(),
@@ -3265,7 +3291,7 @@ impl Engine {
                     let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
                     kept.samples.drain(..over);
                 }
-                match audio.try_send(LinePart::Sound(samples, true)) {
+                match audio.try_send(LinePart::Sound(samples, true, read_completed_at_us)) {
                     Ok(()) => {}
                     // The task already failed the turn itself.
                     Err(mpsc::error::TrySendError::Closed(_)) => turn.audio = None,
@@ -4213,6 +4239,8 @@ async fn spoken(
         None
     };
     let mut told_unfinished = None;
+    let mut enrollment_audio = None;
+    let mut enrollment_audio_valid = true;
     loop {
         tokio::select! {
             Some(words) = next_said(&mut words_said) => {
@@ -4224,8 +4252,23 @@ async fn spoken(
             }
             part = heard.recv() => match part {
                 None => break,
-                Some(LinePart::Sound(samples, fresh)) => {
+                Some(LinePart::Sound(samples, fresh, read_completed_at_us)) => {
                     turn.captured |= fresh && !samples.is_empty();
+                    if shared.remember_speaker {
+                        // The microphone clock, not STT's delayed queue:
+                        // 16 kHz samples, timestamped when the read ended.
+                        let duration_us = (samples.len() as u64).saturating_mul(1_000_000)
+                            / u64::from(lamp_audio::CAPTURE_RATE);
+                        let began_us = read_completed_at_us.checked_sub(duration_us);
+                        match (enrollment_audio, began_us) {
+                            (_, _) if !fresh || samples.is_empty() => enrollment_audio_valid = false,
+                            (None, Some(began)) => enrollment_audio = Some((began, read_completed_at_us)),
+                            (Some((began, end)), Some(_)) if read_completed_at_us > end => {
+                                enrollment_audio = Some((began, read_completed_at_us));
+                            }
+                            _ => enrollment_audio_valid = false,
+                        }
+                    }
                     if let Err(error) = listener.send(&samples) {
                         shared.stages(request, &Times::new(begun)).await;
                         return shared.fail(request, FailedStage::InputOpen, &error).await;
@@ -4358,6 +4401,40 @@ async fn spoken(
                 .await;
         }
     };
+    // Snapshot the actual line before name carries or older words are
+    // joined. Those may belong to someone else and never prove this name.
+    let enrollment_allowed = shared.remember_speaker
+        && !marks.count_only.load(Ordering::Acquire)
+        && scope.as_ref().is_some_and(|lease| lease.is_current());
+    let enrollment = if enrollment_allowed && enrollment_audio_valid {
+        shared.enrollment_sight.as_ref().and_then(|eyes| {
+            let (began_us, ended_us) = enrollment_audio?;
+            let now_us = monotonic_us();
+            let now = Instant::now();
+            let from = now.checked_sub(Duration::from_micros(now_us.checked_sub(began_us)?))?;
+            let to = now.checked_sub(Duration::from_micros(now_us.checked_sub(ended_us)?))?;
+            let face = eyes.enrollment_speaker(from, to)?;
+            crate::remember_speaker::Proof::heard(
+                face,
+                began_us,
+                ended_us,
+                &text,
+                turn.enrollment_generation,
+            )
+        })
+    } else {
+        None
+    };
+    if enrollment_allowed && let Some(lease) = scope.as_ref() {
+        crate::speaking_faces::saw_line_scoped(
+            crate::speaking_faces::LineSeen {
+                request,
+                enrollment: enrollment.clone(),
+                ..crate::speaking_faces::LineSeen::default()
+            },
+            lease,
+        );
+    }
     // Seeing someone speak: a line admitted as the known person's that any
     // other face spoke is the room's, before anything is told or filed with
     // it. Only ever narrowed (the first builder, #1722 00:23).
@@ -4441,11 +4518,19 @@ async fn spoken(
                 .ok()
                 .flatten();
             if asks {
-                crate::speaking_faces::saw_line(crate::speaking_faces::LineSeen {
+                let seen = crate::speaking_faces::LineSeen {
                     request,
                     speakers: speakers.clone(),
                     known: pair.clone(),
-                });
+                    enrollment: enrollment.clone(),
+                };
+                if shared.remember_speaker {
+                    if let Some(lease) = scope.as_ref() {
+                        crate::speaking_faces::saw_line_scoped(seen, lease);
+                    }
+                } else {
+                    crate::speaking_faces::saw_line(seen);
+                }
             }
             if held && let Ok(mut hold) = shared.held_forget.lock() {
                 hold.sight = Some((request, speakers, pair));
