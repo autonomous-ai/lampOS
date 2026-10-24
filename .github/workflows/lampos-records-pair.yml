@@ -1,0 +1,172 @@
+name: lampOS published Records compatibility
+
+# Records' unchanged guard requires real systemd/procfs. Keep this dedicated
+# native lane separate from the container-based Schedule/Tasks state pair and
+# from the ordinary ARM64 and Clippy gates. Only these three ignored tests run.
+on:
+  pull_request:
+    branches: ['lamp-voice']
+    paths:
+      - 'lampOS/crates/records/tests/release_pair_systemd*'
+      - 'lampOS/crates/records/tests/release_pair_systemd/**'
+      - 'lampOS/crates/records/tests/support/release_pair/**'
+      - '.github/workflows/lampos-records-pair.yml'
+      - '.github/scripts/lampos-records-pair*.sh'
+      - '.github/scripts/lampos-records-pair*.jq'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lampos-records-pair-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  published-records-pair:
+    name: published 6408 and 6449 Records with real systemd on ARM64
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 60
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '2'
+      CARGO_TERM_COLOR: never
+      CARGO_TARGET_DIR: ${{ github.workspace }}/lampOS/target
+      PAIR_ROOT_OUTPUT: /run/lamp-records-pair-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: initialize evidence and inspect the native host
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAIR_ARTIFACTS="$RUNNER_TEMP/records-pair-artifacts"
+          PAIR_EVIDENCE="$RUNNER_TEMP/records-pair-evidence"
+          printf 'PAIR_ARTIFACTS=%s\nPAIR_EVIDENCE=%s\n' "$PAIR_ARTIFACTS" "$PAIR_EVIDENCE" >> "$GITHUB_ENV"
+          mkdir -m 700 "$PAIR_EVIDENCE"
+          # Source receipts use these preinstalled runner tools before apt.
+          command -v jq sha256sum stat xargs > "$PAIR_EVIDENCE/receipt-tools"
+          uname -sm > "$PAIR_EVIDENCE/platform"
+          id > "$PAIR_EVIDENCE/ordinary-runner-id"
+          trap 'printf "host preflight failed at line %s\n" "$LINENO" >> "$PAIR_EVIDENCE/host-preflight.txt"' ERR
+          test "$(id -u)" -ne 0
+          test "$(uname -m)" = aarch64
+          # PID1 namespace links can require privilege even on the real host.
+          # Inspect them with the same privilege the fixture requires; retain
+          # each prerequisite instead of comparing unchecked substitutions.
+          sudo --non-interactive /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 \
+            /bin/bash -euo pipefail -c '
+              pid1=$(cat /proc/1/comm)
+              printf "pid1=%s\n" "$pid1"
+              test "$pid1" = systemd
+              init_namespace=$(readlink /proc/1/ns/pid)
+              self_namespace=$(readlink /proc/self/ns/pid)
+              printf "init_namespace=%s\nself_namespace=%s\n" "$init_namespace" "$self_namespace"
+              test -n "$init_namespace"
+              test "$init_namespace" = "$self_namespace"
+              if test -f /sys/fs/cgroup/cgroup.controllers && test ! -L /sys/fs/cgroup/cgroup.controllers; then
+                printf "unified_cgroup_v2=true\n"
+              else
+                printf "unified_cgroup_v2=false\n"
+                exit 1
+              fi
+            ' > "$PAIR_EVIDENCE/host-preflight.txt" 2>&1
+          # Never stop these services. The exact Voice artifacts repeat this
+          # genuine legacy absence check before they create any session.
+          for unit in hal.service os-server.service led-boot.service led-shutdown.service; do
+            if /usr/bin/systemctl --system is-active --quiet "$unit"; then
+              status=0
+            else
+              status=$?
+            fi
+            printf '%s %s\n' "$unit" "$status" >> "$PAIR_EVIDENCE/legacy-inactive.txt"
+            test "$status" = 3 || test "$status" = 4
+          done
+          test ! -e "$PAIR_ROOT_OUTPUT"
+          test ! -L "$PAIR_ROOT_OUTPUT"
+          sudo --non-interactive install -d -o root -g root -m 0700 "$PAIR_ROOT_OUTPUT"
+          bash .github/scripts/lampos-records-pair.sh source \
+            --workspace "$GITHUB_WORKSPACE" --evidence "$PAIR_EVIDENCE" --phase before
+      - name: fixture build dependencies
+        timeout-minutes: 5
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config libasound2 binutils jq
+      - name: Rust 1.96.0 for the ordinary runner
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            --connect-timeout 15 --max-time 120 https://sh.rustup.rs -o "$RUNNER_TEMP/rustup-init.sh"
+          sh "$RUNNER_TEMP/rustup-init.sh" -y --profile minimal --default-toolchain 1.96.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache/restore@v4
+        timeout-minutes: 2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: lampos-records-pair-registry-${{ hashFiles('lampOS/Cargo.lock') }}
+          restore-keys: |
+            lampos-records-pair-registry-
+      - name: verify acquisition and selection guards offline
+        timeout-minutes: 1
+        run: bash .github/scripts/lampos-records-pair-test.sh
+      - name: fetch and bind only the fixed public Records and Voice artifacts
+        timeout-minutes: 10
+        run: |
+          bash .github/scripts/lampos-records-pair.sh fetch \
+            --artifacts "$PAIR_ARTIFACTS" --evidence "$PAIR_EVIDENCE"
+      - name: compile only the Records systemd test executable as the ordinary runner
+        timeout-minutes: 10
+        working-directory: lampOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          test ! -e target
+          rustc --version --verbose > "$PAIR_EVIDENCE/rustc-version"
+          cargo test --locked -p lamp-records --test release_pair_systemd --no-run \
+            --message-format=json-render-diagnostics \
+            > "$PAIR_EVIDENCE/build.jsonl" 2> "$PAIR_EVIDENCE/build.stderr"
+          bash ../.github/scripts/lampos-records-pair.sh select \
+            --workspace "$GITHUB_WORKSPACE" --build-log "$PAIR_EVIDENCE/build.jsonl" --evidence "$PAIR_EVIDENCE"
+      - name: execute exactly three published-pair cases with root and a clean environment
+        timeout-minutes: 13
+        run: |
+          bash .github/scripts/lampos-records-pair.sh run \
+            --workspace "$GITHUB_WORKSPACE" --artifacts "$PAIR_ARTIFACTS" \
+            --evidence "$PAIR_EVIDENCE" --root-output "$PAIR_ROOT_OUTPUT"
+      - name: retain partial evidence and clean up only journalled owned units
+        if: always()
+        timeout-minutes: 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          if sudo --non-interactive test -d "$PAIR_ROOT_OUTPUT"; then
+            sudo --non-interactive /usr/bin/env -i PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 \
+              /bin/bash "$GITHUB_WORKSPACE/.github/scripts/lampos-records-pair.sh" collect \
+              --artifacts "$PAIR_ARTIFACTS" --evidence "$PAIR_EVIDENCE" --root-output "$PAIR_ROOT_OUTPUT"
+          fi
+      - name: verify source unchanged even after a failed fixture
+        timeout-minutes: 2
+        if: always()
+        shell: bash
+        run: |
+          if test -f "$PAIR_EVIDENCE/source-before.json"; then
+            bash .github/scripts/lampos-records-pair.sh source \
+              --workspace "$GITHUB_WORKSPACE" --evidence "$PAIR_EVIDENCE" --phase after
+          fi
+      - uses: actions/upload-artifact@v4
+        timeout-minutes: 3
+        if: always()
+        with:
+          name: lampos-records-pair-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/records-pair-evidence
+          if-no-files-found: error
+          retention-days: 7
