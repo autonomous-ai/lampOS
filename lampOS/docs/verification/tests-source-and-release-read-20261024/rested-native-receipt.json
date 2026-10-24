@@ -1,0 +1,137 @@
+{
+  "head": "b76fe12ae98c1ac2bd284dae347ab42bb3816776",
+  "run": 40056359883,
+  "job": 120760101535,
+  "counts": {
+    "passed": 4,
+    "failed": 2,
+    "ignored": 0,
+    "filtered": 0
+  },
+  "artifact_id": 12545721799,
+  "artifact_zip_bytes": 630127,
+  "artifact_zip_sha256": "4c6810ac1d687095477f63c8b6a3ea34eae30ad4350e61cfd8144d6ef3467eff",
+  "extracted_regular_files": 316,
+  "raw_log_sha256": "e1047a14427fff93a1f0599ce0c255d1995d6a0ffd36241078a9c4218b8df91b",
+  "retained_failure_bytes": [
+    142885,
+    148704
+  ],
+  "cases": [
+    {
+      "case": "kn-6iFfa5",
+      "records": 60,
+      "last_event": {
+        "event": "snapshot",
+        "files": [
+          {
+            "bytes": 22118,
+            "file": "daily.json",
+            "mode": 384,
+            "sha256": "db695c636fe0b55d60fc44771f2cc9e5b0082134ccc05610149284f881b3a1aa"
+          },
+          {
+            "bytes": 19,
+            "file": "rested",
+            "mode": 420,
+            "sha256": "ca9a8a44196f47452fad3060f0aaa14c2528d0c7c0262bc963e2c80b36b26aef"
+          },
+          {
+            "absent": true,
+            "file": "on"
+          },
+          {
+            "absent": true,
+            "file": "off"
+          },
+          {
+            "bytes": 75,
+            "file": "SKILL.md",
+            "sha256": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+            "unchanged": true
+          },
+          {
+            "bytes": 1288,
+            "file": "skill.toml",
+            "sha256": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+            "unchanged": true
+          }
+        ],
+        "name": "after-a"
+      },
+      "reaped": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10068,
+          "signal": 9,
+          "stage": "a"
+        }
+      ],
+      "started_stages": [
+        "a"
+      ]
+    },
+    {
+      "case": "kn-cJ2RNS",
+      "records": 60,
+      "last_event": {
+        "event": "snapshot",
+        "files": [
+          {
+            "bytes": 22118,
+            "file": "daily.json",
+            "mode": 384,
+            "sha256": "db695c636fe0b55d60fc44771f2cc9e5b0082134ccc05610149284f881b3a1aa"
+          },
+          {
+            "bytes": 19,
+            "file": "rested",
+            "mode": 420,
+            "sha256": "ca9a8a44196f47452fad3060f0aaa14c2528d0c7c0262bc963e2c80b36b26aef"
+          },
+          {
+            "absent": true,
+            "file": "on"
+          },
+          {
+            "absent": true,
+            "file": "off"
+          },
+          {
+            "bytes": 75,
+            "file": "SKILL.md",
+            "sha256": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+            "unchanged": true
+          },
+          {
+            "bytes": 1288,
+            "file": "skill.toml",
+            "sha256": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27",
+            "unchanged": true
+          }
+        ],
+        "name": "after-a"
+      },
+      "reaped": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10104,
+          "signal": 9,
+          "stage": "a"
+        }
+      ],
+      "started_stages": [
+        "a"
+      ]
+    }
+  ],
+  "finding": "Persistent bus root/b collides with stage b before opposite reader starts; both traces end at after-a.",
+  "not_shown": [
+    "opposite released reader B",
+    "returning released reader A",
+    "physical output",
+    "elapsed overnight"
+  ]
+}

@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 10:08 +0700 — current-source audit and rested-reader fixture finding
+
+Ready for lamp-voice: no; matched qualification and native checks remain.
+
+[Source and release-reader audit](verification/tests-source-and-release-read-20261024/) records the 24-path integration delta, unchanged dependency scope, #3327's native 4/2 setup failure and its exact directory collision. The failed head and source-bound artifact remain retained; B and returning A never ran. Second owns the correction, while the independent source read found no additional concrete P1/P2.
+
+The frozen #3190 tests ended with summary counts 7,219 passed, 17 failed and 34 ignored. The runner stopped on one Voice-eval case whose printed child JSON split its libtest result row; the original raw bytes contain the case and its `ok`. Census recovery is being audited from that retained output without repeating tests; workspace build/diff gates were not yet run at this entry. These counts are not a completed-gate claim. The sign-in fixture ownership corrections and refreshed unapplied control remain uncompiled; no local ARM build or lamp action ran.
+
 ## 2026-10-24 09:46 +0700 — corrected release-pair native evidence read
 
 Ready for lamp-voice: no; own qualification continues and #3312 still needs its current carry/fold.

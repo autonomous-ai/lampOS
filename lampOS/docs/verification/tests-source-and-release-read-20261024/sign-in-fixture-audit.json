@@ -1,0 +1,17 @@
+{
+  "checked_utc": "2026-10-24T03:05:51.213393+00:00",
+  "source_only": true,
+  "compiled": false,
+  "tested": false,
+  "formatting_pending_after_test_only_edit": true,
+  "voice_sign_in_sha256": "ae7fe529dc1b1b418701204f460f7cc7045e0404317b8cc9c3f2c7a0bc3a95a6",
+  "fixes": [
+    "Four existing sign-in mock scripts now use the owned CodeReplies server, retaining their reply sequence and assertions.",
+    "OwnedSignInRead joins the existing asynchronous privacy read on normal return or unwinding."
+  ],
+  "product_prefix_unchanged_from_previous_draft": true,
+  "control": "legacy-continuation-control-v3",
+  "control_applied": false,
+  "control_executed": false,
+  "generator_preflight_failure": "v2 guard selected an earlier cfg(test) helper rather than the test module; aborted before writing source/patch files or modifying the worktree. v3 compares the whole test module and git apply --check passed."
+}
