@@ -1,0 +1,8 @@
+{
+  "code": null,
+  "event": "reaped",
+  "pid": 6569,
+  "reaped": true,
+  "signal": 9,
+  "stage": "return-a"
+}

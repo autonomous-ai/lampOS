@@ -1,0 +1,75 @@
+{
+  "head": "63e2d963d1d0ec4b9ee341e5be144e8518ecc2ee",
+  "tested_merge": "cf24eb8c168293774965849dab6f3c31f04d0350",
+  "run": 40070948285,
+  "passed": 2,
+  "failed": 0,
+  "ignored": 0,
+  "filtered": 2,
+  "source_comparison": {
+    "files": 6994,
+    "before_after_identical": true,
+    "matches_tested_merge_blobs": true,
+    "manifest_sha256": "355b039dbee32082dd477603eaf9dbdeff1ac591b7eb5611b4803d943311dfcd"
+  },
+  "cases": [
+    {
+      "directory": "cp-BG74n1",
+      "test": "release_6498_keeps_6408_caps_and_6408_reads_its_changes",
+      "writer": 6408,
+      "reader": 6498,
+      "return_reader": 6408,
+      "owned_signal9_reaps": 3,
+      "rpc_count": 33,
+      "mutations": 10,
+      "accepted_exact_noops": 4,
+      "refusals": {
+        "conflict": 1,
+        "stale": 2,
+        "token_mismatch": 2,
+        "bad_arguments": 1
+      },
+      "caps_get_snapshots": 13,
+      "fresh_publisher_sessions": 3,
+      "published_snapshots": 13,
+      "sqlite_copies_verified": 29,
+      "live_sqlite_verified": 1,
+      "final_revision": 10,
+      "final_cancelled_sources": 4,
+      "max_rpc_us": 1850,
+      "total_rpc_us": 17012,
+      "transcript_sha256": "af36ab8dc60dd44f6914b3b75b490209c081e5a60078845b0f2fd0bedf1c7a60",
+      "result_sha256": "1e75513488eed854b9044e48ee4e75fe8d09f97f6dc5b688a2e15ba1a0ccedbf"
+    },
+    {
+      "directory": "cp-wP6Iwj",
+      "test": "release_6408_keeps_6498_caps_and_6498_reads_its_changes",
+      "writer": 6498,
+      "reader": 6408,
+      "return_reader": 6498,
+      "owned_signal9_reaps": 3,
+      "rpc_count": 33,
+      "mutations": 10,
+      "accepted_exact_noops": 4,
+      "refusals": {
+        "conflict": 1,
+        "stale": 2,
+        "token_mismatch": 2,
+        "bad_arguments": 1
+      },
+      "caps_get_snapshots": 13,
+      "fresh_publisher_sessions": 3,
+      "published_snapshots": 13,
+      "sqlite_copies_verified": 29,
+      "live_sqlite_verified": 1,
+      "final_revision": 10,
+      "final_cancelled_sources": 4,
+      "max_rpc_us": 1890,
+      "total_rpc_us": 18015,
+      "transcript_sha256": "ec5bd73192d87d2eed2221f366c76a144af13fa1015546694f4f25a7ab626645",
+      "result_sha256": "ec8ec2da1a00a4d4b39f53eb7cb7114a1e4ca321e09469afc138b7131d803076"
+    }
+  ],
+  "archive_sha256": "ce96360f4e9cf9eefae261c40e6d6cfc72a602c315e758cc325d1c25ed587030",
+  "scope": "same independent SQLite/RPC/state replay as original audit; ordinary controls execute in Mac/ordinary gates, filtered here"
+}

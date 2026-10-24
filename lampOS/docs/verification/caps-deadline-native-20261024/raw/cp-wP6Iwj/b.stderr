@@ -1,0 +1,9 @@
+lamp-actions: output cap snapshot published
+lamp-actions: serving; can do now: 
+lamp-actions: caps_put: accepted in 0 ms
+lamp-actions: caps_put: conflict in 0 ms
+lamp-actions: caps_put: stale in 0 ms
+lamp-actions: caps_remove: token_mismatch in 0 ms
+lamp-actions: caps_put: bad_arguments in 0 ms
+lamp-actions: caps_put: accepted in 1 ms
+lamp-actions: caps_remove: accepted in 1 ms

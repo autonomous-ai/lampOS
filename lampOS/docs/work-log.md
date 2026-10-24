@@ -1,3 +1,49 @@
+## Current checkpoint: 2026-10-24 13:43 +07, four qualification PRs advance
+
+#3312 and #3323 landed through trains 71 and 70. The unpublished reminder
+carry's Voice reports-consent failure is retained separately in
+[carry gates](verification/current-carry-gates-20261024/README.md), without
+claiming a base comparison or overwriting the landed branch.
+
+#3327 `fe04835b0` and #3330 `618644e2a` are ready for renewed review after
+parent integration. Both: Mac **514/0/7 ignored**, fmt and strict Skills
+Clippy pass; dedicated native **6/0/0 ignored**; ordinary ARM **7,348 PASS +
+1 LEAK**, zero failures, 47 skipped; strict Linux Clippy green. Exact Linux
+formatting preserves 6,974 authored files. Their tested previews additionally
+contain the newer base; all 6,992 captured source hashes match those previews.
+[Current native proof](verification/skills-carry-native-20261024/).
+The carry range-diffs preserve fixture/workflow bytes and update historical
+wording. Current confirmation is requested from the prior readers.
+
+#3334 `63e2d963d` fixes the reviewers' absolute-reply-deadline P2. Partial
+bytes cannot renew the original case/step/two-second I/O deadline. A dribbling
+peer and complete response run as ordinary controls. Mac **122/0/2 ignored**,
+fmt and strict Actions Clippy pass, 6,994 source hashes unchanged. Exact Linux
+fmt passes with cleanup verified. Dedicated native **2/0/0 ignored/2 filtered**
+and strict Linux Clippy pass; ordinary ARM64 is active. Prior fast native
+results remain separate. Renewed review is requested before the HOLD clears.
+[Corrected native proof](verification/caps-deadline-native-20261024/README.md).
+
+#3342 `2ad786f91` covers the claimed actual Cloud provenance consumer.
+Mac **196/0/4 ignored**, fmt and strict Cloud Clippy pass; exact Linux fmt
+preserves 6,973 files, cleanup verified. Dedicated official ARM64 **2/0**
+and strict Linux Clippy pass; ordinary ARM64 is active. Each direction has
+seven matching owned exits, nine actual MQTT replies and four synthetic
+metadata controls. Private network-none/read-only container isolation and
+owned removal verify. Source hashes match the tested preview; one legacy
+symlink was hashed through its target, with that limitation explicit.
+[Cloud native proof](verification/cloud-provenance-native-20261024/README.md).
+One independent reader is requested; no physical or signing qualification.
+
+The Queue's 12:29 audit decision is in force: no HOLD merely for base drift,
+one reader for these test-only changes, and status goes in this log rather
+than Queue comments. Actual conflicts still get resolved. The Actions
+updates paragraph conflict was resolved by retaining both paragraphs.
+#1812 still waits on a trusted signing key; #2810 on an attended lamp window.
+Neither wait stops software work. No lamp is held or accessed by Second.
+
+---
+
 ## Current checkpoint: 2026-10-24 11:03 +07, Actions pair passes and Cloud consumer taken
 
 Ready for lamp-voice: #3312 and #3323, with current independent reads and all
