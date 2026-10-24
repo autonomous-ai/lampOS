@@ -1,0 +1,11 @@
+auth	auth	status	--json
+machines	machines	--json
+new	new	claude	--machine	0123456789abcdef0123456789abcdef	/fixture/project	--name	lamp-b69c3d2748be4414c6aa9b02b7453b91	--mode	auto	--json	--task	Pair working
+show	show	--machine	0123456789abcdef0123456789abcdef	11111111-1111-4111-8111-111111111111	--chars	4000	--json
+machines	machines	--json
+new	new	claude	--machine	0123456789abcdef0123456789abcdef	/fixture/project	--name	lamp-30bb818e967f3201bf5b32435c5374dd	--mode	auto	--json	--task	Pair answered
+show	show	--machine	0123456789abcdef0123456789abcdef	22222222-2222-4222-8222-222222222222	--chars	4000	--json
+machines	machines	--json
+new	new	claude	--machine	0123456789abcdef0123456789abcdef	/fixture/project	--name	lamp-7269ce2f70ae12a965120b0eb101158b	--mode	auto	--json	--task	Pair blocked
+auth	auth	status	--json
+auth	auth	status	--json

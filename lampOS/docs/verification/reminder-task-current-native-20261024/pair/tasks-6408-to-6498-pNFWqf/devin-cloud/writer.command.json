@@ -1,0 +1,30 @@
+{
+  "arguments": [
+    "serve",
+    "--enable",
+    "--dir",
+    "/tmp/pair-output/tasks-6408-to-6498-pNFWqf/devin-cloud/store",
+    "--socket",
+    "/tmp/ltp-TFaEN0/public",
+    "--voice-socket",
+    "/tmp/ltp-TFaEN0/voice",
+    "--targets",
+    "/tmp/pair-output/tasks-6408-to-6498-pNFWqf/devin-cloud/targets.json",
+    "--harness",
+    "/tmp/pair-output/tasks-6408-to-6498-pNFWqf/devin-cloud/home/harness",
+    "--bus-root",
+    "/tmp/ltp-TFaEN0/bus",
+    "--boot-id",
+    "release-pair-boot",
+    "--run-for-ms",
+    "60000",
+    "--no-watch",
+    "--set-up-later"
+  ],
+  "release": 6408,
+  "sha256": "7286dde761ab03155d0f867c3c8965759a010c5434e52df7d16756b32bbea003",
+  "socket_parent": {
+    "mode": 448,
+    "uid": 0
+  }
+}

@@ -1,3 +1,40 @@
+## Current checkpoint: 2026-10-24 10:26 +07, current native pairs green and package continuation opened
+
+Ready for lamp-voice: yes (#3323); #3312 awaits its second current read.
+
+These are explicitly selected verification fixtures, with no runtime or default
+behavior change. #3323 `6c8c52e37` has both current-head READ-OKs and all native
+gates green. [Current proof](verification/routine-state-current-native-20261024/README.md):
+dedicated **4/0**, ordinary ARM **11,163 PASS + 1 known LEAK**, zero failed,
+75 skipped; Mac **514/0/5 ignored**, strict Clippy and Linux formatting pass.
+The train owns integration; no direct merge is attempted.
+
+#3312 `4ba9d959f` has green dedicated **12/0**, ordinary ARM and Linux Clippy.
+All 6,977 authored source hashes, process reaps and snapshots verify; ordinary
+ARM is **11,163 PASS + 1 known LEAK**, zero failed, 83 skipped.
+[Current native proof](verification/reminder-task-current-native-20261024/README.md). Current Mac coverage **4,411 unique passes**
+includes an unchanged Voice ring `StaleOwner` failure and its isolated pass,
+retained separately rather than presented as an uninterrupted green suite.
+
+#3327 `8bc821736` resolves the first native run's private-directory collision.
+Corrected dedicated **6/0**, ordinary ARM and Linux Clippy are green; the
+first **4/2** run stays retained. Mac **514/0/7 ignored** and exact-head Linux
+fmt pass. Final evidence publication and reads proceed while the parent lands.
+
+#3330 `22e5f4873` adds two actual released package/installable-folder cases,
+using offline `pack/install/list` and seven refusal controls per reader.
+Mac fmt, strict Skills Clippy and **514/0/7 ignored** pass. Exact-head Linux
+fmt preserves 6,974 files, cleanup verified. Official dedicated/ordinary/Clippy
+runs have started. No native package result is claimed. Parent #3323 lands
+before this continuation is rebased and offered to the train.
+
+#1812 still needs the independently trusted signing key; #2810 still needs
+an attended lamp window. Neither wait stops these software qualifications.
+Next: finish publication and own-PR findings, the requested independent #3329
+Records read, then the next unclaimed ship-critical qualification boundary.
+
+---
+
 ## Current checkpoint: 2026-10-24 08:43 +07, published reminder/task PR open
 
 #3312 is ready for reads at `3e6248467`, on current `88b1ad796`.

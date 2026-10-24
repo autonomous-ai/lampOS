@@ -1,0 +1,13 @@
+{
+  "boundary": "released delivery-ledger consumer; authored Schedule API and completion; no audio",
+  "cut": "unfinished",
+  "reader": 6408,
+  "reader_bytes": 28375944,
+  "reader_sha256": "af7cd0d1e384ebddcca2b58eea94176c80aba573a5f47f4cd95cc8ce1a7ad084",
+  "reader_source": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb",
+  "return_reader": 6498,
+  "writer": 6498,
+  "writer_bytes": 28403184,
+  "writer_sha256": "67ab7d3fd77bca2b6e5cf962bc0ec7a7db3520de1de3620f25e3899cb3a5a1f2",
+  "writer_source": "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+}

@@ -1,0 +1,11 @@
+{
+  "6408": {
+    "bytes": 4493144,
+    "sha256": "10ff8a223ad58da2afba2fa798bf9b07199c6af05fa0ffc678b8d714e49b7570"
+  },
+  "6498": {
+    "bytes": 4493144,
+    "sha256": "10ff8a223ad58da2afba2fa798bf9b07199c6af05fa0ffc678b8d714e49b7570"
+  },
+  "scope": "published Schedule payload is byte-identical; this pair is not a Schedule code-delta qualification"
+}

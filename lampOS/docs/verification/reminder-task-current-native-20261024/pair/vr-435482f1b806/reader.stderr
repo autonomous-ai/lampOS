@@ -1,0 +1,4 @@
+lamp-voice schedule-consumer: started
+lamp-voice schedule-consumer: due reminders available
+lamp-voice schedule-consumer: reminder id 1 delivery 1: said, waiting to be acknowledged
+lamp-voice schedule-consumer: reminder id 1 delivery 1: resolved (AckConfirmed { revision: 3 }), not offered
