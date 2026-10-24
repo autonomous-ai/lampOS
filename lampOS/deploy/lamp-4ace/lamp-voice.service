@@ -51,6 +51,7 @@ Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
 Environment=LAMP_SAY=on
 Environment=LAMP_SAY_GROUP=orangepi
 Environment=LAMP_FIRST_WORDS=kept
+Environment=LAMP_SOFT_START=on
 Environment=LAMP_OTHER_LANGUAGE=sorry
 Environment=LAMP_START_OFFLINE=on
 Environment=LAMP_HEAD_TOUCH=on

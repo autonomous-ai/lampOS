@@ -1,0 +1,28 @@
+deployed 7bc8ebfebfcf4be36807203c64e7597a393ee79cd71658d2b50f264e8a84dd3d (lamp-voice pr3396 0b41ef825) at 2026-10-24T20:54:18Z, mute left as it was
+not muted
+active
+/opt/lampOS/releases/7bc8ebfebfcf4be36807203c64e7597a393ee79
+LAMP_FIRST_WORDS=kept
+LAMP_WAIT_KEEPS_ANSWER=on
+LAMP_SECOND_NAME_CARRIES=on
+{"muted":false}not muted
+arm 0: pause lines
+arm 0: owner set
+light saved: {"colour":"warm","level":1,"on":true}
+light before put-back: {"colour":"warm","level":1,"on":true} (saved {"colour":"warm","level":1,"on":true})
+light after put-back: {"colour":"warm","level":1,"on":true}
+active
+/opt/lampOS/releases/7bc8ebfebfcf4be36807203c64e7597a393ee79
+LAMP_FIRST_WORDS=kept
+LAMP_WAIT_KEEPS_ANSWER=on
+LAMP_SOFT_START=on
+LAMP_CALL_TAKES_NEXT_LINE=on
+LAMP_SECOND_NAME_CARRIES=on
+{"muted":false}not muted
+arm 1: pause lines
+arm 1: owner set
+light saved: {"colour":"warm","level":1,"on":true}
+light before put-back: {"colour":"warm","level":1,"on":true} (saved {"colour":"warm","level":1,"on":true})
+light after put-back: {"colour":"warm","level":1,"on":true}
+deployed c6da7c948d88dd4ab48bb9d1d470df2f9a6906ad56ded4904f96815b8fe0a8fa (lamp-voice 2e2eee360 (put back)) at 2026-10-24T21:30:10Z, mute left as it was
+not muted
