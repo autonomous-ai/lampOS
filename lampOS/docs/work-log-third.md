@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 09:03 — guarded enrollment pushed as #3318
+
+- Pushed `46c072c98` on `third/remember-speaking-face`, current base
+  `4a84fa5ab`. Exact 22 files; one-line commit, no attribution.
+- Full Mac Voice **3,977/0/15 ignored**; current-base Eyes **326/0/5 ignored**;
+  formatting and strict Clippy pass. Sixteen focused Voice privacy and
+  cancellation controls pass. [Gate receipt](verification/remember-speaking-face-20261024/README.md).
+- Posted PR/head on Queue #3126, requested assigned privacy/source reads
+  and Linux formatting. ARM64 40052552152 and Linux Clippy 40052552144 are
+  watched. No device action; #3276's Monday hand trial remains separate.
+- Sixth accepted the post-merge #3313 P2 and is making its correction;
+  activation and the 52e6 run wait for it. Third continues its gate watch
+  and takes the next eligible work under the owner's standing order.
+
 ## 2026-10-24 08:55 — post-merge speaking-outlier finding
 
 - Independent #3313 read reproduced a P2 after it merged: removing one

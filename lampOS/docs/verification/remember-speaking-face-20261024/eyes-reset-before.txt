@@ -1,0 +1,19 @@
+
+running 1 test
+remember_speaker::tests::a_line_crossing_a_hold_reset_or_forget_cannot_choose_its_later_occupant --- FAILED
+
+failures:
+
+---- remember_speaker::tests::a_line_crossing_a_hold_reset_or_forget_cannot_choose_its_later_occupant stdout ----
+
+thread 'remember_speaker::tests::a_line_crossing_a_hold_reset_or_forget_cannot_choose_its_later_occupant' (237736605) panicked at crates/eyes/src/remember_speaker.rs:404:67:
+called `Result::unwrap_err()` on an `Ok` value: Guard { face: "boot/f3", print: [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], hold: 2, arrived_us: 3100000, last_frame_us: None, failed: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    remember_speaker::tests::a_line_crossing_a_hold_reset_or_forget_cannot_choose_its_later_occupant
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 310 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-eyes --lib`

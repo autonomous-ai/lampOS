@@ -1,0 +1,102 @@
+{
+  "base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "source_before": {
+    "lampOS/crates/eyes/src/lib.rs": "cfbc105e7c8a045be90ca1e5572ca70436c589f067dca295d846ad41bfed7776",
+    "lampOS/crates/eyes/src/main.rs": "74931041ba21a7242039f451c874e8d66a0833ca196ca86c2212455490c3080f",
+    "lampOS/crates/eyes/src/remember_speaker.rs": "2de555e20c4431c1a0ca77c05bcc2a78ec29821c647fe7c6bb6539a8ee366fb7",
+    "lampOS/crates/eyes/src/who.rs": "5e3f7beebca16e7ef2acf1642863d518136fe27e1cef0e9d460f86532f3e1599",
+    "lampOS/crates/eyes/tests/remember_speaker.rs": "503572b3b18df61c54580ac8ee88b5104fc3f282b3c5bd8f49fa8438e27b5e2e",
+    "lampOS/crates/voice/src/known_faces.rs": "2892daf6061fd0b434aaf1a04d33a9b07f369aae07aa5006ddb34a6ccb64ba06",
+    "lampOS/crates/voice/src/lib.rs": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+    "lampOS/crates/voice/src/memory_scope.rs": "f37f1efb5580d70ebc2c16c4830bc4b98e208b01abc4e93c1b65bd0340914a01",
+    "lampOS/crates/voice/src/process/switch_census_tests.rs": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "f4c145a9cf53684997c39c5d110c26e9783ca1bc392aa44561e4ee046ae279a8",
+    "lampOS/crates/voice/src/remember.rs": "ffc50f75011e22fe83b78aa1bab3fb2fe12c8088758770f3b4bf8ffb6bf1d483",
+    "lampOS/crates/voice/src/remember_speaker.rs": "a6ddb53d368c90d6f1c905f3c27c4e03953e9653919297b702d44d5b50b8025e",
+    "lampOS/crates/voice/src/second_provider.rs": "d889f8e71430903237a944ec677ccaeea7227dd8fb2bdc80db61c3ba03d81881",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "1c9edec80a4e7558d5b04a96975c3bcd26d2fcc23cb8ff470242503bb162924d",
+    "lampOS/crates/voice/src/second_provider/tests/held_forget.rs": "16991e8bbbb3373702ea0748d2941078babd409a5e7168fb54edba8ec0a5e289",
+    "lampOS/crates/voice/src/second_provider/tests/remember_speaker.rs": "0262e1b9bf28d0316742c9f51a58211d803a01345d334a9c9cafd00419165d30",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "889bd22b144bc7d93361e87455b8018bfabeb15a8b9f3f9b67670af0bd338e3f",
+    "lampOS/crates/voice/src/speaking_faces.rs": "69b246d705ba365617e9e21dfcda49c9f265b7f2f295aad4f4075e3570cf1efe",
+    "lampOS/crates/voice/src/tools.rs": "2d6265c95b352806885931967972b3dc8295e193118e44f9c35a2e6b620c1545",
+    "lampOS/docs/eyes.md": "52704f53d10abe08de57837187645972922db045cd39a86d3675cbc4630e3cd5",
+    "lampOS/docs/reuse-decisions.md": "b2b3649d870cae582762a4e725eaa4ab77ad28e9288c67fa3231f1ce908f83c5",
+    "lampOS/docs/switches.md": "dd99216a8b13551028cc324ab4aa377ae37188a63359b7ce5bd29e7c5149b78c"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.884,
+      "log": "/private/tmp/third-remember-final-fmt.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 58.9,
+      "log": "/private/tmp/third-remember-final-clippy.log"
+    },
+    {
+      "name": "voice-tests",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit": 0,
+      "seconds": 531.827,
+      "log": "/private/tmp/third-remember-final-voice-tests.log"
+    }
+  ],
+  "source_after": {
+    "lampOS/crates/eyes/src/lib.rs": "cfbc105e7c8a045be90ca1e5572ca70436c589f067dca295d846ad41bfed7776",
+    "lampOS/crates/eyes/src/main.rs": "74931041ba21a7242039f451c874e8d66a0833ca196ca86c2212455490c3080f",
+    "lampOS/crates/eyes/src/remember_speaker.rs": "2de555e20c4431c1a0ca77c05bcc2a78ec29821c647fe7c6bb6539a8ee366fb7",
+    "lampOS/crates/eyes/src/who.rs": "5e3f7beebca16e7ef2acf1642863d518136fe27e1cef0e9d460f86532f3e1599",
+    "lampOS/crates/eyes/tests/remember_speaker.rs": "503572b3b18df61c54580ac8ee88b5104fc3f282b3c5bd8f49fa8438e27b5e2e",
+    "lampOS/crates/voice/src/known_faces.rs": "2892daf6061fd0b434aaf1a04d33a9b07f369aae07aa5006ddb34a6ccb64ba06",
+    "lampOS/crates/voice/src/lib.rs": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+    "lampOS/crates/voice/src/memory_scope.rs": "f37f1efb5580d70ebc2c16c4830bc4b98e208b01abc4e93c1b65bd0340914a01",
+    "lampOS/crates/voice/src/process/switch_census_tests.rs": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "f4c145a9cf53684997c39c5d110c26e9783ca1bc392aa44561e4ee046ae279a8",
+    "lampOS/crates/voice/src/remember.rs": "ffc50f75011e22fe83b78aa1bab3fb2fe12c8088758770f3b4bf8ffb6bf1d483",
+    "lampOS/crates/voice/src/remember_speaker.rs": "a6ddb53d368c90d6f1c905f3c27c4e03953e9653919297b702d44d5b50b8025e",
+    "lampOS/crates/voice/src/second_provider.rs": "d889f8e71430903237a944ec677ccaeea7227dd8fb2bdc80db61c3ba03d81881",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "1c9edec80a4e7558d5b04a96975c3bcd26d2fcc23cb8ff470242503bb162924d",
+    "lampOS/crates/voice/src/second_provider/tests/held_forget.rs": "16991e8bbbb3373702ea0748d2941078babd409a5e7168fb54edba8ec0a5e289",
+    "lampOS/crates/voice/src/second_provider/tests/remember_speaker.rs": "0262e1b9bf28d0316742c9f51a58211d803a01345d334a9c9cafd00419165d30",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "889bd22b144bc7d93361e87455b8018bfabeb15a8b9f3f9b67670af0bd338e3f",
+    "lampOS/crates/voice/src/speaking_faces.rs": "69b246d705ba365617e9e21dfcda49c9f265b7f2f295aad4f4075e3570cf1efe",
+    "lampOS/crates/voice/src/tools.rs": "2d6265c95b352806885931967972b3dc8295e193118e44f9c35a2e6b620c1545",
+    "lampOS/docs/eyes.md": "52704f53d10abe08de57837187645972922db045cd39a86d3675cbc4630e3cd5",
+    "lampOS/docs/reuse-decisions.md": "b2b3649d870cae582762a4e725eaa4ab77ad28e9288c67fa3231f1ce908f83c5",
+    "lampOS/docs/switches.md": "dd99216a8b13551028cc324ab4aa377ae37188a63359b7ce5bd29e7c5149b78c"
+  }
+}

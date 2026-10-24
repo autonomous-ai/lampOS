@@ -1,0 +1,25 @@
+    Blocking waiting for file lock on build directory
+   Compiling lamp-voice v0.1.0 (/private/tmp/third-remember-speaking-face/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 40s
+     Running unittests src/lib.rs (/private/tmp/third-remember-voice-target/debug/deps/lamp_voice-6afccc7ec26c06bc)
+
+running 16 tests
+test remember_speaker::tests::remember_speaker_expiry_and_forget_remove_stored_and_in_flight_evidence ... ok
+test process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments ... ok
+test remember_speaker::tests::remember_speaker_is_an_exact_opt_in_and_is_passed_to_tool_routing ... ok
+test speaking_faces::tests::remember_speaker_requires_positive_evidence_in_one_boot_and_the_whole_window ... ok
+test speaking_faces::tests::remember_speaker_rejects_a_competitor_seen_once ... ok
+test remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation ... ok
+test remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire ... ok
+test remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating ... ok
+test second_provider::tests::remember_speaker::remember_speaker_without_a_live_request_scope_never_records_evidence ... ok
+test remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket ... ok
+test remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence ... ok
+test remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect ... ok
+test remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry ... ok
+test second_provider::tests::remember_speaker::remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enrollment ... ok
+test second_provider::tests::remember_speaker::remember_speaker_records_an_ordinary_request_from_its_microphone_clock ... ok
+test second_provider::tests::remember_speaker::remember_speaker_count_only_never_records_enrollment_words_or_identity ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 3695 filtered out; finished in 0.06s
+

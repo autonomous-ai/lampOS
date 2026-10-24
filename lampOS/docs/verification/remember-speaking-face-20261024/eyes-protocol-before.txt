@@ -1,0 +1,20 @@
+
+running 2 tests
+. 1/2
+a_speaker_bound_enrollment_request_is_understood --- FAILED
+
+failures:
+
+---- a_speaker_bound_enrollment_request_is_understood stdout ----
+
+thread 'a_speaker_bound_enrollment_request_is_understood' (237596413) panicked at crates/eyes/tests/remember_speaker.rs:6:5:
+the guarded enrollment protocol is absent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_speaker_bound_enrollment_request_is_understood
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-eyes --test remember_speaker`

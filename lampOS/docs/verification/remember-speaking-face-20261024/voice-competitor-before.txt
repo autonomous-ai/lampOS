@@ -1,0 +1,25 @@
+    Blocking waiting for file lock on build directory
+   Compiling lamp-voice v0.1.0 (/private/tmp/third-remember-speaking-face/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 42s
+     Running unittests src/lib.rs (/private/tmp/third-remember-voice-target/debug/deps/lamp_voice-6afccc7ec26c06bc)
+
+running 1 test
+test speaking_faces::tests::remember_speaker_rejects_a_competitor_seen_once ... FAILED
+
+failures:
+
+---- speaking_faces::tests::remember_speaker_rejects_a_competitor_seen_once stdout ----
+
+thread 'speaking_faces::tests::remember_speaker_rejects_a_competitor_seen_once' (237706966) panicked at crates/voice/src/speaking_faces.rs:648:9:
+assertion `left == right` failed
+  left: Some("b/f1")
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    speaking_faces::tests::remember_speaker_rejects_a_competitor_seen_once
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3695 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`
