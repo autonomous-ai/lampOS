@@ -1,0 +1,86 @@
+{
+  "base": "6902cf8e203d165f63e73059d2747a9ec7002642",
+  "commands_executed": [
+    "ruby /private/tmp/fourth-linux-format-gate-validation-20261024/validate.rb",
+    "git diff --check",
+    "bash -n (four extracted Rust-setup/format scripts)"
+  ],
+  "workflows": [
+    {
+      "workflow": ".github/workflows/lampos-clippy.yml",
+      "job": "clippy",
+      "yaml_parse": true,
+      "format_command": "cargo +1.96.0 fmt --all --check",
+      "working_directory": "lampOS",
+      "rust_step_index": 2,
+      "format_step_index": 3,
+      "gate_step_index": 6,
+      "no_if_or_continue_on_error": true,
+      "pinned_rustfmt_component": true,
+      "all_unrelated_yaml_structure_exact_base": true,
+      "bash_syntax": [
+        {
+          "file": "/private/tmp/fourth-linux-format-gate-validation-20261024/clippy-rust-setup.sh",
+          "command": [
+            "bash",
+            "-n",
+            "/private/tmp/fourth-linux-format-gate-validation-20261024/clippy-rust-setup.sh"
+          ],
+          "exit": 0,
+          "sha256": "17b21dcf3559dd5cb8f8d3984504fd2ad7464fe0edce924788936bd9260cd92e"
+        },
+        {
+          "file": "/private/tmp/fourth-linux-format-gate-validation-20261024/clippy-format.sh",
+          "command": [
+            "bash",
+            "-n",
+            "/private/tmp/fourth-linux-format-gate-validation-20261024/clippy-format.sh"
+          ],
+          "exit": 0,
+          "sha256": "7c68a6b48a1c8736545cd5ab4119fd541a6139133ce17dfed120e21bd176dc3a"
+        }
+      ],
+      "sha256": "78b809e48005f1f853553e0604ac43dc664eb79c7adaf98f3a65e724df7c4b47"
+    },
+    {
+      "workflow": ".github/workflows/lampos-arm64.yml",
+      "job": "arm64",
+      "yaml_parse": true,
+      "format_command": "cargo +1.96.0 fmt --all --check",
+      "working_directory": "lampOS",
+      "rust_step_index": 3,
+      "format_step_index": 4,
+      "gate_step_index": 10,
+      "no_if_or_continue_on_error": true,
+      "pinned_rustfmt_component": true,
+      "all_unrelated_yaml_structure_exact_base": true,
+      "bash_syntax": [
+        {
+          "file": "/private/tmp/fourth-linux-format-gate-validation-20261024/arm64-rust-setup.sh",
+          "command": [
+            "bash",
+            "-n",
+            "/private/tmp/fourth-linux-format-gate-validation-20261024/arm64-rust-setup.sh"
+          ],
+          "exit": 0,
+          "sha256": "17b21dcf3559dd5cb8f8d3984504fd2ad7464fe0edce924788936bd9260cd92e"
+        },
+        {
+          "file": "/private/tmp/fourth-linux-format-gate-validation-20261024/arm64-format.sh",
+          "command": [
+            "bash",
+            "-n",
+            "/private/tmp/fourth-linux-format-gate-validation-20261024/arm64-format.sh"
+          ],
+          "exit": 0,
+          "sha256": "7c68a6b48a1c8736545cd5ab4119fd541a6139133ce17dfed120e21bd176dc3a"
+        }
+      ],
+      "sha256": "739e2f9f1bfb0853de03d69ccd0165f1686db3b683ebe50a7755799494f368e1"
+    }
+  ],
+  "english_vietnamese_command_and_version_match": true,
+  "cargo_or_container_or_target_actions": false,
+  "ci_result_claimed": false,
+  "staged_committed_or_pushed": false
+}

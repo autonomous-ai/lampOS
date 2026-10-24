@@ -1,0 +1,20 @@
+{
+  "head": "e36f065eb242ad904c21a30243ec3024f16b2fdc",
+  "base": "6902cf8e203d165f63e73059d2747a9ec7002642",
+  "pr": 3375,
+  "validation": "local YAML/shell/structural and Mac+direct pinned Linux formatting; CI pending",
+  "mac_exact_selector_exit": 0,
+  "linux_selector_initial_exit": 101,
+  "linux_direct_exit": 0,
+  "verified_linux_versions": {
+    "cargo": "1.96.0 (30a34c682 2026-05-25)",
+    "rustfmt": "1.9.0-stable (ac68faa20c 2026-05-25)"
+  },
+  "exact_validation_source_sha256": {
+    ".github/workflows/lampos-clippy.yml": "78b809e48005f1f853553e0604ac43dc664eb79c7adaf98f3a65e724df7c4b47",
+    ".github/workflows/lampos-arm64.yml": "739e2f9f1bfb0853de03d69ccd0165f1686db3b683ebe50a7755799494f368e1",
+    "lampOS/docs/ci-formatting.md": "f8e1f9cce909be7cf6569ebbc8da8a1f3a296f91d5c3d275459b523ba939db2b",
+    "lampOS/docs/vi/ci-formatting_vi.md": "c55edb928875bd702341b0f5d96675ffc4a370bb8fa1dfa4610707e9d3d36c06"
+  },
+  "source_files_exact_validated_commit": true
+}

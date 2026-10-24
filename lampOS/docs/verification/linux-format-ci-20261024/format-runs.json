@@ -1,0 +1,65 @@
+{
+  "boundary": "Exact pinned workflow format command on native Mac and offline Linux AMD64, source read-only in Linux; no build, Clippy, test or ARM64 claim; no target/registry cache mount",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "source_diff_sha256": "d3b4284a23ed1c5442d308bafe7b82d7ca23f7739bb012dc40fe1a5f39729a9a",
+  "runs": [
+    {
+      "platform": "mac",
+      "actual_command": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "pid": 24938,
+      "exit": 0,
+      "elapsed_seconds": 12.628722745999767,
+      "process_group_absent": true,
+      "source_diff_unchanged": true,
+      "source_status_unchanged": true
+    },
+    {
+      "platform": "linux",
+      "actual_command": [
+        "/usr/local/bin/podman",
+        "run",
+        "--rm",
+        "--pull=never",
+        "--name",
+        "fourth-ci-format-b84c9fdc1d79",
+        "--platform=linux/amd64",
+        "--user=1000:1000",
+        "--network=none",
+        "--read-only",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--tmpfs",
+        "/tmp:rw",
+        "-v",
+        "/private/tmp/fourth-linux-format-gate-20261024/lampOS:/src-ci-format:ro",
+        "-w",
+        "/src-ci-format",
+        "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "pid": 25086,
+      "exit": 101,
+      "elapsed_seconds": 0.3053519029999734,
+      "process_group_absent": true,
+      "container_cleanup_exit": 0,
+      "source_diff_unchanged": true,
+      "source_status_unchanged": true
+    }
+  ]
+}

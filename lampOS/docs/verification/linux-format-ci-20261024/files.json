@@ -1,0 +1,50 @@
+{
+  "README.md": {
+    "bytes": 2310,
+    "sha256": "b45c31cbd0ca130f293b70d58f22bbe93683c1bf3c613c09f5866ccdad5d94d8"
+  },
+  "arm64-format.sh": {
+    "bytes": 32,
+    "sha256": "7c68a6b48a1c8736545cd5ab4119fd541a6139133ce17dfed120e21bd176dc3a"
+  },
+  "arm64-rust-setup.sh": {
+    "bytes": 181,
+    "sha256": "17b21dcf3559dd5cb8f8d3984504fd2ad7464fe0edce924788936bd9260cd92e"
+  },
+  "clippy-format.sh": {
+    "bytes": 32,
+    "sha256": "7c68a6b48a1c8736545cd5ab4119fd541a6139133ce17dfed120e21bd176dc3a"
+  },
+  "clippy-rust-setup.sh": {
+    "bytes": 181,
+    "sha256": "17b21dcf3559dd5cb8f8d3984504fd2ad7464fe0edce924788936bd9260cd92e"
+  },
+  "final-head.json": {
+    "bytes": 979,
+    "sha256": "58543d1b99fdc1fcef6d731e33fe571e28601ac7b5d324db2bafb39fb4c7a665"
+  },
+  "format-runs-direct-linux.json": {
+    "bytes": 1572,
+    "sha256": "cb7c609dbff5bea280247f023dd023c6a8bbc3daab51220af5fa643a5b1e38a8"
+  },
+  "format-runs.json": {
+    "bytes": 1738,
+    "sha256": "19a2f357239e5e4d19c9af37e9eac13411dd64cd8446f99ba2729096b8bf3b04"
+  },
+  "linux-direct-format.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "linux-format.log": {
+    "bytes": 107,
+    "sha256": "27dadac09acce28d193cf5ae06ed3cb0b8e8e65dd537683621e13e2e42d37f83"
+  },
+  "mac-format.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "receipt.json": {
+    "bytes": 3112,
+    "sha256": "37861ef86caa203e25d91d5151dd86616edd837b4fdc0248ac04bf2f845f3c79"
+  }
+}
