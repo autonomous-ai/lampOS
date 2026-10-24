@@ -1,0 +1,36 @@
+   Compiling lamp-ipc v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/turn-owner)
+   Compiling lamp-local-time v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/local-time)
+   Compiling lamp-gemini v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/msgs)
+   Compiling lamp-camera v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/camera)
+   Compiling lamp-audio v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/turn-end-wire)
+   Compiling lamp-near-call v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/near-call)
+   Compiling lamp-keeper v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/keeper)
+   Compiling lamp-lean v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/lean)
+   Compiling lamp-schedule v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/schedule)
+   Compiling lamp-body v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/body)
+   Compiling lamp-health v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/controls)
+   Compiling lamp-actions v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/actions)
+   Compiling lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/expression)
+   Compiling lamp-tasks v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/tasks)
+   Compiling lamp-policy v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/policy)
+   Compiling lamp-ears v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/ears)
+    Finished `test` profile [unoptimized] target(s) in 2m 12s
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d)
+error: test failed, to rerun pass `-p lamp-voice --lib`
+     Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/lamp_voice-507b8ab98a2c94b0)
+     Running tests/it/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/it-ac9b9993d410d428)
+error: test failed, to rerun pass `-p lamp-voice --test it`
+     Running tests/release_pair.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/release_pair-92e5f959ae720155)
+     Running unittests examples/render_line_second.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/render_line_second-d52e8b12a523439f)
+     Running unittests examples/stop_words_stt_replay.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff)
+   Doc-tests lamp_voice
+error: 2 targets failed:
+    `-p lamp-voice --lib`
+    `-p lamp-voice --test it`

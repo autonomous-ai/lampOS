@@ -1,14 +1,14 @@
 {
-  "status": "private prepared UTF-8/JSON publication evidence; not a new test run",
+  "status": "Public raw evidence with root primary-stream supplement; original failed outcomes retained",
   "files": [
     {
       "path": "README.md",
-      "bytes": 5158,
-      "sha256": "c4c26e7dbfe4d5fb55362b627193285f97338951aaeeea6f3fe4e125da9e481a",
-      "original_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/publication/README.md",
-      "original_sha256": "c4c26e7dbfe4d5fb55362b627193285f97338951aaeeea6f3fe4e125da9e481a",
+      "bytes": 5538,
+      "sha256": "f5a1198334cc41b6a2e6f518e2ea599cc274d900355a172552f13f58aca4891e",
+      "original_path": "lampOS/target/tests-recovery/log/lampOS/docs/verification/tests-update-parent-qualification-20261024/README.md",
+      "original_sha256": "f5a1198334cc41b6a2e6f518e2ea599cc274d900355a172552f13f58aca4891e",
       "encoding": "UTF-8",
-      "role": "private publication prose, independent projection or non-executable source snapshot"
+      "role": "Public README updated by root to disclose original full-stream supplement"
     },
     {
       "path": "independent-count-projection.json",
@@ -2871,6 +2871,69 @@
       "original_sha256": "d0f2656bcf46208df0a67550eedb33e40769bf86dac0d930f90c17e78c9f37c8",
       "encoding": "UTF-8",
       "role": "private publication prose, independent projection or non-executable source snapshot"
+    },
+    {
+      "path": "original-full-run/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "bytes": 730189,
+      "sha256": "cbe6ce9881e55970bc842919589789ad689a15ffc03fe553d794c86367d88e75",
+      "original_path": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "original_sha256": "cbe6ce9881e55970bc842919589789ad689a15ffc03fe553d794c86367d88e75",
+      "encoding": "UTF-8",
+      "role": "Primary original full stream supplement; no rerun"
+    },
+    {
+      "path": "original-full-run/voice-default-parallel/voice-default-parallel.stderr.txt",
+      "bytes": 5286,
+      "sha256": "c5edfcd25c15e0088470993ac3710bd82bc686ec1d849dfc50f1c5a9d7257e96",
+      "original_path": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/voice-default-parallel/voice-default-parallel.stderr.txt",
+      "original_sha256": "c5edfcd25c15e0088470993ac3710bd82bc686ec1d849dfc50f1c5a9d7257e96",
+      "encoding": "UTF-8",
+      "role": "Primary original full stream supplement; no rerun"
+    },
+    {
+      "path": "original-full-run/voice-default-parallel/voice-default-parallel.json",
+      "bytes": 1306,
+      "sha256": "6cbc43bdd8a2dc5e22d4baff283616b8b001c2abe06ae5595b4227a3caf9c5df",
+      "original_path": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/voice-default-parallel/voice-default-parallel.json",
+      "original_sha256": "6cbc43bdd8a2dc5e22d4baff283616b8b001c2abe06ae5595b4227a3caf9c5df",
+      "encoding": "UTF-8",
+      "role": "Primary original full stream supplement; no rerun"
+    },
+    {
+      "path": "original-full-run/readers-default-parallel/readers-default-parallel.stdout.txt",
+      "bytes": 768698,
+      "sha256": "2044be052f874cf646f47ab067fde9b7d6f5bb92d4eb7722b08a56833e08f1c6",
+      "original_path": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+      "original_sha256": "2044be052f874cf646f47ab067fde9b7d6f5bb92d4eb7722b08a56833e08f1c6",
+      "encoding": "UTF-8",
+      "role": "Primary original full stream supplement; no rerun"
+    },
+    {
+      "path": "original-full-run/readers-default-parallel/readers-default-parallel.stderr.txt",
+      "bytes": 62898,
+      "sha256": "32b792d213534d2a92438bb60231f1cd3a5d5085669bc6d539e3a3f27a6c2af6",
+      "original_path": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stderr.txt",
+      "original_sha256": "32b792d213534d2a92438bb60231f1cd3a5d5085669bc6d539e3a3f27a6c2af6",
+      "encoding": "UTF-8",
+      "role": "Primary original full stream supplement; no rerun"
+    },
+    {
+      "path": "original-full-run/readers-default-parallel/readers-default-parallel.json",
+      "bytes": 1599,
+      "sha256": "39dc67c8d45d975e57f004db69b76144d6e73fbe4a8e30f3b916a48248415d83",
+      "original_path": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.json",
+      "original_sha256": "39dc67c8d45d975e57f004db69b76144d6e73fbe4a8e30f3b916a48248415d83",
+      "encoding": "UTF-8",
+      "role": "Primary original full stream supplement; no rerun"
+    },
+    {
+      "path": "original-full-stream-supplement.json",
+      "bytes": 2591,
+      "sha256": "b1ed21ea348285afff5845eb85090e2f7fcd0c12cdf960e10a136c964e2c5974",
+      "original_path": "lampOS/target/tests-recovery/log/lampOS/docs/verification/tests-update-parent-qualification-20261024/original-full-stream-supplement.json",
+      "original_sha256": "b1ed21ea348285afff5845eb85090e2f7fcd0c12cdf960e10a136c964e2c5974",
+      "encoding": "UTF-8",
+      "role": "Primary original full stream supplement; no rerun"
     }
   ],
   "file_count": 319,

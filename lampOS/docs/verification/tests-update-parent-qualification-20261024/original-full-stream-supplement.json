@@ -1,0 +1,42 @@
+{
+  "historical_result": "FAILED7300/10/52 unchanged",
+  "copied_primary_streams_and_command_records": [
+    {
+      "copied": "original-full-run/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "original": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/voice-default-parallel/voice-default-parallel.stdout.txt",
+      "sha256": "cbe6ce9881e55970bc842919589789ad689a15ffc03fe553d794c86367d88e75",
+      "bytes": 730189
+    },
+    {
+      "copied": "original-full-run/voice-default-parallel/voice-default-parallel.stderr.txt",
+      "original": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/voice-default-parallel/voice-default-parallel.stderr.txt",
+      "sha256": "c5edfcd25c15e0088470993ac3710bd82bc686ec1d849dfc50f1c5a9d7257e96",
+      "bytes": 5286
+    },
+    {
+      "copied": "original-full-run/voice-default-parallel/voice-default-parallel.json",
+      "original": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/voice-default-parallel/voice-default-parallel.json",
+      "sha256": "6cbc43bdd8a2dc5e22d4baff283616b8b001c2abe06ae5595b4227a3caf9c5df",
+      "bytes": 1306
+    },
+    {
+      "copied": "original-full-run/readers-default-parallel/readers-default-parallel.stdout.txt",
+      "original": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stdout.txt",
+      "sha256": "2044be052f874cf646f47ab067fde9b7d6f5bb92d4eb7722b08a56833e08f1c6",
+      "bytes": 768698
+    },
+    {
+      "copied": "original-full-run/readers-default-parallel/readers-default-parallel.stderr.txt",
+      "original": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.stderr.txt",
+      "sha256": "32b792d213534d2a92438bb60231f1cd3a5d5085669bc6d539e3a3f27a6c2af6",
+      "bytes": 62898
+    },
+    {
+      "copied": "original-full-run/readers-default-parallel/readers-default-parallel.json",
+      "original": "lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/full-gates/run/readers-default-parallel/readers-default-parallel.json",
+      "sha256": "39dc67c8d45d975e57f004db69b76144d6e73fbe4a8e30f3b916a48248415d83",
+      "bytes": 1599
+    }
+  ],
+  "all_ten_excerpt_offsets_independently_verified": true
+}

@@ -4318,3 +4318,9 @@ Ready for lamp-voice: no
 Ready for lamp-voice: no
 
 Update #3403 and NoPause #3404 are separate pushed drafts on427. Update Linux formatting/strict Clippy40118324982 passed; ARM40118324976 remains pending. NoPause ARM40118961257 and LinuxClippy40118961251 are pending. Current-base local qualification is prepared on both frozen current sources; Update’s one supported clean/no-run is active before its full gate, and NoPause prepare-only passed with no target mutation. The broader shared-clock API is proposed concretely to First on Queue6387680211; no implementation proceeds without that scope decision. Four immediately preceding entry times were corrected to their actual commit timestamps. No local ARM build or device action.
+
+## 25 October, 01:12 — Original Update full streams added
+
+Ready for lamp-voice: no
+
+The [qualification evidence](verification/tests-update-parent-qualification-20261024/) now also publishes unchanged primary full Voice/readers stdout/stderr and original command receipts, addressing the reader’s independent-reprojection limit. All stream hashes/lengths and ten failure-excerpt byte offsets verify. The original 7,300/10/52 stays failed; no run was repeated. Root notes the historical319-file manifest is superseded by the explicit326-payload supplemented manifest while the earlier commit remains unchanged.

@@ -317,5 +317,10 @@ run/metadata/metadata.stdout.txt
 run/parent-bindings.json
 run/sealed-outputs.json
 source-protocol-snapshots.json
-manifest.json
-FILE_LIST.txt
+original-full-run/voice-default-parallel/voice-default-parallel.stdout.txt
+original-full-run/voice-default-parallel/voice-default-parallel.stderr.txt
+original-full-run/voice-default-parallel/voice-default-parallel.json
+original-full-run/readers-default-parallel/readers-default-parallel.stdout.txt
+original-full-run/readers-default-parallel/readers-default-parallel.stderr.txt
+original-full-run/readers-default-parallel/readers-default-parallel.json
+original-full-stream-supplement.json

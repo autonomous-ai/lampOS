@@ -72,3 +72,5 @@ budget with NoPause's separate two-job target. No globally isolated hardware,
 byte-identical Cargo-injected runtime-loader environment, ARM64 execution, or
 parallel-load reproduction is claimed. No source worktree or log branch was
 changed while preparing this publication bundle.
+
+Primary full Voice and reader stdout/stderr and their original command records are now included under `original-full-run/`. `original-full-stream-supplement.json` binds their original hashes/lengths. Root independently verified every published failure excerpt against its primary byte offset and stream hash. No run was repeated and the original failed full result is unchanged.
