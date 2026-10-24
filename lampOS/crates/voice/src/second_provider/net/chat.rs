@@ -1543,12 +1543,88 @@ data: [DONE]
         );
     }
 
+    /// Header-only GET fixture, using the same framing boundary as the TTS
+    /// mocks. TCP reads can split one request or contain several requests.
+    async fn kept_fixture_connection(
+        mut socket: tokio::net::TcpStream,
+        reply_after: std::time::Duration,
+        processed: Option<Arc<tokio::sync::Notify>>,
+    ) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut pending = Vec::new();
+        let mut read = [0; 4096];
+        loop {
+            let n = match socket.read(&mut read).await {
+                Ok(0) | Err(_) => return,
+                Ok(n) => n,
+            };
+            pending.extend_from_slice(&read[..n]);
+            while let Some(end) = pending.windows(4).position(|w| w == b"\r\n\r\n") {
+                if end + 4 > 4096 {
+                    return;
+                }
+                pending.drain(..end + 4);
+                if !reply_after.is_zero() {
+                    tokio::time::sleep(reply_after).await;
+                }
+                if socket
+                    .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
+            if pending.len() > 4096 {
+                return;
+            }
+            if let Some(processed) = processed.as_ref() {
+                processed.notify_one();
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn the_kept_fixture_answers_a_split_header_once_after_it_is_complete() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let processed = Arc::new(tokio::sync::Notify::new());
+        let server_processed = processed.clone();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            kept_fixture_connection(socket, std::time::Duration::ZERO, Some(server_processed))
+                .await;
+        });
+        let mut client = tokio::net::TcpStream::connect(address).await.unwrap();
+        client
+            .write_all(b"GET /v1/models HTTP/1.1\r\nHost: fixture\r\n")
+            .await
+            .unwrap();
+        // Observe a completed server read before sending the final separator,
+        // rather than hoping that two client writes became two TCP reads.
+        tokio::time::timeout(std::time::Duration::from_secs(2), processed.notified())
+            .await
+            .expect("the fixture did not read the incomplete header");
+        client.write_all(b"\r\n").await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut replies = Vec::new();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            client.read_to_end(&mut replies),
+        )
+        .await
+        .expect("the fixture did not finish after the write half closed")
+        .unwrap();
+        server.await.unwrap();
+        assert_eq!(replies, b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}");
+    }
+
     /// #2602 (`LAMP_SECOND_CHAT_KEPT`): a kept client lets an idle
     /// connection go after its idle limit, so the next request opens a new
     /// one; the default client reuses it.
     #[tokio::test]
     async fn a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it() {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
         async fn connections(kept: Option<std::time::Duration>) -> usize {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let address = listener.local_addr().unwrap();
@@ -1556,24 +1632,13 @@ data: [DONE]
             let accepted = count.clone();
             tokio::spawn(async move {
                 loop {
-                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let (socket, _) = listener.accept().await.unwrap();
                     accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    tokio::spawn(async move {
-                        let mut buffer = [0; 4096];
-                        while let Ok(n) = socket.read(&mut buffer).await {
-                            if n == 0 {
-                                return;
-                            }
-                            let body = "{}";
-                            let reply = format!(
-                                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{body}",
-                                body.len()
-                            );
-                            if socket.write_all(reply.as_bytes()).await.is_err() {
-                                return;
-                            }
-                        }
-                    });
+                    tokio::spawn(kept_fixture_connection(
+                        socket,
+                        std::time::Duration::ZERO,
+                        None,
+                    ));
                 }
             });
             let client = super::super::client_kept(kept).unwrap();
@@ -1608,7 +1673,6 @@ data: [DONE]
     /// the default keeps both and reuses them (2 in all).
     #[tokio::test]
     async fn a_kept_client_keeps_one_idle_connection_per_host() {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
         async fn connections(idle: Option<std::time::Duration>) -> usize {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let address = listener.local_addr().unwrap();
@@ -1616,22 +1680,14 @@ data: [DONE]
             let accepted = count.clone();
             tokio::spawn(async move {
                 loop {
-                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let (socket, _) = listener.accept().await.unwrap();
                     accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    tokio::spawn(async move {
-                        let mut buffer = [0; 4096];
-                        while let Ok(n) = socket.read(&mut buffer).await {
-                            if n == 0 {
-                                return;
-                            }
-                            // Slow enough that two asks overlap.
-                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-                            let reply = "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}";
-                            if socket.write_all(reply.as_bytes()).await.is_err() {
-                                return;
-                            }
-                        }
-                    });
+                    // Slow enough that two asks overlap, as before.
+                    tokio::spawn(kept_fixture_connection(
+                        socket,
+                        std::time::Duration::from_millis(50),
+                        None,
+                    ));
                 }
             });
             let client = super::super::client_kept(idle).unwrap();
