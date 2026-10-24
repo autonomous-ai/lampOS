@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-24 16:43 +07, published pairs landed
+
+Train 80 landed #3347 (Settings) at `9872cb692`; train 81 landed #3330
+(package continuation) at `7e82733e0`. Their cleared heads and exact gate
+counts remain in the entries below. No remaining author HOLD on either.
+
+Taken: #2809 Surround provider-candidate generation and operation-journal
+qualification on `second/surround-release-pair`, from `9872cb692`.
+Open/merged PRs and Queue claims checked before claiming. The actual
+6408/6498 Surround payloads and source trees are identical. The new fixture
+uses synthetic private Unix HTTP candidate saves, generated operation IDs,
+manifest/journal continuity, intentional generation collection and strict
+request/saved-state refusal controls. It selects or applies nothing.
+
+Mac formatting and strict Surround Clippy pass; scoped tests are running.
+The dedicated ARM64 workflow is prepared with network-none, a read-only
+root, private tmpfs and no host state mounts; official execution and an
+independent read remain pending. No released ARM executable runs locally.
+#2810 still needs the holder/person's attended lamp window and selected
+artifacts; #1812 still needs Migrate's trusted public key. No lamp, key,
+release or default voice behavior changed. Next: finish scoped tests, source
+review and exact Linux fmt, then push the draft and qualify official ARM64.
+
+---
+
 ## Current checkpoint: 2026-10-24 16:18 +07, both final carries cleared
 
 #3330 `6cba81532`: current Reviewer-two READ-OK, Mac **516/0/9 ignored**,
