@@ -1,0 +1,30 @@
+{
+  "native_session": 82213,
+  "terminal_exit": 0,
+  "head": "fc31e012334cda59eb3c489560454c515fb86386",
+  "profile_debug": 0,
+  "targets": [
+    {
+      "target": "lamp-voice-eval-it-53a6cb53a7",
+      "cases": 238,
+      "ignored": 0
+    },
+    {
+      "target": "lamp-voice-eval-lamp_voice_eval-00786c44f7",
+      "cases": 378,
+      "ignored": 0
+    },
+    {
+      "target": "lamp-voice-it-a564adb82f",
+      "cases": 275,
+      "ignored": 0
+    }
+  ],
+  "selected_names_unique_nonignored": 8,
+  "all9direct_waits_zero_groups_absent": true,
+  "source_fullmode_mtime_and_sealed_guards_passed": true,
+  "selected_bindings_sha256": "a0a2af9a5c02d8e87d22811ad738e643f0dd650dfe3f165f8f09438d13b809d9",
+  "observation_controller_sha256": "bdce346402c83d4fb59f0f0f58af08d95b102eaa84288dfc2c78fe077e6d85b0",
+  "observation_plan_sha256": "a4212137f56c3e7a157bf750d440d1c13450342e9670d878ee95f1820a095d12",
+  "observation_execution_ready": false
+}

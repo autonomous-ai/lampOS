@@ -1,0 +1,7 @@
+{
+  "recorded_at": "2026-10-24T21:45:24.919622+00:00",
+  "root_grant_sha256": "7eaa7606d7745c077fab06d2843a4a68932f8d0845af8a3d2147a992a5fa5d06",
+  "authorization": "Root explicitly grants this helper compile2 alongside actualCloud74966 compiler2 andNoPause30040 compiler2, aggregate maximum6 on distinct targets. Inherited/runtime CARGO_BUILD_JOBS4 unchanged, actual compile argv --jobs2. No observations until all compiled jobs close.",
+  "actual_helper_process_start": "Not yet launched; subsequent closed command receipts bind actual starts.",
+  "no_global_isolation_or_timing_claim": true
+}

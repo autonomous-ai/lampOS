@@ -1,0 +1,8 @@
+{
+  "full_graph_features_targets_equal": true,
+  "only_mapping": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/current-fc31-update-qualification/lampOS": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS"
+  },
+  "actual_sha256": "c8b4f33b7cfb555d9fadd461c5015ab5ed53d07b519fa8bc113dd3726679b293",
+  "no_runtime_code_equivalence_claim": true
+}

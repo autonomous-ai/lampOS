@@ -1,0 +1,113 @@
+{
+  "baseline_head": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "baseline_once": {
+    "passed": 8,
+    "failed": 0
+  },
+  "current_head": "fc31e012334cda59eb3c489560454c515fb86386",
+  "current_profile_debug": 0,
+  "current": {
+    "passed": 24,
+    "failed": 0,
+    "unrun": 0
+  },
+  "cases": [
+    {
+      "case_key": "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]",
+      "name": "physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]",
+      "name": "physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]",
+      "name": "physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]",
+      "name": "physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]",
+      "name": "physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]",
+      "name": "physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]",
+      "name": "physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason",
+      "repetitions": [
+        1,
+        2,
+        3
+      ],
+      "passed": 3,
+      "failed": 0,
+      "basis": "Three originally scheduled currentfc31 standalone observations; baselineoncePASS does not reproduce original failure."
+    }
+  ],
+  "qualification": "All8 have3/3alone on actualfc31; no baseline failure phase matched; old full remainsFAILED/no cause claim."
+}

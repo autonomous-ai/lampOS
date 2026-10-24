@@ -1,0 +1,6 @@
+
+running 1 test
+test voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 2.66s
+

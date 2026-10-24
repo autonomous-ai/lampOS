@@ -1,0 +1,74 @@
+{
+  "native": 36124,
+  "terminal_exit_code": 0,
+  "variant": "base-update0",
+  "head": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174",
+  "local_artifact_rows": 136,
+  "fresh_false": 136,
+  "compiler_messages": 444,
+  "unique_contexts": 438,
+  "sealed_outputs": 172,
+  "frozen_bindings": 99,
+  "normal_bin_example_bindings": 32,
+  "test_executable_bindings": 67,
+  "physical_evaluator": {
+    "binding": {
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+      "sha256": "9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef",
+      "bytes": 28924864,
+      "compiler_artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice-eval",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/voice-eval/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+        "fresh": false
+      },
+      "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+    },
+    "original_mode": 493,
+    "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-update0/readonly/9fad1d3bcacd91fe3c5653d4e08a7fde1f3bf65f67732d435b782688ac7b2aef"
+  },
+  "source_branch_pathset_bytes_fullmodes_mtimes_and_program_before_after_stability": true,
+  "source_target_restoration": "No source or target restore/substitution; new target holds its own actual compiled baseline CLIs. Readonly copies are forensic only; canonical evaluator name/path remains required.",
+  "both_owned_groups_closed": true,
+  "local_provenance_sha256": "84a72211a9cae11d88966de56cd522ec4e1a98deff2cf3930b15f1a1399a0c1a",
+  "frozen_bindings_sha256": "a28022252ef2fb9465157dae2f6f6fb07182b27d7366c09403927f840f9ab636",
+  "phase_lock_released": true,
+  "next_proposed_command": [
+    "python3",
+    "run-preparation.py",
+    "--variant",
+    "base-update0",
+    "--phase",
+    "inventory",
+    "--approval",
+    "root-base-update0-inventory-approval.json"
+  ],
+  "no_inventory_or_case_execution": true
+}

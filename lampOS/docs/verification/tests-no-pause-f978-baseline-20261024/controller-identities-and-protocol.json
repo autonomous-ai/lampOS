@@ -1,0 +1,63 @@
+{
+  "identities": [
+    {
+      "role": "baseline",
+      "name": "run-preparation.py",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/run-preparation.py",
+      "sha256": "3dc9cf58d8f944b46f809985498a1c8e088803a22055dbb55cc6cd5dbe59b18f",
+      "bytes": 9872,
+      "body_included": false
+    },
+    {
+      "role": "baseline",
+      "name": "run-baseline-observations.py",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/run-baseline-observations.py",
+      "sha256": "ca88791f89379f831b561d7b5d43f54aed718f2cf6e9b90722669e22a612ef0b",
+      "bytes": 6838,
+      "body_included": false
+    },
+    {
+      "role": "baseline",
+      "name": "owned_session.py",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/owned_session.py",
+      "sha256": "4a06b3b4779200d2b738a10ae795ba67e76dccade9011fd232b305ace8bf3f84",
+      "bytes": 4113,
+      "body_included": false
+    },
+    {
+      "role": "baseline",
+      "name": "observation_support.py",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/observation_support.py",
+      "sha256": "199360aaeebf18bb554938b049df7946d1993f245f6a6178938a71be00037da2",
+      "bytes": 6287,
+      "body_included": false
+    },
+    {
+      "role": "baseline",
+      "name": "reviewed-core.py",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/reviewed-core.py",
+      "sha256": "613a43124d98f7865e0456e08da7112b1822e7a5186534ca3d438ef980c4cf8a",
+      "bytes": 15431,
+      "body_included": false
+    },
+    {
+      "role": "baseline",
+      "name": "support.py",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/support.py",
+      "sha256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+      "bytes": 5896,
+      "body_included": false
+    },
+    {
+      "role": "baseline",
+      "name": "census.py",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/census.py",
+      "sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+      "bytes": 14714,
+      "body_included": false
+    }
+  ],
+  "protocol": "Controllers are represented by SHA256/size/name only. No Python bodies or wrappers are included. Actual commands, environments from plans, approvals, consumed slots, source/unit/profile/CLI identities and raw results are preserved unchanged. No execution is authorized by this packet.",
+  "owned_cleanup": "Reviewed new-session PID=SID=PGID binding; finite ownSID census before/after outer cleanup and fresh empty recheck, no numeric-SID reacquisition signaling, bounded anchored group cleanup. Each observation receipt retains direct wait/group/session outcomes.",
+  "projection_limits": "Some plans refer by hash to older or unexecuted variant input guards and external historical receipts. Only executed source/context inputs and expressly included provenance are projected; omitted program bodies are not reproducible from hashes alone. Raw case counts and actual executed-context binding data are independently inspectable."
+}

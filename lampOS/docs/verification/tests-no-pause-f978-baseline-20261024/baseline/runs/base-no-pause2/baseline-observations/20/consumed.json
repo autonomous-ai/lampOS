@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-expression\", \"test\", \"runtime\", \"sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service\"]", "name": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service", "repetition": 1, "consumed_before_any_launch": true}

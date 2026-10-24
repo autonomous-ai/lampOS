@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-memory\", \"test\", \"it\", \"voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append\"]", "name": "voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append", "repetition": 1, "consumed_before_any_launch": true}

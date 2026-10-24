@@ -1,0 +1,12 @@
+{
+  "claimed_for": "#1806",
+  "target": "lampOS/crates/skills/tests/it/addon.rs",
+  "complete_open_pr_count": 18,
+  "open_owners": [],
+  "merged_search_result": "Related #2768 is the earlier budget behavior change; no observer fix found. Earlier fixture #2693 and #3076 are closed.",
+  "source_case": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+  "owner_request": "Queue6390038068",
+  "candidate_mechanism": "Events are subscribed before proposals but only drained after allfour; queue capacity/drops unobserved in original failures; no historical cause claim.",
+  "planned_scope": "Bounded concurrent test-only Done observer; retain eight-second deadline and all existing assertions/runtime/clocks.",
+  "code_changed": false
+}

@@ -1,0 +1,281 @@
+{
+  "old_audit_sha256": "5b7957a8b450d244de1e65d85bec2ea55bd5937041d7b43862d81e1a84c99bf9",
+  "old_audit_scope": {
+    "in-process-only": 38,
+    "compiled-program": 9,
+    "self-executable": 2
+  },
+  "latest_base": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "latest_no_pause": "ea10e4c7d364b86fea7ed023c14c69fe70b43769",
+  "source_files": [
+    {
+      "path": "lampOS/crates/body/src/runtime/supervisor/tests.rs",
+      "old208_sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a",
+      "variants": {
+        "base": {
+          "sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/bus_out.rs",
+      "old208_sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+      "variants": {
+        "base": {
+          "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/unplug.rs",
+      "old208_sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf",
+      "variants": {
+        "base": {
+          "sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/cloud/src/lamp.rs",
+      "old208_sha256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8",
+      "variants": {
+        "base": {
+          "sha256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "old208_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "variants": {
+        "base": {
+          "sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/expression/tests/it/recent_playout_runtime.rs",
+      "old208_sha256": "80910fc320c3d42040d7b4753a868e60763d61eb969aa47816e91463685ebac2",
+      "variants": {
+        "base": {
+          "sha256": "80910fc320c3d42040d7b4753a868e60763d61eb969aa47816e91463685ebac2",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "80910fc320c3d42040d7b4753a868e60763d61eb969aa47816e91463685ebac2",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/expression/tests/it/rest_replay.rs",
+      "old208_sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c",
+      "variants": {
+        "base": {
+          "sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/expression/tests/it/rest_requests.rs",
+      "old208_sha256": "74b152d143b3b75b6a0c1ce77220270d5051b66a50f70b2cd5851171a898149c",
+      "variants": {
+        "base": {
+          "sha256": "74b152d143b3b75b6a0c1ce77220270d5051b66a50f70b2cd5851171a898149c",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "74b152d143b3b75b6a0c1ce77220270d5051b66a50f70b2cd5851171a898149c",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/expression/tests/runtime.rs",
+      "old208_sha256": "9a5cec8774cd62182d51444214f277152f052006a314d1109a8c0b82c33153b8",
+      "variants": {
+        "base": {
+          "sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+          "byte_equal": false,
+          "diff": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/child-scope-source-comparison/base-lampOS__crates__expression__tests__runtime.rs.diff"
+        },
+        "current-no-pause": {
+          "sha256": "9a5cec8774cd62182d51444214f277152f052006a314d1109a8c0b82c33153b8",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/health.rs",
+      "old208_sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+      "variants": {
+        "base": {
+          "sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice.rs",
+      "old208_sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+      "variants": {
+        "base": {
+          "sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice_people.rs",
+      "old208_sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+      "variants": {
+        "base": {
+          "sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "0943c619c9756791059e6aeb432f52f1dc7d69c77836ff72e027857c556f1ee9",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/memory/tests/it/voice_name.rs",
+      "old208_sha256": "e103e6921c1044bd60c93c74871ca970fc6e5901eef5495b83a0fe7facf261f9",
+      "variants": {
+        "base": {
+          "sha256": "e103e6921c1044bd60c93c74871ca970fc6e5901eef5495b83a0fe7facf261f9",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "e103e6921c1044bd60c93c74871ca970fc6e5901eef5495b83a0fe7facf261f9",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/skills.rs",
+      "old208_sha256": "ba5c06d90f777082416243ee82fbc4b55fe97a4eac78bf4eef7fd2805a100311",
+      "variants": {
+        "base": {
+          "sha256": "ba5c06d90f777082416243ee82fbc4b55fe97a4eac78bf4eef7fd2805a100311",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "ba5c06d90f777082416243ee82fbc4b55fe97a4eac78bf4eef7fd2805a100311",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/routine_service.rs",
+      "old208_sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+      "variants": {
+        "base": {
+          "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/runtime/supervisor.rs",
+      "old208_sha256": "f3f997ed7fe30b77ba6c0753ca118ec26f96bbd1c128505f8ea773256f942c8d",
+      "variants": {
+        "base": {
+          "sha256": "f3f997ed7fe30b77ba6c0753ca118ec26f96bbd1c128505f8ea773256f942c8d",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "f3f997ed7fe30b77ba6c0753ca118ec26f96bbd1c128505f8ea773256f942c8d",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/memory/tests/support/health_control.rs",
+      "old208_sha256": "a06cb3e241ac901f5729eefe89abedf96cf5c8f7eb580bfcc715540ee67f97db",
+      "variants": {
+        "base": {
+          "sha256": "a06cb3e241ac901f5729eefe89abedf96cf5c8f7eb580bfcc715540ee67f97db",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "a06cb3e241ac901f5729eefe89abedf96cf5c8f7eb580bfcc715540ee67f97db",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+      "old208_sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+      "variants": {
+        "base": {
+          "sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+          "byte_equal": true
+        }
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/local_time.rs",
+      "old208_sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc",
+      "variants": {
+        "base": {
+          "sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc",
+          "byte_equal": true
+        },
+        "current-no-pause": {
+          "sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc",
+          "byte_equal": true
+        }
+      }
+    }
+  ],
+  "case_audit_reference": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/compact-failure-source-manifest/per-case-child-scope/review.json",
+  "limits": "Exact source-body comparison supports child-callgraph audit only; no executable, behavior, cause or failure-phase waiver. Different source bodies require reachable helper review before observations."
+}

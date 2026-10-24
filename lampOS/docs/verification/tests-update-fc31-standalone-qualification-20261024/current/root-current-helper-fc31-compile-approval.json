@@ -1,0 +1,13 @@
+{
+  "root_reviewed": true,
+  "phase": "compile",
+  "variant": "current-helper-debug0",
+  "controller_sha256": "3dc9cf58d8f944b46f809985498a1c8e088803a22055dbb55cc6cd5dbe59b18f",
+  "plan_sha256": "f55ce8ded73f111a4fe143cb586edeef465877f58dbd0a83a495cf296f71dac8",
+  "source_guard_sha256": "dc2597433c270b64e244c007f3149f464930be56a0a09af2c913588d72b0ab85",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0",
+  "closed_slot_receipt_sha256": "36d293d5f02a8a589bf7481c1a25273c1dfaef2dd95cabc1babfbf6cf90f0211",
+  "at": "2026-10-24T21:45:04.786333+00:00",
+  "scope": "Supported48 clean/full12 no-run --jobs2, inherited/runtime4/profile0; actualfc31 source/CLI lineage/freeze only. No list/cases/source mutation. Cloud74966 compiler2 + NoPause30040 compiler2 + this2 <=6 on distinct exclusive targets; record actual starts separately, no isolation claim.",
+  "actual_metadata_sha256": "c8b4f33b7cfb555d9fadd461c5015ab5ed53d07b519fa8bc113dd3726679b293"
+}

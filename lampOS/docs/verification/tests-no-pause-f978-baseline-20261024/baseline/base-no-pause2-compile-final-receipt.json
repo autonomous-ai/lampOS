@@ -1,0 +1,185 @@
+{
+  "native_session": 11250,
+  "terminal_exit": 0,
+  "variant": "base-no-pause2",
+  "head": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "profile_debug": 2,
+  "local_rows": 136,
+  "all_local_fresh_false": true,
+  "compiler_messages": 444,
+  "unique_contexts": 438,
+  "sealed_outputs": 172,
+  "readonly_executable_bindings": 99,
+  "normal_bins_examples": 32,
+  "tests": 67,
+  "no_tests_executed": true,
+  "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174",
+  "source_guard_result": "Reviewed controller passed full10444 bytes/kind/mode/mtime/pathset/branch checks before and after; immutable inputs matched.",
+  "provenance_sha256": "bcb4ad633ac446677474652c0bc80bd9aba2cb22f7a04733147ce79983a865a2",
+  "frozen_bindings_sha256": "4f6d744376c063b4dd415a520a1be9235861d03c497dc21aa7d8e0c9f7b3c36d",
+  "commands": [
+    {
+      "path": "runs/base-no-pause2/clean-compile/clean-local.json",
+      "sha256": "2dcbcd3f9b8bb34ba9ccfdaf5735d6d9d259260d96f897926bc4d48eaa4ce4bd",
+      "started_at": "2026-10-24T20:39:27.203240+00:00",
+      "finished_at": "2026-10-24T20:39:27.518133+00:00",
+      "direct_wait_status": 0,
+      "group_absent": true
+    },
+    {
+      "path": "runs/base-no-pause2/clean-compile/compile-no-run.json",
+      "sha256": "00033efa71db6a6e34c847db24df49e2a7efaf27a65c68c510e487183205a559",
+      "started_at": "2026-10-24T20:39:29.221849+00:00",
+      "finished_at": "2026-10-24T20:47:34.096064+00:00",
+      "direct_wait_status": 0,
+      "group_absent": true
+    }
+  ],
+  "concurrency_correction": "Root confirmed Cloud53518 finished20:38:34.163720Z, before compile grant20:39:05.976258Z and actual commands below.4+2 described authorized ceiling, not actual overlap. No global isolation/timing attribution.",
+  "required_normal_CLIs": [
+    {
+      "binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-skills",
+        "sha256": "12bad1e17ea1a6e398fec0189e2d57348b422648e80cebe154341d38691fac64",
+        "bytes": 25641792,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-skills",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/skills/src/main.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-skills"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-skills",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "original_mode_proof": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-skills",
+        "bytes": 25641792,
+        "sha256": "12bad1e17ea1a6e398fec0189e2d57348b422648e80cebe154341d38691fac64",
+        "mode": 493
+      },
+      "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-no-pause2/readonly/12bad1e17ea1a6e398fec0189e2d57348b422648e80cebe154341d38691fac64",
+      "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+    },
+    {
+      "binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory-fixture",
+        "sha256": "368074db93879c3bbe35f0d5ab19302393911b0d24fb9c7af9aeb3204205eec6",
+        "bytes": 9733152,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/memory#lamp-memory@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/memory/Cargo.toml",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-memory-fixture",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory-fixture"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory-fixture",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "original_mode_proof": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory-fixture",
+        "bytes": 9733152,
+        "sha256": "368074db93879c3bbe35f0d5ab19302393911b0d24fb9c7af9aeb3204205eec6",
+        "mode": 493
+      },
+      "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-no-pause2/readonly/368074db93879c3bbe35f0d5ab19302393911b0d24fb9c7af9aeb3204205eec6",
+      "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+    },
+    {
+      "binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory",
+        "sha256": "1e46688b4404361c4713e2291884e747c9365d11dcd0b1fa05692a806c7b073a",
+        "bytes": 9373336,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/memory#lamp-memory@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/memory/Cargo.toml",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-memory",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/memory/src/main.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+      },
+      "original_mode_proof": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2/debug/lamp-memory",
+        "bytes": 9373336,
+        "sha256": "1e46688b4404361c4713e2291884e747c9365d11dcd0b1fa05692a806c7b073a",
+        "mode": 493
+      },
+      "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-no-pause2/readonly/1e46688b4404361c4713e2291884e747c9365d11dcd0b1fa05692a806c7b073a",
+      "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174"
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+diff --git a/lampOS/crates/expression/alive-behaviours.json b/lampOS/crates/expression/alive-behaviours.json
+index 68ebbf26aa..a8a2eb8597 100644
+--- a/lampOS/crates/expression/alive-behaviours.json
++++ b/lampOS/crates/expression/alive-behaviours.json
+@@ -453,9 +453,9 @@
+       "shoulder": 0.0,
+       "elbow": 0.0,
+       "head_roll": 0.0,
+-      "head_pitch": 0.035
++      "head_pitch": 0.075
+     },
+-    "nod_us": 360000,
++    "nod_us": 450000,
+     "nod_gap_us": 900000,
+     "stress_level": 0.35,
+     "stress_rise": 1.5,
+diff --git a/lampOS/crates/expression/tests/it/speaking_engine.rs b/lampOS/crates/expression/tests/it/speaking_engine.rs
+index 16d6515d6d..483b0b458d 100644
+--- a/lampOS/crates/expression/tests/it/speaking_engine.rs
++++ b/lampOS/crates/expression/tests/it/speaking_engine.rs
+@@ -249,9 +249,17 @@ fn while_it_speaks_it_nods_on_stressed_words_sways_its_base_between_sentences_an
+                 r.max((w[1].1 - w[0].1).abs()),
+             )
+         });
++        // A smooth nod's own steepest step bounds the head's: `nod` over
++        // `nod_us`, in and out as a raised cosine, moves at most
++        // nod * PI / nod_us, 0.0105 rad a 20 ms tick for 0.075 over 0.45 s
++        // (24 Oct; 0.0061 for the old 0.035 over 0.36 s, under the 0.007 the
++        // base keeps). Anything past it is a jump, not a nod.
++        let speaking = catalogue(true).speaking.expect("it speaks");
++        let nod_step = speaking.nod.head_pitch.abs() * std::f64::consts::PI * 20_000.0
++            / speaking.nod_us as f64;
+         assert!(
+-            pitch_step < 0.007 && yaw_step < 0.007,
+-            "{room:?} {pitch_step} {yaw_step}"
++            pitch_step < (nod_step * 1.1).max(0.007) && yaw_step < 0.007,
++            "{room:?} {pitch_step} {yaw_step} (a nod's own step {nod_step})"
+         );
+         // A nod on a stressed word in each of its three sentences, never
+         // two in one, never two within 4 s (the first builder on #2030).
+diff --git a/lampOS/crates/voice/src/attention.rs b/lampOS/crates/voice/src/attention.rs
+index e6ab0238f1..c4ee65a70c 100644
+--- a/lampOS/crates/voice/src/attention.rs
++++ b/lampOS/crates/voice/src/attention.rs
+@@ -582,8 +582,15 @@ const STAND_INS: &[&str] = &[
+ /// writes "Lamp" so, Gemini's transcript doesn't, and Linh and Lin are
+ /// common names, so "Lin, pass me that." between people stays held on a
+ /// Live lamp.
++///
++/// "Louvre" is the word written for "Lamp," most often: 27 of the played
++/// lines on lamp-4ace from 22 to 25 October, every one said as "Lamp" or
++/// "Hey Lamp". 15 of them were held, 11 as said to someone it calls by
++/// name ("Louvre, what did I just ask you?" five times of five). Nobody's
++/// name, and lamp-name heard none of those five, so the near rule
++/// (`LAMP_NAME_NEAR`) could not take it.
+ const STAND_ALONE_INS: &[&str] = &[
+-    "lynn", "len", "lin", "lump", "land", "line", "palin", "palan",
++    "lynn", "len", "lin", "lump", "land", "line", "palin", "palan", "louvre",
+ ];
+ 
+ /// [`STAND_ALONE_INS`] when they count, else none.
+@@ -3858,6 +3865,8 @@ mod tests {
+             "Palin, set a timer for five minutes.",
+             "Len, what's the weather?",
+             "Lin, what time is it?",
++            "Louvre, what did I just ask you?",
++            "Hey, Louvre. What time is it in London right now?",
+         ] {
+             assert!(!addresses_someone_else_on(heard, true), "{heard}");
+             assert!(called_by_name_on(heard, true), "{heard}");
+@@ -3865,6 +3874,7 @@ mod tests {
+         for heard in [
+             "Line up the meetings for me.",
+             "We should land the plan soon.",
++            "We went to the Louvre in May.",
+         ] {
+             assert!(!called_by_name_on(heard, true), "{heard}");
+         }
+@@ -3927,6 +3937,15 @@ mod tests {
+                 ),
+                 "the second route, {room:?}"
+             );
++            // 25 Oct: held five times of five on lamp-4ace as said to
++            // someone it calls by name.
++            assert!(
++                matches!(
++                    judged("Louvre, what did I just ask you?", true, room),
++                    Some(Verdict::Play(_))
++                ),
++                "Louvre on the second route, {room:?}"
++            );
+         }
+     }
+ 
+@@ -4693,6 +4712,7 @@ mod tests {
+             "lamp",
+             "Hey Lamp,",
+             "Hey, Lynn.",
++            "Louvre.",
+             "Okay. Lamp?",
+             "Lamb.",
+         ] {
+diff --git a/lampOS/crates/voice/src/remember_speaker.rs b/lampOS/crates/voice/src/remember_speaker.rs
+index b9a44e36d7..6147192170 100644
+--- a/lampOS/crates/voice/src/remember_speaker.rs
++++ b/lampOS/crates/voice/src/remember_speaker.rs
+@@ -204,6 +204,9 @@ mod tests {
+             loop {
+                 match listener.accept() {
+                     Ok((mut stream, _)) => {
++                        // macOS inherits the listener's nonblocking mode.
++                        // The existing socket read timeout needs blocking I/O.
++                        stream.set_nonblocking(false).unwrap();
+                         stream
+                             .set_read_timeout(Some(Duration::from_secs(2)))
+                             .unwrap();
+diff --git a/lampOS/deploy/product/settings/expression.json b/lampOS/deploy/product/settings/expression.json
+index 31454cda02..2b062be2ce 100644
+--- a/lampOS/deploy/product/settings/expression.json
++++ b/lampOS/deploy/product/settings/expression.json
+@@ -5,7 +5,7 @@
+     "shoulder": 0.025,
+     "elbow": 0.025,
+     "head_roll": 0.065,
+-    "head_pitch": 0.085
++    "head_pitch": 0.13
+   },
+   "postures": {
+     "resting": {
+@@ -20,21 +20,21 @@
+       "shoulder": 0.0,
+       "elbow": 0.0,
+       "head_roll": 0.02,
+-      "head_pitch": -0.025
++      "head_pitch": -0.05
+     },
+     "thinking": {
+       "base_yaw": 0.0,
+       "shoulder": 0.0,
+       "elbow": 0.0,
+       "head_roll": 0.02,
+-      "head_pitch": -0.025
++      "head_pitch": -0.12
+     },
+     "speaking": {
+       "base_yaw": 0.0,
+       "shoulder": 0.0,
+       "elbow": 0.0,
+       "head_roll": 0.0,
+-      "head_pitch": -0.015
++      "head_pitch": -0.04
+     }
+   },
+   "face_levels": {
+@@ -454,9 +454,9 @@
+       "shoulder": 0.0,
+       "elbow": 0.0,
+       "head_roll": 0.0,
+-      "head_pitch": 0.035
++      "head_pitch": 0.075
+     },
+-    "nod_us": 360000,
++    "nod_us": 450000,
+     "nod_gap_us": 900000,
+     "stress_level": 0.35,
+     "stress_rise": 1.5,
+diff --git a/lampOS/docs/attention.md b/lampOS/docs/attention.md
+index 5834f872ac..23ce537f60 100644
+--- a/lampOS/docs/attention.md
++++ b/lampOS/docs/attention.md
+@@ -218,7 +218,7 @@ written for the lamp's name at least once in its records).
+ 
+ **On the second route only** (#1973, the first builder at 22:38), more
+ words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
+-"Land", "Line", "Palin", "Palan", `attention::STAND_ALONE_INS`) are never
++"Land", "Line", "Palin", "Palan", "Louvre", `attention::STAND_ALONE_INS`) are never
+ taken for someone else's name, and call the lamp only standing alone, set
+ off as a name is. Its worker's rule counts them
+ (`Attention::count_stand_alone_ins`, `called_by_name_on`). Deepgram writes
+@@ -233,6 +233,14 @@ were held as said to someone it calls by name (#1712). The voice keeps no
+ list of the known faces' names yet, so a known person called Lynn is not
+ told from the lamp.
+ 
++"Louvre" joined them on 25 Oct. It is the word written for "Lamp," most
++often: 27 of the played lines on lamp-4ace from 22 to 25 October, each said
++as "Lamp" or "Hey Lamp". 15 of those were held, 11 as said to someone it
++calls by name ("Louvre, what did I just ask you?" five times of five).
++lamp-name heard none of those five, so the near rule (`LAMP_NAME_NEAR`,
++[second-voice.md](second-voice.md)) could not take it. "We went to the
++Louvre in May" is no call.
++
+ Of the three rounds with no answer heard, the rule held one. In one the
+ service sent the words of an answer ("Four. Easy one.") and no sound, the
+ only time in the 800 and more answers in the lamp's records. In one it
+diff --git a/lampOS/docs/expression.md b/lampOS/docs/expression.md
+index 36eed90a12..636ed176db 100644
+--- a/lampOS/docs/expression.md
++++ b/lampOS/docs/expression.md
+@@ -264,8 +264,14 @@ only. The nods move the head's pitch and the sway turns the base,
+ within the catalogue's limits, in any room
+ (it is the lamp's own speech). None runs while the body is held, while
+ concentrating, asleep, or once someone has cut in, and nothing is owed after.
+-- **A nod on a stressed word.** A dip of `nod` (0.035 rad of head pitch, about
+-  2°) over `nod_us` (0.36 s), in and out smoothly. It comes when the level is
++- **A nod on a stressed word.** A dip of `nod` (0.075 rad of head pitch, about
++  4°) over `nod_us` (0.45 s), in and out smoothly. Until 24 Oct it was 0.035
++  over 0.36 s. With the body's pose at `--speed 120`, lamp-4ace's head showed
++  only its posture moving through an answer; at `--speed 300` (#3385) the nods
++  showed as head swings of 3 to 7.6° an answer. The speaking posture now holds
++  the head 0.04 up, so the dip comes down from there. Body takes at most 60
++  counts (about 5°) of Expression's head pitch before adding mood and gaze, and
++  folded the head reaches 15 counts below home, more as it stands. It comes when the level is
+   at least `stress_level` (0.35) and `stress_rise` (1.5) times the recent
+   level, which follows the sound with a 0.25 s time constant, and at least
+   0.15 (about 5 dB) over its own sentence's mean level so far
+diff --git a/lampOS/docs/second-voice.md b/lampOS/docs/second-voice.md
+index 7f96261b86..2c68c681a1 100644
+--- a/lampOS/docs/second-voice.md
++++ b/lampOS/docs/second-voice.md
+@@ -1235,7 +1235,9 @@ order is kept. A written turn is the same from the chat on.
+     (Sixth's P3 on c0890e8db). People's names
+     have the shape ("Leon", "Lynne", "Laine", "Lon", "Lem"), and a list of
+     them always trails (reviewer-three's P2 on 194accd24); the words
+-    written for "Lamp" need the near hearing alone. A line that begins
++    written for "Lamp" need the near hearing alone. "Louvre" set off as a
++    name calls the lamp by its text too, near hearing or not
++    (`attention::STAND_ALONE_INS`, 25 Oct, [attention.md](attention.md)). A line that begins
+     with an earlier piece's words (`before`) is never rewritten: its start
+     is not that word's (the P3). Then "Lamp" takes the word's place, so
+     the rule and the model read the call, and a lone one waits for the line
+diff --git a/lampOS/docs/voice-test-fixtures.md b/lampOS/docs/voice-test-fixtures.md
+index cd971cf4ae..785e1d5658 100644
+--- a/lampOS/docs/voice-test-fixtures.md
++++ b/lampOS/docs/voice-test-fixtures.md
+@@ -558,3 +558,16 @@ reads responses through EOF and requires exactly one response. This detects
+ premature per-read replies without a short absence window or an assumption
+ that two writes are two reads. The retained three-versus-two full-run outcome
+ is not assigned a historical cause by this fixture correction.
++
++## Mock Eyes accepted connections
++
++`remember_speaker::tests::own_name_exchange` polls a nonblocking Unix
++listener so its peer can observe completion without waiting for another
++connection. Each accepted stream explicitly enters blocking mode before
++the existing two-second socket read timeout and `read_line`.
++
++On macOS the accepted stream can inherit the listener's nonblocking mode;
++an empty read then returns `WouldBlock` instead of waiting under that
++timeout. Clearing the accepted stream's flag leaves listener polling,
++request/reply assertions, timeout values and cleanup unchanged. This is a
++test-fixture correction, not a runtime or historical failure-cause claim.

@@ -1,0 +1,41 @@
+{
+  "record": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "metadata",
+      "--offline",
+      "--locked",
+      "--format-version",
+      "1"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS",
+    "started_at": "2026-10-24T20:37:17.250327+00:00",
+    "timeout_seconds": 300,
+    "stdout": "metadata.stdout.txt",
+    "stderr": "metadata.stderr.txt",
+    "timeout_cleanup": [],
+    "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+    "available_bytes_before_Cargo": 25398706176,
+    "owned_pid": 72219,
+    "owned_process_group": 72219,
+    "timed_out": false,
+    "exit_code": 0,
+    "unexpected_residual_group_after_normal_exit": false,
+    "direct_status_before_cleanup": 0,
+    "owned_group_present_before_cleanup": false,
+    "direct_wait_status": 0,
+    "owned_group_absent_after_cleanup": true,
+    "wall_seconds": 0.852187,
+    "finished_at": "2026-10-24T20:37:18.102979+00:00",
+    "stdout_sha256": "dca29284e8a1ee195cb62879aadba6727130be09dddd0d82ed08a4b222238825",
+    "stdout_bytes": 2377478,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "local_packages": 48,
+  "packages": 451,
+  "resolve_nodes": 451,
+  "raw_metadata_sha256": "dca29284e8a1ee195cb62879aadba6727130be09dddd0d82ed08a4b222238825",
+  "no_old_graph_or_profile_collapse": true
+}

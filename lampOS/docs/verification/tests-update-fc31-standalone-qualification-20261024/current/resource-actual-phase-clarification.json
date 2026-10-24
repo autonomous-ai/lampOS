@@ -1,0 +1,7 @@
+{
+  "helper_native": 87603,
+  "helper_actual_compile_record": "runs/current-helper-debug0/clean-compile/compile-no-run.json",
+  "helper_compile_record_sha256": "973d222368ac23a3987476abed7ed03efde1e8743a9e23f4ca763442a808f883",
+  "clarification": "The prelaunch helper2+Cloud2+NoPause2 entries are authorized compiler-job ceilings. Root subsequently confirmed Cloud74966 andNoPause30040 both CLOSED incomplete during supported clean, before their Clippy/no-run or tests. They were active Cargo allocations, not proven active Rust compiler jobs. Do not infer three-way Rust compilation from prelaunch labels. Helper actual no-run compilation succeeded. Original authorization/partial-clean outcomes remain unchanged.",
+  "observations": "During helper24, root confirmed all existing Cargo allocations closed and recoverypaused. No global hardware-isolation or timing cause claim."
+}

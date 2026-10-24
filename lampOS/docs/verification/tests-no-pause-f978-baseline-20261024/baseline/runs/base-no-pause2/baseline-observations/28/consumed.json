@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-memory\", \"test\", \"it\", \"health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals\"]", "name": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals", "repetition": 1, "consumed_before_any_launch": true}

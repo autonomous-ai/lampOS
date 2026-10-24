@@ -1,0 +1,6 @@
+
+running 1 test
+test rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 279 filtered out; finished in 0.03s
+

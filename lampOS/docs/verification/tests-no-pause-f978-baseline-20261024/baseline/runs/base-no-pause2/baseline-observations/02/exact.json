@@ -1,0 +1,51 @@
+{
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/pr-head-qualification-f978/runs/base-no-pause2/readonly/986006ee8d2d48dd1e96718ea764ff3cef0459c23e72f41e2aae964ea8b04ed0",
+    "--exact",
+    "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-base8db/lampOS/crates/body",
+  "started_at": "2026-10-24T20:51:51.890830+00:00",
+  "timeout_seconds": 600,
+  "stdout": "exact.stdout.txt",
+  "stderr": "exact.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 38802,
+  "owned_process_group": 38802,
+  "validated_child_session": {
+    "pid": 38802,
+    "sid": 38802,
+    "pgid": 38802,
+    "start_new_session": true
+  },
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "owned_session_cleanup": {
+    "sid": 38802,
+    "censuses": [
+      {
+        "label": "before outer cleanup",
+        "members": []
+      },
+      {
+        "label": "after outer cleanup / empty recheck",
+        "members": []
+      }
+    ],
+    "signals": [],
+    "errors": [],
+    "absent": true
+  },
+  "wall_seconds": 0.207237,
+  "finished_at": "2026-10-24T20:51:52.098280+00:00",
+  "stdout_sha256": "4c3ff2292c3c14c9a29775d290debe70e78cf2f5f21908c3a17c9b41f1e1e5e6",
+  "stdout_bytes": 214,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

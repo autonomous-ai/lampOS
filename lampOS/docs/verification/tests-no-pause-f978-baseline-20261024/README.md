@@ -1,0 +1,11 @@
+# NoPause baseline49 on frozenf978
+
+All 49 preplanned baseline cases passed once on `f9780cb2a117f5c5d2c0960cd28cfbee866bd59b`, actual profiledebug2: **49 passed,0 failed,0 unrun** (allocation95681). No original failure phase was reproduced; these passes do not supply a matched-base waiver or historical cause finding. The original NoPause full run on208/427 remains **7,265 passed/49 failed/52 ignored FAILED**. Current147 observations remain pending; this packet contains no current-head test execution.
+
+`baseline/runs/base-no-pause2/baseline-observations/` preserves all 49 raw command/stdout/stderr/consumed records and results. Actual metadata(451packages/451nodes/48locals), supported48 clean/full12 no-run compile11250, seven-target inventory45797, profile2/features and all 99 readonly executable/CLI binding proofs are preserved as JSON/text. The three required normalCLI identities are lamp-memory-fixture, lamp-memory and lamp-skills; nine cases invoke those programs and two self-exec. Canonical compiled paths were guarded without replacement.
+
+All 49 direct waits were 0; outergroups and owned sessions were absent after fresh cleanup rechecks, zero signals/errors. The reviewed runner passed source full 10,444 bytes/kinds/modes/mtimes/pathset/branch and required child/test identities before and after each observation. Child audit records classify38in-process/9compiled-program/2self-exec; the old208 audit is source context only. The frozenf978 source bridge explicitly records the changed Expression test setup order, not phase equivalence or cause from source equality.
+
+Exact actual baseline clean started20:39:27.203240Z; actual no-run20:39:29.221849Z–20:47:34.096064Z on24October2026. Root corrected the earlier overlap authorization: Cloud53518 had already closed20:38:34.163720Z, before these starts; the4+2 figures were permission, not actual compiler overlap. No global hardware-isolation/timing-cause claim. Observations ran20:51:45.060107Z–20:56:12.789534Z.
+
+Controllers/wrappers are SHA/protocol only; no binaries or Python bodies included. Historical absolute paths are unchanged in primary records; `manifest.json` maps copied paths and original byte hashes. `SHA256SUMS` seals the packet. This packet supports the pending current147 plan, never relabels it done.

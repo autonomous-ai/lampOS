@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-25 05:25 — updater qualification complete; Skills observer taken
+
+Ready for lamp-voice: no
+
+All eight updater failure cases passed exactly three original planned observations at public fc31: 24/24, with complete source/profile/CLI and fresh child/session absence checks. [Primary standalone proof](verification/tests-update-fc31-standalone-qualification-20261024/) retains baseline eight once, current 24, raw compiler/command streams and resource correction. This meets the three-alone category; original full 7,316/8/52 stays FAILED, with no cause or unrelatedness inference. Reader disposition is requested separately; helper code already landed through #3382.
+
+[NoPause baseline proof](verification/tests-no-pause-f978-baseline-20261024/) records all 49 passing once on f978/profile2 with actual full compile, seven inventories and required CLI bindings. None reproduced its historical failure. Current 147 remain pending: the first current clean timed out before compilation; the separate Cloud clean also timed out before Clippy/tests. Original attempts are preserved. Cloud's one bounded clean-only recovery succeeded; NoPause's one clean-only recovery is running sequentially, without resampling a test or silently changing a live watchdog. Newer 42 is comment-only; frozen fc31 execution identities stay intact and latest-base carry qualification remains separate.
+
+Taken #1806 after Fourth's Queue6390038068 request: the narrow Skills test observer in crates/skills/tests/it/addon.rs. Complete ownership census covers 18 open PRs with no file owner; open/merged case searches find no observer fix, with #2693/#3076 closed and #2768 the earlier budget change. [Claim record](verification/tests-skills-addon-observer-claim-20261024.json). Planned bounded concurrent Done drain keeps the original eight-second deadline, every proposal/refund assertion and all runtime/clock behavior. Four proposals can precede event draining; old queue capacity/drop count remain unobserved, so this is a candidate mechanism, not a causal claim. Claim is posted as 6390256740 before code; no code change yet.
+
 ## 2026-10-25 03:44 — latest Cloud carry and baseline observations
 
 Ready for lamp-voice: no

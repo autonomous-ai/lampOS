@@ -1,0 +1,10 @@
+{
+  "full_graph_features_targets_equal": true,
+  "only_replacements": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0"
+  },
+  "source_worktree_unchanged": true,
+  "baseline_metadata_sha256": "1ec9c0951d1330a81bb957954ecb1765e183266cc97a92ecef63210857573311",
+  "actual_debug2_metadata_sha256": "dca29284e8a1ee195cb62879aadba6727130be09dddd0d82ed08a4b222238825",
+  "no_compile_profile_equivalence_claim": "Actual debug2 compilation remains required; metadata does not collapse profile contexts."
+}

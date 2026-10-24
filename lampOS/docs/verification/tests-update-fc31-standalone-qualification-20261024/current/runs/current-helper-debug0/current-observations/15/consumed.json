@@ -1,0 +1,1 @@
+{"case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]", "name": "physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn", "repetition": 3, "consumed_before_any_launch": true}

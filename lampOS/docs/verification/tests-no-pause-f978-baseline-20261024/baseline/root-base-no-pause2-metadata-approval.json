@@ -1,0 +1,12 @@
+{
+  "phase": "metadata",
+  "variant": "base-no-pause2",
+  "root_reviewed": true,
+  "controller_sha256": "3dc9cf58d8f944b46f809985498a1c8e088803a22055dbb55cc6cd5dbe59b18f",
+  "plan_sha256": "2e1e7c747e669b7269a76cb92477dcc9c528f82646e90fcf90afeb7cdd088349",
+  "source_guard_sha256": "6617706b292e9b9015148b764101718c144bb884f41a118954ee8c8e2706c174",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2",
+  "closed_slot_receipt_sha256": "28f7d30cd445171ee4c6a09570519f0bcb5fe2e30eec658c59a9224e4aa5ac9d",
+  "at": "2026-10-24T20:36:55.007751+00:00",
+  "scope": "One actual offline locked metadata query only for frozen f978 baseline debug2 context, full graph/targets normalization proof against prior actual same-root metadata; no compile/list/cases. No profile collapse or relabelled execution."
+}

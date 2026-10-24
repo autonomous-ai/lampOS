@@ -1,0 +1,29 @@
+{
+  "native": 65788,
+  "exit_code": 0,
+  "inventories": [
+    {
+      "package": "lamp-voice",
+      "target": "it",
+      "cases": 278,
+      "ignored": 0
+    },
+    {
+      "package": "lamp-voice-eval",
+      "target": "lamp_voice_eval",
+      "cases": 378,
+      "ignored": 0
+    },
+    {
+      "package": "lamp-voice-eval",
+      "target": "it",
+      "cases": 238,
+      "ignored": 0
+    }
+  ],
+  "all_eight_unique_nonignored_profile_features_equal": true,
+  "all_nine_groups_absent_direct_wait0": true,
+  "source_and_artifact_guards": true,
+  "bindings_sha256": "ec632c0d555308c3cbb81eabe2934e29afe530a076c4b280786cf0af6969fc07",
+  "no_case_execution": true
+}

@@ -1,0 +1,50 @@
+{
+  "native_session": 45797,
+  "terminal_exit": 0,
+  "source": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "profile_debug": 2,
+  "targets": [
+    {
+      "target": "lamp-body-lamp_body-986006ee8d",
+      "case_count": 440,
+      "ignored_count": 0
+    },
+    {
+      "target": "lamp-cloud-lamp_cloud-3dac351407",
+      "case_count": 168,
+      "ignored_count": 2
+    },
+    {
+      "target": "lamp-expression-it-6d81d239bb",
+      "case_count": 280,
+      "ignored_count": 0
+    },
+    {
+      "target": "lamp-expression-lamp_expression-9f6236f96b",
+      "case_count": 27,
+      "ignored_count": 0
+    },
+    {
+      "target": "lamp-expression-runtime-e78304fd3c",
+      "case_count": 27,
+      "ignored_count": 0
+    },
+    {
+      "target": "lamp-memory-it-ff3e032b05",
+      "case_count": 169,
+      "ignored_count": 5
+    },
+    {
+      "target": "lamp-skills-it-5a5d5704be",
+      "case_count": 307,
+      "ignored_count": 1
+    }
+  ],
+  "named_cases_unique_nonignored": 49,
+  "file_list_ignored_commands": 21,
+  "all_direct_waits_zero_groups_absent": true,
+  "source_fullmode_mtime_and_sealed_guard_passed": true,
+  "no_test_bodies_executed": true,
+  "selected_bindings_sha256": "80626d26373e24b08d0527114ee5921a5f601a10a46b2e009a3324ee656159c0",
+  "observation_plan_sha256": "4493f1f80842087195747ec985d8f14142f758840c74d1203d9bb2000f36de42"
+}

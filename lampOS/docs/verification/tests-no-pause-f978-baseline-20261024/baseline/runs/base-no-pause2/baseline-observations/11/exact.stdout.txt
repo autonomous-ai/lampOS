@@ -1,0 +1,6 @@
+
+running 1 test
+test rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 279 filtered out; finished in 0.06s
+

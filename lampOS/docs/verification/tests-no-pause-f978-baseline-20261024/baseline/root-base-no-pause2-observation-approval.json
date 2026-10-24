@@ -1,0 +1,17 @@
+{
+  "phase": "baseline-observations",
+  "root_reviewed": true,
+  "controller_sha256": "ca88791f89379f831b561d7b5d43f54aed718f2cf6e9b90722669e22a612ef0b",
+  "observation_plan_sha256": "4493f1f80842087195747ec985d8f14142f758840c74d1203d9bb2000f36de42",
+  "prep_plan_sha256": "2e1e7c747e669b7269a76cb92477dcc9c528f82646e90fcf90afeb7cdd088349",
+  "owned_session_cleanup_reviewed": true,
+  "at": "2026-10-24T20:51:24.771426+00:00",
+  "scope": "Exactly49 prescribed baseline observations once each on frozenf978/profile2, seven actual inventory-bound targets, required actualMemory/MemoryFixture/Skills CLI and self-exec guards. No current source observations, retries, Cargo, source/target replacement. Actual0/101 retained; any infrastructure/cleanup error stops before next. Original full7265/49/52 remainsFAILED.",
+  "concurrency": {
+    "other_active_owned_compiler_jobs": 0,
+    "this_run_direct_cases": 1,
+    "this_run_compiler_jobs": 0,
+    "qualification_debug2_exclusive": true,
+    "global_isolation_or_timing_claim": false
+  }
+}

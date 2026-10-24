@@ -1,0 +1,18 @@
+{
+  "native": 22837,
+  "terminal_exit_code": 0,
+  "actual_head": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "variant": "base-update0",
+  "profile_debug": 0,
+  "local_packages": 48,
+  "workspace_members": 46,
+  "graph_packages": 451,
+  "resolve_nodes": 451,
+  "raw_metadata_sha256": "1ec9c0951d1330a81bb957954ecb1765e183266cc97a92ecef63210857573311",
+  "actual_local_package_file_sha256": "08b4d1cb46b0e8d1d767178feccd41b1a8a0a01525d368262c52c235cfdeeee1",
+  "source_branch_full_pathset_bytes_modes_mtimes_guard": true,
+  "direct_wait_zero_group_absent": true,
+  "target_exists": false,
+  "phase_lock_released": true,
+  "no_compile_inventory_observations": true
+}

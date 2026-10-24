@@ -1,0 +1,138 @@
+{
+  "variant": "current-helper-debug0",
+  "head": "fc31e012334cda59eb3c489560454c515fb86386",
+  "source_guard_sha256": "dc2597433c270b64e244c007f3149f464930be56a0a09af2c913588d72b0ab85",
+  "case_count": 8,
+  "case_keys": [
+    "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]",
+    "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]",
+    "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]",
+    "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]",
+    "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]",
+    "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]",
+    "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]",
+    "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]"
+  ],
+  "repetitions": 3,
+  "outer_seconds": 600,
+  "case_scopes": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/case-scopes.json",
+  "input_hashes": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/run-current-observations.py": "bdce346402c83d4fb59f0f0f58af08d95b102eaa84288dfc2c78fe077e6d85b0",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/owned_session.py": "4a06b3b4779200d2b738a10ae795ba67e76dccade9011fd232b305ace8bf3f84",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/observation_support.py": "199360aaeebf18bb554938b049df7946d1993f245f6a6178938a71be00037da2",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/run-preparation.py": "3dc9cf58d8f944b46f809985498a1c8e088803a22055dbb55cc6cd5dbe59b18f",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/plan.json": "f55ce8ded73f111a4fe143cb586edeef465877f58dbd0a83a495cf296f71dac8",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/case-scopes.json": "8c5a471b4bf77db9e7d8b882805ad14d3b9cffcf8ba841cbaac7fcdb4ed82c79",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/update-debug0-cases.json": "1d2ff984af1e11ac89013390867a6a3ae65050dfebfd76457fd2b788c4fd078f",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/selected-child-scope-audit.json": "6afc27938a6282160fb00af2752efdf2c0a29ed676b029089b46d4b1fb18ed47",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/runs/current-helper-debug0/inventory-terminal.json": "ee430a564e917627560e06a2fa82bc5178fbc68b039f6c9bae5557ff876b9bdb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/runs/current-helper-debug0/selected-case-bindings.json": "a0a2af9a5c02d8e87d22811ad738e643f0dd650dfe3f165f8f09438d13b809d9",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/runs/current-helper-debug0/frozen-executables-and-CLIs.json": "271b984f5f7bf25ce9c43c8805d26fae14fd5fc4d9c12cb2fd2ba11bd29fc38e",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/runs/current-helper-debug0/compile-terminal.json": "ee430a564e917627560e06a2fa82bc5178fbc68b039f6c9bae5557ff876b9bdb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/runs/current-helper-debug0/metadata/metadata.stdout.txt": "c8b4f33b7cfb555d9fadd461c5015ab5ed53d07b519fa8bc113dd3726679b293"
+  },
+  "current_head_observations": "Future exactly3 per8 actualfc31 helper source, after all current compiles close; separate grant plus fresh artifact bindings required.",
+  "owned_cleanup": "Validate actual newSID/PGID==PID; finite ownSID census before/after outercleanup; fresh anchored bounded TERM/KILL only verified ownSID groups. Empty recheck rejects numeric SID reacquisition without signaling. Every cleanup error stops before next case.",
+  "limits": "Preserve ordinary0/101 and all failures. No retries or baseline witness reuse; 3/3 category only when all3 original planned observations pass. Current sourcefc31; no historical cause or fullgreen claim.",
+  "execution_ready": true,
+  "fixed_schedule": [
+    {
+      "case_key": "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice\", \"test\", \"it\", \"light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"lib\", \"lamp_voice_eval\", \"physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::cue_triggered_acknowledgment_is_injected_during_playback_and_scored\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_interruption_during_second_occurrence_preserves_owner_and_yields\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_two_occurrences_wait_for_true_completion_before_followup\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::physical_next_turn_ready_follows_lamp_voice_readiness_cues\"]",
+      "repetition": 3
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]",
+      "repetition": 1
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]",
+      "repetition": 2
+    },
+    {
+      "case_key": "[\"lamp-voice-eval\", \"test\", \"it\", \"physical_loopback::directed_natural_interruption_runs_during_reply_with_original_cancel_reason\"]",
+      "repetition": 3
+    }
+  ],
+  "concurrency_gate": "All existing owned Cargo allocations are closed. Helper compile/inventory succeeded; unrelated Cloud/NoPause allocations closed incomplete before tests. Both future recoveries remain paused until all24 observations close. No compiler or recovery clean overlaps this fixed window; no global isolation claim.",
+  "resource_window": "Root selected helper24 BEFORE any recovery. Cloud74966 andNoPause30040 are closed incomplete; no owned compilers remain, recovery paused. No claim of successful unrelated compilation or global isolation. Explicit24grant still required."
+}

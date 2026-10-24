@@ -1,0 +1,12 @@
+{
+  "phase": "current-observations",
+  "root_reviewed": true,
+  "controller_sha256": "bdce346402c83d4fb59f0f0f58af08d95b102eaa84288dfc2c78fe077e6d85b0",
+  "observation_plan_sha256": "d142a7c693c679a8479171ef8ab85bf9a51e0b7a4a9075623e0bb938b2724798",
+  "prep_plan_sha256": "f55ce8ded73f111a4fe143cb586edeef465877f58dbd0a83a495cf296f71dac8",
+  "owned_session_cleanup_reviewed": true,
+  "all_current_compiles_closed": true,
+  "at": "2026-10-24T22:03:13.830560+00:00",
+  "scope": "Exactly3 original fixed observations of each8 cases =24 on actualfc31/profile0 compiled87603 and inventory82213; no retries/replacements/Cargo/source changes. Preserve0/101; infrastructure/cleanup error stops nextcase. All allocated Cargo processes closed; NoPause actualbuild still unrun/incomplete, not a claimed successful compile. Recoveries paused until this24terminal.",
+  "no_global_isolation_or_cause_claim": true
+}

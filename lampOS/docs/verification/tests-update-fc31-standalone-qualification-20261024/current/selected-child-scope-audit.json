@@ -1,0 +1,170 @@
+{
+  "source_head": "fc31e012334cda59eb3c489560454c515fb86386",
+  "parent_audit_head": "3d1a13ae7d937e56d4af3606732333812c805961",
+  "all_changed_paths": [
+    "lampOS/crates/expression/alive-behaviours.json",
+    "lampOS/crates/expression/tests/it/speaking_engine.rs",
+    "lampOS/crates/voice/src/attention.rs",
+    "lampOS/crates/voice/src/remember_speaker.rs",
+    "lampOS/deploy/product/settings/expression.json",
+    "lampOS/docs/attention.md",
+    "lampOS/docs/expression.md",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "selected_paths_compared": 107,
+  "selected_changed_paths": [],
+  "changed_product_dependency": "Voice attention.rs adds standalone louvre alias; remember_speaker.rs only test fixture accepted socket switches to blocking for existing2s read timeout. Expression alive-behaviours catalogue/deploy setting and speaking_engine test also change. These actual dependencies are disclosed, not treated as historical cause/non-cause proof.",
+  "child_callgraph_review": {
+    "light": "light_call Executive/BusLight/RingLight bus loop; no detector/coordinator execution or child launch in selected test.",
+    "startup": "VoiceEval audit in-process backend; /usr/bin/true child already waited, unchanged exact source and system file guard mandatory.",
+    "physical6": "PhysicalLoopback ClockedFixture canonical evaluator filename/path check -> same BIN fake-clock-session -> same BIN fake-clock-lamp-voice -> fake_lamp::run_with_clock_and_poll -> run_inner -> FakeRuntime. FakeRuntime imports Voice activity::TurnDetector (fake.rs27), initializes TurnDetector::default (118), tick calls detector.push (360), which calls activity::push_heard. Therefore changed activity.rs IS reachable and freshly compiled current binary is mandatory. FakeRuntime leaves first_words=false and soft_start=false from actual detector default and has no keep_first_words/keep_soft_starts calls; this is source configuration evidence, not historical cause/non-cause proof. Real coordinator conversation entrypoint is not invoked on this fake path. CueSink uses in-process trace scan plus a UnixDatagram, no extra process.",
+    "normal_CLI": "Must freshly compile actual canonical CARGO_BIN_EXE_lamp-voice-eval at new source/profile0, verify before/after each case. Forensic renamed CLI is never substituted."
+  },
+  "source_bindings": [
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "kind": "file",
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "bytes": 3214,
+      "mode": 420,
+      "mtime_ns": 1792878051671189215
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_light.rs",
+      "kind": "file",
+      "sha256": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+      "bytes": 81921,
+      "mode": 420,
+      "mtime_ns": 1792878049007901024
+    },
+    {
+      "path": "lampOS/crates/voice/src/activity.rs",
+      "kind": "file",
+      "sha256": "61046ef3234cf835c15f86fe430885809bb17a6d95ac96d1868536c3d8478134",
+      "bytes": 73044,
+      "mode": 420,
+      "mtime_ns": 1792878041615751959
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator.rs",
+      "kind": "file",
+      "sha256": "6d38f5037b643fd0072d62fc077438134e5b2c4a63d3eb647fafe72dffd983c8",
+      "bytes": 755889,
+      "mode": 420,
+      "mtime_ns": 1792878043324623794
+    },
+    {
+      "path": "lampOS/crates/voice-eval/tests/it/physical_loopback.rs",
+      "kind": "file",
+      "sha256": "a89a5b2e9dff63813f837ba7c2839fb72ad47913c537f6d2d04cbadacee47e21",
+      "bytes": 26032,
+      "mode": 420,
+      "mtime_ns": 1792878040352253480
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/main.rs",
+      "kind": "file",
+      "sha256": "61b18db109fe9b1157bb1089e9037c9c05b6c576f659a0e4885f9ae8221c2eb1",
+      "bytes": 55028,
+      "mode": 420,
+      "mtime_ns": 1792878037988788983
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/physical/fixture_driver.rs",
+      "kind": "file",
+      "sha256": "0fd8625f6ba9245ef36e2dfe191fe75fd1b394f3bb8aa39a9e313d00c6b46aef",
+      "bytes": 30074,
+      "mode": 420,
+      "mtime_ns": 1792878038490075452
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/physical/fixture_commands.rs",
+      "kind": "file",
+      "sha256": "b9cd63c46803efe08cdc32b9d308612b7a9b54b937b193b73f87624b1124c4db",
+      "bytes": 27980,
+      "mode": 420,
+      "mtime_ns": 1792878038352350545
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/physical/session.rs",
+      "kind": "file",
+      "sha256": "c5baf822c82a0824ca655a11ad73a36d266fe121ce8853961732925da6f67212",
+      "bytes": 79408,
+      "mode": 420,
+      "mtime_ns": 1792878038948745920
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/physical/fake_lamp.rs",
+      "kind": "file",
+      "sha256": "b9637518aaf8e0dffc587273ab0c5e19c6ff1d72337796c71a4d0832cb4f1327",
+      "bytes": 24315,
+      "mode": 420,
+      "mtime_ns": 1792878038170916189
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/physical/mac.rs",
+      "kind": "file",
+      "sha256": "a111b761214e797ab491c15b3fc6b29ba0e6bf728895420936c69308bb93124e",
+      "bytes": 190408,
+      "mode": 420,
+      "mtime_ns": 1792878038553068061
+    },
+    {
+      "path": "lampOS/crates/voice-eval/src/fake.rs",
+      "kind": "file",
+      "sha256": "e95394bcad2146c66bcde22ac605d655e4c52140c042a4a1973fa00ed9035d24",
+      "bytes": 34858,
+      "mode": 420,
+      "mtime_ns": 1792878037921671884
+    },
+    {
+      "path": "lampOS/crates/voice/src/fixture_provider.rs",
+      "kind": "file",
+      "sha256": "3a5e2c9bdda813b394d10591d5b3ac79d2abd810c2dbeb3f837712d73ed42cbb",
+      "bytes": 64141,
+      "mode": 420,
+      "mtime_ns": 1792878045538938609
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_requests.rs",
+      "kind": "file",
+      "sha256": "633c2573d2c5236cc50f0fb67d211b7bd04f3e04bb313fbdfe3b206284d52ac4",
+      "bytes": 18910,
+      "mode": 420,
+      "mtime_ns": 1792878049047243969
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_face.rs",
+      "kind": "file",
+      "sha256": "fc0676ed54e23818ad7657c7cdee867993bd3cf4ba45bf82b92e7f65a207cbef",
+      "bytes": 99007,
+      "mode": 420,
+      "mtime_ns": 1792878048967487159
+    },
+    {
+      "path": "lampOS/crates/voice/src/attention.rs",
+      "kind": "file",
+      "sha256": "5c2747db8d0da3f872336c041906d952e5173891df0d904e7efe863aa9c7b181",
+      "bytes": 218226,
+      "mode": 420,
+      "mtime_ns": 1792878042242835970
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember_speaker.rs",
+      "kind": "file",
+      "sha256": "884d6b7cd69c066b15802234f87d57380561f0620050a72f41aae44430871bc2",
+      "bytes": 30380,
+      "mode": 420,
+      "mtime_ns": 1792878048658626884
+    }
+  ],
+  "patch_sha256": "a1ed057aa57e8fe5df086f36a963941e0dc0a34e53c7e39c3610945888acc622",
+  "limits": "Source-supported childscope review only, not historical cause/non-cause proof or waiver. Actual new metadata/profile/features/inventory/child artifacts required before exactly3 per8.",
+  "correction": "Earlier fake_lamp-level audit incorrectly excluded TurnDetector. This corrected audit follows FakeRuntime into the real detector; no execution used the earlier audit.",
+  "reachable_detector_excerpts": {
+    "lampOS/crates/voice-eval/src/fake.rs:94": "}\n\nimpl FakeRuntime {\n    pub fn new(\n        profile: FakeProfile,\n        scenario: &Scenario,\n        fixed_reply: FixedReply,\n        signal: bool,\n        seed: u64,\n    ) -> Self {\n        let mut runtime = Self {\n            ready_at_us: u64::from(profile.startup_ms) * 1000,\n            session_end_us: u64::MAX,\n            profile,\n            provider: scenario.provider,\n            fixed_reply,\n            replies: scenario.fake_replies.clone(),\n            faults: scenario.fake_faults.clone(),\n            rng: Rng::new(seed),\n            now_us: 0,\n            ready: false,\n            ended: false,\n            sequence: 0,\n            playback_sequence: 0,\n            detector: TurnDetector::default(),\n            vad: signal.then(SpeechProbability::default),\n            sources: Vec::new(),\n            turn: 0,\n            candidates: 0,\n            answers: 0,\n            first_turn: None,\n            reply: None,\n            tails: Vec::new(),\n            idle_failure_at: None,\n            leaks: Vec::new(),\n            out: VecDeque::new(),\n            input_available: true,\n            reopen_at: None,\n        };\n        runtime.session_end_us =\n            runtime.ready_at_us + u64::from(scenario.session_seconds) * 1_000_000;\n        let provider_kind = match scenario.provider {\n            ProviderKind::Gemini => \"fake_gemini_like\",\n            ProviderKind::FixedReply => \"one_cached_reply\",\n        };\n        runtime.emit(\n            EventKind::RunStart {\n                provider_kind: Some(provider_kind.into()),\n                voice_route: None,\n            },\n            None,\n        );\n        runtime",
+    "lampOS/crates/voice/src/activity.rs:309": "        Self {\n            prefix: VecDeque::with_capacity(PRE_ROLL_BLOCKS),\n            scores: VecDeque::new(),\n            first_words: false,\n            reach_back: false,\n            reach_onset: false,\n            lamp_silent: VecDeque::new(),\n            soft_start: false,\n            next_lamp_silent: false,\n            start_count: 0,\n            silence_count: 0,\n            end_silence_blocks: END_SILENCE_BLOCKS,\n            active_blocks: 0,\n            active: false,\n            last: None,\n            confirmation: None,\n            decision: None,\n            abandoned: false,\n            ignore_through_us: None,\n            await_pause: false,\n            call_wait_blocks: None,\n            began_us: 0,\n            speech_blocks: 0,\n            waiting: false,\n            waited: false,\n            unfinished: None,\n            held_end: None,\n            held_blocks: 0,\n            held_told: None,\n        }\n    }\n}\n"
+  },
+  "selected_callgraph_delta_review": "All107 selected VoiceEval+light paths and actual FakeRuntime/TurnDetector/CueSink/fixture/session/driver/CLI launch paths remain byte/kind/mode equal3d. Light uses RingLight/Lit; ring_face has a compilation-level attention::TAPPED_BEFORE_US constant reference, unchanged by alias patch. Selected path does not invoke alias judging or remember-speaker functions. Full VoiceEval src search finds no product expression catalogue/deploy include or lamp_expression code reference; no new process in selected callgraph. Real TurnDetector remains reachable via FakeRuntime default/push, as corrected earlier; fresh fc31 artifacts mandatory."
+}

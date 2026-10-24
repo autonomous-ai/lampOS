@@ -1,0 +1,13 @@
+# Helper qualification: frozen baseline 8 and current fc31 24
+
+Baseline `f9780cb2a117f5c5d2c0960cd28cfbee866bd59b` passed all 8 cases once (debug0). Current `fc31e012334cda59eb3c489560454c515fb86386` passed all 8 cases three times each: **24 passed,0 failed,0 unrun**. The 24 were preplanned and executed once by allocation42802 after actual current compile87603 and inventory82213. No retry or extra cases.
+
+This meets the requested3/3 alone category for the eight cases. It does not establish historical cause/non-cause, prove them unrelated, or make the original full run green: **7,316 passed/8 failed/52 ignored remainsFAILED**. Original failure excerpts and final receipt are under `original-failed-full-run/`. Current NoPause147 observations remain pending.
+
+`case-summary.json` names the cases. `current/runs/current-helper-debug0/current-observations/` contains every unchanged raw command/stdout/stderr/consumption record and results; `baseline/runs/base-update0/` contains the baseline 8 raw records and actual profile0 compile/inventory/metadata/CLI provenance. Both contexts retain source fullmode/mtime guards, complete actual metadata, actual CargoJSON and executable/CLI profiles/outputs. The current child audit explicitly retains reachable real TurnDetector and compilation-level attention constant dependencies; source equality is not a cause waiver.
+
+All 24 direct waits were 0; outergroups and owned sessions were absent after fresh rechecks, with zero cleanup signals/errors. Before/after each case, the reviewed runner checked full 10,446 source bytes/kinds/modes/mtimes/branch/pathset and exact test/required canonical evaluator/system identities. Canonical CLI paths were not replaced by forensic filenames.
+
+Resource correction: configured helper2+Cloud2+NoPause2 are authorized ceilings. Cloud/NoPause allocations actually ended incomplete in clean before their compiler/test stages; do not describe three-way Rust compilation. Their original failures remain separate. Root paused all recovery and confirmed all existing Cargo allocations closed during24; no global hardware-isolation/timing-cause claim. See `current/resource-actual-phase-clarification.json` (SHA14abdca11252cda7fe4eaf29e5804555410036c76fb1ddb1aaf3df046e62dbb1).
+
+Controllers/wrappers are SHA/protocol only in `controller-identities-and-protocol.json`; no binaries or Python bodies are included. Plans and raw records retain historical absolute paths unchanged; `manifest.json` maps each projected file to its original path/hash. `SHA256SUMS` seals the packet. This is evidence, not execution authorization.

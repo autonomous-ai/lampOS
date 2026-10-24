@@ -1,0 +1,87 @@
+{
+  "native_session": 87603,
+  "terminal_exit": 0,
+  "head": "fc31e012334cda59eb3c489560454c515fb86386",
+  "source_guard_sha256": "dc2597433c270b64e244c007f3149f464930be56a0a09af2c913588d72b0ab85",
+  "source_checks": "Full10446 bytes/kind/fullmode/mtime/branch/pathset and immutableinput hashes passed before/after.",
+  "profile_debug": 0,
+  "compile_jobs_argv": 2,
+  "inherited_and_runtime_CARGO_BUILD_JOBS": "4",
+  "local_rows": 136,
+  "all_local_fresh_false": true,
+  "compiler_messages": 444,
+  "unique_contexts": 438,
+  "sealed_outputs": 172,
+  "frozen_executable_bindings": 99,
+  "provenance_sha256": "46ea3e3d6819954494097cf627784b38abfc0da56845c56f189fe907132ef8d5",
+  "frozen_bindings_sha256": "271b984f5f7bf25ce9c43c8805d26fae14fd5fc4d9c12cb2fd2ba11bd29fc38e",
+  "required_evaluator_binding": {
+    "binding": {
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+      "sha256": "efce70038ada27c8b82bd43249ed69635cb8e0dd947d8ac8bdeab3549a75ee92",
+      "bytes": 28931560,
+      "compiler_artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/current-fc31-update-qualification/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/current-fc31-update-qualification/lampOS/crates/voice-eval/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice-eval",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/current-fc31-update-qualification/lampOS/crates/voice-eval/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+        "fresh": false
+      },
+      "source_aggregate_sha256": "dc2597433c270b64e244c007f3149f464930be56a0a09af2c913588d72b0ab85"
+    },
+    "original_mode_proof": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0/debug/lamp-voice-eval",
+      "bytes": 28931560,
+      "sha256": "efce70038ada27c8b82bd43249ed69635cb8e0dd947d8ac8bdeab3549a75ee92",
+      "mode": 493
+    },
+    "readonly_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/current-helper-fc31-qualification/runs/current-helper-debug0/readonly/efce70038ada27c8b82bd43249ed69635cb8e0dd947d8ac8bdeab3549a75ee92",
+    "source_guard_sha256": "dc2597433c270b64e244c007f3149f464930be56a0a09af2c913588d72b0ab85"
+  },
+  "commands": [
+    {
+      "record": "runs/current-helper-debug0/clean-compile/clean-local.json",
+      "sha256": "cdad91d27d7a960fc9d480e11bfc6dd0739f0803f112e438f472c2b983eec1c5",
+      "started_at": "2026-10-24T21:45:37.034258+00:00",
+      "finished_at": "2026-10-24T21:46:11.264587+00:00",
+      "direct_wait_status": 0,
+      "group_absent": true
+    },
+    {
+      "record": "runs/current-helper-debug0/clean-compile/compile-no-run.json",
+      "sha256": "973d222368ac23a3987476abed7ed03efde1e8743a9e23f4ca763442a808f883",
+      "started_at": "2026-10-24T21:46:13.510055+00:00",
+      "finished_at": "2026-10-24T21:54:02.738706+00:00",
+      "direct_wait_status": 0,
+      "group_absent": true
+    }
+  ],
+  "prelaunch_resource_authorization_sha256": "f0120cba9cb02671388e9805f1446af2f7a4f3720f326142739e150ef6b290e1",
+  "no_tests_or_inventory_executed": true,
+  "limits": "Actual compiler2 alongside separately authorizedCloud2/NoPause2, distinct targets, no global isolation/timing cause claim. No old artifact relabel or current-case qualification."
+}
