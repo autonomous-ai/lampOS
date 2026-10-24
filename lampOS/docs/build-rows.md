@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-24 18:05 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-25 00:16 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 92.9% over 70 rows. Quality 61.6% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 92.9% over 70 rows. Quality 61.9% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -101,7 +101,7 @@ Written by the first builder from the team's review page at 2026-10-24 18:05 (+0
 | Remembers you: your name and what you told it | 0.35 | 0.90 | 24 Oct 15:5x, down from 0.45: the owner’s own test: “Lamp, remember my face, and I’m …” was heard as “Man. |
 | A good companion | 0.55 | 0.90 | 23 Oct 18:5x, down from 0.65: the owner couldn’t hold a back-and-forth past two turns tonight. |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
-| Body | 0.60 | 0.80 | 24 Oct 16:1x, down from 0.7: lamp-4ace’s body never stood from 20 to 24 Oct: three elbow strains in half an hour on 20 Oct folded it for the rest of a five-day run, and every gesture since was dropped as “not standing”. |
+| Body | 0.65 | 0.80 | 25 Oct 00:2x, up from 0.6: in the product now, merged in train 95: the body rests half an hour after three strains and stands again (#3365), says so on its health (#3378), and moves its pose at 300 counts a second so the… |
 | Head and eye | 0.65 | 0.80 | 23 Oct 11:2x, up from 0.6: head touch passed with the lead’s own hand on lamp-52e6: a tap, a stroke, a 3 s hold that put it to sleep, a tap that woke it, and nothing with hands away (#2857 closed). |
 | The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live | 0.50 | 0.90 | 24 Oct 15:5x, down from 0.55: the owner’s own test: about 6 of 10 lines got through; |
 | Light and all of it together | 0.75 | 0.80 | 24 Oct 16:1x, down from 0.8: the not-feeling-well light (pale white) came on 18 times in three hours on lamp-4ace because its case at 40 °C was judged an error (#3367 makes that 46, off at 50). |
