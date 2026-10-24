@@ -1,0 +1,30 @@
+[
+  {
+    "assets": [
+      {
+        "browser_download_url": "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-6408/lamp-skills",
+        "digest": "sha256:2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5",
+        "id": 668607909,
+        "name": "lamp-skills",
+        "size": 8807104
+      }
+    ],
+    "published_at": "2026-10-23T09:20:09Z",
+    "tag_name": "lampos-lamp-voice-6408",
+    "target_commitish": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb"
+  },
+  {
+    "assets": [
+      {
+        "browser_download_url": "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-6498/lamp-skills",
+        "digest": "sha256:87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984",
+        "id": 670759909,
+        "name": "lamp-skills",
+        "size": 8786048
+      }
+    ],
+    "published_at": "2026-10-23T23:58:23Z",
+    "tag_name": "lampos-lamp-voice-6498",
+    "target_commitish": "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+  }
+]
