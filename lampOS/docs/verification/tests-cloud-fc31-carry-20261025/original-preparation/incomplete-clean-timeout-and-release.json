@@ -1,0 +1,33 @@
+{
+  "native": 74966,
+  "native_terminal_exit_code": 1,
+  "qualification_incomplete": true,
+  "failure_stage": "clean-before-clippy",
+  "actual_started_at": "2026-10-24T21:41:14.503996+00:00",
+  "actual_finished_at": "2026-10-24T21:46:14.704160+00:00",
+  "watchdog_seconds": 300,
+  "wall_seconds": 300.207843,
+  "actual_command_exit": -15,
+  "stdout_bytes": 0,
+  "stderr_bytes": 0,
+  "available_bytes_before_Cargo": 17806659584,
+  "original_raw_record_sha256": "b5ee2fdc92506a39a3d1f7c5aac9c2e4cbe48bc1162c897c44c93264d59d0467",
+  "owned_group": 91335,
+  "group_absent_after_cleanup": true,
+  "direct_wait_status": -15,
+  "owned_jobs_outstanding": 0,
+  "source_guard_unchanged": {
+    "canonical": "d9348a34b99bf7111392515505e38a65a4923c61e5010af9e6b3aedd897d7635"
+  },
+  "unrun_stages": [
+    "clippy",
+    "clean-before-tests",
+    "tests",
+    "clean-before-workspace-build",
+    "workspace-build",
+    "diff-check"
+  ],
+  "Clippy_test_build_or_controls_not_executed": true,
+  "cause": "UNDETERMINED: both captured streams empty; no cache/lock/disk/source attribution",
+  "retry_or_target_cleanup_authorized": false
+}

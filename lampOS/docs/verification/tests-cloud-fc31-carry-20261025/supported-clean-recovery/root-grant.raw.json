@@ -1,0 +1,17 @@
+{
+  "root_reviewed": true,
+  "execution_authorized": true,
+  "lane": "cloud",
+  "scope": "ONE-supported-clean-ONLY-then-STOP",
+  "controller_sha256": "56a0f928ff092e1f0c004eb7def99e07ab5a946dd16b76d59a006848c93bdf98",
+  "plan_sha256": "0a14e6e3f82ffbb4370116576d1c2979ea354c7b16c9ea65aedd73bd1846156a",
+  "head": "e993cacefb453830b2979b7662a081c5b1b42bc4",
+  "source_guard": "d9348a34b99bf7111392515505e38a65a4923c61e5010af9e6b3aedd897d7635",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+  "target_exclusive": true,
+  "all_other_owned_jobs_closed": true,
+  "helper24_closed_sha256": "111ab2a9fc300e6ebd4607c71f2759ddea1eeb148f564bf4cee054631224678e",
+  "timeout_seconds": 600,
+  "grant_id": "root-cloud-clean-recovery-once-2026-10-24T22:19:57.612921+00:00",
+  "limits": "One new supportedclean preparation attempt after all prior jobs closed; old300s timeout preserved. No compile/list/test/nextlane/source/lock mutation. Stop on failure; no auto increase/retry. Frozenfc31 data not relabelled latest42comment-only."
+}

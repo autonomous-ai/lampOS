@@ -1,0 +1,18 @@
+{
+  "recorded_at": "2026-10-24T21:44:16.518500+00:00",
+  "authorization": "Parent expressly authorizes NoPause compile-only parallel Cloud74966",
+  "compile_approval_sha256": "851b241d5033d6217bba7e2522633a4692605d4b19a899bbcf7f011aa36b078c",
+  "Cloud_native": 74966,
+  "Cloud_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+  "Cloud_compile_jobs": 2,
+  "NoPause_native_pending": true,
+  "NoPause_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug2",
+  "NoPause_effective_compile_jobs": 2,
+  "NoPause_runtime_environment_CARGO_BUILD_JOBS": "4",
+  "current_authorized_compile_total": 4,
+  "future_helper2_requires_actual_amendment_and_launch_receipt": true,
+  "maximum_later_total": 6,
+  "authorization_precedes_new_launch": true,
+  "actual_overlap_not_inferred_from_authorization": true,
+  "global_isolation_or_timing_claim": false
+}

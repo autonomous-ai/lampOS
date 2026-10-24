@@ -1,0 +1,11 @@
+# Cloud acknowledgment wait: fc31 carry
+
+#3410 head `e993cacefb453830b2979b7662a081c5b1b42bc4` on `fc31e012334cda59eb3c489560454c515fb86386`. Range-diff against the previous 72/bcb carry is exactly equal. These are macOS x86 local results; later native and latest-base results remain separate.
+
+Full Cloud: **196 passed / zero failed / four ignored**, including the changed Wi-Fi case, across five actual targets. Strict Cloud all-target Clippy and ordinary workspace build pass. Local compiler lineage records are 32/32 fresh for Clippy, 32/32 for tests, 96/96 for workspace build, with no unresolved reuse. All 18 resumed commands and 36 complete raw streams have matching SHA/byte lengths, direct waits zero and owned groups absent. Full source aggregate stays unchanged. Executable witnesses were frozen before later cleaning; binaries and scratch Python controllers are not published.
+
+The original preparation passed formatting, then its first clean timed out after 300 seconds before any Clippy or tests. That failed attempt is retained in `original-preparation`. One separately authorized supported clean succeeded (`supported-clean-recovery`). The six original unrun stages resumed once; no initial clean, formatting, A/B or standalone controls were repeated. The reused fmt record binds the unchanged source and pinned selector; it does not establish a historical formatter binary digest. The clean timeout's cause remains unknown.
+
+Cloud ran with two compile jobs alongside the separate two-job NoPause compiler on an exclusive, distinct target. No isolated-load or timing comparison is claimed. The historical one-baseline/one-candidate experiment and prior native runs stay on their separately published source identities. Current native checks are required before ready, as is the later comment-only latest-base carry.
+
+Primary outputs are copied byte-for-byte; projections/receipts describe producer checks. `manifest.json` lists copied payloads; `SHA256SUMS` additionally covers this README and manifest. Raw streams retain original whitespace and are excluded from whitespace-only diff validation; their bytes are validated by hashes. No device action, CI rerun or local ARM64 build.

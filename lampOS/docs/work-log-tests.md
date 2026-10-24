@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-25 05:49 — qualified Cloud carry pushed; NoPause inventory complete
+
+Ready for lamp-voice: no
+
+Cloud #3410 is pushed as e993cacef on fc31, with equal range-diff from72/bcb. [Full current local packet](verification/tests-cloud-fc31-carry-20261025/) retains original fmt0, original 300-second clean timeout, one successful supported clean recovery and all six original unrun stages passing. Full Cloud196/0/4 and affected case pass; strict Clippy and workspace build pass with32/32/96 fresh local lineage records. Root independently checked18commands/36streams and unchanged source. No control or first-clean/fmt resampling, no timing/cause/isolation claim. New native runs, reader disposition and comment-only latest-base carry remain; earlier72native1216/0/8 stays separately scoped. The console-log representation P3 is corrected in6857d25dd7 without changing log bytes.
+
+NoPause current no-run and inventory have completed:136fresh local records,99frozen executable/CLI bindings,49actual cases across7binaries,21inventory commands allclosed. Its first observer launch failed on a missing scratch support import before parsing/consumption/test allocation; original traceback retained, zero observations. Import-only repair is under review; the fixed147 schedule is unchanged. Updater's24/0 qualification is accepted by Reviewer-two6390479623, with the original failedfull retained. Skills source fix remains uncompiled under the quiet allocation; its test-only assertions/deadlines are unchanged.
+
 ## 2026-10-25 05:32 — original Cloud native result retained
 
 Ready for lamp-voice: no

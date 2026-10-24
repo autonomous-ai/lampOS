@@ -1,0 +1,192 @@
+{
+  "native": 52313,
+  "terminal_exit_code": 0,
+  "all_six_original_unrun_stages_passed": true,
+  "source_guard": {
+    "canonical": "d9348a34b99bf7111392515505e38a65a4923c61e5010af9e6b3aedd897d7635"
+  },
+  "totals": {
+    "passed": 196,
+    "failed": 0,
+    "ignored": 4,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_case_binding": true,
+  "affected_case": [
+    {
+      "package": "lamp-cloud",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+      "status": "ok"
+    }
+  ],
+  "commands": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/clean-before-tests/clean-before-tests.json",
+      "sha256": "cf47ab7899a6cc63cddb74a503a48557661ad06baf39919e0b2743d6afcd236f",
+      "started_at": "2026-10-24T22:33:01.644620+00:00",
+      "finished_at": "2026-10-24T22:33:04.490398+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/clean-before-workspace-build/clean-before-workspace-build.json",
+      "sha256": "fd6065b98bb5547fcf6a8d2a2b313354cacb86edb13f785274484c6881ed7377",
+      "started_at": "2026-10-24T22:38:11.596544+00:00",
+      "finished_at": "2026-10-24T22:38:17.471643+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/clippy/clippy.json",
+      "sha256": "66dc75162d45e20a088c193849e893915a1892d186289eb8921829cd9166ff0b",
+      "started_at": "2026-10-24T22:31:07.149477+00:00",
+      "finished_at": "2026-10-24T22:32:51.902982+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/diff-check/diff-check.json",
+      "sha256": "ef23cd545df7737ddd195b487ff7491e3028613a0ed58c20824205e1698ae554",
+      "started_at": "2026-10-24T22:44:07.135349+00:00",
+      "finished_at": "2026-10-24T22:44:07.229446+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-it-f17523f9da/all.json",
+      "sha256": "0f2629ff0c871650bdb7e87ac31ff703297274482ef02af744c1964807544374",
+      "started_at": "2026-10-24T22:37:56.875723+00:00",
+      "finished_at": "2026-10-24T22:37:56.935572+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-it-f17523f9da/file.json",
+      "sha256": "d39d6dfaa877247ba54832098d594347ceb76a195016a4b6df6538531459d1e2",
+      "started_at": "2026-10-24T22:37:56.763799+00:00",
+      "finished_at": "2026-10-24T22:37:56.874071+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-it-f17523f9da/ignored.json",
+      "sha256": "a1f2513dea9b7de5086ea7df8c3b264fe9688db27e7e287d144e0c3f872fac61",
+      "started_at": "2026-10-24T22:37:56.944129+00:00",
+      "finished_at": "2026-10-24T22:37:57.028032+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-lamp-cloud-41252e7202/all.json",
+      "sha256": "36656a5828b06a1840bfa3f5fcb147b263908d461757abc93881d64cf80a7ff8",
+      "started_at": "2026-10-24T22:37:56.459468+00:00",
+      "finished_at": "2026-10-24T22:37:56.505705+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-lamp-cloud-41252e7202/file.json",
+      "sha256": "1f15fbb8e4c4a628c4f1d90afc97aac5062ceb916b1aa2832ed643c0ac2b75fc",
+      "started_at": "2026-10-24T22:37:56.430349+00:00",
+      "finished_at": "2026-10-24T22:37:56.458386+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-lamp-cloud-41252e7202/ignored.json",
+      "sha256": "b5b2032d7f02ce4fb05b49c0cc3e9db62cb4002d18d6326640ee159a41e777b7",
+      "started_at": "2026-10-24T22:37:56.506514+00:00",
+      "finished_at": "2026-10-24T22:37:56.553175+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-lamp_cloud-25e2e47485/all.json",
+      "sha256": "115263ec5c6979b229cf7648c502f292ff8b39e36c726c7704ae098f942648f3",
+      "started_at": "2026-10-24T22:37:57.206154+00:00",
+      "finished_at": "2026-10-24T22:37:57.344214+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-lamp_cloud-25e2e47485/file.json",
+      "sha256": "89ba4f78df96668b71e45027b05af3f49de3a39777225299503372741b2443cf",
+      "started_at": "2026-10-24T22:37:57.127433+00:00",
+      "finished_at": "2026-10-24T22:37:57.204848+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-lamp_cloud-25e2e47485/ignored.json",
+      "sha256": "12b4caaa8dee3c437502736f0d57df109c0d1f5954bbd6241675adb11520c88b",
+      "started_at": "2026-10-24T22:37:57.346549+00:00",
+      "finished_at": "2026-10-24T22:37:57.430230+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-release_pair-e276aff842/all.json",
+      "sha256": "cdda1f5f4bfc59c5578665bd8b777354ef32eaa5499e6b9ee9540b640b2ff4d7",
+      "started_at": "2026-10-24T22:37:56.589613+00:00",
+      "finished_at": "2026-10-24T22:37:56.645551+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-release_pair-e276aff842/file.json",
+      "sha256": "9590bf41d249704b66416e378485ed0d7e0064c1fee349cedd78894945d65e2e",
+      "started_at": "2026-10-24T22:37:56.564562+00:00",
+      "finished_at": "2026-10-24T22:37:56.588619+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/compiled-census/lamp-cloud-release_pair-e276aff842/ignored.json",
+      "sha256": "8013546dc4631a80ef5eeb4c840e43ebb4b18fd7b3fe40692fdb482590982b53",
+      "started_at": "2026-10-24T22:37:56.649441+00:00",
+      "finished_at": "2026-10-24T22:37:56.707112+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/tests/tests.json",
+      "sha256": "d04d2e69161747e07b3ddc99a245d44e9d7fea515ddb442c4c8035f00ec8ac82",
+      "started_at": "2026-10-24T22:33:14.523323+00:00",
+      "finished_at": "2026-10-24T22:37:47.731308+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-fc31-unrun-stages-resume/run-2026-10-24T223102.491196+0000/workspace-build/workspace-build.json",
+      "sha256": "145b646483d27b0255836a7bbb6d3278663692468a9b2f2a0f967c95ee46a959",
+      "started_at": "2026-10-24T22:38:32.023837+00:00",
+      "finished_at": "2026-10-24T22:43:37.787519+00:00",
+      "direct_wait": 0,
+      "group_absent": true
+    }
+  ],
+  "command_count": 18,
+  "result_sha256": "f916a0b027c8b013742dc207419973542bbfe476113f629d0b553585a086c7f4",
+  "no_Cargo_jobs_or_owned_groups_remaining_on_this_target": true,
+  "NoPause95561_still_active_on_distinct_target": true,
+  "initial_fmt0_and_one_recovery_clean_reused": true,
+  "original_300s_failure_preserved_cause_unknown": true,
+  "no_repeated_controls": true,
+  "isolated_load_or_timing_claim": false,
+  "target_released_for_root_decision_only": true
+}

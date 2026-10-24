@@ -1,0 +1,54 @@
+{
+  "plan_identity": "cloud-e993-fc31-six-original-unrun-stages",
+  "plan_sha256": "4f7e8e2989603f9a51f950593254315d836416df225953d0f05d4a076cb561ac",
+  "controller_sha256": "1287b5efe4f501a89c79dbd8b1c4c9008f1d6eedeffce78e6f84e73920b1e15d",
+  "source_map_sha256": {
+    "canonical": "75d6c5282f99cb8c2bb10849c70d4c5e4effeb8e5fdf5cef0b6c61fa4f2b5c8c"
+  },
+  "source_guards": {
+    "canonical": "d9348a34b99bf7111392515505e38a65a4923c61e5010af9e6b3aedd897d7635"
+  },
+  "source_heads": {
+    "canonical": "e993cacefb453830b2979b7662a081c5b1b42bc4"
+  },
+  "execution_authorized": true,
+  "grant_scope": "ONLY six original unrun canonical stages; reuse closed fmt and one supported-clean recovery",
+  "exclusive_target_grant": {
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "previous_owner_released": true,
+    "cpu_exclusive": false,
+    "target_exclusive": true
+  },
+  "concurrency_context": {
+    "mode": "root-authorized overlap on distinct exclusive targets",
+    "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Current other compilers0. Future helper2/NoPause2 only with explicit amendments and actual receipts on distinct targets; aggregate<=6. No isolation or timing claim.",
+    "other_active_compiler_jobs": 0,
+    "total_bounded_compile_jobs": 2,
+    "this_gate_compiler_jobs": 2,
+    "later_other_compile_job_limit": 4,
+    "maximum_later_total_compile_jobs": 6,
+    "other_target_role": "Reserved future qualification target only; no active sibling Cargo job at grant/start",
+    "other_active_native_sessions": [],
+    "other_active_targets": []
+  },
+  "grant_id": "root-authorized-cloud-six-resume-2026-10-24T22:30:53.688451+00:00",
+  "previous_target_release_sha256": "5baf1ee1c4dd58bfd97dd2225a43728529049849dd0becf1ce8c8e2adeae841c",
+  "scope_limits": "Six unrun stages only; original timeout and pinned-toolchain fmt-proof limit retained. No initialclean/control. NoPause2 permitted by separate prelaunch amendment; aggregate4.",
+  "reused_completed_input_hashes": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-e993cac-canonical-prep/run-2026-10-24T214041.618075+0000/fmt/fmt.json": "8ec011356663627702d6af27974b614595885086765eaa71754997d4ecca4565",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-e993cac-canonical-prep/run-2026-10-24T214041.618075+0000/fmt/fmt.guards.json": "2b922efeccee0e5d7a2ffb4c20cafcf081f29315e8c42e0775d2da3474ecd4e7",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-e993cac-canonical-prep/run-2026-10-24T214041.618075+0000/fmt/fmt.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-carry-e993cac-canonical-prep/run-2026-10-24T214041.618075+0000/fmt/fmt.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/fc31-supported-clean-recovery-prep/cloud-run-2026-10-24T222026.683915+0000/verified-closure.json": "43995e214cde8476d2586bac67c9472526fd39eb0a01ebb310b17f5b6e6906eb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/fc31-supported-clean-recovery-prep/cloud-run-2026-10-24T222026.683915+0000/result.json": "4c63b6e5580d58e9b3a4c7576ca204c76ffef27e24388ea94184e0ef6fe8e55d",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/fc31-supported-clean-recovery-prep/cloud-run-2026-10-24T222026.683915+0000/supported-clean.json": "4ea49401e5b77fe7ad34af70aec8a8465b816c827ee3dab58db155248cdcd6f2",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/fc31-supported-clean-recovery-prep/cloud-run-2026-10-24T222026.683915+0000/supported-clean.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/fc31-supported-clean-recovery-prep/cloud-run-2026-10-24T222026.683915+0000/supported-clean.stderr.txt": "df1ca7387b1540c63f80a33ab3f3189923f3581610a2bb6f4149fc8fb7374dfc"
+  },
+  "root_message_authorization": "ROOT REVIEW COMPLETE: exact1287/4f7 six original unrun stages; no initialclean/fmt/control"
+}

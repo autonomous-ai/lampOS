@@ -1,0 +1,13 @@
+{
+  "normalized_full_graph_equal": true,
+  "normalized_only": [
+    "actual source-root prefix",
+    "target_directory",
+    "build_directory"
+  ],
+  "local_packages": 48,
+  "reverse_closure": [
+    "lamp-cloud"
+  ],
+  "raw_metadata_sha256": "a028aca64b389125d59dff5c7e5cab44c4751747b5c8daebfd689974cda2827a"
+}

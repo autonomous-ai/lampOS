@@ -1,0 +1,16 @@
+{
+  "recorded_at": "2026-10-24T21:45:46.314286+00:00",
+  "authorization": "Parent authorizes helperfc31 compiler2, handle pending",
+  "Cloud_native": 74966,
+  "Cloud_compiler_jobs": 2,
+  "NoPause_native": 30040,
+  "NoPause_compiler_jobs": 2,
+  "helper_native_pending": true,
+  "helper_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target/debug0",
+  "helper_compiler_jobs_authorized": 2,
+  "helper_plan_sha256": "f55ce8ded73f111a4fe143cb586edeef465877f58dbd0a83a495cf296f71dac8",
+  "authorized_total_after_actual_helper_launch": 6,
+  "three_distinct_targets": true,
+  "actual_launch_not_inferred_from_authorization": true,
+  "no_global_isolation_or_timing_claim": true
+}

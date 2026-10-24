@@ -1,0 +1,2 @@
+    Blocking waiting for file lock on package cache
+     Removed 9864 files, 2.4GiB total

@@ -1,0 +1,42 @@
+{
+  "plan_identity": "cloud-ack-e993cacef-canonical-only-v1",
+  "plan_sha256": "e365efec8b17207f7d4188637510cb6eed52ac49c4dd59337c091a345b21c03e",
+  "controller_sha256": "f3539a43466b804afd5843a05acfdf26fca7539a0952e06432380e414b0a0a5e",
+  "source_map_sha256": {
+    "canonical": "75d6c5282f99cb8c2bb10849c70d4c5e4effeb8e5fdf5cef0b6c61fa4f2b5c8c"
+  },
+  "source_guards": {
+    "canonical": "d9348a34b99bf7111392515505e38a65a4923c61e5010af9e6b3aedd897d7635"
+  },
+  "source_heads": {
+    "canonical": "e993cacefb453830b2979b7662a081c5b1b42bc4"
+  },
+  "execution_authorized": true,
+  "grant_scope": "one-current-cloud-canonical-fmt-clippy-full-tests-workspace-build-no-controls",
+  "exclusive_target_grant": {
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "previous_owner_released": true,
+    "cpu_exclusive": false,
+    "target_exclusive": true
+  },
+  "concurrency_context": {
+    "mode": "root-authorized overlap on distinct exclusive targets",
+    "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Current other compilers0. Future helper2/NoPause2 only with explicit amendments and actual receipts on distinct targets; aggregate<=6. No isolation or timing claim.",
+    "other_active_compiler_jobs": 0,
+    "total_bounded_compile_jobs": 2,
+    "this_gate_compiler_jobs": 2,
+    "later_other_compile_job_limit": 4,
+    "maximum_later_total_compile_jobs": 6,
+    "other_target_role": "Reserved future qualification target only; no active sibling Cargo job at grant/start",
+    "other_active_native_sessions": [],
+    "other_active_targets": []
+  },
+  "grant_id": "root-cloud-fc31-2026-10-24T21:40:04.867951+00:00",
+  "previous_target_release_sha256": "5baf1ee1c4dd58bfd97dd2225a43728529049849dd0becf1ce8c8e2adeae841c",
+  "scope_limits": "Eight canonical stages once on committed e993/fc31, jobs2; no A/B control repeat/source mutation. Current others0; future qualification2+2 needs explicit amendments/actual receipts,total<=6."
+}
