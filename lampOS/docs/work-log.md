@@ -1,3 +1,41 @@
+## Current checkpoint: 2026-10-25 06:51 +07, successor-socket fixture qualification open
+
+Taken on Queue 6390840447: the unowned Body supervisor successor-socket
+case from the six unqualified NoPause groups. Tests retains Body Hand.
+The complete 22-open-PR path census found no supervisor owner; prior
+#1314/#1315 startup work was read. [Source plan and preserved evidence](verification/body-successor-socket-source-20261025/README.md)
+cover only the named test and realtime-test documentation. Candidate own
+branch `second/body-successor-sockets` is on efbf42a02 with two modified
+files; no code commit, push or PR claims qualification yet. All ownership
+assertions remain, explicit owned kill/reap replaces only later teardown's
+graceful-stop assertion, and runtime deadlines/code remain unchanged.
+Independent source read 6391002248 has no P1/P2.
+
+The first command epoch is terminal: baseline exact 1/0, candidate-labelled
+exact 1/0, full command 608/0, fmt/strict Body Clippy pass, deliberate
+missing-peer negative 0/1 at the expected assertion. All owned groups
+closed and all 7,041 source hashes match after restoration. **Candidate
+library qualification is unproven:** exact/full reused an executable
+byte-identical to the baseline. [Complete original commands and limitation](verification/body-successor-socket-source-20261025/first-commands-unqualified/README.md)
+are retained; they are not a candidate passing gate or a cache-mechanism
+cause claim. No pre-launch byte-witness claim for that original epoch.
+
+[Separate fresh-target plan](verification/body-successor-socket-source-20261025/fresh-qualification-plan.md)
+fixes one exact and one full candidate qualification, no baseline/negative
+repeat, with pre-exec byte witnesses and explicit instrumentation/child
+limits. Independent plan read 6391060148 has no P1/P2; actual execution
+remains unrun. Original two-job allocation was released to Cloud at
+6390983252; fresh qualification queues after Cloud. Fourth holds its
+separate Skills lane. No new compiler allocation, local ARM64 job,
+device action, deadline change or historical-failure waiver.
+
+Earlier product/native and build-row reads are complete and published.
+Next: resource handoff/current-base preflight, fresh qualification, exact
+source commit/push/PR once qualified, native CI and readers; while queued,
+handle findings and current Queue work without ending the turn.
+
+---
+
 ## Current checkpoint: 2026-10-25 06:17 +07, product native and build-row reads complete
 
 Own source PRs remain closed and landed; no own open PR needs a carry.
