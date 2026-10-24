@@ -1,0 +1,239 @@
+{
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "current_mac_gate_verified": true,
+  "gates": [
+    {
+      "actual_compilation_members": 46,
+      "all_host_process_groups_cleaned": true,
+      "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "captured_output_hashes_are_stage_time_observations": true,
+      "compiler_bindings_independently_reparsed": true,
+      "controls": [
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+          "observed_once_passed": true
+        }
+      ],
+      "host": "mac",
+      "linux_only": false,
+      "manual_actual_release_cases": [],
+      "name": "common-current-mac",
+      "no_container_required_on_host_mac": true,
+      "no_current_target_binary_read": true,
+      "not_full_acceptance": true,
+      "only_completed_mac_streams_read": true,
+      "owned_paths": 36,
+      "source_files": 10453,
+      "source_guard_verified": true,
+      "source_tree_and_index_reconstructed": true,
+      "stages": [
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "f8fd4e500d6d607e30646176b1ada8fc8da8ffbcde4888d47bb9f7cdc90f0024",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "required_control_count": 0,
+          "stage": "fmt"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "6319d87cb7049dd42ec415c859b3360a92e51e3a01bbbcf6fe8016289ed7cd7c",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "65294ad0bbf6f2859155518efdd2d10dde6d19f37edbedd7535e4c8d99e99d0f",
+          "required_control_count": 0,
+          "stage": "clippy"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "4d2d03b99dfa98058f66b63adb519fa62ab1c746af62b3c993bdfa3fad371d4d",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "92cd00fa7d4fb307d75557d575e5949fce0b75aa66a0d6fdff737f51363048bf",
+          "required_control_count": 0,
+          "stage": "workspace-build"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 357
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "baa275ae959231dc8819851ba686fc0cc64e9402a876a7b5fd8adc79ef12a52b",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 357
+          },
+          "raw_stdout_sha256": "836464f6b79a90101d6b62973ef5e68778ae2ddc8930ef191249f84182b7642c",
+          "required_control_count": 0,
+          "stage": "full-eyes"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 21,
+            "passed": 4125
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "a5005d5c5ab4c5aabbc117709f945a2ac5d26a4b6f05a84ba16c718f812509f3",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 21,
+            "passed": 4125
+          },
+          "raw_stdout_sha256": "2ce160bee28254f2a7dd75fcaaa2caa00625b80726219b788d12353eb9d263eb",
+          "required_control_count": 4,
+          "stage": "full-voice"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 6,
+            "passed": 386
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "e343fa64d0632cfd2785e6be2f5a1e8feca5687624892708ad192059215c44d6",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 6,
+            "passed": 386
+          },
+          "raw_stdout_sha256": "f067634fadd8a5aa9821f0f22f924bfc50515cade9fc0ddeebcd007f3b41f384",
+          "required_control_count": 0,
+          "stage": "full-update"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 9,
+            "passed": 516
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "101f3982e41256c1c8fcec5c2a2a8d33d15cd986a0d2c86044c15bfa4019ffe1",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 9,
+            "passed": 516
+          },
+          "raw_stdout_sha256": "99f934966f42b7fe481de1bc83cd5a229c3bce0d5d90ac95efcd43e00fb8cf9a",
+          "required_control_count": 0,
+          "stage": "full-skills"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 8,
+            "passed": 324
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "4fa53f4bed27da8688a00feaff0b46363ccf64357c2972cfe7ca2cc1382b4af8",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 8,
+            "passed": 324
+          },
+          "raw_stdout_sha256": "b09bb8b17b8465f7e4181325097593257c4b769bc643b0793fdd660bec0a7ef0",
+          "required_control_count": 0,
+          "stage": "full-memory"
+        }
+      ],
+      "successor_clean_may_have_removed_binary_outputs": true,
+      "terminal_sha256": "9be8913dbcf77117dfc0002c5f28c35929fd7b4416bedf2271ec55f9912f1a9b",
+      "tested_source_epoch": "778e before any final documentation binding; sourced only from completed current receipts; old665d evidence remains separate",
+      "tree": "778e51d10695f37e5d4e05250f9814ea022edf26"
+    }
+  ],
+  "historical_failures_not_waived": true,
+  "linux_manifest_reference": "08cd331f9e9e108095942ac5c0c28cb0d21942d4d976855db1417be8b0299b39",
+  "linux_publication_reference": "2b942",
+  "not_claimed": [
+    "new ARM64 qualification",
+    "lamp behavior",
+    "latency",
+    "readiness",
+    "product activation",
+    "independent final authored documentation parity"
+  ],
+  "published_linux_packet_unchanged": true,
+  "tested_tree": "778e51d10695f37e5d4e05250f9814ea022edf26",
+  "verification_boundary": "Completed current Mac raw receipts independently reparsed. No current source, target/cache, index, refs or source mtime read/changed. Compiler-output hashes/exists_after_stage are captured stage-time observations only; successor cleans may remove outputs."
+}

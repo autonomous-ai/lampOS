@@ -1,0 +1,17 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "path+file:///private/tmp/fourth-common-current-carry-20261024/lampOS/crates/same-voice#lamp-same-voice@0.1.0"
+  ],
+  "elapsed_seconds": 0.25519185600205674,
+  "exit": 0,
+  "pid": 91420,
+  "process_group": 91420,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

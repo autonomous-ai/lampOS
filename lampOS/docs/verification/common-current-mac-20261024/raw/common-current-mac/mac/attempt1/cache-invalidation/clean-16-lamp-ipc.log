@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-common-current-carry-20261024/lampOS/crates/ipc#lamp-ipc@0.1.0` is ignored, cleaning all versions of `lamp-ipc` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-common-current-carry-20261024/lampOS/crates/ipc#lamp-ipc@0.1.0` ignored, cleaning all versions of `lamp-ipc` found
+     Removed 26 files, 5.7MiB total

@@ -1,0 +1,15 @@
+{
+  "cargo_or_cache_access": false,
+  "files": {
+    "cache.py": "de6f8b4418b61605846aa230022754f045a557feb2eeae7cc3c1adb840e221e9",
+    "config.json": "f470d770c4f8cd483b90cc39be7173db3492482f7e8be327c2e501803aa87d91",
+    "frozen.json": "ddeb21f1ab9ec9ca8344c7b07460d56a42fc147bfcd0402e30b7727bef37dc2d",
+    "gate.py": "9b856d9426d9c9d664bd86d82ccb09abc22881a585bccedd2b12bf5a86ee6940"
+  },
+  "local_workspace_invalidation_required": true,
+  "owned_paths": 36,
+  "preparation_only": true,
+  "source_files": 10453,
+  "source_tree": "778e51d10695f37e5d4e05250f9814ea022edf26",
+  "target_access_granted": false
+}

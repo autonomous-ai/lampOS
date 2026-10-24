@@ -8557,3 +8557,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: current Common carry pushed after both full gates
 
 #3064 now owns one commit e9d00f935 on2e2eee360 after exact successful lease replacement of8ed. [Final binding and range-diff](verification/common-current-final-head-20261024/README.md) prove runtime/test identity to tested778e; only two result notes differ. Both complete eight-stage gates0, fresh46 each, all controls/source/cleanup valid. Mac357/4125/386/516/324 andLinux360/4186/388/519/324, every failure0, ignored recorded in table. GitHub reports mergeable and fresh native40101806082/Clippy40101805913 active, not passed. Draft/voice-freeze/privacy/pins/physical holds remain. Claimed separate combined name/hits→Engine→HTTP test before isolated code preparation; no runtime or product-default change.
+
+## 2026-10-24: current Mac raw qualification published
+
+[Current778e Mac full raw packet](verification/common-current-mac-20261024/README.md) independently reparses all eight successful stages, four controls,46 fresh members and stable source/index/cleanup/release. Original159-payload manifest6590611c is retained; matching Linux08cd manifest remains unchanged. Final #3064 head e9d runtime/test binding is already public. Current native/review/physical holds remain separate; no stage-time artifact observation is promoted to a current-cache or lamp claim.

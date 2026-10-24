@@ -1,0 +1,17 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "path+file:///private/tmp/fourth-common-current-carry-20261024/lampOS/crates/mood#lamp-mood@0.1.0"
+  ],
+  "elapsed_seconds": 0.2621147870013374,
+  "exit": 0,
+  "pid": 91354,
+  "process_group": 91354,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

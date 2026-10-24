@@ -1,0 +1,802 @@
+{
+  "files": [
+    {
+      "bytes": 2295,
+      "path": "README.md",
+      "sha256": "5fedae808371d22bd7e5a78f38a10d1607c03dc1134b04ba32b4f2cfeace9030"
+    },
+    {
+      "bytes": 22630,
+      "path": "common-current-mac/bindings/config.json",
+      "sha256": "f470d770c4f8cd483b90cc39be7173db3492482f7e8be327c2e501803aa87d91"
+    },
+    {
+      "bytes": 613,
+      "path": "common-current-mac/bindings/design.json",
+      "sha256": "e81a461325b549b3a57451d914e926beafc2a30209adee0c6a30cf42efe1b845"
+    },
+    {
+      "bytes": 3704303,
+      "path": "common-current-mac/bindings/frozen.json",
+      "sha256": "ddeb21f1ab9ec9ca8344c7b07460d56a42fc147bfcd0402e30b7727bef37dc2d"
+    },
+    {
+      "bytes": 384,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-01-lamp-actions-process.json",
+      "sha256": "c28d1cb9bb6b31b570606c17541056619af41145c40e1043c0a59f0eb455d217"
+    },
+    {
+      "bytes": 422,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-01-lamp-actions.log",
+      "sha256": "54cee0787e759614c438210867b63df6b9778270e64bb6b00cddbd3a9d418c0e"
+    },
+    {
+      "bytes": 382,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-02-lamp-addons-process.json",
+      "sha256": "6f061f079aca8af4e40204e0d7fe0ea4bc052e7f22d717639c29828040651c14"
+    },
+    {
+      "bytes": 416,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-02-lamp-addons.log",
+      "sha256": "cdff08ac6ae6c26ad11354e914d5c78ba01ede5142f841af032e217f05989466"
+    },
+    {
+      "bytes": 375,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-03-lamp-air-process.json",
+      "sha256": "57fc1925138a40b05a0f70748c6b18721e2bd622b067dda62bf7faffe0035775"
+    },
+    {
+      "bytes": 397,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-03-lamp-air.log",
+      "sha256": "85f3910c1d2d4b037e9ea679e881970668df4ff90867f1f18a74d600c80296c4"
+    },
+    {
+      "bytes": 380,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-04-lamp-audio-process.json",
+      "sha256": "c5a9b71a061eca4bd051935c061598f25a5e06437fc40fd6a3d7928604964814"
+    },
+    {
+      "bytes": 410,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-04-lamp-audio.log",
+      "sha256": "238a75d16b58a892f6cc4b27a1f6e0e0a3922bc0ec634c748f62ed94786a0355"
+    },
+    {
+      "bytes": 378,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-05-lamp-body-process.json",
+      "sha256": "2959201433a349100752b871aff9e16e0fba40dfc97588b26f6cdb1338d65ad5"
+    },
+    {
+      "bytes": 404,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-05-lamp-body.log",
+      "sha256": "b31b066b097032be7754dfee75cd3a7d7c7879a7f9f07bb93dfd715ae1a1537c"
+    },
+    {
+      "bytes": 376,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-06-lamp-bus-process.json",
+      "sha256": "c03d39100747b21ed54f1bc51cb8fce4c724790a4abc61a0b92848f3b558c4aa"
+    },
+    {
+      "bytes": 398,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-06-lamp-bus.log",
+      "sha256": "20d6c449c0be1368c29a15c7cf4230096e980f6f3e8907638053b8598835547b"
+    },
+    {
+      "bytes": 383,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-07-lamp-camera-process.json",
+      "sha256": "8c3c054df9c8ff0db1dc244493216bc102621bde7eac5e7b9e7c4079398950b4"
+    },
+    {
+      "bytes": 415,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-07-lamp-camera.log",
+      "sha256": "430255e15b2f2ba2514c033b22d4abd75e3adbe3db898ace598ff788799d55d0"
+    },
+    {
+      "bytes": 380,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-08-lamp-cloud-process.json",
+      "sha256": "cdea17aad32da2375396d314e440068c1c0f45b66d7d45992591611b9aba0093"
+    },
+    {
+      "bytes": 410,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-08-lamp-cloud.log",
+      "sha256": "4011a64f8e23940e67ef045a58d64464b858a7567b40a79bc229214be2b6a8ca"
+    },
+    {
+      "bytes": 387,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-09-lamp-controls-process.json",
+      "sha256": "aff7c5246784fd315bf2972d350c35bdd0e7589cd6a8daaec12787bd9ede5190"
+    },
+    {
+      "bytes": 428,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-09-lamp-controls.log",
+      "sha256": "35b9694355f7d6ceaf60d0e4d3d83262d68049be8ac2ae91e9d943c47447fa99"
+    },
+    {
+      "bytes": 379,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-10-lamp-ears-process.json",
+      "sha256": "b3a5df002c84ce4cb80b5d38345aeb6ce7e321dfe73a61d1b640132b7eaf037d"
+    },
+    {
+      "bytes": 405,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-10-lamp-ears.log",
+      "sha256": "472396ff6374836ce703ad3ad9c8f0302c0b101b8d77adad4e1933408ed4b306"
+    },
+    {
+      "bytes": 392,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-11-lamp-environment-process.json",
+      "sha256": "ce4fcf5e2926ef071bb5c7349e024c7675637df49856613064cbdd7b573f67d4"
+    },
+    {
+      "bytes": 445,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-11-lamp-environment.log",
+      "sha256": "5d14774aa1722799b07471324e7cd2af9baa1d3c9a19d304911684e5b6a98c22"
+    },
+    {
+      "bytes": 391,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-12-lamp-expression-process.json",
+      "sha256": "5d3b2d839fb1d92ca8d6de19cdd7680be932c9ffa94b4ac06a935e9955d653da"
+    },
+    {
+      "bytes": 440,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-12-lamp-expression.log",
+      "sha256": "418adcdc125c7e83c1b5f201d6587e2f2f5f7cb8d55302c004863fc1fa93fd42"
+    },
+    {
+      "bytes": 379,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-13-lamp-eyes-process.json",
+      "sha256": "c2fde2ab239e121548cc1decfd28ef25485f77956614fcd2ad96558e86750706"
+    },
+    {
+      "bytes": 405,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-13-lamp-eyes.log",
+      "sha256": "24aaeef89ce68c9b47787628803cf86c9049254388f644aa980f45e68132d7d4"
+    },
+    {
+      "bytes": 383,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-14-lamp-gemini-process.json",
+      "sha256": "a36f4bf38378ece04307adaa33301ba7ff6d79e5507fb598a1b3207f4755e1dc"
+    },
+    {
+      "bytes": 416,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-14-lamp-gemini.log",
+      "sha256": "aa0105a269517e83b462cde1c8340cff5c6a5e7909ce6035f2884507db8d38eb"
+    },
+    {
+      "bytes": 383,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-15-lamp-health-process.json",
+      "sha256": "21d78fec8d994d0c062cf1b5103c204a2bf1cbce392d3199f28961e5bf6cc0bb"
+    },
+    {
+      "bytes": 416,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-15-lamp-health.log",
+      "sha256": "f74e3f71f3d6af8d3e0eb474a99a2d3bcd23211d8b1616325427527836c14b66"
+    },
+    {
+      "bytes": 377,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-16-lamp-ipc-process.json",
+      "sha256": "a3c13e08ecc432040ec2c227f3109cc6a7a7b0f9adafa497f8f85cdbb1e90f05"
+    },
+    {
+      "bytes": 397,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-16-lamp-ipc.log",
+      "sha256": "f80ca755aa98f5c0209e8886e9312e4b451cce8664cdc11e29dec1d62954c060"
+    },
+    {
+      "bytes": 383,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-17-lamp-keeper-process.json",
+      "sha256": "e790a99b954cfc2b7f56e71f4600bfcbb5026ad471f3ea9b40ae5f14205d8074"
+    },
+    {
+      "bytes": 416,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-17-lamp-keeper.log",
+      "sha256": "ea099ab5902b2c8c4216ea2e836dbe4aa2fd2f87faab80b036220ff09821d0e6"
+    },
+    {
+      "bytes": 378,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-18-lamp-lean-process.json",
+      "sha256": "4b8a3232b95fc7b2882884c3905dfedf6efefa27a6c03980dea69df4e8b6fc45"
+    },
+    {
+      "bytes": 403,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-18-lamp-lean.log",
+      "sha256": "67e862120107826fdf27d3b2aa1966d6146f972ee2570811f65aa2fe45ad677b"
+    },
+    {
+      "bytes": 391,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-19-lamp-local-time-process.json",
+      "sha256": "b70688669ec9b765c5b442141edb626722631af13de11693fdabbbf080a634d6"
+    },
+    {
+      "bytes": 439,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-19-lamp-local-time.log",
+      "sha256": "aac615850cb9b6f1b6e8fa2a6b834c9f0002f71d0273ed2cdba01f2c5c0aef03"
+    },
+    {
+      "bytes": 383,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-20-lamp-memory-process.json",
+      "sha256": "b2f3876f31607c893886dc5e6c48f5bbe6a728c8a832e27cd64c00a615ac26ef"
+    },
+    {
+      "bytes": 416,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-20-lamp-memory.log",
+      "sha256": "74264972c2ea2634aa8052e7d2ca3c1dadc26bd25f16635d4613639c6a438de2"
+    },
+    {
+      "bytes": 378,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-21-lamp-mood-process.json",
+      "sha256": "c0c4641412203cca316d2ea13664331a06fdd459165bbe9923c867ee7c68c80d"
+    },
+    {
+      "bytes": 404,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-21-lamp-mood.log",
+      "sha256": "3f16138206cc261436dde0983df5cea8ae78184a6f04dccf6d29218229b78153"
+    },
+    {
+      "bytes": 379,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-22-lamp-msgs-process.json",
+      "sha256": "f144f90e290ab6a0454b619f5c78b92971a7072cc782e1be57ce02acb4d16023"
+    },
+    {
+      "bytes": 404,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-22-lamp-msgs.log",
+      "sha256": "8a8091499dc9171664f6c30fa8e13322e0c6af1ec1cc5621674c9b3402f577f5"
+    },
+    {
+      "bytes": 378,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-23-lamp-name-process.json",
+      "sha256": "7375a2c42ff0cadc9fadf78d4e8366809cf350ca09a00b0848177e247ea67494"
+    },
+    {
+      "bytes": 405,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-23-lamp-name.log",
+      "sha256": "8c8367e1180d92a5eb4aa9859b1da3e8ded30caf23b906db1769504f3405b2b3"
+    },
+    {
+      "bytes": 389,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-24-lamp-near-call-process.json",
+      "sha256": "a39283ce26d2e026ac81cb07e2352042291b7095077f41301665843eeea84ece"
+    },
+    {
+      "bytes": 433,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-24-lamp-near-call.log",
+      "sha256": "951930d5730179384ea33a3bae59f69a16afbaed23089af5ed72643eaad50f09"
+    },
+    {
+      "bytes": 386,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-25-lamp-observer-process.json",
+      "sha256": "13ef5c8fe8658bc044cd0c733891eab9a8cf9f0ad8e007b04cde9a29982526fa"
+    },
+    {
+      "bytes": 428,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-25-lamp-observer.log",
+      "sha256": "7bd287373b1f3d381de3915642c5ca5b1fd5df104950eb155c04c964f73784bc"
+    },
+    {
+      "bytes": 378,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-26-lamp-peek-process.json",
+      "sha256": "2fcb270f43658d66e5d403886b00e6c1917c08685015ecc4ec02ad356a1aa90f"
+    },
+    {
+      "bytes": 404,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-26-lamp-peek.log",
+      "sha256": "3aa08a82a3d80abe5089300005d85a921f09da33fb2cd2a882a2793437372f10"
+    },
+    {
+      "bytes": 382,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-27-lamp-policy-process.json",
+      "sha256": "953820e69b6fdfb163a25541657be33b77575aa02bf555b6634d90b5fd05b261"
+    },
+    {
+      "bytes": 417,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-27-lamp-policy.log",
+      "sha256": "61ff1c19241ff355851e7afacf0d8d8904c1edcef5a5aa06c3a4830f9cdb8152"
+    },
+    {
+      "bytes": 383,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-28-lamp-records-process.json",
+      "sha256": "9b8843a414e0422391c292a1cbb8a266f50f0cbc7abcc20e38aff6c89d7ed194"
+    },
+    {
+      "bytes": 424,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-28-lamp-records.log",
+      "sha256": "72d8210b54e3e8da78d2aab25fef2337f0fa1e69254baba69260d7a958e8addf"
+    },
+    {
+      "bytes": 378,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-29-lamp-ring-process.json",
+      "sha256": "d9e281a9e732a309673ba671eb7dd607a2e8c0cdd10cf9ba17fb1608eeff3950"
+    },
+    {
+      "bytes": 403,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-29-lamp-ring.log",
+      "sha256": "99b47351c43b9550032eaf4f60c5e44e06b099803ef1de49eb06e181cc64fa45"
+    },
+    {
+      "bytes": 391,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-30-lamp-same-voice-process.json",
+      "sha256": "5782a7c5da3f7b08827c6b226c322598580c181520ce0c1eadd803d9bf0edd23"
+    },
+    {
+      "bytes": 441,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-30-lamp-same-voice.log",
+      "sha256": "ca1aa4362569cf437d29d6192f631052a4c218c6793be2c56991228a777abf64"
+    },
+    {
+      "bytes": 387,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-31-lamp-schedule-process.json",
+      "sha256": "5569a40a5fb9c6195712b7b997f28b32ba6be84062bfbd6541aee5f27a8b3d4b"
+    },
+    {
+      "bytes": 428,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-31-lamp-schedule.log",
+      "sha256": "cb16ba94c9712b3f5f412c5e2c867eee47c9fc79fe1e6aee3855842f4a8bd62a"
+    },
+    {
+      "bytes": 386,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-32-lamp-selftest-process.json",
+      "sha256": "1d6db40307beeca0860a47c433a73c7200c83b465b5664c41569053bfcd2dbba"
+    },
+    {
+      "bytes": 428,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-32-lamp-selftest.log",
+      "sha256": "c7d0af768235ffaf6130e4e441413f2385db6689d638b946420f806deea558f0"
+    },
+    {
+      "bytes": 387,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-33-lamp-settings-process.json",
+      "sha256": "a61f20e0aa73467118b6e98f7debd8a40907e4ab0bd318073bb34af0372a2b26"
+    },
+    {
+      "bytes": 428,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-33-lamp-settings.log",
+      "sha256": "40854d27b475d2765d9bb22c69e927c842c0808ba8d9c4867468d35d0e516ca8"
+    },
+    {
+      "bytes": 381,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-34-lamp-setup-process.json",
+      "sha256": "84af32005733909136d916e2d8b8799ac11a1ff953f135c1973429c77952e91c"
+    },
+    {
+      "bytes": 410,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-34-lamp-setup.log",
+      "sha256": "93be59dd6f53894217e63c1bc6514bdf74347fb07e96049fabacfd6aca589021"
+    },
+    {
+      "bytes": 383,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-35-lamp-skills-process.json",
+      "sha256": "3fad9f1b531efe63fed9ec7207e0eae5fbea4436237da265c6cbbebb8f20b899"
+    },
+    {
+      "bytes": 417,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-35-lamp-skills.log",
+      "sha256": "e44e10a3727a00e996f26ebc61802f8123a8ecf41bc96851f5f176e9bd190f3e"
+    },
+    {
+      "bytes": 398,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures-process.json",
+      "sha256": "6c685626d671d4c6c114a050ac5160ca251dc12cf91906c0ecd7981cfe98b164"
+    },
+    {
+      "bytes": 464,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-36-lamp-sound-fixtures.log",
+      "sha256": "e97e82f53759e28f0fc5838bec9115deeb32d44453b2e9878e4beddd7f739695"
+    },
+    {
+      "bytes": 384,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-37-lamp-station-process.json",
+      "sha256": "732a74d130a61535f033f7bb9be801155b696938ab8df0e699c2657c112b2bed"
+    },
+    {
+      "bytes": 422,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-37-lamp-station.log",
+      "sha256": "7f65164a694900da79fc045f41288ecc007dd49fd7a1af62f1bc837f326e6087"
+    },
+    {
+      "bytes": 387,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-38-lamp-surround-process.json",
+      "sha256": "b0040dee21af0dba5c9bd028218a7527407bfdf2c5119a8db14e9d5be9de5d89"
+    },
+    {
+      "bytes": 429,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-38-lamp-surround.log",
+      "sha256": "6ce044b459b93a8e92300cc90b744f2b0de3a3af924cde09017252c8452032f9"
+    },
+    {
+      "bytes": 380,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-39-lamp-tasks-process.json",
+      "sha256": "0e4d03e509cb3e4285523e9a93ef232bf57344a042f0e9cee52c1de79e1764f0"
+    },
+    {
+      "bytes": 410,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-39-lamp-tasks.log",
+      "sha256": "4be46ab7531e842e97309c8622109e9c1cc922bf3a51bd8600f6f6d76c0d916c"
+    },
+    {
+      "bytes": 387,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-40-lamp-turn-end-process.json",
+      "sha256": "67784838a53d218c60f04baf6e634898def9393bcefbca814f40f035a2115020"
+    },
+    {
+      "bytes": 429,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-40-lamp-turn-end.log",
+      "sha256": "479aa79445c6a1114e95270d30c63f092a4d8ae14ec86a8f05a8aa8c36ad4a45"
+    },
+    {
+      "bytes": 397,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire-process.json",
+      "sha256": "d7e6b81d556b275835742cc405fd6be696e16e81425f9b51fdc22758b8837bcd"
+    },
+    {
+      "bytes": 457,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-41-lamp-turn-end-wire.log",
+      "sha256": "a56c80c1ba8b5475d693b86693c25718360a3aa68cfc401692239ce58d943512"
+    },
+    {
+      "bytes": 391,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-42-lamp-turn-owner-process.json",
+      "sha256": "709adf780000680d11fc0e91b0971af037f7a697e73bcc69a39aa86d9b2263f8"
+    },
+    {
+      "bytes": 439,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-42-lamp-turn-owner.log",
+      "sha256": "f644c2e9d5cb7d126820b3c32c7a8dd856ea4b416834e988d463d03a8deffcb4"
+    },
+    {
+      "bytes": 382,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-43-lamp-update-process.json",
+      "sha256": "2cd04988899ade45e8dd591ece9d4588f0be69a857ae7f382f2c0f255311a8b7"
+    },
+    {
+      "bytes": 417,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-43-lamp-update.log",
+      "sha256": "5e0e20280c50faf1da7f4aca13f721c8057fc07b8f136e485ebb7ca2f0c275ef"
+    },
+    {
+      "bytes": 381,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-44-lamp-voice-process.json",
+      "sha256": "dcf6b980f638dd4bba65561df384d7736617f1d2b7e4cbd3e61c87fcf5bd8b12"
+    },
+    {
+      "bytes": 411,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-44-lamp-voice.log",
+      "sha256": "f03a5a311e24775e43f3aa6490bcb627b78974ebafc034f1477452e3f9010b7b"
+    },
+    {
+      "bytes": 390,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-45-lamp-voice-eval-process.json",
+      "sha256": "931611c714ecec107c7af2454f1142bbffe1c9e02422239411ab620484501120"
+    },
+    {
+      "bytes": 441,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-45-lamp-voice-eval.log",
+      "sha256": "847731c177367f05742f97c2e4a12f08894963e7ff1b637798377d6ecaee9732"
+    },
+    {
+      "bytes": 400,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-46-lamp-voice-processes-process.json",
+      "sha256": "4bd3e2f59c1dec9ff6fd07c70572b64c7993202a4636c691514237df162383e1"
+    },
+    {
+      "bytes": 471,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/clean-46-lamp-voice-processes.log",
+      "sha256": "d800a6fcf07397820309c1bdf6f2b590d244d62223740f374342d01266b585d7"
+    },
+    {
+      "bytes": 2,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 346,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/metadata-process.json",
+      "sha256": "98138fe12d7629a899b5e506be3930b8c0d576191affd4089468b3e09a47bd75"
+    },
+    {
+      "bytes": 491,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/metadata-validation.json",
+      "sha256": "ea6c8c417af03bf39f1eaba20bc5b35079c379e5bda19d038e06fe930c57ef50"
+    },
+    {
+      "bytes": 300986,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/metadata.json",
+      "sha256": "42b993762c4ca91718199c679e8dfca94834e619a3151784b5c867af79b2387a"
+    },
+    {
+      "bytes": 187172,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/metadata.log",
+      "sha256": "a5de3a2bb89c7f9ec5c63055bb0d3d4f573aec69ffd3e1c95c167f0b03ac7d2e"
+    },
+    {
+      "bytes": 0,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/metadata.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 41644,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/operations.json",
+      "sha256": "f893567115c6764152ec9a2ccd7d5cfa062a4869ff8d39fc3d9f2881700f4909"
+    },
+    {
+      "bytes": 224,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/source-after-metadata.json",
+      "sha256": "3361935390cfcd190f0901250d498cdae56b467a449cce63af2c933c6768a050"
+    },
+    {
+      "bytes": 224,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/source-after.json",
+      "sha256": "b67db03f1ec7887a49d94262df744370d4f216ac6312ae59ec04f76b79080b02"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/source-before.json",
+      "sha256": "d97ca6e929cd938e368b0da157718bcf62845e4857077df0fc584bdb9a8722db"
+    },
+    {
+      "bytes": 633,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/terminal.json",
+      "sha256": "03aeef4cb4668284f537a695f9375ec91c3b2724cdf2b3680899309bfb6b1247"
+    },
+    {
+      "bytes": 124316,
+      "path": "common-current-mac/mac/attempt1/cache-invalidation/validated-packages.json",
+      "sha256": "bf980075ea5c8bb20e133efa9348ce41d801a0db42074692986a2ed5c1c48566"
+    },
+    {
+      "bytes": 400,
+      "path": "common-current-mac/mac/attempt1/clippy-process.json",
+      "sha256": "6319d87cb7049dd42ec415c859b3360a92e51e3a01bbbcf6fe8016289ed7cd7c"
+    },
+    {
+      "bytes": 1191,
+      "path": "common-current-mac/mac/attempt1/clippy-result.json",
+      "sha256": "50adaa4d05f4b32c5719b1f48e433687ec5240034936d533b2858f9199965009"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/clippy-source-after.json",
+      "sha256": "527b20cd9700abef95afa3950949926cebaaa777dc7f71662e5e626757976091"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/clippy-source-before.json",
+      "sha256": "caf671ddbde9fc1ddd197c88f875b74398969d9e1b5ea9445db1a2e55a0b958e"
+    },
+    {
+      "bytes": 541167,
+      "path": "common-current-mac/mac/attempt1/clippy.log",
+      "sha256": "65294ad0bbf6f2859155518efdd2d10dde6d19f37edbedd7535e4c8d99e99d0f"
+    },
+    {
+      "bytes": 554305,
+      "path": "common-current-mac/mac/attempt1/compiler-clippy.json",
+      "sha256": "2dab0c8c600b6e4c7f74741ebbd8ab9a1e9cb4bb061ba06338612d3ed26ed1c1"
+    },
+    {
+      "bytes": 194012,
+      "path": "common-current-mac/mac/attempt1/compiler-workspace-build.json",
+      "sha256": "fd05b900d1325b63ac838eaff2ea7d202c375c61f3c52a604e50f14f2800fce9"
+    },
+    {
+      "bytes": 256,
+      "path": "common-current-mac/mac/attempt1/fmt-process.json",
+      "sha256": "f8fd4e500d6d607e30646176b1ada8fc8da8ffbcde4888d47bb9f7cdc90f0024"
+    },
+    {
+      "bytes": 1029,
+      "path": "common-current-mac/mac/attempt1/fmt-result.json",
+      "sha256": "8afe55754ae6406dae8ebb761969809677c97396cc44ad1aca4dbebc4da84a5e"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/fmt-source-after.json",
+      "sha256": "66b3a374fbf87d42f8a3f3f56fccaeb50465b46790256cea3b44e014bd62119f"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/fmt-source-before.json",
+      "sha256": "b90ff81a6be58b8b093f3a0548f187c31922e259dae9b820184048ed237b55ad"
+    },
+    {
+      "bytes": 0,
+      "path": "common-current-mac/mac/attempt1/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 376,
+      "path": "common-current-mac/mac/attempt1/full-eyes-process.json",
+      "sha256": "baa275ae959231dc8819851ba686fc0cc64e9402a876a7b5fd8adc79ef12a52b"
+    },
+    {
+      "bytes": 72698,
+      "path": "common-current-mac/mac/attempt1/full-eyes-result.json",
+      "sha256": "8f9dc520be469f94fe6a8cea99dbb35880acb27cb4070b18c7e143174a34aa05"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/full-eyes-source-after.json",
+      "sha256": "d7c7cd96936f70b3895736dce5149410be39cc5f9ebfc89dbe07ad17d621d358"
+    },
+    {
+      "bytes": 224,
+      "path": "common-current-mac/mac/attempt1/full-eyes-source-before.json",
+      "sha256": "47016b4ef7d0e528b94c90019c26056e0a07909a6171fbe4a1f6dd527073eb7e"
+    },
+    {
+      "bytes": 33806,
+      "path": "common-current-mac/mac/attempt1/full-eyes.log",
+      "sha256": "836464f6b79a90101d6b62973ef5e68778ae2ddc8930ef191249f84182b7642c"
+    },
+    {
+      "bytes": 379,
+      "path": "common-current-mac/mac/attempt1/full-memory-process.json",
+      "sha256": "4fa53f4bed27da8688a00feaff0b46363ccf64357c2972cfe7ca2cc1382b4af8"
+    },
+    {
+      "bytes": 77715,
+      "path": "common-current-mac/mac/attempt1/full-memory-result.json",
+      "sha256": "955d31f12cef4a6d49991be5292fb5efd2a8da87a6376efa7dc36acb97b1a090"
+    },
+    {
+      "bytes": 221,
+      "path": "common-current-mac/mac/attempt1/full-memory-source-after.json",
+      "sha256": "7cfb5a9c22fd589087704ce6f5cd24287e0357473870bdd44cbb51c665cfe21c"
+    },
+    {
+      "bytes": 224,
+      "path": "common-current-mac/mac/attempt1/full-memory-source-before.json",
+      "sha256": "b44a277efcfc1aa2172dd9f3ff20130ec9a38f11a54637fde0e7a61d938d8f17"
+    },
+    {
+      "bytes": 34479,
+      "path": "common-current-mac/mac/attempt1/full-memory.log",
+      "sha256": "b09bb8b17b8465f7e4181325097593257c4b769bc643b0793fdd660bec0a7ef0"
+    },
+    {
+      "bytes": 378,
+      "path": "common-current-mac/mac/attempt1/full-skills-process.json",
+      "sha256": "101f3982e41256c1c8fcec5c2a2a8d33d15cd986a0d2c86044c15bfa4019ffe1"
+    },
+    {
+      "bytes": 85812,
+      "path": "common-current-mac/mac/attempt1/full-skills-result.json",
+      "sha256": "728f049e87c7ee7c76e6de1b2a210cf2aadd438d4e5b9aecee4ac40b6f752df8"
+    },
+    {
+      "bytes": 224,
+      "path": "common-current-mac/mac/attempt1/full-skills-source-after.json",
+      "sha256": "0537162b12529d67404a3c44b86ddedd7a18870a1bfe820fa95dea76ab074507"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/full-skills-source-before.json",
+      "sha256": "c8cd476402da565ec319b62703f50ceed8816be7b7348c846ab0c232ab651b95"
+    },
+    {
+      "bytes": 95085,
+      "path": "common-current-mac/mac/attempt1/full-skills.log",
+      "sha256": "99f934966f42b7fe481de1bc83cd5a229c3bce0d5d90ac95efcd43e00fb8cf9a"
+    },
+    {
+      "bytes": 379,
+      "path": "common-current-mac/mac/attempt1/full-update-process.json",
+      "sha256": "e343fa64d0632cfd2785e6be2f5a1e8feca5687624892708ad192059215c44d6"
+    },
+    {
+      "bytes": 76353,
+      "path": "common-current-mac/mac/attempt1/full-update-result.json",
+      "sha256": "f7a66b49f6f7e24be9b3e9eb60e91cb9369796b11515abac50896704acde4164"
+    },
+    {
+      "bytes": 224,
+      "path": "common-current-mac/mac/attempt1/full-update-source-after.json",
+      "sha256": "e96cdd27c5a89b19268a4b2f3bb06906544a31e7cefb3b9ebc567eece88e21c1"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/full-update-source-before.json",
+      "sha256": "441f358707d48ac3cee99ccee8321bcdff99cbb11be1ec554b5c16b2b6778144"
+    },
+    {
+      "bytes": 35317,
+      "path": "common-current-mac/mac/attempt1/full-update.log",
+      "sha256": "f067634fadd8a5aa9821f0f22f924bfc50515cade9fc0ddeebcd007f3b41f384"
+    },
+    {
+      "bytes": 374,
+      "path": "common-current-mac/mac/attempt1/full-voice-process.json",
+      "sha256": "a5005d5c5ab4c5aabbc117709f945a2ac5d26a4b6f05a84ba16c718f812509f3"
+    },
+    {
+      "bytes": 811759,
+      "path": "common-current-mac/mac/attempt1/full-voice-result.json",
+      "sha256": "497e9a51e83d29e3e1cf60b22597f8a702f1683506137821648e130df4e4f999"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/full-voice-source-after.json",
+      "sha256": "24bea4c18c19332a02b07432990d15fac3b5845654ac85027a38ea8efde6b063"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/full-voice-source-before.json",
+      "sha256": "011cf5a64da29ed5ba5634e4669c46faa36a504a489e5d82a31171f04028e11d"
+    },
+    {
+      "bytes": 416100,
+      "path": "common-current-mac/mac/attempt1/full-voice.log",
+      "sha256": "2ce160bee28254f2a7dd75fcaaa2caa00625b80726219b788d12353eb9d263eb"
+    },
+    {
+      "bytes": 2,
+      "path": "common-current-mac/mac/attempt1/gate.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "bytes": 934,
+      "path": "common-current-mac/mac/attempt1/grant.json",
+      "sha256": "d677982490b40c9f8311a10f84124fc5b3c33db86858e8601f13c2b9b67aba64"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/initial-source-guard.json",
+      "sha256": "9367a566e414474611f485443aa9a59f879491359fe08502a47d05a48ffda971"
+    },
+    {
+      "bytes": 1188597,
+      "path": "common-current-mac/mac/attempt1/stages.json",
+      "sha256": "fe12e166e2f14f685d38d63663784e5caa5f48be1816855d6b0464d55da1641e"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/terminal-source-guard.json",
+      "sha256": "8c86958284df3d249e34b1b0dfc306a9fbcd17e19f34c2d33d4bdbb52b02667a"
+    },
+    {
+      "bytes": 149233,
+      "path": "common-current-mac/mac/attempt1/terminal.json",
+      "sha256": "9be8913dbcf77117dfc0002c5f28c35929fd7b4416bedf2271ec55f9912f1a9b"
+    },
+    {
+      "bytes": 339,
+      "path": "common-current-mac/mac/attempt1/workspace-build-process.json",
+      "sha256": "4d2d03b99dfa98058f66b63adb519fa62ab1c746af62b3c993bdfa3fad371d4d"
+    },
+    {
+      "bytes": 1131,
+      "path": "common-current-mac/mac/attempt1/workspace-build-result.json",
+      "sha256": "b486b6c527fe8c9caaef74dcf9219f63d3ba5839f91df70394f46e6f1af026ba"
+    },
+    {
+      "bytes": 223,
+      "path": "common-current-mac/mac/attempt1/workspace-build-source-after.json",
+      "sha256": "1577610cdfb666b41715fd89e32360ec88bdd1015fe5e7fa7934c8b55b8daa53"
+    },
+    {
+      "bytes": 224,
+      "path": "common-current-mac/mac/attempt1/workspace-build-source-before.json",
+      "sha256": "05e6a25938f1ce4034962a53ad102157a882a3c40233d61e97d4fc088441da18"
+    },
+    {
+      "bytes": 398726,
+      "path": "common-current-mac/mac/attempt1/workspace-build.log",
+      "sha256": "92cd00fa7d4fb307d75557d575e5949fce0b75aa66a0d6fdff737f51363048bf"
+    },
+    {
+      "bytes": 139133,
+      "path": "common-current-mac/mac/attempt1/workspace-compilation-freshness.json",
+      "sha256": "34b3339b1dbff05011ae3b9764f9efcea3add5e7b3eaad14aca517a6ed6e5214"
+    },
+    {
+      "bytes": 13364,
+      "path": "common-current-mac/source-binding.json",
+      "sha256": "fb0594e5bd001cc6839cf6453bf251d18e7fcfafe4e47901aa3174147a7c3dbf"
+    },
+    {
+      "bytes": 8743,
+      "path": "qualification.json",
+      "sha256": "2518faa21e8372b0376b6beae2ad387562d4c4d4e807cefe8e7936ff5236eff2"
+    }
+  ],
+  "format": "fourth-current-mac-evidence/1",
+  "manifest_self_excluded": true,
+  "tested_tree": "778e51d10695f37e5d4e05250f9814ea022edf26"
+}
