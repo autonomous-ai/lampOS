@@ -1700,8 +1700,10 @@ dependencies = [
  "lamp-ipc",
  "lamp-msgs",
  "lamp-schedule",
+ "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
 ]
 
