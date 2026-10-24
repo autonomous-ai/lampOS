@@ -1,0 +1,70 @@
+{
+  "README.md": {
+    "bytes": 2778,
+    "sha256": "3855a5c1c64ebea01b5e25e50b0fd0d550ab166b1f584db5061756dce9cd09fb"
+  },
+  "author-focused.txt": {
+    "bytes": 1829,
+    "sha256": "b710989e7937cd21adc035f65bff1caedb713407c6f87b66208273fc6e755605"
+  },
+  "author-gates.json": {
+    "bytes": 4551,
+    "sha256": "d7e0608021065d42c5c36f6ced72d6ad240b8c099c0dc90e9f507c0f86d978c2"
+  },
+  "author-source-after.json": {
+    "bytes": 1003761,
+    "sha256": "9b2446511f7b3d78737302b29a88d99bb81f3b5cd33913ae94a98a0d1af7bb81"
+  },
+  "author-source-before.json": {
+    "bytes": 1003761,
+    "sha256": "9b2446511f7b3d78737302b29a88d99bb81f3b5cd33913ae94a98a0d1af7bb81"
+  },
+  "native-arm-run.json": {
+    "bytes": 5034,
+    "sha256": "0fbc210cd6a5ab00e88f0b298f0cd9931c12b26f0f10c0046c86dd44690bfd87"
+  },
+  "native-arm.txt": {
+    "bytes": 1826944,
+    "sha256": "00227dc70fa611e55358b600ea731ba54f0f155b21d39c6281a410aa12bf227c"
+  },
+  "native-linux-run.json": {
+    "bytes": 2297,
+    "sha256": "98c75b4b3a76eeac83a5ee7da053855065093724899a1f6990f120c81e41bc25"
+  },
+  "native-linux.txt": {
+    "bytes": 72807,
+    "sha256": "3a91a2e050b537f6165af5c681e440338a073227ddb56b6e569070ed4ee28bcd"
+  },
+  "reader-clippy.txt": {
+    "bytes": 244950,
+    "sha256": "69c9e7f74ad394cf4e6483ffb02db190912c2d755a141ec8360786574ecb9a7b"
+  },
+  "reader-compiler-audit.json": {
+    "bytes": 60832,
+    "sha256": "74958f9b108ef19b0bb3da6720f65857a53539cd29a6142a020844b88648cb49"
+  },
+  "reader-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "reader-focused.txt": {
+    "bytes": 258485,
+    "sha256": "d4f366e9a797a5d9c41f911df03427eff7c4837bc720bc065433e17225341332"
+  },
+  "reader-gates.json": {
+    "bytes": 3269,
+    "sha256": "4802aee7836d89c7763e9da5c6ec8514158528d3cd9f75269f8d24f63617b36d"
+  },
+  "reader-source-after.json": {
+    "bytes": 1460258,
+    "sha256": "d453c961ef0466e1dd98a064431c1c376880a01e72f082880c45991bfba8138c"
+  },
+  "reader-source-before.json": {
+    "bytes": 1460258,
+    "sha256": "d453c961ef0466e1dd98a064431c1c376880a01e72f082880c45991bfba8138c"
+  },
+  "review-audit.json": {
+    "bytes": 7393,
+    "sha256": "38fefc4b3db74a57eef3caf88a0f49d6b1debff7536031d836f82af9db306aee"
+  }
+}

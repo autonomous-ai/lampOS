@@ -1,0 +1,92 @@
+{
+  "head": "9456d86349b028c28db7efb933c5626920d6327e",
+  "own_source_count": 7023,
+  "author_before_after_and_own_hashes_equal": true,
+  "own_gate_summary": "fmt,strict all-target Voice Clippy,14 exact controls passed; no full Voice/Linux/device run by Third",
+  "local_environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/third-3397-reader-target-f5h9dssc",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "native": {
+    "arm": {
+      "run": 40113550829,
+      "checkout": "d6585a982ebfc4e9a032dd056ff69ad076fade52",
+      "raw_log_sha256": "00227dc70fa611e55358b600ea731ba54f0f155b21d39c6281a410aa12bf227c",
+      "conclusion": "success",
+      "summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:40.8182677Z      Summary [ 147.778s] 7375 tests run: 7375 passed (1 leaky), 53 skipped",
+      "ordinary_pass": 7374,
+      "leaky_pass": 1,
+      "skipped": 53,
+      "fourteen_pass_rows": {
+        "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:01.2070820Z         PASS [   0.055s] (4515/7375) lamp-voice provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply"
+        ],
+        "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:01.4799155Z         PASS [   0.048s] (4531/7375) lamp-voice provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation"
+        ],
+        "second_provider::tests::music_current::a_lost_line_retry_dispatches_music_once_with_the_original_identity": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:15.1643876Z         PASS [   0.008s] (5704/7375) lamp-voice second_provider::tests::music_current::a_lost_line_retry_dispatches_music_once_with_the_original_identity"
+        ],
+        "second_provider::tests::music_scope::another_speaking_face_discards_prepared_personal_music_for_fresh_room_context": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:15.1908210Z         PASS [   0.008s] (5712/7375) lamp-voice second_provider::tests::music_scope::another_speaking_face_discards_prepared_personal_music_for_fresh_room_context"
+        ],
+        "second_provider::tests::music_scope::the_matching_speaking_face_keeps_prepared_personal_music": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:15.1975889Z         PASS [   0.008s] (5713/7375) lamp-voice second_provider::tests::music_scope::the_matching_speaking_face_keeps_prepared_personal_music"
+        ],
+        "second_provider::tests::requested_music_through_the_installed_runner_keeps_its_offer_private": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:15.8579217Z         PASS [   0.010s] (5769/7375) lamp-voice second_provider::tests::requested_music_through_the_installed_runner_keeps_its_offer_private"
+        ],
+        "second_provider::worker::tests::the_production_audio_runner_keeps_skills_identity_and_private_offers": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:19.8647441Z         PASS [   0.008s] (5985/7375) lamp-voice second_provider::worker::tests::the_production_audio_runner_keeps_skills_identity_and_private_offers"
+        ],
+        "tools::tests::scoped_audio_direct_and_wrapped_replies_require_a_live_lease": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:28.2903582Z         PASS [   0.008s] (6318/7375) lamp-voice tools::tests::scoped_audio_direct_and_wrapped_replies_require_a_live_lease"
+        ],
+        "tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:28.2659650Z         PASS [   0.006s] (6314/7375) lamp-voice tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill"
+        ],
+        "tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:28.2489776Z         PASS [   0.009s] (6311/7375) lamp-voice tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes"
+        ],
+        "tools::tests::requested_audio_rejects_changed_binding_and_unknown_offer_fields": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:28.2595734Z         PASS [   0.005s] (6313/7375) lamp-voice tools::tests::requested_audio_rejects_changed_binding_and_unknown_offer_fields"
+        ],
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:12.6461880Z         PASS [   2.412s] (5534/7375) lamp-voice second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it"
+        ],
+        "second_provider::net::chat::tests::a_kept_client_keeps_one_idle_connection_per_host": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:10.8463292Z         PASS [   0.617s] (5365/7375) lamp-voice second_provider::net::chat::tests::a_kept_client_keeps_one_idle_connection_per_host"
+        ],
+        "second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete": [
+          "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:10.4237386Z         PASS [   0.005s] (5292/7375) lamp-voice second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete"
+        ]
+      },
+      "process_controls": [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T17:04:54.3189684Z test result: 12 passed; 0 failed"
+      ]
+    },
+    "linux": {
+      "run": 40113550837,
+      "checkout": "d6585a982ebfc4e9a032dd056ff69ad076fade52",
+      "raw_log_sha256": "3a91a2e050b537f6165af5c681e440338a073227ddb56b6e569070ed4ee28bcd",
+      "conclusion": "success",
+      "actual_linux_fmt": true,
+      "strict_workspace_all_target_clippy": true
+    }
+  },
+  "authored_native_whole_trees_equal": true,
+  "prior_full_to_current_changes": [
+    "lampOS/crates/voice/src/second_provider/net/chat.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "prefixes": {
+    "lampOS/crates/voice/src/provider_worker.rs": "production prefix identical to current base",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "production prefix identical to current base",
+    "lampOS/crates/voice/src/second_provider/net/chat.rs": "production prefix identical across prior full-gated/current rebase"
+  },
+  "source_P1_P2": "none established",
+  "semantic_limit": "model context only; no deterministic speech enforcement, audible playback, timing or physical acceptance"
+}

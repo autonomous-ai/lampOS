@@ -1,0 +1,88 @@
+{
+  "head": "9456d86349b028c28db7efb933c5626920d6327e",
+  "worktree": "/private/tmp/third-read-3397",
+  "target": "/private/tmp/third-3397-reader-target-f5h9dssc",
+  "target_initially_empty": true,
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/private/tmp/third-3397-reader-target-f5h9dssc",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "scope": "independent current-head Mac Voice fmt/strict Clippy and fourteen exact owned/guard/framing controls; no full Voice/Linux/device claim",
+  "source_count": 7023,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.621,
+      "log": "/private/tmp/third-3397-reader-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 120.738,
+      "log": "/private/tmp/third-3397-reader-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--message-format=json",
+        "--",
+        "--test-threads=1",
+        "--exact",
+        "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+        "provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation",
+        "second_provider::tests::music_current::a_lost_line_retry_dispatches_music_once_with_the_original_identity",
+        "second_provider::tests::music_scope::another_speaking_face_discards_prepared_personal_music_for_fresh_room_context",
+        "second_provider::tests::music_scope::the_matching_speaking_face_keeps_prepared_personal_music",
+        "second_provider::tests::requested_music_through_the_installed_runner_keeps_its_offer_private",
+        "second_provider::worker::tests::the_production_audio_runner_keeps_skills_identity_and_private_offers",
+        "tools::tests::scoped_audio_direct_and_wrapped_replies_require_a_live_lease",
+        "tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill",
+        "tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes",
+        "tools::tests::requested_audio_rejects_changed_binding_and_unknown_offer_fields",
+        "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+        "second_provider::net::chat::tests::a_kept_client_keeps_one_idle_connection_per_host",
+        "second_provider::net::chat::tests::the_kept_fixture_answers_a_split_header_once_after_it_is_complete"
+      ],
+      "exit": 0,
+      "seconds": 131.216,
+      "log": "/private/tmp/third-3397-reader-focused.txt",
+      "source_unchanged": true
+    }
+  ]
+}
