@@ -1,0 +1,3 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T02:06:13.1948885Z         PASS [   0.006s] ( 9766/11118) lamp-voice second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T02:06:30.1324210Z      Summary [ 200.699s] 11118 tests run: 11118 passed (1 leaky), 83 skipped
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-24T02:06:43.9252360Z test result: 12 passed; 0 failed

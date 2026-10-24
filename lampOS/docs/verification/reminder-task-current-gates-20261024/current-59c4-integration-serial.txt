@@ -1,0 +1,4 @@
+error: no test target named `scenarios` in `lamp-voice` package
+help: available test targets:
+    it
+    release_pair
