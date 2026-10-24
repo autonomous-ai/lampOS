@@ -32,7 +32,12 @@ Environment=LAMP_EXPRESSION_BODY=on
 # body folds now, whoever is in front of it (#1362).
 Environment=LAMP_HEAD_TOUCH=on
 EnvironmentFile=/etc/lampOS/body/lamp.env
-ExecStart=/opt/lampOS/body/current/lamp-body --device /dev/ttyACM0 --unit-id %H --lock-directory /run/lampos-locks/motor --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock --reach 150,15,1,250 --speed 120 --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on $BODY_POSES
+# --speed 300, the code's cap (24 Oct): every Expression offset, mood pose, gaze move and lean goes through the pose
+# filter at this rate, and at 120 (10.5 degrees a second) the speaking nods never reached the head. lamp-4ace's joints,
+# read off body/joint_states 10 times a second through one answer each: at 120, 2 head swings of 2 degrees or more
+# (its posture moves only); at 300, 6 (3 to 7 degrees, the nods). No false cut-ins in either, no retreat, peak loads
+# 251 head and 184 base against 950. The factory's first stand (deploy/factory/steps.sh) stays at 120.
+ExecStart=/opt/lampOS/body/current/lamp-body --device /dev/ttyACM0 --unit-id %H --lock-directory /run/lampos-locks/motor --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock --reach 150,15,1,250 --speed 300 --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on $BODY_POSES
 Restart=on-failure
 RestartSec=15s
 KillMode=mixed

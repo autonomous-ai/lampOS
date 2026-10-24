@@ -163,7 +163,7 @@ build hash taken out. Same board (Orange Pi 4 Pro), two lamps.
   `--mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100`,
   `--keep-days 30 --memory-days`, …), and `CPUAffinity=6 7` (the board's
   two fast cores; keeper.md).
-- The body's speeds and limits: `--reach 150,15,1,250 --speed 120
+- The body's speeds and limits: `--reach 150,15,1,250 --speed 300
   --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120
   --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on
   --force-limit 600 --wake on --rest-glance on --look-at-name on`.
