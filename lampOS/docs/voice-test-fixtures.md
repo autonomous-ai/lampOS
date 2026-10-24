@@ -558,3 +558,16 @@ reads responses through EOF and requires exactly one response. This detects
 premature per-read replies without a short absence window or an assumption
 that two writes are two reads. The retained three-versus-two full-run outcome
 is not assigned a historical cause by this fixture correction.
+
+## Mock Eyes accepted connections
+
+`remember_speaker::tests::own_name_exchange` polls a nonblocking Unix
+listener so its peer can observe completion without waiting for another
+connection. Each accepted stream explicitly enters blocking mode before
+the existing two-second socket read timeout and `read_line`.
+
+On macOS the accepted stream can inherit the listener's nonblocking mode;
+an empty read then returns `WouldBlock` instead of waiting under that
+timeout. Clearing the accepted stream's flag leaves listener polling,
+request/reply assertions, timeout values and cleanup unchanged. This is a
+test-fixture correction, not a runtime or historical failure-cause claim.
