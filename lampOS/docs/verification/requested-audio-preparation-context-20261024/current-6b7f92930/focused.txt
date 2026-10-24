@@ -1,0 +1,18 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837)
+
+running 11 tests
+test provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply ... ok
+test provider_worker::tests::review_2026_10_14::a_music_action_before_decline_keeps_its_single_offer_and_confirmation ... ok
+test second_provider::tests::music_current::a_lost_line_retry_dispatches_music_once_with_the_original_identity ... ok
+test second_provider::tests::music_scope::another_speaking_face_discards_prepared_personal_music_for_fresh_room_context ... ok
+test second_provider::tests::music_scope::the_matching_speaking_face_keeps_prepared_personal_music ... ok
+test second_provider::tests::requested_music_through_the_installed_runner_keeps_its_offer_private ... ok
+test second_provider::worker::tests::the_production_audio_runner_keeps_skills_identity_and_private_offers ... ok
+test tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes ... ok
+test tools::tests::requested_audio_rejects_changed_binding_and_unknown_offer_fields ... ok
+test tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill ... ok
+test tools::tests::scoped_audio_direct_and_wrapped_replies_require_a_live_lease ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 3729 filtered out; finished in 0.18s
+

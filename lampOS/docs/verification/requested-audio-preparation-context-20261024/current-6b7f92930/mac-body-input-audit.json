@@ -1,0 +1,42 @@
+{
+  "compiled_body_artifacts": [
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/second-music-offer-wording-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/private/tmp/second-music-offer-wording-20261024/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/second-music-offer-wording-20261024/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_body-680795bd2880d9e9.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_body-680795bd2880d9e9.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    }
+  ],
+  "cfg_declarations": [
+    "#[cfg(any(target_os = \"linux\", test))]\npub mod body;",
+    "#[cfg(any(target_os = \"linux\", test))]\npub mod bus_out;"
+  ],
+  "Mac_scope": "Body is a non-test library dependency; changed modules excluded on Mac. Units/docs are not Rust compile targets. Not Linux or physical equivalence; current native checks required."
+}
