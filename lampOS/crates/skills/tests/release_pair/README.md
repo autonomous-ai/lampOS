@@ -1,16 +1,19 @@
-# Published Skills daily, on/off and rested-night continuity
+# Published Skills routine, rested-night and local-package continuity
 
-Six ignored integration cases execute the actual published Linux ARM64
+Eight ignored cases execute the actual published Linux ARM64
 `lamp-skills` artifacts, in both 6408 → 6498 → 6408 and
 6498 → 6408 → 6498 directions. Today's Skills library is not used as either
-persisted-state reader or writer. The harness supplies synthetic manifests,
-local bus input, a clock-drain control, and private output traps.
+persisted-state reader or writer. The routine harness supplies synthetic
+manifests, local bus input, a clock-drain control, and private output traps. The two package
+cases use only offline `pack`, `install` and `list` commands, with no daemon or
+peer. All eight cases are ignored by an ordinary test run.
 
-These cases do not cover updater installation, package permissions, the full
-skill loader, physical output, clock synchronization, or power-loss durability.
-The two rested-night cases add synthetic Expression receipts and a private
-Body datagram peer. No passing result is claimed until the pinned native
-cases have executed.
+These cases exclude updater installation, the complete product skill set,
+Cloud's provenance consumer, Store trust, physical output, clock synchronization
+and power-loss durability. Rested-night uses synthetic Expression receipts
+and a private Body datagram peer. Package cases cover selected strict loader
+refusals, not complete loader qualification. Only explicit native execution
+qualifies a case; earlier six-case runs remain bound to their prior heads.
 
 ## Inputs and isolated execution
 
@@ -22,8 +25,9 @@ cases have executed.
 Set `LAMP_COMPAT_SKILLS_6408` and `LAMP_COMPAT_SKILLS_6498` to those artifacts.
 Set `LAMP_COMPAT_OUTPUT` to an existing short absolute directory, such as
 `/tmp/pair-output`, created with mode 0700. When omitted, the system temporary
-directory is used. Each case retains a unique `kr-*` or `kn-*` directory on success or
-failure; its mode, and its state directory's mode, are explicitly set to 0700.
+directory is used. Each routine case retains `kr-*`, each rested case `kn-*`,
+and each package case `kp-*`, on success or failure. Roots and routine state
+directories are explicitly mode 0700.
 Use an isolated native Linux ARM64 runner with no network, credentials, device
 mounts, running lamp services, or capture/playback access:
 
@@ -31,12 +35,15 @@ mounts, running lamp services, or capture/playback access:
 cargo test -p lamp-skills --test release_pair -- --ignored --test-threads=1
 ```
 
-The fixture source typechecks on macOS; only executing these ignored cases
-requires Linux ARM64. Every artifact is checked for exact length, SHA-256,
+All fixture source remains visible to macOS typechecking; executing these
+ignored cases requires Linux ARM64. Every artifact is checked for exact length, SHA-256,
 ELF64 little-endian format and AArch64 machine type, copied privately as
 `lamp-skills-6408` or `lamp-skills-6498`, and made mode 0555. Every child is owned
-by cleanup before its `/proc/<pid>/exe` bytes are verified. Copied artifact
-bytes and modes are checked again after the case. The caller must exclude
+by cleanup before any post-spawn assertion. Routine cases verify live
+`/proc/<pid>/exe` bytes. Package commands can exit before that read, so their
+identity evidence is direct execution of the private pinned path, with exact
+executable hashes before and after each command; no live `/proc` claim is made.
+Copied artifact bytes and modes are checked again after the case. The caller must exclude
 those executable copies from any published evidence archive.
 
 Each case has a 90-second overall bound, each process/readiness phase at most
@@ -45,7 +52,7 @@ cleanup at most five seconds. Daemons are actually SIGKILLed and reaped between
 readers, after their acknowledged state boundary. Helpers exit normally and
 are reaped. A cut after a completed write is not a cut inside rename/fsync.
 
-## What the cases establish
+## What the routine cases establish
 
 Daily cases use a synthetic skill with three stable named daily triggers.
 A fixed, permitted UTC offset places the actual wall clock near local noon;
@@ -143,7 +150,7 @@ receipt proves process sequencing, never physical movement or completion.
 
 ## Retained evidence and limits
 
-Each case retains the release/source pins, fixed clock settings, exact
+Each routine case retains the release/source pins, fixed clock settings, exact
 argv and explicit environment, running executable identities, input and
 event transcripts, exact helper responses, raw child stdout/stderr, exit or
 failure-cleanup receipts, and state/manifest snapshots with file hashes.
@@ -168,5 +175,48 @@ The shared clock/asked reply helper now uses one absolute deadline capped
 by the original case, step and two-second I/O budget. Each buffer read uses
 the remaining time; partial bytes cannot renew it. Ordinary complete and
 dribbling-peer controls execute on the host; dedicated ignored selection
-filters those two controls while retaining the six artifact cases. Earlier
+filters those two controls while retaining all eight artifact cases. Earlier
 fast native passes remain historical evidence, not timeout qualification.
+
+## Local package and installed-folder cases
+
+`package.rs` adds these two cases:
+
+- `release_6498_installs_6408_packages_and_6408_loads_the_replacement`
+- `release_6408_installs_6498_packages_and_6498_loads_the_replacement`
+
+Each direction freezes separate version-1.0.0 and version-1.1.0 synthetic
+source folders before any command. The first executable packs and installs
+version 1.0.0 and a disabled companion. The other lists both, reinstalls the
+first executable's package unchanged, packs and installs version 1.1.0, and
+hands the installed folder and its package back to the first executable.
+The returning reader lists version 1.1.0 and reinstalls the opposite writer's
+package unchanged. Inventory is parsed as exact rows and function names:
+the disabled companion contributes no function but still reserves its tool.
+
+Both released installers must refuse a newer package format, a damaged file
+digest, injected hidden provenance, an unknown TOML field, an unknown skill
+kind, an absent required speech grant, and a tool already reserved by the
+disabled companion. Each refusal must leave every installed file's bytes and
+mode, all directory modes and the directory membership unchanged. A fresh
+successful inventory after each refusal group proves the valid installation
+still loads. Another inventory contains a valid package and an unsupported-kind
+folder: the CLI exits zero, but the exact `not loaded` row must be recognized,
+and only the valid tool may appear in the function summary.
+
+The commands inherit no environment, use null stdin and private log files,
+and are owned and reaped with the same 90-second case, 15-second process and
+five-second failure-cleanup bounds. They open no bus sockets and start no
+services. Raw package and source files, before/after source manifests, installed
+snapshots, exact argv, stdout/stderr, and exit receipts remain in the private
+case directory. The source folders are mode 0555 and their files 0444, with
+unchanged hashes/modes checked after execution.
+
+The harness inspects the actual installer's `.package.json` output against the
+actual package hash and manifest. This proves writer bytes, not consumption
+by Cloud's `skills.list`; the Skills CLI does not read that provenance record.
+Both releases have identical package/loader persistence code. These cases
+also do not qualify signed Store installation, updater folder restoration,
+the full core catalog, live reloading, or output. See the separate
+[package execution record](../../../../docs/verification/package-state-release-pair-20261024/README.md)
+for qualification status and the precise boundary.
