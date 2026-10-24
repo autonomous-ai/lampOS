@@ -1,0 +1,49 @@
+{
+  "head": "a9d8928ffcf737c4172b2ff4a2fea90d2a3ceebf",
+  "correction": "Compiler profile/freshness projection applies only to strict Clippy and combined no-run test compilation. It does not describe the later separate Update test compilation.",
+  "covered_stages": [
+    "clippy",
+    "test-compile"
+  ],
+  "voice_execution": {
+    "running_paths": 6,
+    "all_match_combined_compiler_json": true
+  },
+  "update_execution": {
+    "running_paths": 9,
+    "recompiled_crates_visible_in_plain_log": 19,
+    "recompiled_crate_names": [
+      "lamp-bus",
+      "lamp-turn-owner",
+      "lamp-near-call",
+      "lamp-gemini",
+      "lamp-ring",
+      "lamp-camera",
+      "lamp-audio",
+      "lamp-msgs",
+      "lamp-lean",
+      "lamp-keeper",
+      "lamp-schedule",
+      "lamp-health",
+      "lamp-update",
+      "lamp-controls",
+      "lamp-body",
+      "lamp-actions",
+      "lamp-expression",
+      "lamp-voice",
+      "lamp-skills"
+    ],
+    "bindings": "post-run actual Running-path SHA-256 and size only",
+    "per_target_compiler_json_for_actual_separate_compilation": false,
+    "profile_or_freshness_claim_for_actual_update_executables": false
+  },
+  "unchanged_records": [
+    "Voice 4032/0/21",
+    "Update 395/0/6",
+    "all 7,027 source hashes",
+    "all raw command outputs",
+    "all fifteen captured executable hashes/sizes",
+    "original false/2-of-3 table"
+  ],
+  "new_experiment_or_rerun": false
+}

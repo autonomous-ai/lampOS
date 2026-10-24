@@ -94,5 +94,10 @@
   "linux-fmt-current-cleanup.json": {
     "original_sha256": "d107498632b75e9f9c3c2457fd6facc18860ffbca698de6662f1b81726b936a7",
     "published_sha256": "d107498632b75e9f9c3c2457fd6facc18860ffbca698de6662f1b81726b936a7"
+  },
+  "execution-lineage-scope.json": {
+    "published_sha256": "45d0964746ca47583a7b229fe8eb99851fbf5bf00e408eb11e3fd89e256aebcf",
+    "kind": "scope clarification; no raw record changed",
+    "original_sha256": "45d0964746ca47583a7b229fe8eb99851fbf5bf00e408eb11e3fd89e256aebcf"
   }
 }
