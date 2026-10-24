@@ -1,8 +1,10 @@
-# Controls published writer/reader pair, 24 October 2026
+# Controls published single-implementation replay, 24 October 2026
 
 Part of #2809. This is a test-only calibration/pins compatibility slice;
-it does not complete the whole-lamp update row. Official native execution
-and independent review are pending when this record is introduced.
+it does not complete the whole-lamp update row. Native run 40075828326 on
+`27b3695f0` passed **2/0/0 ignored/1 filtered**. Second and Lead read that
+head with no P1/P2. Both published payloads are identical: this is a
+single-implementation replay check, not distinct-version compatibility.
 
 | Release | Source | Controls asset | Bytes | SHA-256 |
 |---|---|---|---|---|
@@ -51,6 +53,8 @@ No lamp, GPIO/I2C, acoustic measurement, real touch, motor, provider, service
 restart or updater transaction participates. This establishes only the
 selected published file writer/reader behavior if the native gate passes.
 Physical calibration and action-to-feedback latency remain unverified.
+There is no authored hanging-child cleanup control; output size is checked
+after each bounded command rather than enforced by a live disk quota.
 
 ## Local driver gates
 
@@ -65,5 +69,9 @@ bind failures (`Operation not permitted`); workspace was not run after that
 failure. The socket-enabled rerun above is separate evidence. The first
 fixture smoke exposed a 17/18 command-counter mismatch; a final original
 reader reopening now makes all 18 execute. No actual published executable
-was downloaded or run on the Mac. Native pair and ordinary Linux gates
-remain pending.
+was downloaded or run on the Mac. On `27b3695f0`, native pair, ordinary ARM64 (11,196 PASS plus one LEAK,
+92 skipped; process 12/0) and Linux Clippy pass. The raw pair has 36 matching
+starts/reaps, 24 successful commands and 12 expected refusals; all 18 positive
+47-frame replays and both three-file written-pin comparisons verify.
+The source map stays unchanged across 10,347 tracked paths. Later docs-only
+heads retain these as historical results, with current CI reported on the PR.
