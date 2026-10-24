@@ -55,6 +55,14 @@ People mutation path and its actual result, without a V1 runtime bridge,
 new inference dependency or automatic privacy opening. Guarded renaming
 waits for a future same-speaker confirmation design; it fails closed here.
 
+Keep this enrollment authority independent of request-owned private memory
+disclosure. Its three-positive-look requirement does not borrow the narrower
+two-original-look disclosure case, and disclosure's Checking pause does not
+renew enrollment proof. The shared bounded socket implementation retains the
+tri-state private-read fence and the enrollment lifetime fence separately.
+Admitting either live capture withdraws known-speaker disclosure before prints
+are collected; this does not revoke the valid enrollment guard itself.
+
 The distinct internal `remember_speaker` operation makes mixed-version
 Voice/Eyes pairs refuse unsupported proof instead of ignoring an added
 field and enrolling unguarded. The switch is off by default on both sides.
@@ -1648,3 +1656,51 @@ No new I/O, inference, polling, topic, switch or protocol field is added.
 The known-file read remains background work; the immediate publish target
 is under 1 ms without added I/O, with no device latency claim. The combined
 switches still need the physical two-person/cancellation enrollment trial.
+
+### Request speaker continuity and short lines (23 October 2026, #3064)
+
+V1 inspected: `hal/drivers/voice/_internal/realtime_turn.py`,
+`build_turn_context` and `build_speaker_correction`, distinguishes an actual
+voice identity from its fallback perception user and can correct one turn.
+Keep the per-turn distinction; do not use the fallback visible person to
+prove an unseen current speaker. The FaceID recognizer's authorized-bank
+selection and unsure stranger band
+(`hal/drivers/sensing/perceptions/processors/faceid/recognizer.py`) retain
+uncertainty instead of using whichever identity score is highest. Its
+corroboration ticks do not establish an error rate for visual speech frames.
+
+Reuse the existing Rust request owner, sealed original microphone intervals,
+clock bounds, final private-output guards, bounded atomic Eyes source and
+existing `getrandom` dependency. Change only initial proof and continuation:
+exactly two looks require the same sole positive face in both original
+frames; three-or-more and legacy narrowing retain their existing rules.
+A request already pinned from typed positive evidence may continue through
+explicit fresh successful no-detection at the same publisher lifecycle and
+revocation generation. Missing/error/unaligned/unmatched source never supplies
+that continuation. A returning or changed track publishes identity-free
+`checking` before recognition and asks for recognition immediately, rather
+than leaving a stale absence or waiting for the ordinary 2 s refresh. The same
+unmatched candidate then retains that ordinary cadence; disappearing before
+recognition completes advances the epoch before later absence. Checking
+grants no disclosure. Only an already pinned v2 request at the exact same
+epoch and person may pause in Pending; completed recognition of the same name
+and optional raw stable ID, under the same boot/publisher/generation, can
+return it to Ready across a new geometric track. Its original speaker, scope
+and audio-end-plus-30-second maximum deadline do not change; the source still
+expires after 3 s. Initial/legacy Checking cannot grant authority, and Lost
+remains terminal. Pending holds private bytes, RPC/fallback sends and speech
+IPC. Async and off-loop read checks use at most 20 ms intervals, with the
+existing 2 ms worker ticker for queued output; no Sessions/Days lock is held
+while waiting.
+Forget/privacy/unmatched or changed identity advances the generation;
+a later positive cannot revive a request that observed loss. A new proved
+ask may proceed after recognition. No new memory service,
+identity fallback, heartbeat-generated look or model RPC is introduced.
+Recognition waits spend existing proof and read deadlines, never a new grace
+or renewed admission.
+The added work stays in the independent Eyes process; capture does not wait
+for recognition. The local bounded-source guard target remains under 5 ms;
+return-to-recognition CPU cost and device timing are not established by host
+controls. This conservative source contract still needs real-person refusal/false-admission
+and acoustic latency measurements; it does not establish liveness or every
+lowered-face case. Live's visible-person name note remains outside this fix.
