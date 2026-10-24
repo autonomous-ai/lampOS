@@ -17897,6 +17897,7 @@ mod tests {
                 request,
                 speakers: speakers.iter().map(|id| (*id).to_owned()).collect(),
                 known: known.map(|(name, face)| (name.to_owned(), face.to_owned())),
+                enrollment: None,
             }
         }
 
