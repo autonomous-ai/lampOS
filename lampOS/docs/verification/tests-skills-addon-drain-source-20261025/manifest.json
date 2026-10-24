@@ -1,0 +1,36 @@
+{
+  "status": "UNCOMPILED source handoff, not ready, no gate or outcome claim",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "files": [
+    {
+      "path": "base-addon.rs",
+      "sha256": "3c866284cc865f76077999c47718ed9cec2997f6c429bb5f36304893818a2d07",
+      "bytes": 29605
+    },
+    {
+      "path": "candidate-addon.rs",
+      "sha256": "31b9a5618eef671cb4cfd4745c3d00ba71e49e45492a94a079829fb65091d4fb",
+      "bytes": 33071
+    },
+    {
+      "path": "base-skills.md",
+      "sha256": "afd5561c9988b0a93d222f6f19b69dc5892422b444d33c4c54f0d9356691678f",
+      "bytes": 201183
+    },
+    {
+      "path": "candidate-skills.md",
+      "sha256": "99748c984d93c321d1820f4fa8369f2b668c0853b2187454784eedff04d2d8c0",
+      "bytes": 201696
+    },
+    {
+      "path": "candidate.patch",
+      "sha256": "c7495fa8ae6ecec00958acb26a0201277017e87e8f7e5775ea2a6b3327aea611",
+      "bytes": 7105
+    },
+    {
+      "path": "candidate-receipt.json",
+      "sha256": "7418f06be658853d9ab04c31d25c968faef4f453f11cec9db17bc7de6813c403",
+      "bytes": 869
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+diff --git a/lampOS/crates/skills/tests/it/addon.rs b/lampOS/crates/skills/tests/it/addon.rs
+index c8c9c297a9..a763a531f8 100644
+--- a/lampOS/crates/skills/tests/it/addon.rs
++++ b/lampOS/crates/skills/tests/it/addon.rs
+@@ -601,6 +601,42 @@ fn only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted() {
+ /// dropped by the judge first or not decided at all, then the four's
+ /// trigger again: what the fifth did, in the journal.
+ fn a_fifth_say(drop_the_four: bool) -> String {
++    use std::sync::{
++        Arc,
++        atomic::{AtomicBool, Ordering},
++        mpsc::{self, RecvTimeoutError},
++    };
++
++    struct DoneDrain {
++        stop: Arc<AtomicBool>,
++        worker: Option<std::thread::JoinHandle<Result<(), String>>>,
++        events: mpsc::Receiver<SkillEvent>,
++    }
++
++    impl DoneDrain {
++        fn finish(&mut self) -> Result<(), String> {
++            self.stop.store(true, Ordering::Release);
++            if let Some(worker) = self.worker.take() {
++                worker
++                    .join()
++                    .map_err(|_| "the Done observer panicked".to_owned())?
++            } else {
++                Ok(())
++            }
++        }
++    }
++
++    impl Drop for DoneDrain {
++        fn drop(&mut self) {
++            let result = self.finish();
++            if !std::thread::panicking()
++                && let Err(why) = result
++            {
++                panic!("{why}");
++            }
++        }
++    }
++
+     let dir = tempfile::Builder::new()
+         .prefix("ad")
+         .tempdir_in("/tmp")
+@@ -649,6 +685,50 @@ fn a_fifth_say(drop_the_four: bool) -> String {
+     // The probe budget is shorter than the unchanged ten-second proposal
+     // limit and starts before any of the first four can be admitted.
+     let completion_deadline = Instant::now() + Duration::from_secs(8);
++    let stop = Arc::new(AtomicBool::new(false));
++    let worker_stop = Arc::clone(&stop);
++    let (done_send, done_recv) = mpsc::sync_channel(32);
++    let (started_send, started_recv) = mpsc::sync_channel(1);
++    // Drain while the judge collects proposals, not only when it asks for
++    // completions. The observer keeps each Done, rather than a latest value.
++    let worker = std::thread::spawn(move || {
++        started_send
++            .send(())
++            .map_err(|error| format!("the Done observer could not announce startup: {error}"))?;
++        while !worker_stop.load(Ordering::Acquire) {
++            let left = completion_deadline.saturating_duration_since(Instant::now());
++            if left.is_zero() {
++                return Err("the Done observer's completion budget expired".to_owned());
++            }
++            if let Some(message) = events
++                .recv(left.min(Duration::from_millis(100)))
++                .map_err(|error| format!("the Done observer could not receive: {error}"))?
++            {
++                let event = message.parse::<SkillEvent>().map_err(|error| {
++                    format!("the Done observer could not parse an event: {error}")
++                })?;
++                if event.stage == SkillStage::Done {
++                    done_send.try_send(event).map_err(|error| match error {
++                        mpsc::TrySendError::Full(_) => {
++                            "the Done observer overflowed its 32 completions".to_owned()
++                        }
++                        mpsc::TrySendError::Disconnected(_) => {
++                            "the Done observer's consumer disconnected".to_owned()
++                        }
++                    })?;
++                }
++            }
++        }
++        Ok(())
++    });
++    let mut done = DoneDrain {
++        stop,
++        worker: Some(worker),
++        events: done_recv,
++    };
++    started_recv
++        .recv_timeout(completion_deadline.saturating_duration_since(Instant::now()))
++        .expect("the Done observer starts before the first voice publication");
+     let mut completed = |names: &[&str], phase: &str| {
+         let mut seen = Vec::<SkillEvent>::new();
+         while seen.len() < names.len() {
+@@ -659,13 +739,25 @@ fn a_fifth_say(drop_the_four: bool) -> String {
+                 "waiting for {phase}: child {status:?}, completions {seen:?}; journal:\n{}",
+                 std::fs::read_to_string(root.join("stderr")).unwrap()
+             );
+-            if let Some(message) = events.recv(left.min(Duration::from_millis(100))).unwrap() {
+-                let event = message.parse::<SkillEvent>().unwrap();
+-                if event.stage == lamp_msgs::SkillStage::Done
+-                    && names.contains(&event.skill.as_str())
+-                    && !seen.iter().any(|old| old.skill == event.skill)
+-                {
+-                    seen.push(event);
++            match done
++                .events
++                .recv_timeout(left.min(Duration::from_millis(100)))
++            {
++                Ok(event) => {
++                    if event.stage == lamp_msgs::SkillStage::Done
++                        && names.contains(&event.skill.as_str())
++                        && !seen.iter().any(|old| old.skill == event.skill)
++                    {
++                        seen.push(event);
++                    }
++                }
++                Err(RecvTimeoutError::Timeout) => {}
++                Err(RecvTimeoutError::Disconnected) => {
++                    let result = done.finish();
++                    panic!(
++                        "the Done observer ended during {phase}: {result:?}; journal:\n{}",
++                        std::fs::read_to_string(root.join("stderr")).unwrap()
++                    );
+                 }
+             }
+         }
+@@ -747,6 +839,7 @@ fn a_fifth_say(drop_the_four: bool) -> String {
+         .unwrap();
+     // The program writes each journal line before publishing its Done.
+     completed(&names, "the final four refusals");
++    done.finish().unwrap();
+     let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
+     match fifth {
+         Some(message) => format!(
+diff --git a/lampOS/docs/skills.md b/lampOS/docs/skills.md
+index 2a7c3e7338..c2ab0a53fc 100644
+--- a/lampOS/docs/skills.md
++++ b/lampOS/docs/skills.md
+@@ -589,6 +589,13 @@ skills".)
+   first proposals: this probe budget is below the unchanged ten-second
+   proposal allowance, and expiry fails the fixture. Final Done events fence
+   the journal read, because each line is written before its event. The
++  observer starts before the first voice publication and drains Done events
++  concurrently while the judge collects proposals. Its bounded 32-event
++  queue fails on overflow, and the fixture stops and joins the observer on
++  success or unwind; receiver, parse and thread errors fail the fixture.
++  The observer shares that same absolute eight-second completion deadline.
++  This avoids deliberately leaving the event subscriber idle; event loss
++  has not been established as the cause of a historical failure. The
+   undecided case retains its full three-second no-proposal observation;
+   the product's hour budget and drop hold are unchanged.
+ 

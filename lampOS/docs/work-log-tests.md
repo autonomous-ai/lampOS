@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-25 05:56 — frozen Skills source handoff
+
+Ready for lamp-voice: no
+
+[Uncompiled Skills observer source](verification/tests-skills-addon-drain-source-20261025/) publishes the exact42 base/two-file patch c7495fa8, source snapshots and predefined Linux x86 commands/bounds for the offered validation slot. Formatting/source review only; no compilation or test outcome is claimed. The queue/deadline/assertion/cleanup scope remains unchanged. Compute allocation must preserve the active NoPause147 window; no source publication authorizes observation or a competing edit. The first24current NoPause observations are15/9 with123unrun; all ordinary failures retained and the changed NoPause case still unrun. Root continues source audits while the fixed schedule completes.
+
 ## 2026-10-25 05:49 — qualified Cloud carry pushed; NoPause inventory complete
 
 Ready for lamp-voice: no

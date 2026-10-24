@@ -1,0 +1,21 @@
+{
+  "head": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "branch": "tests/1806-addon-event-drain",
+  "files": [
+    {
+      "path": "lampOS/crates/skills/tests/it/addon.rs",
+      "candidate_sha256": "31b9a5618eef671cb4cfd4745c3d00ba71e49e45492a94a079829fb65091d4fb",
+      "mode": 420
+    },
+    {
+      "path": "lampOS/docs/skills.md",
+      "candidate_sha256": "99748c984d93c321d1820f4fa8369f2b668c0853b2187454784eedff04d2d8c0",
+      "mode": 420
+    }
+  ],
+  "patch_sha256": "c7495fa8ae6ecec00958acb26a0201277017e87e8f7e5775ea2a6b3327aea611",
+  "addon_outside_a_fifth_say_byte_identical": true,
+  "formatter": "First shell lookup rustfmt exited127, no formatter launched. Actual /Users/autonomous/.cargo/bin/rustfmt +1.96.0 --edition2024 on addon.rs only exited0 once.",
+  "diff_check": "git diff --check passed",
+  "no_Cargo_compile_tests_commit_or_push": true
+}
