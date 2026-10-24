@@ -5877,8 +5877,10 @@ Second, 23:14 +07: #2793 preparation-note follow-up remains under its final comp
 
 Ready for lamp-voice: yes (#3389, landed through train 96)
 
-Second, 23:41 +07: feature95a, train3fb, tested previewcd3 and landed419d share complete tree099e2a3f1. Train ARM40110394001: 7,374 PASS + 1 LEAK / 53 skipped, zero failed/unrun; actual Linux fmt/strict Clippy40110393979 pass. Direct feature40111245085 remains its own observation, not inferred from train. No self/manual merge, historical cause, physical or signature-trust claim.
+Second, 23:41 +07: feature `95a04165b`, train `3fb8e6560`, tested preview `cd3b09a6e` and landed `419d6f64b` share complete tree `099e2a3f1`. Train ARM40110394001: 7,374 PASS + 1 LEAK / 53 skipped, zero failed/unrun; actual Linux fmt/strict Clippy40110393979 pass. Direct feature40111245085 remains its own observation, not inferred from train. No self/manual merge, historical cause, physical or signature-trust claim.
 
 Ready for lamp-voice: no (#3382, #3397)
 
 New #3397 c9 on6b is pushed for preparation-only music context, Mac full sourceea2 4,006/0/21 and current11/0 with fmt/strict Clippy green, raw attempts/source/cfg proof in703e05e5b/2695fedbc. Current Linux40111528897 is verified green; ARM40111528929 and independent reads are active, source P1/P2 none reported. A further full Voice test on exactc9 runs under frozen source before its next rebase. Phone is locally rebased to419d asae9cf505d, not yet pushed/gated there while that test owns the Cargo target; current published674 native remains separate and its historical Update HOLD persists.
+
+Second, 23:49 +07: retained #3389 direct ARM40111245085 failure separately from the successful train: 1,139 pass / 1 fail / 53 skipped / 6,235 selected unrun. Shared SleepingService counts.refused precondition observes2, not two look-ups; unchanged fixture handed to Tests, no cause/waiver/rerun. Music exactc9 full Mac Voice passes4,006/0/21, source unchanged; its ARM and Linux watchers finish successfully and primary audit continues. Phone674 ARM passes7,373 PASS +1 LEAK/53 skipped, full authored/preview trees equal, historical Update HOLD unchanged. Latest419d phone/music scoped gates include all three newly landed network cases plus owned controls; full results stay on their actual sources.

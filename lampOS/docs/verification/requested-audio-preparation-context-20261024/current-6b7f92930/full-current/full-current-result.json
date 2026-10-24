@@ -1,0 +1,19 @@
+{
+  "head": "c9c8d660fd7fc0f33b4582a762cb39714567897e",
+  "command": [
+    "<private-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--",
+    "--test-threads=1"
+  ],
+  "exit": 0,
+  "seconds": 565.358,
+  "source_unchanged": true,
+  "owned_unix_bind": "passed",
+  "scope": "Complete Voice tests on current head; reuses immediately preceding fresh current compilation and successful fmt/strict Clippy, no second compile-clean gate"
+}

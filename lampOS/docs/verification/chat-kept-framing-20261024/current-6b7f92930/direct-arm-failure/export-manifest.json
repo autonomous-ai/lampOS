@@ -1,0 +1,10 @@
+{
+  "arm64-official.json": {
+    "original_sha256": "951a165956ed4c009c4f8c9ad0bf9bcc707efeb1a0e3833f86366e586e9fe198",
+    "published_sha256": "951a165956ed4c009c4f8c9ad0bf9bcc707efeb1a0e3833f86366e586e9fe198"
+  },
+  "arm64-official.txt": {
+    "original_sha256": "941a073df5cbdf87d0c93d1e461ed8ceb96255ef2273940b681ef82e919c7df2",
+    "published_sha256": "941a073df5cbdf87d0c93d1e461ed8ceb96255ef2273940b681ef82e919c7df2"
+  }
+}
