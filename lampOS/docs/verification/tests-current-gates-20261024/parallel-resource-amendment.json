@@ -1,0 +1,31 @@
+{
+  "recorded_at_utc": "2026-10-24T16:30:03Z",
+  "authorization": "Root orchestration decision within authorized test work; no product or device change.",
+  "effective": "CPU-sharing phase begins when the canonical NoPause gate launches; Update closed Voice predates this amendment.",
+  "observed_resources": {
+    "logical_cpus": 16,
+    "memory_bytes": 68719476736,
+    "free_disk_df": "48 GiB"
+  },
+  "maximum_owned_canonical_gates": 2,
+  "allocations": [
+    {
+      "name": "Update corrected full gate",
+      "native_handle": 85212,
+      "target": "qualification/cargo-target",
+      "cargo_build_jobs": 4,
+      "existing_process_env_plan_source_unchanged": true
+    },
+    {
+      "name": "NoPause canonical full gate",
+      "target": "cargo-target",
+      "cargo_build_jobs": 2,
+      "pending_launch": true
+    }
+  ],
+  "maximum_combined_owned_compile_jobs": 6,
+  "targets_exclusive_and_distinct": true,
+  "cpu_exclusive_after_second_launch": false,
+  "limits": "Other builders may also use the host. This does not claim globally isolated hardware, matched performance, or causal attribution. All actual failures and original isolated-control records remain retained. No rerun or interruption of Update.",
+  "storage": "NoPause enforces 5 GiB reserve before every stage and all witness copies; no shared target clean."
+}

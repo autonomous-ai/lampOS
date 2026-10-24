@@ -1,0 +1,15 @@
+{
+  "recorded_at_utc": "2026-10-24T16:32:48Z",
+  "Update_native": 85212,
+  "NoPause_native": 98367,
+  "resource_amendment_sha256": "4526c08ba70f7c597d2d09ed492365040cd05415fdf2819d5639d14ecca2e522",
+  "Update_target": "qualification/cargo-target",
+  "NoPause_target": "cargo-target",
+  "Update_compile_jobs": 4,
+  "NoPause_compile_jobs": 2,
+  "cpu_shared": true,
+  "targets_distinct_and_exclusive": true,
+  "NoPause_controller_sha256": "81633bb3eb6f3a2255402c64639365f7809fb2b00c9accaf1d5ab198e1b628ce",
+  "NoPause_plan_sha256": "2b415f7a9874b45aadeb1eaf68137d78180383379f1e3cea40ca3dd3f3211d7e",
+  "limits": "Separate observed outcomes only; no isolated-load comparison or timing attribution."
+}

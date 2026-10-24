@@ -1,0 +1,38 @@
+[
+  {
+    "file": "README.md",
+    "sha256": "f0077c667122d2c34d6160a553133dc0df5c172a79727bd976c104d51991a45d"
+  },
+  {
+    "file": "closed-executable-witnesses.json",
+    "sha256": "9c2d33d57b02f1bc85e079a4ddcc109d7753464064c59fb9ad50bc7cc3672048"
+  },
+  {
+    "file": "original-seven-result.json",
+    "sha256": "4eb286287c11f376f0a9a20ce57a08fe2f8223d11c46307cc7e8558331f8c1f0"
+  },
+  {
+    "file": "parallel-launch-observation.json",
+    "sha256": "43425588b4fabb6331807d235b10e7e1c16680af4bf578ac27be3140333c3106"
+  },
+  {
+    "file": "parallel-resource-amendment.json",
+    "sha256": "4526c08ba70f7c597d2d09ed492365040cd05415fdf2819d5639d14ecca2e522"
+  },
+  {
+    "file": "parallel-timestamp-clarification.json",
+    "sha256": "527955924ead3a984cabe2f9052720a4630eebb706b19ba292c3db5a6de9fc2e"
+  },
+  {
+    "file": "voice-command.json",
+    "sha256": "6cbc43bdd8a2dc5e22d4baff283616b8b001c2abe06ae5595b4227a3caf9c5df"
+  },
+  {
+    "file": "voice-executed-summaries.json",
+    "sha256": "8aeb23b1f469bcdf641cd8e7ce2df96696bfea7d23628a40da1eb00447d24694"
+  },
+  {
+    "file": "voice-failure-excerpts.json",
+    "sha256": "7b92ce1639cae3b9056c2b75c0c61d3c48d4dbaa83b771fc979feeb46b06e0a5"
+  }
+]

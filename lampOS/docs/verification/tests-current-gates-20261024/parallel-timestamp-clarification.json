@@ -1,0 +1,7 @@
+{
+  "authorization_at_utc": "2026-10-24T16:30:03Z",
+  "NoPause_results_started_at_utc": "2026-10-24T16:32:23.939807Z",
+  "root_receipt_observed_launch_at_utc": "2026-10-24T16:32:48Z",
+  "own_CPU_exclusivity_claim_ends_conservatively_at_utc": "2026-10-24T16:30:03Z",
+  "interpretation": "The original actual-start receipt recorded root observation, not exact process start. NoPause source/guard startup can precede its results timestamp. Do not infer isolated load after resource authorization. Original immutable receipts are retained. Closed Voice ended16:04 and predates authorization/overlap."
+}

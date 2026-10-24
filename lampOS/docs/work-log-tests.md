@@ -4276,3 +4276,9 @@ The first full allocation failed socket preflight before any Rust command; the p
 Ready for lamp-voice: no for the pending test fixes
 
 Read the completed #3382 runs directly: 7,373 PASS plus one LEAK, all 7,374 selected terminal, 53 skipped; actual Linux fmt/strict Clippy pass and authored/preview trees equal. No dispatch or historical Update waiver. [Exact receipt](verification/tests-phone-current-native-20261024/). Corrected Update local fmt/strict twelve-package Clippy pass; Voice completed 4,000/4/21 ignored with every case bound, and readers continue. The four failures remain failed and under phase review, without source-equality waiver. Claimed the Linux metadata-rollback fixture precondition after open/merged searches; its stage-hit/source proposal is in progress with privacy validation intact.
+
+## 24 October, 23:36 — Both canonical gates active; original seven pass
+
+Ready for lamp-voice: no
+
+Corrected Update fmt/strict twelve-package Clippy pass. Full Voice is 4,000/4/21 ignored, with complete binding and all seven originally requested cases passed. Four failures remain failed and under phase review; 99 matched executable witnesses are preserved before later build replacement. Readers continue. Canonical NoPause now runs on its own target, with explicit shared CPU context (Update four compile jobs plus NoPause two). The resource amendment and timestamp clarification prevent an isolated-load claim. [Actual failures, seven-case rows and concurrency receipts](verification/tests-current-gates-20261024/). No new test retries or product changes.
