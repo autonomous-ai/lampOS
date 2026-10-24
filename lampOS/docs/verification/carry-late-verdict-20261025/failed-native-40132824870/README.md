@@ -1,0 +1,5 @@
+# Original bcb-head native failure, preserved
+
+Authored 05f219d9338567a82740835f5cdcc636f55736d0. ARM64 40132824870 failed the Controls program::sigterm_finishes_recording_and_releases_the_actual_serve_owner assertion at program.rs:358: recording.finished was false, expected true. Main summary is 1,648 passed / one failed / 9,616 selected unrun / 106 skipped, fail-fast exit 100. The two new Voice controls and later doc/process stages are unrun. Other caught panic output is not an additional failed test. Actual Linux pinned formatting/strict workspace-all-target Clippy 40132824858 succeeded.
+
+Actual checkout from the primary log is 4e7d72d3f7bcff7cdc4d9b18dc7293d6da8894ca, combining latest 3d1 with authored 05. It differs from authored source in six Soft paths, including the combined switches.md blob; no complete-tree equality or authored latest-base ancestry is claimed. The raw failed epoch stays failed, with no retry or filesystem/load cause assertion. The source recorder's bounded completion contract is being checked separately, not treated as an automatic waiver of this gate.

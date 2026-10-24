@@ -5,6 +5,25 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 05:08 — latest parent pushed; original ARM failure retained
+
+Ready for lamp-voice: no (#3408 new native/current reads remain).
+
+- Latest fc31 parent 96ec82d0d is pushed after fmt/strict Voice/Eval Clippy,
+  workspace build and full **4,654/0/21**, 11 summaries; all 7,027 source
+  records match Git blobs/modes. Both final controls pass; upstream Soft
+  listings explain the four-added/seven-removed test census.
+- [Latest proof](verification/carry-late-verdict-20261025/current-fc31-96ec82d0d/README.md)
+  and [failed original native](verification/carry-late-verdict-20261025/failed-native-40132824870/README.md)
+  stay separate: old 05 ARM is **1,648/1, 9,616 unrun, 106 skipped**.
+- Child's completed bcb epoch **4,666/0/21**, 7,028 Git-bound records, is
+  [preserved](verification/held-colleague-constraints-20261025/bcb-qualified-2855d6983/README.md).
+  Actual latest fc31 child gate is active; no prior result transfers.
+- Controls' zero-wait pending-writer counterexample rejects the old
+  unconditional completion predicate, expected 0/1 red. Truthful three-case
+  completion and CLI contract correction have fmt/Clippy/build green;
+  full Controls tests remain active. Product deadline/source unchanged.
+
 ## 2026-10-25 04:48 — Controls native failure claimed separately
 
 Ready for lamp-voice: no.

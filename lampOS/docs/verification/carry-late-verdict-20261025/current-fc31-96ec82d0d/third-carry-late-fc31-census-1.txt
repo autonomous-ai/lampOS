@@ -1,0 +1,9 @@
+observe_dry::tests::a_copy_that_fails_partway_is_removed: test
+observe_dry::tests::a_cut_that_joins_or_drops_made_up_conversations_is_refused: test
+observe_dry::tests::a_dry_run_keeps_what_the_store_allows_and_removes_its_copy: test
+observe_dry::tests::its_arguments_need_a_store_an_out_folder_and_a_key: test
+observe_dry::tests::the_journal_is_cut_into_conversations_as_the_voice_cuts_it: test
+observe_dry::tests::the_made_up_set_is_scored_against_what_each_conversation_should_keep: test
+observe_dry::tests::the_score_counts_whole_words_and_each_thing_once: test
+
+7 tests, 0 benchmarks

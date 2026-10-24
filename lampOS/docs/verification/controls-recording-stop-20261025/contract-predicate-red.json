@@ -1,0 +1,33 @@
+{
+  "head": "fc31e012334cda59eb3c489560454c515fb86386",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717",
+  "initially_empty": true,
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-controls",
+    "--lib",
+    "record::tests::finish_without_a_writer_acknowledgement_is_not_complete",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-controls-stop-target-hqfpb717",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "exit": 101,
+  "seconds": 22.428,
+  "record_source_before_after": "bbc5d3e7d6583da62b6654be3620afeb0393a4283be2ffe24e4146abe8871423",
+  "production_prefix_unchanged": true,
+  "scope": "controlled pending writer, zero-duration observation; reproduces invalid unconditional completion predicate, not measured CI cause"
+}

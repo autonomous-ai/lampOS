@@ -1,0 +1,22 @@
+{
+  "prior_head": "69975c6234d898970967bc0d41d62943656d610b",
+  "current_head": "2855d6983d5658ba165fdac1a2f7e4e850915596",
+  "current_parent_before_prose": "94f6c957ecd46f71c5e1434cf487c4d94dc1f8f3",
+  "current_tree": "132cab2fb0562bf12b227b021eb08d564e2ecadb",
+  "range": "1:  69975c6234 = 1:  2855d6983d lampOS: retain held voice constraints for each caller\n",
+  "owned_blobs_match_prior": {
+    "lampOS/crates/voice/src/second_provider/worker.rs": true,
+    "lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs": true,
+    "lampOS/docs/second-voice.md": true,
+    "lampOS/docs/switches.md": true
+  },
+  "all_prior_current_changes": [
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+    "lampOS/crates/update/tests/round/runnable_events.rs",
+    "lampOS/crates/update/tests/round/self_cuts.rs",
+    "lampOS/crates/voice/src/messages.rs",
+    "lampOS/docs/messages.md",
+    "lampOS/docs/updates.md"
+  ],
+  "scope": "actual current-bcb composition will get a fresh gate; parent prose correction is already present in the child, so later history attachment requires complete tree equality or requalification"
+}

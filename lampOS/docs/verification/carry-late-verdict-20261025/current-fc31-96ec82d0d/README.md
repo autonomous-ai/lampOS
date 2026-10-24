@@ -1,0 +1,9 @@
+# Latest fc31 carry: separate Mac qualification
+
+Head 96ec82d0dcc76db723d18d8acee2c8bb45c68e30 is based on actual latest fc31e012334cda59eb3c489560454c515fb86386 at its qualification. Three owned files, unchanged one-line message, clean worktree. The carried patch range and changed upstream source are kept distinct; no previous bcb source execution is relabelled.
+
+All four frozen Mac stages pass: whole-workspace formatting, strict all-target Voice/Eval Clippy, workspace build and full affected serial tests. Eleven summaries total 4,654 passed / 0 failed / 21 ignored; test stage 861.529 s. All 7,027 source byte/mode/symlink records match before/after every stage and independently match committed Git blobs/modes. The target remains exclusive to this same worktree and is reused after the latest rebase, with debug information off, debug assertions retained, incremental off and two build jobs. No cross-worktree or all-fresh claim.
+
+Two final named controls pass from the source-bound executable, with nine compiler/profile/freshness/hash/listing bindings retained. The sixty internal verdict rows, twenty-four conditional room assertions and four closure/off rows remain two test executions. The compiled listing comparison records four added and seven removed upstream Soft test names, explaining the three-test count reduction without a dropped invocation; census-delta.json retains every name.
+
+New original ARM64/Linux jobs and current source/read dispositions remain required. Original 05/bcb ARM64 40132824870 remains FAILED at 1,648 passed / one failed / 9,616 selected unrun / 106 skipped, before these controls or later stages. The separate Controls fixture-contract repair is being built on its own latest-main branch. Neither old failures, new local green nor that repair transfer a native pass to this head. Physical/calibration/personal-scope/held-print scopes remain separate; no device action.

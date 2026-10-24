@@ -1,0 +1,28 @@
+diff --git a/lampOS/crates/controls/src/record.rs b/lampOS/crates/controls/src/record.rs
+index 05331f89ff..724db28e87 100644
+--- a/lampOS/crates/controls/src/record.rs
++++ b/lampOS/crates/controls/src/record.rs
+@@ -422,6 +422,23 @@ mod tests {
+         assert!((overflow(u64::MAX, false, true).unwrap().len() as u64) < TERMINAL_BYTES);
+     }
+ 
++    #[test]
++    fn finish_without_a_writer_acknowledgement_is_not_complete() {
++        let (sender, _receiver) = mpsc::sync_channel(1);
++        let (_finish, done) = mpsc::sync_channel(1);
++        let recorder = Recorder {
++            sender,
++            done,
++            counters: Arc::new(Counters::default()),
++            gap: false,
++            touch: false,
++        };
++        let stats = recorder.finish_within(Duration::ZERO);
++        assert!(!stats.failed);
++        // The original CLI test's unconditional completion assumption.
++        assert!(stats.finished);
++    }
++
+     #[test]
+     fn recording_formats_cannot_be_mixed_silently() {
+         let (mut legacy, _) = recorder(1);

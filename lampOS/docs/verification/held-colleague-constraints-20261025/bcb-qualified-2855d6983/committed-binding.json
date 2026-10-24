@@ -1,0 +1,17 @@
+{
+  "head": "2855d6983d5658ba165fdac1a2f7e4e850915596",
+  "tree": "132cab2fb0562bf12b227b021eb08d564e2ecadb",
+  "public_reconstruction_base": "05f219d9338567a82740835f5cdcc636f55736d0",
+  "source_count": 7028,
+  "all_frozen_records_match": true,
+  "worktree_clean": true,
+  "summary": {
+    "summaries": 11,
+    "passed": 4666,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "scope": "completed bcb-source epoch, now historical because main advanced; latest fc31 composition must qualify separately",
+  "every_frozen_record_matches_committed_blob_and_mode": true
+}

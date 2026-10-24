@@ -1,0 +1,30 @@
+{
+  "authored": "05f219d9338567a82740835f5cdcc636f55736d0",
+  "tested": "4e7d72d3f7bcff7cdc4d9b18dc7293d6da8894ca",
+  "parents": [
+    "3d1a13ae7d937e56d4af3606732333812c805961",
+    "05f219d9338567a82740835f5cdcc636f55736d0"
+  ],
+  "authored_tested_trees_equal": false,
+  "authored_tested_differences": [
+    "lampOS/crates/voice/src/activity.rs",
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs",
+    "lampOS/crates/voice/tests/it/soft_start.rs",
+    "lampOS/docs/duplex-listening.md",
+    "lampOS/docs/switches.md"
+  ],
+  "controls_blobs_match_authored_tested_latest": {
+    "lampOS/crates/controls/src/record.rs": true,
+    "lampOS/crates/controls/tests/it/program.rs": true
+  },
+  "unique_main_rows": 1649,
+  "counts": {
+    "PASS": 1648,
+    "FAIL": 1
+  },
+  "selected_unrun": 9616,
+  "skipped": 106,
+  "later_stages": "unrun, no Voice new-control/doc/process credit",
+  "scope": "original failed epoch; unchanged Controls blobs do not establish cause or exonerate indirect effects; no rerun"
+}
