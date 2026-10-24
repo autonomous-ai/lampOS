@@ -1,0 +1,1 @@
+/tmp/cloud-provenance-pair/input/cloud-release-pair: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=e0e21acace97af35a16a9b8ac13ce749e0253ae2, for GNU/Linux 3.7.0, not stripped

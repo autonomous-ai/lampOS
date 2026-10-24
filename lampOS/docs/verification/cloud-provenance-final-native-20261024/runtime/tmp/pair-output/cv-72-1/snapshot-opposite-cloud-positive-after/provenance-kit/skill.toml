@@ -1,0 +1,10 @@
+kind = "installable"
+version = "1.0.0"
+enabled = true
+tool = "fixture_provenance"
+
+[permissions]
+speak = true
+
+[[do]]
+say = "Synthetic inert definition 1.0.0."

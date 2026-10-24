@@ -1,0 +1,10 @@
+cloud-release-pair: OK
+lamp-cloud-6408: OK
+lamp-cloud-6498: OK
+lamp-skills-6408: OK
+lamp-skills-6498: OK
+cloud-release-pair: OK
+lamp-cloud-6408: OK
+lamp-cloud-6498: OK
+lamp-skills-6408: OK
+lamp-skills-6498: OK

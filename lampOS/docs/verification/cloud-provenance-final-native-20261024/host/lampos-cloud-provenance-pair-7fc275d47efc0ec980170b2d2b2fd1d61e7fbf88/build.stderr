@@ -1,0 +1,93 @@
+   Compiling syn v3.0.7
+   Compiling cc v1.7.0
+   Compiling serde v1.0.229
+   Compiling libc v0.2.190
+   Compiling lamp-ipc v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/ipc)
+   Compiling subtle v2.6.1
+   Compiling futures-util v0.3.34
+   Compiling ring v0.17.14
+   Compiling either v1.19.0
+   Compiling libsqlite3-sys v0.38.2
+   Compiling itertools v0.13.0
+   Compiling clang-sys v1.9.1
+   Compiling synstructure v0.14.0
+   Compiling futures-channel v0.3.34
+   Compiling serde_derive v1.0.229
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerofrom v0.1.8
+   Compiling tokio-macros v2.7.2
+   Compiling tokio v1.53.1
+   Compiling yoke v0.8.3
+   Compiling zerovec-derive v0.11.6
+   Compiling zerovec v0.11.8
+   Compiling displaydoc v0.2.7
+   Compiling rustls v0.23.45
+   Compiling lamp-bus v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/bus)
+   Compiling rustls-webpki v0.103.15
+   Compiling lamp-msgs v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/msgs)
+   Compiling tinystr v0.8.4
+   Compiling icu_locale_core v2.3.0
+   Compiling zerotrie v0.2.5
+   Compiling potential_utf v0.1.6
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling thiserror-impl v2.0.21
+   Compiling thiserror v2.0.21
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling tokio-rustls v0.26.6
+   Compiling lamp-turn-owner v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/turn-owner)
+   Compiling idna_adapter v1.2.2
+   Compiling hyper v1.12.0
+   Compiling idna v1.1.0
+   Compiling hyper-util v0.1.21
+   Compiling tower v0.5.3
+   Compiling bindgen v0.72.1
+   Compiling bytemuck_derive v1.12.1
+   Compiling lamp-local-time v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/local-time)
+   Compiling cpufeatures v0.2.17
+   Compiling alsa-sys v0.6.1
+   Compiling sha2 v0.10.9
+   Compiling url v2.5.8
+   Compiling bytemuck v1.25.2
+   Compiling tokio-util v0.7.20
+   Compiling gpiocdev-uapi v0.7.0
+   Compiling v4l2r v0.0.8
+   Compiling lamp-lean v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/lean)
+   Compiling tungstenite v0.30.0
+   Compiling sonora-agc2 v0.2.0
+   Compiling tower-http v0.6.11
+   Compiling lamp-camera v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/camera)
+   Compiling hyper-rustls v0.27.10
+   Compiling lamp-keeper v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/keeper)
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling lamp-ring v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/ring)
+   Compiling tokio-tungstenite v0.30.0
+   Compiling sonora v0.2.0 (/home/runner/work/lampOS/lampOS/lampOS/third_party/sonora)
+   Compiling lamp-body v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/body)
+   Compiling reqwest v0.13.5
+   Compiling alsa v0.12.1
+   Compiling gpiocdev v0.8.0
+   Compiling rusqlite v0.40.2
+   Compiling lamp-audio v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/audio)
+   Compiling lamp-schedule v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/schedule)
+   Compiling lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)
+   Compiling lamp-gemini v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/gemini)
+   Compiling lamp-update v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/update)
+   Compiling lamp-health v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/health)
+   Compiling lamp-near-call v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/near-call)
+   Compiling lamp-turn-end-wire v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/turn-end-wire)
+   Compiling lamp-voice-processes v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice-processes)
+   Compiling lamp-voice v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice)
+   Compiling tar v0.4.46
+   Compiling lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)
+   Compiling tokio-stream v0.1.19
+   Compiling rustls-webpki v0.102.8
+   Compiling rumqttc v0.25.1
+   Compiling lamp-actions v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/actions)
+   Compiling axum v0.8.9
+   Compiling lamp-setup v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/setup)
+   Compiling lamp-skills v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/skills)
+   Compiling lamp-cloud v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/cloud)
+    Finished `release` profile [optimized] target(s) in 2m 51s
