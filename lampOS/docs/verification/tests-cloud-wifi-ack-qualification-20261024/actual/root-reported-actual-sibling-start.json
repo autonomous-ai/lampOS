@@ -1,0 +1,15 @@
+{
+  "recorded_at": "2026-10-24T20:06:31.411960+00:00",
+  "provenance": "Parent reports actual qualification compile-only sibling launched native36124 at approximately20:08UTC; exact first command timestamp available from sibling owner.",
+  "other_native": 36124,
+  "other_compile_jobs": 4,
+  "Cloud_native": 22074,
+  "Cloud_compile_jobs": 2,
+  "maximum_owned_compile_jobs": 6,
+  "other_stage_scope": "compile only; no observations/inventory authorized",
+  "approximate_other_launch_time": "2026-10-24T20:08:00Z",
+  "exact_timestamp_claim": false,
+  "actual_first_command_proof_pending_sibling_owner": true,
+  "resource_amendment_sha256": "8019a6406aa21fa6e37e79577362cb870b13a2d409c4d58d503d587729f7ddb4",
+  "global_isolated_load_or_causal_timing_claim": false
+}

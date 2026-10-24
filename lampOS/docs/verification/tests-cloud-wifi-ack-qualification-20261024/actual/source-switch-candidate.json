@@ -1,0 +1,43 @@
+{
+  "variant": "candidate",
+  "restoring": false,
+  "files": [
+    {
+      "path": "lampOS/crates/cloud/src/settings.rs",
+      "before": {
+        "sha256": "3f7527e1bab70d17b28b489c659ef4092aad82673f91d6f90f0a093a67d45a87",
+        "mode": "0o644",
+        "bytes": 75915,
+        "mtime_ns": 1792871589082409363
+      },
+      "after": {
+        "sha256": "66ad0d899d055e555e25198daee6a0ec3b89c1717da51a2d2697e5aa3af4827f",
+        "mode": "0o644",
+        "bytes": 76375,
+        "mtime_ns": 1792871850838804643
+      }
+    },
+    {
+      "path": "lampOS/docs/cloud.md",
+      "before": {
+        "sha256": "79055bbb98129a9938c91d74032b8fffb34645c2355e598267c09d96af89f678",
+        "mode": "0o644",
+        "bytes": 101563,
+        "mtime_ns": 1792871589084039930
+      },
+      "after": {
+        "sha256": "929fc8f6d395d1af1a24802f9461e6991d76fa3b2c7e067ed5e3766f24f346ff",
+        "mode": "0o644",
+        "bytes": 101988,
+        "mtime_ns": 1792871850840671454
+      }
+    }
+  ],
+  "errors": [],
+  "actual_new_mtimes_disclosed": true,
+  "mtime_preservation_claim": false,
+  "source_guard": {
+    "variant": "candidate",
+    "aggregate": "b782d7d4ac690003c08b4d8fde795ca619392e9bd59fa441dde06a7ec47decc8"
+  }
+}

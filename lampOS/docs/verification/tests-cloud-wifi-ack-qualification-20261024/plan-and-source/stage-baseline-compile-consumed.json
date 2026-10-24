@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-cloud",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "source_guard": {
+    "variant": "baseline",
+    "aggregate": "507641bba84fa368bc9e866effc9f6e705ea5ecd0701b34d8b27d7673ee2537f"
+  },
+  "controller_sha256": "a370b9545484bede61049f22ad79fe771bfd5d786a4cc7de7a84bfde7d981fb5",
+  "permanent_even_if_aborted": true
+}

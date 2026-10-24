@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/frozen-executables/7a9ac5db2683c1435bcc25ce5f9348e507ec2795b4c788df825bad4bd8621c65-lamp_cloud-181eacc6d66b1b58",
+    "--exact",
+    "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+  "started_at": "2026-10-24T19:59:38.970616+00:00",
+  "timeout_seconds": 120,
+  "stdout": "candidate-observation.stdout.txt",
+  "stderr": "candidate-observation.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 44623,
+  "owned_process_group": 44623,
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "wall_seconds": 5.7838,
+  "finished_at": "2026-10-24T19:59:44.754392+00:00",
+  "stdout_sha256": "4c1b2875eb9ed7da042fb3d3fe3586842450bbc92ba95aee1ab1971daba835d3",
+  "stdout_bytes": 212,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

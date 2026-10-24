@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--check",
+    "HEAD",
+    "--"
+  ],
+  "source_guard": {
+    "variant": "candidate",
+    "aggregate": "b782d7d4ac690003c08b4d8fde795ca619392e9bd59fa441dde06a7ec47decc8"
+  },
+  "controller_sha256": "a370b9545484bede61049f22ad79fe771bfd5d786a4cc7de7a84bfde7d981fb5",
+  "permanent_even_if_aborted": true
+}

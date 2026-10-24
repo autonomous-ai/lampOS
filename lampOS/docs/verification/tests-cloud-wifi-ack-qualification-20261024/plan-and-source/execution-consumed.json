@@ -1,0 +1,10 @@
+{
+  "grant_sha256": "37cd4a06457b97770a710fb48889eb5e59bcae9df6caf659717c23a4e7726a7d",
+  "grant_id": "root-cloud-f978-20261024T195220Z",
+  "plan_sha256": "e363e1aa40484a8effd5c95ba9d2c8be905b4436c9251a255cd518c44cc054f6",
+  "controller_sha256": "a370b9545484bede61049f22ad79fe771bfd5d786a4cc7de7a84bfde7d981fb5",
+  "source_guard": {
+    "variant": "candidate",
+    "aggregate": "b782d7d4ac690003c08b4d8fde795ca619392e9bd59fa441dde06a7ec47decc8"
+  }
+}

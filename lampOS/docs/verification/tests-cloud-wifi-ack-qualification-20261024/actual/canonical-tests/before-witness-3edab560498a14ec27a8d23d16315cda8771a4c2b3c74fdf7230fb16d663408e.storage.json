@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-24T20:07:16.745959+00:00",
+  "available_bytes": 28959744000,
+  "minimum_reserve_bytes": 5368709120,
+  "planned_witness_bytes": 36721888,
+  "required_bytes": 5405431008,
+  "sufficient": true
+}

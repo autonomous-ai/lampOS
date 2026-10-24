@@ -1,0 +1,12 @@
+{
+  "before": {
+    "variant": "candidate",
+    "aggregate": "b782d7d4ac690003c08b4d8fde795ca619392e9bd59fa441dde06a7ec47decc8"
+  },
+  "after": {
+    "variant": "candidate",
+    "aggregate": "b782d7d4ac690003c08b4d8fde795ca619392e9bd59fa441dde06a7ec47decc8"
+  },
+  "executable_after": null,
+  "metadata_scope": "source bytes and Git executable bit; executable full mode"
+}

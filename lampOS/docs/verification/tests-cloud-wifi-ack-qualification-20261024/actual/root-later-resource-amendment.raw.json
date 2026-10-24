@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-24T20:04:07.285520+00:00",
+  "cloud_native_session": 22074,
+  "cloud_jobs": 2,
+  "qualification_jobs": 4,
+  "max_combined_owned_cargo_jobs": 6,
+  "exclusive_targets": [
+    "cloud-ack-cargo-target",
+    "pr-head-qualification-cargo-target/debug0"
+  ],
+  "scope": "Compile-only base-update0 overlap authorized. No case observations or inventory execution. No isolated-load or global performance claim. Preserve both original timing controls and all failed gates."
+}

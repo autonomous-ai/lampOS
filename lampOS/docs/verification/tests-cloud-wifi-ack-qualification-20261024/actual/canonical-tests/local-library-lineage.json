@@ -1,0 +1,1690 @@
+[
+  {
+    "stdout_line": 90,
+    "raw_offset": 76565,
+    "raw_bytes": 1125,
+    "raw_sha256": "0ed0e34a71b648d521bba73ee43a532e123429cd52d5cef1417ae3069d6b8fc2",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/ipc/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ipc",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/ipc/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ipc-6c1a4b298525b627.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ipc-6c1a4b298525b627.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ipc-6c1a4b298525b627.rlib",
+        "sha256": "e1c10ed73805acd54083fd8f62711c1a382c3f544caefcd6132dc6eb776e5388",
+        "mode": "0o644",
+        "bytes": 1439488
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ipc-6c1a4b298525b627.rmeta",
+        "sha256": "da63d6850a5ef0ec8595d406918603dbec1045ae7b477575cfbbd43957791bba",
+        "mode": "0o644",
+        "bytes": 74319
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 91,
+    "raw_offset": 77690,
+    "raw_bytes": 1125,
+    "raw_sha256": "20bd7356eb6a5e62b8518611dcb3f4cec5ee48a488b7956fc94a9b3b9f26588b",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/bus#lamp-bus@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/bus/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_bus",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/bus/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_bus-13b5e61c6fb06f5f.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_bus-13b5e61c6fb06f5f.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_bus-13b5e61c6fb06f5f.rlib",
+        "sha256": "52dcc6ae55428e86424127a85dc0100c538cc5f6c58979a8887c2b7cfe2aed39",
+        "mode": "0o644",
+        "bytes": 6578736
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_bus-13b5e61c6fb06f5f.rmeta",
+        "sha256": "939ee7c8a1cd0545523bb8918d6958c3f1705f9e442532c8d26360043a8d7293",
+        "mode": "0o644",
+        "bytes": 563945
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 133,
+    "raw_offset": 116638,
+    "raw_bytes": 1174,
+    "raw_sha256": "85e85409fba414f1bacb9ea154bd227cff1e22c4fac9a8a6ee959cf9d39d3746",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/turn-owner/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_owner",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/turn-owner/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_owner-853e0166f026a98b.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_owner-853e0166f026a98b.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_owner-853e0166f026a98b.rlib",
+        "sha256": "309e48ee7b477a37f81dda5119fe100b1ef952db637ba420d32b5883e700d778",
+        "mode": "0o644",
+        "bytes": 958232
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_owner-853e0166f026a98b.rmeta",
+        "sha256": "f0f0bdc8a3c54ed403077e0c74ffb92c1440abff940a7b8723b8fcf60201fd58",
+        "mode": "0o644",
+        "bytes": 514226
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 171,
+    "raw_offset": 152428,
+    "raw_bytes": 1174,
+    "raw_sha256": "2a6ba0f0f3f7d3c06d6480e881215457f0dc1f3f612b66b505069b81dce19c23",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/local-time/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_local_time",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/local-time/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_local_time-32bb41cabf735c83.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_local_time-32bb41cabf735c83.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_local_time-32bb41cabf735c83.rlib",
+        "sha256": "4a17da69d27be5524a6392f552f4fdc476a3555cc2f12e2f5c7c0cdd30f1186d",
+        "mode": "0o644",
+        "bytes": 1525944
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_local_time-32bb41cabf735c83.rmeta",
+        "sha256": "0945c655724570df57da7a00ccdba97e4fd5a296f849159bc548eac51ccf2428",
+        "mode": "0o644",
+        "bytes": 37529
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 196,
+    "raw_offset": 176884,
+    "raw_bytes": 1007,
+    "raw_sha256": "c124312d8038444875521c4e7f0a79e3444a4425cc483e08302f90ed8e555294",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/camera#lamp-camera@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/camera/Cargo.toml",
+      "target": {
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "build-script-build",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/camera/build.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/build/lamp-camera-6e195a7e2bc223bf/build-script-build"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/build/lamp-camera-6e195a7e2bc223bf/build-script-build",
+        "sha256": "8d86ed2dde76665a27bdc3ac89790f31398201426a9edb966369212f96ab5071",
+        "mode": "0o755",
+        "bytes": 593944
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 211,
+    "raw_offset": 191908,
+    "raw_bytes": 1134,
+    "raw_sha256": "fe56f19d41966d3bf2d73efa0adaf0db6fbc5897e0206963ff92e888c6d8b73c",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/third_party/sonora#0.2.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/third_party/sonora/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "sonora",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/third_party/sonora/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/libsonora-e9f45390ab56b416.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/libsonora-e9f45390ab56b416.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/libsonora-e9f45390ab56b416.rlib",
+        "sha256": "4aa37cc71be576dcc57197b5f8ee68d278f9f825392fe914eda4c00fb6665e1b",
+        "mode": "0o644",
+        "bytes": 3697344
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/libsonora-e9f45390ab56b416.rmeta",
+        "sha256": "0503d960b59e65d867539fa44f17f6a780cf2a1eaa320618d3a748f44ac64ed2",
+        "mode": "0o644",
+        "bytes": 538274
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 212,
+    "raw_offset": 193042,
+    "raw_bytes": 1132,
+    "raw_sha256": "3b9de66332c5ede88db27f11e6d99578d34007c3637ebbae894b3df880fed86e",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/msgs/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_msgs",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/msgs/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_msgs-fbc9cc70fcf9ae74.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_msgs-fbc9cc70fcf9ae74.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_msgs-fbc9cc70fcf9ae74.rlib",
+        "sha256": "7c0c9fd7892cc551f8e80aa0df9022e68b83a01394fea7697b759a9b3fe673a2",
+        "mode": "0o644",
+        "bytes": 15012416
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_msgs-fbc9cc70fcf9ae74.rmeta",
+        "sha256": "986c9c5ae39cfa1b3410893c5f371a05101e930590c65e1e054b223603874240",
+        "mode": "0o644",
+        "bytes": 6169703
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 213,
+    "raw_offset": 194174,
+    "raw_bytes": 1146,
+    "raw_sha256": "b60d078f71989e78c0558e06443dccf7f99759502ecb574ee734c67509d7eccc",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/keeper/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_keeper",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/keeper/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_keeper-8de4661434ba5f2b.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_keeper-8de4661434ba5f2b.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_keeper-8de4661434ba5f2b.rlib",
+        "sha256": "00d74f59c37cd42a404dd7d62965ffc94c96df319cc9a5c315c443c0c15843e9",
+        "mode": "0o644",
+        "bytes": 4510728
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_keeper-8de4661434ba5f2b.rmeta",
+        "sha256": "886ab213ba4e99a7c1155849551383b6830f2976218c1042a6da198b9a36e346",
+        "mode": "0o644",
+        "bytes": 239963
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 214,
+    "raw_offset": 195320,
+    "raw_bytes": 1132,
+    "raw_sha256": "4d114dd302426a003633f0044e979ddcf05313405bc0d7a3597d944fa56725bc",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/lean#lamp-lean@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/lean/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_lean",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/lean/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_lean-56e796f40d158e5c.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_lean-56e796f40d158e5c.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_lean-56e796f40d158e5c.rlib",
+        "sha256": "bf3503ecff5efac1ba0c4abba5cde18f73956bf1351df3be70671d17e23d08b0",
+        "mode": "0o644",
+        "bytes": 1904568
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_lean-56e796f40d158e5c.rmeta",
+        "sha256": "67a073a948034f78fbe87fbd49e28d7e9eff996989fab7d7cca02443ea5ed680",
+        "mode": "0o644",
+        "bytes": 294335
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 215,
+    "raw_offset": 196452,
+    "raw_bytes": 1132,
+    "raw_sha256": "530ccb6662fb883e86d8f30aca486ea17729ae6a7708ca7a025544180eba7dbc",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_body-656e0907ee173a89.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_body-656e0907ee173a89.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_body-656e0907ee173a89.rlib",
+        "sha256": "95e75caae102c3829af6b75b104ee1fcd47f3666000564978ccc6736c00d074f",
+        "mode": "0o644",
+        "bytes": 12345208
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_body-656e0907ee173a89.rmeta",
+        "sha256": "a5de4829f9cd0bd654ddbeca25bcce9f429745507fc6f3d8f9edccf87e43fca1",
+        "mode": "0o644",
+        "bytes": 3341523
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 217,
+    "raw_offset": 198024,
+    "raw_bytes": 1132,
+    "raw_sha256": "9e9bb3daebf2892f52331b450a40d78de65489249674f2a55ef4c1c9aecd6472",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/ring#lamp-ring@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/ring/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ring",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/ring/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ring-e4cd61ca0723c7a0.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ring-e4cd61ca0723c7a0.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ring-e4cd61ca0723c7a0.rlib",
+        "sha256": "7ae342aae41db2fc8fbe8d5da458d662ae93c9915e448b9464353bd67b6f8cda",
+        "mode": "0o644",
+        "bytes": 688424
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_ring-e4cd61ca0723c7a0.rmeta",
+        "sha256": "93ed9f3219c70fe9046e0f35314ee9a597f8321b314600703c83ec64ce6cc722",
+        "mode": "0o644",
+        "bytes": 207986
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 221,
+    "raw_offset": 202101,
+    "raw_bytes": 1160,
+    "raw_sha256": "3b64379a2c5dfdd265ea3d5c1694012f6cb894ad0a930cdbf2d107fd9e87782b",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/schedule#lamp-schedule@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/schedule/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_schedule",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/schedule/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_schedule-9bbb0f8aa400da00.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_schedule-9bbb0f8aa400da00.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_schedule-9bbb0f8aa400da00.rlib",
+        "sha256": "a80ae3bcfc2d1a6adf1c775cfa1c39c6ac53f3c06e5f592176014979bba43a3c",
+        "mode": "0o644",
+        "bytes": 14235136
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_schedule-9bbb0f8aa400da00.rmeta",
+        "sha256": "a1a5ed863f5ca21847bae50205abf8c8a3da3346cf80ddd38cd8575a0fd2a228",
+        "mode": "0o644",
+        "bytes": 2841911
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 222,
+    "raw_offset": 203261,
+    "raw_bytes": 1146,
+    "raw_sha256": "256c8de75d8815163d6395116730a66281d4a7661f024bd1ba6fb94ab17294e5",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/camera#lamp-camera@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/camera/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_camera",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/camera/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_camera-5d3c06caf9cde0bf.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_camera-5d3c06caf9cde0bf.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_camera-5d3c06caf9cde0bf.rlib",
+        "sha256": "cef5b1b93324d5ddc29f274b23bc116306609088d50cd95cf5f694b1d4ef0ca2",
+        "mode": "0o644",
+        "bytes": 3242816
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_camera-5d3c06caf9cde0bf.rmeta",
+        "sha256": "979726a82d350cbc4a28957b0e36e21053634f0b60345d2ea4b45f11648c867b",
+        "mode": "0o644",
+        "bytes": 992810
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 223,
+    "raw_offset": 204407,
+    "raw_bytes": 1139,
+    "raw_sha256": "8b619731c31d38f282582dd261f3fc1eb7e1fbb3649cb0d9bfc07ed5942eacac",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/audio#lamp-audio@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/audio/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_audio",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/audio/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_audio-54c217699c71c4ed.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_audio-54c217699c71c4ed.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_audio-54c217699c71c4ed.rlib",
+        "sha256": "1a80cd3078ddabec12ccc9de024cf678afe04f4825f10edd8c29d2a1277e256a",
+        "mode": "0o644",
+        "bytes": 13572648
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_audio-54c217699c71c4ed.rmeta",
+        "sha256": "39e21612d800fa7b51913b273ca8aa87270977a921531628727ef9437f41725c",
+        "mode": "0o644",
+        "bytes": 1884930
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 224,
+    "raw_offset": 205546,
+    "raw_bytes": 1160,
+    "raw_sha256": "fd2aa3b7869465c12c4ef0f15ba26eaf329d8a41960326c158b3cd5bdeb6310f",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/controls#lamp-controls@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/controls/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_controls",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/controls/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_controls-0704c30a2e0a36bf.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_controls-0704c30a2e0a36bf.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_controls-0704c30a2e0a36bf.rlib",
+        "sha256": "853c4e1ee323f41867f8a400630d25160bc925105fb95a8dc06035649d029e6b",
+        "mode": "0o644",
+        "bytes": 14555088
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_controls-0704c30a2e0a36bf.rmeta",
+        "sha256": "f8b0cc3ba395cbbd9173defd73f3192adf5e6e791b5284c671070bbf6752612b",
+        "mode": "0o644",
+        "bytes": 2705270
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 225,
+    "raw_offset": 206706,
+    "raw_bytes": 1146,
+    "raw_sha256": "e647413151fa3abdeb2304290e034a8a3757e095226ac21d60a0278fa02aee40",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/health#lamp-health@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/health/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_health",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/health/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_health-87cb46e999e3dd34.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_health-87cb46e999e3dd34.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_health-87cb46e999e3dd34.rlib",
+        "sha256": "43472b12181f6adbe7c140500a67ff2f4df02ad466c8d75b5f2c6a4b91cf12d7",
+        "mode": "0o644",
+        "bytes": 9216600
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_health-87cb46e999e3dd34.rmeta",
+        "sha256": "a488102ca51908d7381aaad2dae433ae6130607d46b2ca0239cbd08e913332a3",
+        "mode": "0o644",
+        "bytes": 338366
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 226,
+    "raw_offset": 207852,
+    "raw_bytes": 1155,
+    "raw_sha256": "6c149b38f44e0593c93aa47159fe6ddc6d64ea349126bbd99bc0a7f35e7c169d",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/gemini#lamp-gemini@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/gemini/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_gemini",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/gemini/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default"
+      ],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_gemini-2c9a5fa58a9029c0.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_gemini-2c9a5fa58a9029c0.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_gemini-2c9a5fa58a9029c0.rlib",
+        "sha256": "7928fdf83b729e9dcb204cb7a7e25ad462abb39adb45ca244a4432913597a225",
+        "mode": "0o644",
+        "bytes": 23130544
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_gemini-2c9a5fa58a9029c0.rmeta",
+        "sha256": "dc2eca076996f0247fe70236a39741dee81b5852908bf7271277abe2a0bc40c8",
+        "mode": "0o644",
+        "bytes": 1777918
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 228,
+    "raw_offset": 210025,
+    "raw_bytes": 1195,
+    "raw_sha256": "1c575cb06bbdcf0449dcc1e96e826fd25d0aedb5b2a165b0862526c3cde64dbc",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/turn-end-wire/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_end_wire",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/turn-end-wire/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_end_wire-5d8eef77abd9d9b0.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_end_wire-5d8eef77abd9d9b0.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_end_wire-5d8eef77abd9d9b0.rlib",
+        "sha256": "59c9efb2cb7b795771f9c0a04f7f7b65c71e6a0624a7863e3bd1d11831f1919c",
+        "mode": "0o644",
+        "bytes": 1905312
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_turn_end_wire-5d8eef77abd9d9b0.rmeta",
+        "sha256": "39b33c4e90078ea2ab53080f13f9470e18c17251058dfca3a5afc01d414fc068",
+        "mode": "0o644",
+        "bytes": 189707
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 229,
+    "raw_offset": 211220,
+    "raw_bytes": 1146,
+    "raw_sha256": "b43c103c27bf82b5ffc525a5f10e914187414b4e976e9723f88c78355d71dfd8",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/update/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_update-9d0149d03d39d04a.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_update-9d0149d03d39d04a.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_update-9d0149d03d39d04a.rlib",
+        "sha256": "81a96d175c87c338d1eb859b88be15cda03f7cb5d007967944702b67e781cefb",
+        "mode": "0o644",
+        "bytes": 35720584
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_update-9d0149d03d39d04a.rmeta",
+        "sha256": "005e58456f1eba9a79d6014344a28707ee33d8ee3a41913c4e41db1749916b9d",
+        "mode": "0o644",
+        "bytes": 2455598
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 231,
+    "raw_offset": 213320,
+    "raw_bytes": 1209,
+    "raw_sha256": "06bf0579ac25128e2ed3c0457597dc10d02598428e0b60627c929ff035fa0063",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/voice-processes/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_processes",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/voice-processes/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice_processes-ed5e607373297b21.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice_processes-ed5e607373297b21.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice_processes-ed5e607373297b21.rlib",
+        "sha256": "0150b04ae44b8090490396a74976af593b24ca1ddb3f720043b3aacded9796e4",
+        "mode": "0o644",
+        "bytes": 145888
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice_processes-ed5e607373297b21.rmeta",
+        "sha256": "712cc7d9ad8d4255c6cbabedaf4e419a044f2a7315306de52313329413638c22",
+        "mode": "0o644",
+        "bytes": 33628
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 233,
+    "raw_offset": 215471,
+    "raw_bytes": 1167,
+    "raw_sha256": "b81ae14d48efb846d659271848582f432c58ed40bfb1bfed19aabd4f4d9ef1d6",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/near-call#lamp-near-call@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/near-call/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_near_call",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/near-call/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_near_call-b9079aa41c6dc1b0.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_near_call-b9079aa41c6dc1b0.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_near_call-b9079aa41c6dc1b0.rlib",
+        "sha256": "ab24569ed6e2e23b7a7cfd4552ec071fd81385e6cedf4bea830bc923c24b1c91",
+        "mode": "0o644",
+        "bytes": 1082752
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_near_call-b9079aa41c6dc1b0.rmeta",
+        "sha256": "72c48ba6c23ea9da885d7996da5249c99073a00b78ef7ea6ba0998c08ecde41e",
+        "mode": "0o644",
+        "bytes": 97726
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 236,
+    "raw_offset": 218535,
+    "raw_bytes": 1174,
+    "raw_sha256": "bb140fb3f05b8594eb7c0ecd6e09c0adf14d4811d36178051860f4cf9b998a50",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/expression/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_expression-e79fbbd75ab4f07a.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_expression-e79fbbd75ab4f07a.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_expression-e79fbbd75ab4f07a.rlib",
+        "sha256": "4b8d57b9a4881544011b7faa41f1265d068047655d714d1de3ed403f70e6b25a",
+        "mode": "0o644",
+        "bytes": 19866968
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_expression-e79fbbd75ab4f07a.rmeta",
+        "sha256": "101310c0206d3fda870eea90d8acb6730fd16b8f3ce96b633d479d8019942e14",
+        "mode": "0o644",
+        "bytes": 1995954
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 245,
+    "raw_offset": 227561,
+    "raw_bytes": 1153,
+    "raw_sha256": "4e862f6dcaacac2b930430580871eafbd47927d7588b1336eb3a3f1d2b8a5022",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/actions#lamp-actions@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/actions/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_actions",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/actions/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_actions-4ada22a710b3e83b.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_actions-4ada22a710b3e83b.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_actions-4ada22a710b3e83b.rlib",
+        "sha256": "92f9e64c2c081f4f3089001dd4a86352c7c8960b9fea37ccf0a4370b4960bf98",
+        "mode": "0o644",
+        "bytes": 5533744
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_actions-4ada22a710b3e83b.rmeta",
+        "sha256": "3e9f5f4f7f0b733e787143ff7582c8f2c3a861d95f6e42f01a856853cf69ff75",
+        "mode": "0o644",
+        "bytes": 952594
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 249,
+    "raw_offset": 231637,
+    "raw_bytes": 1139,
+    "raw_sha256": "e2fc460a70046cbca8e44b2500b6f2d25bf2510b6c866cd1c5782e6f2f1db1dc",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/setup#lamp-setup@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/setup/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_setup",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/setup/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_setup-8ded8166a535ffb7.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_setup-8ded8166a535ffb7.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_setup-8ded8166a535ffb7.rlib",
+        "sha256": "f5dd34aab5a3679550eb2d8e77df9f88c468fd6872bccaf87b91f3b8f06c3684",
+        "mode": "0o644",
+        "bytes": 18436952
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_setup-8ded8166a535ffb7.rmeta",
+        "sha256": "f4c9c03bd656363f09c5b4807ca9126f6b25b45192617f61bfb499810722c5c1",
+        "mode": "0o644",
+        "bytes": 1198965
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 250,
+    "raw_offset": 232776,
+    "raw_bytes": 1146,
+    "raw_sha256": "bc125c4965c7fe7c172e9ac2caafc12d7937121790ab66597c68070ec888c20f",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_skills-b1928b43a0561200.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_skills-b1928b43a0561200.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_skills-b1928b43a0561200.rlib",
+        "sha256": "0844c9b4463d033dca4ad3f7eb10fbb9d9c26131c4a852df5cddae1076663d45",
+        "mode": "0o644",
+        "bytes": 40739408
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_skills-b1928b43a0561200.rmeta",
+        "sha256": "868ac205486b0df77678f2e73eb8abc036d34f2f1aa9f10282c421a45a16d2a1",
+        "mode": "0o644",
+        "bytes": 3217032
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 251,
+    "raw_offset": 233922,
+    "raw_bytes": 1139,
+    "raw_sha256": "814801118369cfc1d4569bf4bcd42424dad83456d28d8d323cae52464c36fa37",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_cloud-504d422f66a04946.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_cloud-504d422f66a04946.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_cloud-504d422f66a04946.rlib",
+        "sha256": "93e0cb1b95365da719d78089f9a8535fb7a58840d8f3725131a75e730eb87c5e",
+        "mode": "0o644",
+        "bytes": 16818888
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_cloud-504d422f66a04946.rmeta",
+        "sha256": "522e3f14a66db1ca23808b3a647e62d73914578099fe0722b6f97bf51fb68a06",
+        "mode": "0o644",
+        "bytes": 1472818
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 252,
+    "raw_offset": 235061,
+    "raw_bytes": 1139,
+    "raw_sha256": "ec47f0fee4fe2568061e88cf47d1c3f37a5e2a10393c3c787e9cfe6bc50d6dcf",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice-d55c83bfc2e51103.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice-d55c83bfc2e51103.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice-d55c83bfc2e51103.rlib",
+        "sha256": "3d6fe7542bc621b634af69acc8d643d57552ecc8ffa4ca98c61758d74c473a5e",
+        "mode": "0o644",
+        "bytes": 231701872
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/liblamp_voice-d55c83bfc2e51103.rmeta",
+        "sha256": "c2b881f46474a455054b98d3443ccff0bc191feae6998acbc7bce358170fc525",
+        "mode": "0o644",
+        "bytes": 22350368
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 253,
+    "raw_offset": 236200,
+    "raw_bytes": 1075,
+    "raw_sha256": "60182420f110d0db3664bef0d9b4f3342cfc2682d9cda65cad9172ba389f53b2",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud",
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/lamp-cloud",
+        "sha256": "36128b1900ad5310af3d07268f01bf3708eab74319b001997aa8483930760194",
+        "mode": "0o755",
+        "bytes": 29544720
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 254,
+    "raw_offset": 237275,
+    "raw_bytes": 1101,
+    "raw_sha256": "fadfd6ee015a02f8bfcc618dcf251a9a49bb5465b22e7af6e82e76365fdcf7ee",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1",
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/it-f97da77857dd66f1",
+        "sha256": "3deba80724b968b91762812158fe92f3c33fc752ab5ea8f18a1d0daea05bd058",
+        "mode": "0o755",
+        "bytes": 19646536
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 255,
+    "raw_offset": 238376,
+    "raw_bytes": 1136,
+    "raw_sha256": "87d7a92a132fee8354f818a7ca7f7db8ee86c4dd7f8bbfcdb388b6e8d00493c4",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4",
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/release_pair-03031a8d457564d4",
+        "sha256": "900925f7ec1109d9ac44ae61c1dfca8ee112a8e79a5ab394065dbc0e13c303db",
+        "mode": "0o755",
+        "bytes": 3096920
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 256,
+    "raw_offset": 239512,
+    "raw_bytes": 1118,
+    "raw_sha256": "0b78a3300da3f3703bbd5e529123501913cd8e3fd680abbf46553c098ee1de62",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943",
+        "sha256": "ed871e4a9bf645421a1d2c9c962b786391f64a9624fa22ed5cdfb7089723feb5",
+        "mode": "0o755",
+        "bytes": 1019888
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  },
+  {
+    "stdout_line": 257,
+    "raw_offset": 240630,
+    "raw_bytes": 1116,
+    "raw_sha256": "1dcead9f3939fe046cc3d9ccabdf2a19a501031446277d38ece914596c5b15e4",
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58",
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-181eacc6d66b1b58",
+        "sha256": "3edab560498a14ec27a8d23d16315cda8771a4c2b3c74fdf7230fb16d663408e",
+        "mode": "0o755",
+        "bytes": 36721888
+      }
+    ],
+    "binding": "fresh=false after this stage explicit local-package invalidation"
+  }
+]

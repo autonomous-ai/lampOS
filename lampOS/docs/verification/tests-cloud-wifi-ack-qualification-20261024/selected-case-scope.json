@@ -1,0 +1,8 @@
+{
+  "case": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+  "selected_control_callchain": "Changes::with_wifi -> start_wifi -> ownedstdthread ask_wifi -> UnixStream helper on a joinedstdthread; no Command/current_exe/CARGO_BIN_EXE in selected helper path. Both ackfalse/true branches run in each exact-case observation.",
+  "compiled_children": [],
+  "system_children": [],
+  "future_full_suite_scope": "Canonical Cloud full suite includes its unchanged child/process tests; each actual command has f40 owned-PG/directwait/absence proof. This selected-case child-scope statement is not a blanket claim about every Cloud test.",
+  "unchanged_behavior": "WIFI_RESULT_ACK_WAIT remains5s, original result/immediate-relink/finalrelink assertions and both branch values unchanged. Candidate observes wifi_busy Acquire false after worker Release store, with a new5.5s watchdog replacing the former5.5s fixed settling interval; it does not shorten the product5s ACK deadline."
+}

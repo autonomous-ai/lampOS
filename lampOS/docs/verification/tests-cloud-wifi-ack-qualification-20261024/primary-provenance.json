@@ -1,0 +1,1400 @@
+[
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/closed-run-review.json",
+    "bundle_path": "actual/closed-run-review.json",
+    "sha256": "ab0a0c096524730105ee0e7b81514ad3bd6733a02afbf8b71732fefb52a0a82a",
+    "bytes": 19846
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/root-grant.raw.json",
+    "bundle_path": "actual/root-grant.raw.json",
+    "sha256": "37cd4a06457b97770a710fb48889eb5e59bcae9df6caf659717c23a4e7726a7d",
+    "bytes": 1968
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/results.json",
+    "bundle_path": "actual/results.json",
+    "sha256": "f094d3a27cd6dedbaf8957ea9dfa3f4c103bd6abacb9edd13b031ccbede71b86",
+    "bytes": 215149
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/source-switch-baseline.json",
+    "bundle_path": "actual/source-switch-baseline.json",
+    "sha256": "dee4b16acea441496e4923645550c950e5e1d8b08e1d63a3d5b54ca8c1d3b08c",
+    "bytes": 1218
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/root-later-resource-amendment.raw.json",
+    "bundle_path": "actual/root-later-resource-amendment.raw.json",
+    "sha256": "8019a6406aa21fa6e37e79577362cb870b13a2d409c4d58d503d587729f7ddb4",
+    "bytes": 484
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/original-candidate-owned-1.txt",
+    "bundle_path": "actual/original-candidate-owned-1.txt",
+    "sha256": "929fc8f6d395d1af1a24802f9461e6991d76fa3b2c7e067ed5e3766f24f346ff",
+    "bytes": 101988
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/CPU-target-release.json",
+    "bundle_path": "actual/CPU-target-release.json",
+    "sha256": "f12a2de89418dacd334b367cdd2290f9b7d8216bffc6e6497fd8b065715cd017",
+    "bytes": 626
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/original-candidate-owned-0.txt",
+    "bundle_path": "actual/original-candidate-owned-0.txt",
+    "sha256": "66ad0d899d055e555e25198daee6a0ec3b89c1717da51a2d2697e5aa3af4827f",
+    "bytes": 76375
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/before-owned-source-backups.storage.json",
+    "bundle_path": "actual/before-owned-source-backups.storage.json",
+    "sha256": "9b4a3f9c30767bd2e5f85681c2798ae7c73c69ef2f70b30d929aee9b25ba37b1",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/before-source-switch-baseline.storage.json",
+    "bundle_path": "actual/before-source-switch-baseline.storage.json",
+    "sha256": "f16432bbd3505cb004ab6d3135fb7b460ac6d23296c13642048cb5ab1b805fc1",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/root-later-resource-amendment-receipt.json",
+    "bundle_path": "actual/root-later-resource-amendment-receipt.json",
+    "sha256": "de285f604d83899aec5e0be368146f053bdfdda51dbafdbb4e5b121fa567e345",
+    "bytes": 615
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/source-switch-candidate-restore.json",
+    "bundle_path": "actual/source-switch-candidate-restore.json",
+    "sha256": "e8ede1b608a6759422f44e49104ce8565c2c23061f93dc718d39aba811f37789",
+    "bytes": 1219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/environment.json",
+    "bundle_path": "actual/environment.json",
+    "sha256": "430d7aa5dfb4a8e524cd9100237d5ebbb109e7c22cf220c55729c8ed3459d1e5",
+    "bytes": 5184
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/root-reported-actual-sibling-start.json",
+    "bundle_path": "actual/root-reported-actual-sibling-start.json",
+    "sha256": "8cb6eca510c4e8fad453fb03912b8bbe5ee806029660613a2afa02042ad0273b",
+    "bytes": 763
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/source-switch-candidate.json",
+    "bundle_path": "actual/source-switch-candidate.json",
+    "sha256": "48134498e8219fd96ae5310561860470341068b5b9506d165f0d9a508d7157d9",
+    "bytes": 1220
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/before-source-switch-candidate.storage.json",
+    "bundle_path": "actual/before-source-switch-candidate.storage.json",
+    "sha256": "dab7b243f9d64412ad62256914bc8b906f2ffbad0dfd24024a7ecfa8f8d6f4ff",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-workspace-build/canonical-clean-before-workspace-build.stderr.txt",
+    "bundle_path": "actual/canonical-clean-before-workspace-build/canonical-clean-before-workspace-build.stderr.txt",
+    "sha256": "7a2aaa704dee20eea3920162493af41153ab172356bb3146a49c450f1c9dade2",
+    "bytes": 38
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-workspace-build/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-clean-before-workspace-build/raw-command-outcome.json",
+    "sha256": "bfc3d598c38f4e560188a6d69178b590f5f4c3e1a846db3aa4a780adb12dc33d",
+    "bytes": 2662
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-workspace-build/canonical-clean-before-workspace-build.json",
+    "bundle_path": "actual/canonical-clean-before-workspace-build/canonical-clean-before-workspace-build.json",
+    "sha256": "bfc3d598c38f4e560188a6d69178b590f5f4c3e1a846db3aa4a780adb12dc33d",
+    "bytes": 2662
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-workspace-build/source-executable-guards.json",
+    "bundle_path": "actual/canonical-clean-before-workspace-build/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-workspace-build/before-command.storage.json",
+    "bundle_path": "actual/canonical-clean-before-workspace-build/before-command.storage.json",
+    "sha256": "a028ea2e7c9501019b55aca2c38a4e06e6e4dd6a691f6966f81e4c7b96802622",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-workspace-build/canonical-clean-before-workspace-build.stdout.txt",
+    "bundle_path": "actual/canonical-clean-before-workspace-build/canonical-clean-before-workspace-build.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/executed-summaries.json",
+    "bundle_path": "actual/candidate-observation/executed-summaries.json",
+    "sha256": "7ecee7fbd8ec29df3c826fe47788ece68afbb27a937e107b4c28ed63eab38fb4",
+    "bytes": 671
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/raw-command-outcome.json",
+    "bundle_path": "actual/candidate-observation/raw-command-outcome.json",
+    "sha256": "a1eab3a0fc28acd2bfe57167c8065af9cf42f32982e75ddb3e6c1b1980b9cbbd",
+    "bytes": 1542
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/candidate-observation.stderr.txt",
+    "bundle_path": "actual/candidate-observation/candidate-observation.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/source-executable-guards.json",
+    "bundle_path": "actual/candidate-observation/source-executable-guards.json",
+    "sha256": "a06cf8b7f35db071ef67f5e3c34903bd3a55e0e61293570637c46ad6b37c5074",
+    "bytes": 830
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/before-command.storage.json",
+    "bundle_path": "actual/candidate-observation/before-command.storage.json",
+    "sha256": "8d5aa1864739bc4351bd6fbf5c410286a7d210f1ef2f212fa2e2d9d81bd7d97d",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/candidate-observation.stdout.txt",
+    "bundle_path": "actual/candidate-observation/candidate-observation.stdout.txt",
+    "sha256": "4c1b2875eb9ed7da042fb3d3fe3586842450bbc92ba95aee1ab1971daba835d3",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/candidate-observation.json",
+    "bundle_path": "actual/candidate-observation/candidate-observation.json",
+    "sha256": "a1eab3a0fc28acd2bfe57167c8065af9cf42f32982e75ddb3e6c1b1980b9cbbd",
+    "bytes": 1542
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-observation/validated-outcome.json",
+    "bundle_path": "actual/candidate-observation/validated-outcome.json",
+    "sha256": "a0318ca2619107032913f25dd1d5b81cefa4868260ad2f42affddfad0a6da1fb",
+    "bytes": 38330
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/baseline-compile.json",
+    "bundle_path": "actual/baseline-compile/baseline-compile.json",
+    "sha256": "0c6c0c22bce7deed2685b13d44703e1db3f94539ef68388d37b59646042a9aa5",
+    "bytes": 1295
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/frozen-executable-bindings.json",
+    "bundle_path": "actual/baseline-compile/frozen-executable-bindings.json",
+    "sha256": "27a58f82ca709de06060e379de870a13980650f2f35f4244b9f173650e2dcb66",
+    "bytes": 2406
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compilation-outcome.json",
+    "bundle_path": "actual/baseline-compile/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/before-witness-copies.storage.json",
+    "bundle_path": "actual/baseline-compile/before-witness-copies.storage.json",
+    "sha256": "4b3c5aa6b6cd9b3546703c56100956fab96b44a7e4002d706d4b79fcfaaa6eaa",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/raw-command-outcome.json",
+    "bundle_path": "actual/baseline-compile/raw-command-outcome.json",
+    "sha256": "0c6c0c22bce7deed2685b13d44703e1db3f94539ef68388d37b59646042a9aa5",
+    "bytes": 1295
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census.json",
+    "bundle_path": "actual/baseline-compile/compiled-census.json",
+    "sha256": "36351315728a2bf1ca6dc933c9cf86fd593987c939f30b7d18f9326f2dc6f15e",
+    "bytes": 14049
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/baseline-compile.stderr.txt",
+    "bundle_path": "actual/baseline-compile/baseline-compile.stderr.txt",
+    "sha256": "277e808233b137054abce35e3b8aa81315487103d37dfb9d526c2f0d9d88b16b",
+    "bytes": 10138
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/local-library-lineage.json",
+    "bundle_path": "actual/baseline-compile/local-library-lineage.json",
+    "sha256": "6bedc5db0b1e7fe8eaca135b7ce7da6dcf8ce1694bc91dc645406a3eecb44e5d",
+    "bytes": 64481
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/source-executable-guards.json",
+    "bundle_path": "actual/baseline-compile/source-executable-guards.json",
+    "sha256": "048fa55c5be06e568322e66a6a5558e3c9e934cea2003f0d0f3318768c929c8d",
+    "bytes": 371
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/before-command.storage.json",
+    "bundle_path": "actual/baseline-compile/before-command.storage.json",
+    "sha256": "392c1d0a5bb0d62070e476741a3501728edc5b971bc372312b981b4cb6e5d95e",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-artifacts.json",
+    "bundle_path": "actual/baseline-compile/compiled-artifacts.json",
+    "sha256": "00a629b1fc05524d6eeb35a47a680793ac0809eea1dce6d5fc6431b0035a23f2",
+    "bytes": 1811
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/before-witness-9c64ac302a712fbd8e06f54d12d84034f2523a9697e8e99edf4c06082ba48502.storage.json",
+    "bundle_path": "actual/baseline-compile/before-witness-9c64ac302a712fbd8e06f54d12d84034f2523a9697e8e99edf4c06082ba48502.storage.json",
+    "sha256": "7b56e2b15df5157aed8c986cf941fc5f828f2b7805c0c2817d30df60355dc8a3",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/baseline-compile.stdout.txt",
+    "bundle_path": "actual/baseline-compile/baseline-compile.stdout.txt",
+    "sha256": "d2cee24a138a90df7246fbacdceebf0dff360583941965c5b9fa0788a653e040",
+    "bytes": 236425
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-clippy/canonical-clean-before-clippy.stdout.txt",
+    "bundle_path": "actual/canonical-clean-before-clippy/canonical-clean-before-clippy.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-clippy/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-clean-before-clippy/raw-command-outcome.json",
+    "sha256": "9e3caeb2c76422b624ad5dbd4281b486fbaa17f3948888875668298cd12bf10c",
+    "bytes": 2643
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-clippy/canonical-clean-before-clippy.json",
+    "bundle_path": "actual/canonical-clean-before-clippy/canonical-clean-before-clippy.json",
+    "sha256": "9e3caeb2c76422b624ad5dbd4281b486fbaa17f3948888875668298cd12bf10c",
+    "bytes": 2643
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-clippy/source-executable-guards.json",
+    "bundle_path": "actual/canonical-clean-before-clippy/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-clippy/canonical-clean-before-clippy.stderr.txt",
+    "bundle_path": "actual/canonical-clean-before-clippy/canonical-clean-before-clippy.stderr.txt",
+    "sha256": "79786240a73b134f4b11f43b6a2e666cfe9673d5f68e1e7e3300d110a2ac1f91",
+    "bytes": 38
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-clippy/before-command.storage.json",
+    "bundle_path": "actual/canonical-clean-before-clippy/before-command.storage.json",
+    "sha256": "e5b0a95df3b00514bcf589188e0901f4f2559f6c7db5233f058cdd8eb873f4bf",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-tests/canonical-clean-before-tests.stdout.txt",
+    "bundle_path": "actual/canonical-clean-before-tests/canonical-clean-before-tests.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-tests/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-clean-before-tests/raw-command-outcome.json",
+    "sha256": "a01c1dc45dd2abf7738e53a66e07584d5d4a1a26ba1b7a2613f2eefe1cb7b2fa",
+    "bytes": 2640
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-tests/canonical-clean-before-tests.stderr.txt",
+    "bundle_path": "actual/canonical-clean-before-tests/canonical-clean-before-tests.stderr.txt",
+    "sha256": "223aec06ef0914eaf59d65a3c6f9ec0d6a9aa5ff76236f56aff33fb2c9b51fb2",
+    "bytes": 39
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-tests/source-executable-guards.json",
+    "bundle_path": "actual/canonical-clean-before-tests/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-tests/before-command.storage.json",
+    "bundle_path": "actual/canonical-clean-before-tests/before-command.storage.json",
+    "sha256": "471c51ad5f88320fd2ce0092185b9feb6c3c3cb27b5e112c3c37aa2b3bed865a",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clean-before-tests/canonical-clean-before-tests.json",
+    "bundle_path": "actual/canonical-clean-before-tests/canonical-clean-before-tests.json",
+    "sha256": "a01c1dc45dd2abf7738e53a66e07584d5d4a1a26ba1b7a2613f2eefe1cb7b2fa",
+    "bytes": 2640
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/baseline-observation.json",
+    "bundle_path": "actual/baseline-observation/baseline-observation.json",
+    "sha256": "e725dd8a0f96d4c6d1d96523b4280c7b84d0bab6ce38e9b3580d971e5bd59a99",
+    "bytes": 1542
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/executed-summaries.json",
+    "bundle_path": "actual/baseline-observation/executed-summaries.json",
+    "sha256": "de98550be4675802c4354ae93bd596bc9aff19cf169ffa0ed303830dbf865df6",
+    "bytes": 672
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/raw-command-outcome.json",
+    "bundle_path": "actual/baseline-observation/raw-command-outcome.json",
+    "sha256": "e725dd8a0f96d4c6d1d96523b4280c7b84d0bab6ce38e9b3580d971e5bd59a99",
+    "bytes": 1542
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/baseline-observation.stdout.txt",
+    "bundle_path": "actual/baseline-observation/baseline-observation.stdout.txt",
+    "sha256": "5a07b2714072364254d990a46b6028da4f5a3e347f61678f13858a92026c1eca",
+    "bytes": 213
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/source-executable-guards.json",
+    "bundle_path": "actual/baseline-observation/source-executable-guards.json",
+    "sha256": "65c927aee47545f5f718d6b58957aaaa187d5604bf7adb8ad1a3e05ffa243466",
+    "bytes": 827
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/before-command.storage.json",
+    "bundle_path": "actual/baseline-observation/before-command.storage.json",
+    "sha256": "823282fc6656d5ca33af1e9a8c95a9760879c0025f0205a1dcb9e5441b306b61",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/baseline-observation.stderr.txt",
+    "bundle_path": "actual/baseline-observation/baseline-observation.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-observation/validated-outcome.json",
+    "bundle_path": "actual/baseline-observation/validated-outcome.json",
+    "sha256": "d2b35fe2cfa77c30bd1411e37fa254ba876063a9673e8bdf0d12d84574e02ebf",
+    "bytes": 38328
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/frozen-executable-bindings.json",
+    "bundle_path": "actual/candidate-compile/frozen-executable-bindings.json",
+    "sha256": "0e72efc292f17ba77407a440878bf39dc85320187d5c1f7a30a40e9502810d5b",
+    "bytes": 2407
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compilation-outcome.json",
+    "bundle_path": "actual/candidate-compile/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/before-witness-copies.storage.json",
+    "bundle_path": "actual/candidate-compile/before-witness-copies.storage.json",
+    "sha256": "f7e393c5323df738ff32adcfabd97c08ed3138dc168874d57f1084cf54e87d96",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/candidate-compile.stderr.txt",
+    "bundle_path": "actual/candidate-compile/candidate-compile.stderr.txt",
+    "sha256": "310b8fff6ea68db984e02389122f15587d218e975ec810659e32a2e1a0461839",
+    "bytes": 4426
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/raw-command-outcome.json",
+    "bundle_path": "actual/candidate-compile/raw-command-outcome.json",
+    "sha256": "3f4884f650c696a5bd8d5e5d6058858228e577a3145448ec605313c1602f0b4f",
+    "bytes": 1296
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/before-witness-7a9ac5db2683c1435bcc25ce5f9348e507ec2795b4c788df825bad4bd8621c65.storage.json",
+    "bundle_path": "actual/candidate-compile/before-witness-7a9ac5db2683c1435bcc25ce5f9348e507ec2795b4c788df825bad4bd8621c65.storage.json",
+    "sha256": "e8a0d58bf2a3af2a80a5e0efe99e7c098704c5ce63e2c756a34d52cec7826c81",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census.json",
+    "bundle_path": "actual/candidate-compile/compiled-census.json",
+    "sha256": "ab3b4939c8546ff7088b8951d69f5668991b21732ad6bb396377c53528355050",
+    "bytes": 14049
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/local-library-lineage.json",
+    "bundle_path": "actual/candidate-compile/local-library-lineage.json",
+    "sha256": "87f7c54546917e1100a156ed1771f0fd61e68055a4c38b9d7d41f387af1cca64",
+    "bytes": 64485
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/source-executable-guards.json",
+    "bundle_path": "actual/candidate-compile/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/before-command.storage.json",
+    "bundle_path": "actual/candidate-compile/before-command.storage.json",
+    "sha256": "95118455db8907b2a1f83b8ac1378644f163c7b5c41aadfe6922d139acd25f33",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-artifacts.json",
+    "bundle_path": "actual/candidate-compile/compiled-artifacts.json",
+    "sha256": "d435a6cfb5b3288055615ea8f2ecd1e1b47e3435c1f51844a5373ecb51bcd1be",
+    "bytes": 1811
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/candidate-compile.stdout.txt",
+    "bundle_path": "actual/candidate-compile/candidate-compile.stdout.txt",
+    "sha256": "006dd4596a3e2b78aa51f40cb35960ea2e09a738aece5ed81ecf39eee4ad0d8e",
+    "bytes": 236220
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/candidate-compile.json",
+    "bundle_path": "actual/candidate-compile/candidate-compile.json",
+    "sha256": "3f4884f650c696a5bd8d5e5d6058858228e577a3145448ec605313c1602f0b4f",
+    "bytes": 1296
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-fmt/canonical-fmt.stdout.txt",
+    "bundle_path": "actual/canonical-fmt/canonical-fmt.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-fmt/canonical-fmt.json",
+    "bundle_path": "actual/canonical-fmt/canonical-fmt.json",
+    "sha256": "cceb6cda2fd04f833c9853709f3c827d8cc1e40889e07db2a5cbd3eb13d209b7",
+    "bytes": 1186
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-fmt/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-fmt/raw-command-outcome.json",
+    "sha256": "cceb6cda2fd04f833c9853709f3c827d8cc1e40889e07db2a5cbd3eb13d209b7",
+    "bytes": 1186
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-fmt/canonical-fmt.stderr.txt",
+    "bundle_path": "actual/canonical-fmt/canonical-fmt.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-fmt/source-executable-guards.json",
+    "bundle_path": "actual/canonical-fmt/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-fmt/before-command.storage.json",
+    "bundle_path": "actual/canonical-fmt/before-command.storage.json",
+    "sha256": "499305a0d0a9703b996cd48184d6d9aa790fbb8391f361397047581f10526294",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-clean/baseline-clean.stderr.txt",
+    "bundle_path": "actual/baseline-clean/baseline-clean.stderr.txt",
+    "sha256": "0bdaeb2aa6a92a0fdfec2d2cc4d0ab71946de5d0654e08c526e4629130ae0f28",
+    "bytes": 21
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-clean/raw-command-outcome.json",
+    "bundle_path": "actual/baseline-clean/raw-command-outcome.json",
+    "sha256": "8c8fddd8747fcb3d1bfdf4c539171fb581912a77bfcf76faa9515dd956222764",
+    "bytes": 2613
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-clean/baseline-clean.json",
+    "bundle_path": "actual/baseline-clean/baseline-clean.json",
+    "sha256": "8c8fddd8747fcb3d1bfdf4c539171fb581912a77bfcf76faa9515dd956222764",
+    "bytes": 2613
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-clean/baseline-clean.stdout.txt",
+    "bundle_path": "actual/baseline-clean/baseline-clean.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-clean/source-executable-guards.json",
+    "bundle_path": "actual/baseline-clean/source-executable-guards.json",
+    "sha256": "048fa55c5be06e568322e66a6a5558e3c9e934cea2003f0d0f3318768c929c8d",
+    "bytes": 371
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-clean/before-command.storage.json",
+    "bundle_path": "actual/baseline-clean/before-command.storage.json",
+    "sha256": "f8c5eeee0ba6106369ad106b4ba9a8f9045c60805a02c49018946fed0cc9796c",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-diff-check/canonical-diff-check.stderr.txt",
+    "bundle_path": "actual/canonical-diff-check/canonical-diff-check.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-diff-check/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-diff-check/raw-command-outcome.json",
+    "sha256": "8cf8fd1a85809afba7d6f082b04d1053f8f4c604649bc4e349b6393d2f650df4",
+    "bytes": 1137
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-diff-check/canonical-diff-check.json",
+    "bundle_path": "actual/canonical-diff-check/canonical-diff-check.json",
+    "sha256": "8cf8fd1a85809afba7d6f082b04d1053f8f4c604649bc4e349b6393d2f650df4",
+    "bytes": 1137
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-diff-check/source-executable-guards.json",
+    "bundle_path": "actual/canonical-diff-check/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-diff-check/canonical-diff-check.stdout.txt",
+    "bundle_path": "actual/canonical-diff-check/canonical-diff-check.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-diff-check/before-command.storage.json",
+    "bundle_path": "actual/canonical-diff-check/before-command.storage.json",
+    "sha256": "550e630c29011e56d3682da9b392f5756ca5eee797fd196c3dfd54e87156df2c",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/compilation-outcome.json",
+    "bundle_path": "actual/canonical-workspace-build/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-workspace-build/raw-command-outcome.json",
+    "sha256": "9744bb63f453a4aa2115acd19aaf0db0b912fcaca13706b38ad0f02f25410450",
+    "bytes": 1295
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/canonical-workspace-build.stdout.txt",
+    "bundle_path": "actual/canonical-workspace-build/canonical-workspace-build.stdout.txt",
+    "sha256": "c40a803cbb2fa658afa452accaa266f3948fb5221b5cc230b7199dd7a2d6e544",
+    "bytes": 450087
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/local-library-lineage.json",
+    "bundle_path": "actual/canonical-workspace-build/local-library-lineage.json",
+    "sha256": "1c19ca2d413f8f5d8209870973335df41e70d2df17c6375e5626799e7ebc31c3",
+    "bytes": 209628
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/canonical-workspace-build.json",
+    "bundle_path": "actual/canonical-workspace-build/canonical-workspace-build.json",
+    "sha256": "9744bb63f453a4aa2115acd19aaf0db0b912fcaca13706b38ad0f02f25410450",
+    "bytes": 1295
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/source-executable-guards.json",
+    "bundle_path": "actual/canonical-workspace-build/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/before-command.storage.json",
+    "bundle_path": "actual/canonical-workspace-build/before-command.storage.json",
+    "sha256": "abd165ee87d6f4fba1c3cf4034c84c9edabc1b73a814da1ef302afcfa3d97ab7",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-workspace-build/canonical-workspace-build.stderr.txt",
+    "bundle_path": "actual/canonical-workspace-build/canonical-workspace-build.stderr.txt",
+    "sha256": "e1cdf7cca622ce4669687071d1354c45cd207463459105c3c9bf89c8f4622c47",
+    "bytes": 13452
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/canonical-tests.json",
+    "bundle_path": "actual/canonical-tests/canonical-tests.json",
+    "sha256": "75a59bbc0a8780cdfc47b95a020b75a41505714d6b4b7534d26d92fa8619b3e5",
+    "bytes": 1285
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/before-witness-36128b1900ad5310af3d07268f01bf3708eab74319b001997aa8483930760194.storage.json",
+    "bundle_path": "actual/canonical-tests/before-witness-36128b1900ad5310af3d07268f01bf3708eab74319b001997aa8483930760194.storage.json",
+    "sha256": "63c82a44e92c83d2008dd73e7c37d25632589325606d39db8807e3e9ec754c8d",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/canonical-tests.stdout.txt",
+    "bundle_path": "actual/canonical-tests/canonical-tests.stdout.txt",
+    "sha256": "013617db760e58910292b43f8a71896ee77be36185895b77d3bf8af3978fd62f",
+    "bytes": 258888
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/frozen-executable-bindings.json",
+    "bundle_path": "actual/canonical-tests/frozen-executable-bindings.json",
+    "sha256": "3587ca5b84a172b4c5bb3e2d78dca2a6d8eb795f4d86791707d272b1557cbdfa",
+    "bytes": 11924
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/executed-summaries.json",
+    "bundle_path": "actual/canonical-tests/executed-summaries.json",
+    "sha256": "2c9e6cb9e59c89c5ece0c5a8c72919413ae6252dd79bd8f9d0d3a079353039a2",
+    "bytes": 1666
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compilation-outcome.json",
+    "bundle_path": "actual/canonical-tests/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/before-witness-copies.storage.json",
+    "bundle_path": "actual/canonical-tests/before-witness-copies.storage.json",
+    "sha256": "d63666a841c4c4ab7879e3013ee9010c347e8d5cbfbe84261a60e98ac52ce12e",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/before-witness-3edab560498a14ec27a8d23d16315cda8771a4c2b3c74fdf7230fb16d663408e.storage.json",
+    "bundle_path": "actual/canonical-tests/before-witness-3edab560498a14ec27a8d23d16315cda8771a4c2b3c74fdf7230fb16d663408e.storage.json",
+    "sha256": "3f9f724029ef0851146ef331b9b44966af0b777013feea45714bde89082954a8",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-tests/raw-command-outcome.json",
+    "sha256": "75a59bbc0a8780cdfc47b95a020b75a41505714d6b4b7534d26d92fa8619b3e5",
+    "bytes": 1285
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/before-witness-ed871e4a9bf645421a1d2c9c962b786391f64a9624fa22ed5cdfb7089723feb5.storage.json",
+    "bundle_path": "actual/canonical-tests/before-witness-ed871e4a9bf645421a1d2c9c962b786391f64a9624fa22ed5cdfb7089723feb5.storage.json",
+    "sha256": "9b167616c87b88ffc8400a60aa302a92fa23e91a98b7c8126ad4387d2a32c853",
+    "bytes": 218
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census.json",
+    "bundle_path": "actual/canonical-tests/compiled-census.json",
+    "sha256": "b4ee924c086163f454c6262948ae4ad4065825e560255f8b7360b7dcd8899c36",
+    "bytes": 19459
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/target-outcomes.json",
+    "bundle_path": "actual/canonical-tests/target-outcomes.json",
+    "sha256": "ba0802a5dc869277e25fac3086a9737ef46775ff6f85bb8f157d8e0d493907a2",
+    "bytes": 53188
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/before-witness-3deba80724b968b91762812158fe92f3c33fc752ab5ea8f18a1d0daea05bd058.storage.json",
+    "bundle_path": "actual/canonical-tests/before-witness-3deba80724b968b91762812158fe92f3c33fc752ab5ea8f18a1d0daea05bd058.storage.json",
+    "sha256": "2d1e7501bbdb1799837a7068fd2864c764fc69dc0108c2861a2525cd551307e8",
+    "bytes": 219
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/local-library-lineage.json",
+    "bundle_path": "actual/canonical-tests/local-library-lineage.json",
+    "sha256": "be17053984bedfff9e56c0816011038fbb1436cd59db58996b39437e7cf918a2",
+    "bytes": 74941
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/before-witness-900925f7ec1109d9ac44ae61c1dfca8ee112a8e79a5ab394065dbc0e13c303db.storage.json",
+    "bundle_path": "actual/canonical-tests/before-witness-900925f7ec1109d9ac44ae61c1dfca8ee112a8e79a5ab394065dbc0e13c303db.storage.json",
+    "sha256": "f63da06f2f58ac2af5ec7e87e8d2d129eb8bcc1e6ed5cc0089b0e600ed65cbcb",
+    "bytes": 218
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/canonical-tests.stderr.txt",
+    "bundle_path": "actual/canonical-tests/canonical-tests.stderr.txt",
+    "sha256": "07bf18e4c6b64e37f4563894d2faab86b94b4509f448284d8981263c6e140936",
+    "bytes": 5210
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/source-executable-guards.json",
+    "bundle_path": "actual/canonical-tests/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/before-command.storage.json",
+    "bundle_path": "actual/canonical-tests/before-command.storage.json",
+    "sha256": "cbf0fd4d079d864ea49e162b882ccd5cb5f7e354e2153be7b85911d23f028fff",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-artifacts.json",
+    "bundle_path": "actual/canonical-tests/compiled-artifacts.json",
+    "sha256": "367571167a7d79c232a46ee67b3f157973a394523faa9bb6c8a9f21a431f1d20",
+    "bytes": 8979
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/canonical-clippy.stdout.txt",
+    "bundle_path": "actual/canonical-clippy/canonical-clippy.stdout.txt",
+    "sha256": "b4bab14c61f6232cd20ff11555f1d242b974b9bbe2214385d8b48334da77c02a",
+    "bytes": 212980
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/compilation-outcome.json",
+    "bundle_path": "actual/canonical-clippy/compilation-outcome.json",
+    "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4",
+    "bytes": 162
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/canonical-clippy.json",
+    "bundle_path": "actual/canonical-clippy/canonical-clippy.json",
+    "sha256": "dc705c7a5fee31d12ee05cb87e6df122f4a62df556f8db2c52e9a8d2fd63e7af",
+    "bytes": 1323
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/raw-command-outcome.json",
+    "bundle_path": "actual/canonical-clippy/raw-command-outcome.json",
+    "sha256": "dc705c7a5fee31d12ee05cb87e6df122f4a62df556f8db2c52e9a8d2fd63e7af",
+    "bytes": 1323
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/local-library-lineage.json",
+    "bundle_path": "actual/canonical-clippy/local-library-lineage.json",
+    "sha256": "84b8e498fa14b667a00cd6679927875f85ffac3b74253d3949fa73c3bf154c3b",
+    "bytes": 60900
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/canonical-clippy.stderr.txt",
+    "bundle_path": "actual/canonical-clippy/canonical-clippy.stderr.txt",
+    "sha256": "ba0747dc3c81031babdd41100f0607be0089d9073cbc06285ea30c956614a7eb",
+    "bytes": 9361
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/source-executable-guards.json",
+    "bundle_path": "actual/canonical-clippy/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-clippy/before-command.storage.json",
+    "bundle_path": "actual/canonical-clippy/before-command.storage.json",
+    "sha256": "bb22e42d7ed495a19c6619f5e841692a841b9279559363e2974b68359d5fbf9a",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-clean/candidate-clean.json",
+    "bundle_path": "actual/candidate-clean/candidate-clean.json",
+    "sha256": "7b3ffc42a069eac2a089b9daeb1661073e257a61dff276170d14a6c23307195c",
+    "bytes": 2615
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-clean/candidate-clean.stdout.txt",
+    "bundle_path": "actual/candidate-clean/candidate-clean.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-clean/raw-command-outcome.json",
+    "bundle_path": "actual/candidate-clean/raw-command-outcome.json",
+    "sha256": "7b3ffc42a069eac2a089b9daeb1661073e257a61dff276170d14a6c23307195c",
+    "bytes": 2615
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-clean/source-executable-guards.json",
+    "bundle_path": "actual/candidate-clean/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-clean/before-command.storage.json",
+    "bundle_path": "actual/candidate-clean/before-command.storage.json",
+    "sha256": "7810aac55dd51b625790bca00e26d27be26543d4263829a5b2ec4d3ab893687a",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-clean/candidate-clean.stderr.txt",
+    "bundle_path": "actual/candidate-clean/candidate-clean.stderr.txt",
+    "sha256": "79786240a73b134f4b11f43b6a2e666cfe9673d5f68e1e7e3300d110a2ac1f91",
+    "bytes": 38
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/metadata/actual-graph-proof.json",
+    "bundle_path": "actual/metadata/actual-graph-proof.json",
+    "sha256": "8a1a4b71f8985d19bc8f9cb1d14f09f31291dab76eaab4002f3742f37569f4a2",
+    "bytes": 311
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/metadata/metadata.stdout.txt",
+    "bundle_path": "actual/metadata/metadata.stdout.txt",
+    "sha256": "a028aca64b389125d59dff5c7e5cab44c4751747b5c8daebfd689974cda2827a",
+    "bytes": 2365064
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/metadata/raw-command-outcome.json",
+    "bundle_path": "actual/metadata/raw-command-outcome.json",
+    "sha256": "c2351016e78b15390a46ffd863dff085868426cfeeca488b000db4151d4f7409",
+    "bytes": 1217
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/metadata/metadata.json",
+    "bundle_path": "actual/metadata/metadata.json",
+    "sha256": "c2351016e78b15390a46ffd863dff085868426cfeeca488b000db4151d4f7409",
+    "bytes": 1217
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/metadata/metadata.stderr.txt",
+    "bundle_path": "actual/metadata/metadata.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/metadata/source-executable-guards.json",
+    "bundle_path": "actual/metadata/source-executable-guards.json",
+    "sha256": "4a9cde8f17c4d7717dbc52368d515454bf8d9e722d15690b98cc23793594550a",
+    "bytes": 373
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/metadata/before-command.storage.json",
+    "bundle_path": "actual/metadata/before-command.storage.json",
+    "sha256": "bcfa7043d8e13aeea8e3dcf7240cd64c14c63a22343e234949f9b99b834b664f",
+    "bytes": 212
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/all.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/ignored.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/file.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/file.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/file.json",
+    "sha256": "cf85c821724ab46706c1158bf1ecc4678e12ef147b2d96dba62cb0073bfa6094",
+    "bytes": 1231
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/all.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/all.stdout.txt",
+    "sha256": "07c46bff77ea130bea2bada7b01d0efaa7b0ee4d8bfc9cb31c2c1ce62f539a46",
+    "bytes": 152
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/census.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/census.json",
+    "sha256": "58809c9e0d6145c9e706190fc1304bc8ee601135afda5199c66e27c2e39775a9",
+    "bytes": 1151
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/ignored.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/ignored.json",
+    "sha256": "2687216eb7ebc3a8f4f99b809f5f7b0c26331515c2b98d03774dfde5226f62a9",
+    "bytes": 1285
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/ignored.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/ignored.stdout.txt",
+    "sha256": "07c46bff77ea130bea2bada7b01d0efaa7b0ee4d8bfc9cb31c2c1ce62f539a46",
+    "bytes": 152
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/file.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/file.stdout.txt",
+    "sha256": "d1eec5d5d090c4b06ef84fd40804ed1c5e5f863d41e80edc9d388491cefe3c4a",
+    "bytes": 191
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/all.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-release_pair-900925f7ec/all.json",
+    "sha256": "61bf991d01c8c848e917e17c2d5b8270ec0374cf8872ae62a57144a8e2a23704",
+    "bytes": 1260
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/all.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/ignored.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/file.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/file.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/file.json",
+    "sha256": "1aeec6eb63a2e780830f0fb4b687c79e78f87b8ec6eb268521482c90b5195542",
+    "bytes": 1221
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/all.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/all.stdout.txt",
+    "sha256": "fc341fc3b369cb62574795fb53824c4c9a475b11373aabd723a6689e13762b3a",
+    "bytes": 2362
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/census.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/census.json",
+    "sha256": "d1e9329e956f00ad935f3211780d69b88f1a59839a9bed201522fc6e0335804e",
+    "bytes": 3209
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/ignored.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/ignored.json",
+    "sha256": "e7373100a76eeb8af478a96546705b299150ba97bdde52b9be5c65a3789a58a5",
+    "bytes": 1273
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/ignored.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/ignored.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/file.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/file.stdout.txt",
+    "sha256": "d74ab15991ca0a644bf8a4b0629d3dc8455cf59ef1e02b4f00182c66fe1cf1d5",
+    "bytes": 181
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/all.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-it-3deba80724/all.json",
+    "sha256": "9355d4d424414b771c188e9629bfdf59967760fc308c7a8da38373fa6611c0dd",
+    "bytes": 1251
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/all.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/ignored.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/file.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/file.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/file.json",
+    "sha256": "a8724152fec415db651d7a6873c9c6344316742f59e6f3b0995b68cdc88bbf72",
+    "bytes": 1229
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/all.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/all.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/census.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/census.json",
+    "sha256": "b9534cb71deb38a604d62b21394351a1951c1540bc7d1b20c9bcbbc4a73ab01a",
+    "bytes": 823
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/ignored.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/ignored.json",
+    "sha256": "07db2aa3082787a8d6a76f791d327c020be4e9478f5cc45ca4cdc7fcc588dcfb",
+    "bytes": 1281
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/ignored.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/ignored.stdout.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/file.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/file.stdout.txt",
+    "sha256": "749f1b1d903998d24834e59ae32699ded4b98f54e49ea45138556d0863095501",
+    "bytes": 189
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/all.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp-cloud-ed871e4a9b/all.json",
+    "sha256": "bacff85af1ee26751e2bb3b49b8544cec5e0abd648c213e59d3eafe76c9777e6",
+    "bytes": 1256
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/all.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/ignored.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/file.stderr.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/file.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/file.json",
+    "sha256": "1648a645ea3b391ae9a2e6c028cfc2a67a4f6a80b46bcda3c0e96915032a4875",
+    "bytes": 1229
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/all.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/all.stdout.txt",
+    "sha256": "65a1af78f7f5a5f4fae11cb562ec4172cb0283c09005f24b8c238aa3caaca0eb",
+    "bytes": 12562
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/census.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/census.json",
+    "sha256": "6972c95fc2cb8bd65e2372f0dcb8f00323142a0d67e62d85a2e7a40099315b4a",
+    "bytes": 13651
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/ignored.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/ignored.json",
+    "sha256": "da45d99f542df58bd1c9218e7bdf1219716cf488b1ba18c2d0058565e446f969",
+    "bytes": 1282
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/ignored.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/ignored.stdout.txt",
+    "sha256": "c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21",
+    "bytes": 92
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/file.stdout.txt",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/file.stdout.txt",
+    "sha256": "1226a214373630f0c439184b7abea539a66090c56140d7372de6df9ef659026e",
+    "bytes": 189
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/all.json",
+    "bundle_path": "actual/canonical-tests/compiled-census/lamp-cloud-lamp_cloud-3edab56049/all.json",
+    "sha256": "65c67c0398313e72ef91def408eb880f7fde46f2c84608dd0c4ac377a214ba38",
+    "bytes": 1260
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/all.stderr.txt",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/ignored.stderr.txt",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/file.stderr.txt",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/file.json",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/file.json",
+    "sha256": "ee1f7537629fb89b51539bd567decaad0da705b254077eafaf6963d20573547e",
+    "bytes": 1229
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/all.stdout.txt",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/all.stdout.txt",
+    "sha256": "65a1af78f7f5a5f4fae11cb562ec4172cb0283c09005f24b8c238aa3caaca0eb",
+    "bytes": 12562
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/census.json",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/census.json",
+    "sha256": "fb8ae7c8f07fbb820e8f9afec75feee43f44b834f92ea35a7a6e9b89dab33a09",
+    "bytes": 13651
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/ignored.json",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/ignored.json",
+    "sha256": "811b81b06b5688c05e455c44d63ef03aacc1104d1d0e888a6898a99edf2cec91",
+    "bytes": 1282
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/ignored.stdout.txt",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/ignored.stdout.txt",
+    "sha256": "c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21",
+    "bytes": 92
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/file.stdout.txt",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/file.stdout.txt",
+    "sha256": "1226a214373630f0c439184b7abea539a66090c56140d7372de6df9ef659026e",
+    "bytes": 189
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/all.json",
+    "bundle_path": "actual/candidate-compile/compiled-census/lamp-cloud-lamp_cloud-7a9ac5db26/all.json",
+    "sha256": "de278031edfd023f02e7cb82bf6e50f401cdbedb4b646a46d8affbd282e3132d",
+    "bytes": 1260
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/all.stderr.txt",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/all.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/ignored.stderr.txt",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/ignored.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/file.stderr.txt",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/file.stderr.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/file.json",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/file.json",
+    "sha256": "01e08b8455eaca04e09bbc99a7b44d86256daa4a2b3375f6f5f99f42cc54a4c3",
+    "bytes": 1229
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/all.stdout.txt",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/all.stdout.txt",
+    "sha256": "65a1af78f7f5a5f4fae11cb562ec4172cb0283c09005f24b8c238aa3caaca0eb",
+    "bytes": 12562
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/census.json",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/census.json",
+    "sha256": "d6f14921fec3eba2e530cbf2c3ef1664d97fdeea81ef7a076b0dfb6efc5e78e6",
+    "bytes": 13651
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/ignored.json",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/ignored.json",
+    "sha256": "b1f7b52a4ade61b0968fcf917675c287279823cea4023ea1f31b1ad3bc17c995",
+    "bytes": 1282
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/ignored.stdout.txt",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/ignored.stdout.txt",
+    "sha256": "c6bbe827c7ed16a7e17edb8410f049b4b86009a136c1bc67aaf0fead4a41af21",
+    "bytes": 92
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/file.stdout.txt",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/file.stdout.txt",
+    "sha256": "1226a214373630f0c439184b7abea539a66090c56140d7372de6df9ef659026e",
+    "bytes": 189
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/all.json",
+    "bundle_path": "actual/baseline-compile/compiled-census/lamp-cloud-lamp_cloud-9c64ac302a/all.json",
+    "sha256": "3a0292cc0120af1570472674864d6ee650edede6c5f97746b45eac8a86ee3470",
+    "bytes": 1260
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/baseline-settings.rs.txt",
+    "bundle_path": "plan-and-source/baseline-settings.rs.txt",
+    "sha256": "3f7527e1bab70d17b28b489c659ef4092aad82673f91d6f90f0a093a67d45a87",
+    "bytes": 75915
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-workspace-build-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-workspace-build-consumed.json",
+    "sha256": "8776de5b9e6a40f7717fad6fa4b4fee144ba737acad4780c495a40ee182b2cf2",
+    "bytes": 425
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-metadata-consumed.json",
+    "bundle_path": "plan-and-source/stage-metadata-consumed.json",
+    "sha256": "7b29a157c9ef43f4f306a8b2ff45b10309847e382bbcf6503c6d572d713e7c3e",
+    "bytes": 387
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/candidate-observation-observation-consumed.json",
+    "bundle_path": "plan-and-source/candidate-observation-observation-consumed.json",
+    "sha256": "c549e87f385e031e07f60edb1adeb9e6c74d8f91702e58e355a1d1209ae286c3",
+    "bytes": 781
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/plan.json",
+    "bundle_path": "plan-and-source/plan.json",
+    "sha256": "e363e1aa40484a8effd5c95ba9d2c8be905b4436c9251a255cd518c44cc054f6",
+    "bytes": 15389
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-candidate-compile-consumed.json",
+    "bundle_path": "plan-and-source/stage-candidate-compile-consumed.json",
+    "sha256": "78d85d0f2119eb89538bba59a888f2630c225e203e83a155d768805f4bc3536f",
+    "bytes": 443
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/candidate-settings.rs.txt",
+    "bundle_path": "plan-and-source/candidate-settings.rs.txt",
+    "sha256": "66ad0d899d055e555e25198daee6a0ec3b89c1717da51a2d2697e5aa3af4827f",
+    "bytes": 76375
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-baseline-compile-consumed.json",
+    "bundle_path": "plan-and-source/stage-baseline-compile-consumed.json",
+    "sha256": "acaf5e161a05634742a31d35a2515ee70091d8bf5be60c8d608f71541b4e9fa5",
+    "bytes": 442
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-fmt-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-fmt-consumed.json",
+    "sha256": "0758eb51588f71b580bf3c7c34ee0923421cf06d0ebad33143387182c4ad4060",
+    "bytes": 351
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-clean-before-clippy-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-clean-before-clippy-consumed.json",
+    "sha256": "c4f6ba87e683999377dad3fad51328c596e72a82b946f3728f001d3a50b41c1b",
+    "bytes": 1776
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-candidate-observation-consumed.json",
+    "bundle_path": "plan-and-source/stage-candidate-observation-consumed.json",
+    "sha256": "d03b812a8abdb7389f1a2e96c12135b62dcbabf22ba2fac6d319ca6f1e037d90",
+    "bytes": 739
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/candidate-settings.txt",
+    "bundle_path": "plan-and-source/candidate-settings.txt",
+    "sha256": "66ad0d899d055e555e25198daee6a0ec3b89c1717da51a2d2697e5aa3af4827f",
+    "bytes": 76375
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/candidate-docs-cloud.txt",
+    "bundle_path": "plan-and-source/candidate-docs-cloud.txt",
+    "sha256": "929fc8f6d395d1af1a24802f9461e6991d76fa3b2c7e067ed5e3766f24f346ff",
+    "bytes": 101988
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/metadata-input-comparison.json",
+    "bundle_path": "plan-and-source/metadata-input-comparison.json",
+    "sha256": "ca2d7af9ee0d10674bf3fcb7ea07011705856490393b6b6fe2dec2a6707b3152",
+    "bytes": 13866
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/baseline-source-map.json",
+    "bundle_path": "plan-and-source/baseline-source-map.json",
+    "sha256": "f997178045243ad89acf94394f6793e80b8e8591c0fa155eb4738cb2b922d1b2",
+    "bytes": 2831780
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/execution-consumed.json",
+    "bundle_path": "plan-and-source/execution-consumed.json",
+    "sha256": "d6fd686181168dc6de2f9f59166054ebde5b72b4efe9db6ac1d0222a4babfa92",
+    "bytes": 452
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-diff-check-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-diff-check-consumed.json",
+    "sha256": "a2a1a9d22bebf7efda835ccd8518ac863ad2e28118225475593de881c88b4ba1",
+    "bytes": 344
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/baseline-settings.txt",
+    "bundle_path": "plan-and-source/baseline-settings.txt",
+    "sha256": "3f7527e1bab70d17b28b489c659ef4092aad82673f91d6f90f0a093a67d45a87",
+    "bytes": 75915
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/root-execution-grant.json",
+    "bundle_path": "plan-and-source/root-execution-grant.json",
+    "sha256": "37cd4a06457b97770a710fb48889eb5e59bcae9df6caf659717c23a4e7726a7d",
+    "bytes": 1968
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/candidate-source-map.json",
+    "bundle_path": "plan-and-source/candidate-source-map.json",
+    "sha256": "27f3718cf885d2c28964e47e151b13613785cbef5768c108da5572c1b0aa21df",
+    "bytes": 2831780
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-candidate-clean-consumed.json",
+    "bundle_path": "plan-and-source/stage-candidate-clean-consumed.json",
+    "sha256": "c4f6ba87e683999377dad3fad51328c596e72a82b946f3728f001d3a50b41c1b",
+    "bytes": 1776
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/baseline-docs-cloud.txt",
+    "bundle_path": "plan-and-source/baseline-docs-cloud.txt",
+    "sha256": "79055bbb98129a9938c91d74032b8fffb34645c2355e598267c09d96af89f678",
+    "bytes": 101563
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-clean-before-tests-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-clean-before-tests-consumed.json",
+    "sha256": "c4f6ba87e683999377dad3fad51328c596e72a82b946f3728f001d3a50b41c1b",
+    "bytes": 1776
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-clippy-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-clippy-consumed.json",
+    "sha256": "c63cedd254de11c57d34613b2701c069e4dcea61a1339c8431493e20035f1c7a",
+    "bytes": 473
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/baseline-observation-observation-consumed.json",
+    "bundle_path": "plan-and-source/baseline-observation-observation-consumed.json",
+    "sha256": "1015cd32da42e3a984571df6ec94f2edb818d5c7e78993795ceb4d3a788630e1",
+    "bytes": 778
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/SHA256SUMS",
+    "bundle_path": "plan-and-source/SHA256SUMS",
+    "sha256": "bdb3ac481787be1526ffa3fdcadccacbecd3bbc44f5dc6613d4c7e6cf06c1da9",
+    "bytes": 1584
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-baseline-clean-consumed.json",
+    "bundle_path": "plan-and-source/stage-baseline-clean-consumed.json",
+    "sha256": "cd2775835a390a728765528355d1e7c89ed6f9ed1b0e3eb2f647b95551a71368",
+    "bytes": 1775
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-clean-before-workspace-build-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-clean-before-workspace-build-consumed.json",
+    "sha256": "c4f6ba87e683999377dad3fad51328c596e72a82b946f3728f001d3a50b41c1b",
+    "bytes": 1776
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-baseline-observation-consumed.json",
+    "bundle_path": "plan-and-source/stage-baseline-observation-consumed.json",
+    "sha256": "958a1b4fd5998456c2a7a2cf63484a1a5585e26968b935ead8f7d03c9f476bc0",
+    "bytes": 737
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/stage-canonical-tests-consumed.json",
+    "bundle_path": "plan-and-source/stage-canonical-tests-consumed.json",
+    "sha256": "4de1dc094ce6fdd08f991d354ee4eff3f83522fc6c813ba2e35f932832413836",
+    "bytes": 436
+  },
+  {
+    "primary_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/frozen-update-metadata.stdout.txt",
+    "bundle_path": "plan-and-source/frozen-update-metadata.stdout.txt",
+    "sha256": "9d5a342a1653b28af891a761568f955ddae47d25e69ff4213fdc6371f0c160b1",
+    "bytes": 2362216
+  }
+]

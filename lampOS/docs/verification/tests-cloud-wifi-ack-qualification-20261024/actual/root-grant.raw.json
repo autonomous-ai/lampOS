@@ -1,0 +1,30 @@
+{
+  "execution_authorized": true,
+  "grant_scope": "one-Cloud-metadata-two-control-observations-then-candidate-canonical-gates",
+  "plan_identity": "cloud-unacked-wifi-current-f978-two-file-baseline-comparison-plus-gates-v3",
+  "controller_sha256": "a370b9545484bede61049f22ad79fe771bfd5d786a4cc7de7a84bfde7d981fb5",
+  "plan_sha256": "e363e1aa40484a8effd5c95ba9d2c8be905b4436c9251a255cd518c44cc054f6",
+  "source_aggregates": {
+    "baseline": "507641bba84fa368bc9e866effc9f6e705ea5ecd0701b34d8b27d7673ee2537f",
+    "candidate": "b782d7d4ac690003c08b4d8fde795ca619392e9bd59fa441dde06a7ec47decc8"
+  },
+  "source_head": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+  "local_socket_permissions_authorized": true,
+  "previous_target_owner_released": true,
+  "target_exclusive": true,
+  "concurrency_context": {
+    "maximum_active_Rust_jobs": 2,
+    "this_compile_jobs": 2,
+    "other_active_Rust_jobs": 0,
+    "other_compile_jobs": 0,
+    "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/pr-head-qualification-cargo-target",
+    "later_other_job_limit": 1,
+    "later_other_compile_job_limit": 4,
+    "maximum_later_total_compile_jobs": 6,
+    "global_hardware_or_matched_load_claim": false,
+    "scope": "No other owned Rust job at grant/start; separate root amendment may later allocate qualification4 withCloud2 on distinct targets. No timing attribution."
+  },
+  "grant_id": "root-cloud-f978-20261024T195220Z",
+  "scope_detail": "One metadata query, one matched baseline exact-case observation and one candidate exact-case observation, then the planned candidate canonical gates. Candidate case is intentionally executed again only inside full suite. Keep all failures; no retry. Both owned files restored in finally; no product/API/default or ARM build/device operation."
+}

@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-25 03:19 — Wi-Fi acknowledgment event wait pushed
+
+Ready for lamp-voice: no
+
+#3410 is open as draft: tests/1569-wifi-ack-events at 5b23ab556 on current f978, exact settings.rs and docs/cloud.md only. The test waits for its existing worker completion flag instead of a fixed 5.5-second settling delay. Both acknowledgment branches and every assertion, cleanup action and product deadline stay intact; the new wait has a 5.5-second watchdog.
+
+The predefined single baseline and candidate controls passed at 11.813293 / 5.783800 seconds (whole direct executable command; both original branches). Matching profile/features/configured environment and 168-case/two-ignored inventory are recorded. No extra samples or isolated-host/performance/cause claim. Full Cloud passed 196/0/4 across five targets; fmt, strict Cloud all-target Clippy, workspace build and final source restoration pass. Both source byte sequences and full modes restored; actual new mtimes are disclosed. All 33 commands reaped/groups absent and seven saved witnesses verify. [Primary proof](verification/tests-cloud-wifi-ack-qualification-20261024/) includes complete raw streams and source/compiler/command bindings; scratch Python bodies and binaries are omitted. Original ARM40129047997 and Linux40129048029 are active, so no ready claim; no ARM build on the Mac or device action. Continuing the separate Update/NoPause matched-base classifications.
+
 ## 2026-10-25 03:10 — current f978 native primary proof
 
 Ready for lamp-voice: no

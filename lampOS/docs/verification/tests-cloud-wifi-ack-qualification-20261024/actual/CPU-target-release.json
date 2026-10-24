@@ -1,0 +1,18 @@
+{
+  "native_session": 22074,
+  "terminal_exit_code": 0,
+  "owned_jobs_outstanding": 0,
+  "owned_unique_command_groups_reaped_absent": 33,
+  "saved_witnesses_hash_modes_verified": 7,
+  "candidate_owned_files_restored": {
+    "lampOS/crates/cloud/src/settings.rs": true,
+    "lampOS/docs/cloud.md": true
+  },
+  "source_guard": {
+    "variant": "candidate",
+    "aggregate": "b782d7d4ac690003c08b4d8fde795ca619392e9bd59fa441dde06a7ec47decc8"
+  },
+  "actual_new_source_mtimes_disclosed": true,
+  "further_target_or_observation_grant": false,
+  "review_sha256": "ab0a0c096524730105ee0e7b81514ad3bd6733a02afbf8b71732fefb52a0a82a"
+}

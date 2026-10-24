@@ -1,0 +1,17 @@
+{
+  "before": {
+    "variant": "baseline",
+    "aggregate": "507641bba84fa368bc9e866effc9f6e705ea5ecd0701b34d8b27d7673ee2537f"
+  },
+  "after": {
+    "variant": "baseline",
+    "aggregate": "507641bba84fa368bc9e866effc9f6e705ea5ecd0701b34d8b27d7673ee2537f"
+  },
+  "executable_after": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-ack-events-current-f978-controlled-prep-v3/run-2026-10-24T195301.089747+0000/baseline-compile/frozen-executables/9c64ac302a712fbd8e06f54d12d84034f2523a9697e8e99edf4c06082ba48502-lamp_cloud-181eacc6d66b1b58",
+    "sha256": "9c64ac302a712fbd8e06f54d12d84034f2523a9697e8e99edf4c06082ba48502",
+    "mode": "0o555",
+    "bytes": 36721888
+  },
+  "metadata_scope": "source bytes and Git executable bit; executable full mode"
+}
