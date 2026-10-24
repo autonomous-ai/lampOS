@@ -900,8 +900,40 @@ mod tests {
     /// #2311).
     #[tokio::test]
     async fn a_text_never_waits_on_the_news_for_the_phone() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicU64, Ordering},
+        };
+
+        struct PhoneRound(Option<Arc<AtomicBool>>);
+        impl Drop for PhoneRound {
+            fn drop(&mut self) {
+                if let Some(cancelled) = self.0.as_ref() {
+                    cancelled.store(true, Ordering::Release);
+                }
+            }
+        }
+        struct Fixture {
+            root: std::path::PathBuf,
+            worker: Option<tokio::task::JoinHandle<()>>,
+        }
+        impl Drop for Fixture {
+            fn drop(&mut self) {
+                if let Some(worker) = self.worker.take() {
+                    worker.abort();
+                }
+                if let Err(error) = std::fs::remove_dir_all(&self.root)
+                    && error.kind() != std::io::ErrorKind::NotFound
+                {
+                    eprintln!("phone fixture cleanup {}: {error}", self.root.display());
+                }
+            }
+        }
         /// Slow for the news for the phone, at once for a text.
-        struct SlowForThePhone;
+        struct SlowForThePhone {
+            began: Arc<tokio::sync::Notify>,
+            cancelled: Arc<AtomicBool>,
+        }
         impl Model for SlowForThePhone {
             fn round<'a>(
                 &'a self,
@@ -910,7 +942,10 @@ mod tests {
             ) -> BoxFuture<'a, Result<Vec<ToolCall>, String>> {
                 Box::pin(async move {
                     if format!("{:?}", messages.last()).contains("Nobody wrote just now") {
+                        let mut round = PhoneRound(Some(self.cancelled.clone()));
+                        self.began.notify_one();
                         tokio::time::sleep(Duration::from_secs(30)).await;
+                        round.0 = None;
                         text("Codex finished, says the phone.");
                     } else {
                         text("Hi. Codex finished.");
@@ -919,9 +954,17 @@ mod tests {
                 })
             }
         }
-        let root = std::path::PathBuf::from(format!("/tmp/lvm-phone-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&root).unwrap();
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "lvm-phone-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let mut fixture = Fixture {
+            root: root.clone(),
+            worker: None,
+        };
         let bus = lamp_bus::Bus::new(&root).unwrap();
         let mut replies = bus
             .subscribe_typed(ChatOut::TOPIC, "test", ChatOut::TYPE)
@@ -932,19 +975,26 @@ mod tests {
             .lock()
             .unwrap()
             .push(news("s1:4:1", "(Nobody has spoken. Codex finished.)"));
-        let worker = tokio::spawn(serve_with(
-            SlowForThePhone,
+        let began = Arc::new(tokio::sync::Notify::new());
+        let cancelled = Arc::new(AtomicBool::new(false));
+        fixture.worker = Some(tokio::spawn(serve_with(
+            SlowForThePhone {
+                began: began.clone(),
+                cancelled: cancelled.clone(),
+            },
             system(),
             no_tools(),
             Box::new(waiting),
             root.clone(),
             Unasked::after(Duration::ZERO),
-        ));
+        )));
         let mut sends = bus
             .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
             .unwrap();
-        // The round for the phone has begun by now (it's due at once).
-        tokio::time::sleep(UNASKED_LOOK_EVERY + Duration::from_millis(300)).await;
+        // The slow phone round must be polled before the text is timed.
+        tokio::time::timeout(Duration::from_secs(5), began.notified())
+            .await
+            .expect("phone-news round did not begin");
         let sent_at = Instant::now();
         let until = sent_at + Duration::from_secs(5);
         while sends
@@ -970,13 +1020,21 @@ mod tests {
             "{:?}",
             sent_at.elapsed()
         );
+        // The 30-second future must have been dropped, not left running
+        // beyond the observation window below.
+        assert!(
+            cancelled.load(Ordering::Acquire),
+            "the pending phone round was not cancelled"
+        );
         // The text gave the news: nothing more goes to the phone.
         tokio::time::sleep(UNASKED_LOOK_EVERY * 2).await;
         while let Some(message) = replies.recv(Duration::ZERO).unwrap() {
             got.push(message.parse::<ChatOut>().unwrap());
         }
+        let worker = fixture.worker.take().unwrap();
         worker.abort();
-        let _ = std::fs::remove_dir_all(&root);
+        assert!(worker.await.is_err_and(|error| error.is_cancelled()));
+        std::fs::remove_dir_all(&root).unwrap();
         assert!(
             got.iter().all(|out| out.part != ChatPart::TaskNews),
             "{got:?}"

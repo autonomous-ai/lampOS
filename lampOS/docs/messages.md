@@ -342,7 +342,13 @@ minutes." ([guard-mode.md](guard-mode.md), #1685).
   piece that reached nothing is not kept, and is sent again a minute on.
 - `messages::tests::a_text_never_waits_on_the_news_for_the_phone`: through a
   bus, a text during a 30 s round for the phone is answered within 2 s,
-  with the news, and nothing more is sent.
+  with the news, and nothing more is sent. The fake model signals when the
+  slow round begins before the test sends and times the text. A drop witness
+  proves that pending round was cancelled before the text answer; a 30 s
+  fake round cannot simply outlast the observation and pass. The full
+  two-second observation for unwanted phone news remains on the host clock.
+  An owned fixture aborts the worker and removes its private bus directory
+  on early assertion failure; normal completion also awaits task cancellation.
 - `messages::tests::news_waiting_is_given_with_the_next_texts_answer_once`:
   the next text's answer is given the news, typed, and keeps it as given;
   the text after has none; a model that can't answer gives none.
