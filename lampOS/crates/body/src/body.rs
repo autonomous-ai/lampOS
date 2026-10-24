@@ -943,6 +943,11 @@ pub struct Glimpse {
     /// runs.
     pub bad_reads: [u16; 5],
     pub retreats: u16,
+    /// Seconds left of the long rest after three strains inside
+    /// `Standing::RETREAT_WINDOW`; 0 when it is not resting so. Said on its
+    /// health, so a body sat down for half an hour is seen, not only felt
+    /// (lamp-4ace folded unseen from 20 to 24 Oct).
+    pub resting_s: u16,
     /// Under `Limits::refused_let_go`: the lamp is let go because a joint
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
@@ -5927,6 +5932,15 @@ fn run_on<P: PortIo, R: Runtime>(
             toward_refused,
             bad_reads: bus.bad_reads,
             retreats: retreats.into(),
+            resting_s: match tired_until {
+                Some(until)
+                    if until > now
+                        && retreated_at.len() >= usize::from(Standing::RETREATS_ALLOWED) =>
+                {
+                    u16::try_from((until - now).as_secs()).unwrap_or(u16::MAX)
+                }
+                _ => 0,
+            },
             waiting: None,
         };
         if !unplug_latched {
