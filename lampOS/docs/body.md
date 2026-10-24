@@ -835,7 +835,10 @@ half a second, or reads 62 or warmer for a second sends the lamp back down
 the way it came. It rests there for a minute whatever it is told, and after
 the third time inside half an hour (`Standing::RETREAT_WINDOW`) for half an
 hour (`Standing::LONG_REST`), and then it may rise again; the report lists
-each time (`retreats`). Until 24 Oct the third time was for the rest of the
+each time (`retreats`). While it rests so, its health is a warning, "its arm
+sat down for a strain three times in half an hour: it rests folded and may
+rise again in N min" (`Glimpse::resting_s`), never an error, so the lamp
+does not droop as unwell. Until 24 Oct the third time was for the rest of the
 run: lamp-4ace sat down for three strains of the elbow (loads 572, 573 and
 586 against 560) in half an hour on 20 Oct and never stood again in a
 five-day run, its gestures all dropped as "not standing". Only an arm still over its load or off its goal two seconds

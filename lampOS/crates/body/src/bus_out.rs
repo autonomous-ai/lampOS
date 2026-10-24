@@ -185,6 +185,14 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
             Level::Warn,
             format!("{warmest} is warm: it reads {reading}, and the body stops at 62"),
         )
+    } else if glimpse.resting_s > 0 {
+        (
+            Level::Warn,
+            format!(
+                "its arm sat down for a strain three times in half an hour: it rests folded and may rise again in {} min",
+                glimpse.resting_s.div_ceil(60)
+            ),
+        )
     } else if resisted > 0 {
         (
             Level::Warn,
@@ -833,6 +841,7 @@ mod tests {
             toward_refused: None,
             bad_reads: [0; 5],
             retreats: 0,
+            resting_s: 0,
             waiting: None,
         }
     }
@@ -1120,6 +1129,19 @@ mod tests {
             report.message,
             "shoulder is warm: it reads 55, and the body stops at 62"
         );
+        // Resting folded after three strains in half an hour is said, as
+        // a warning, until it may rise again (lamp-4ace folded unseen from
+        // 20 to 24 Oct). Warmth is said first.
+        let mut resting = glimpse(50);
+        resting.resting_s = 1_741;
+        let report = health(&resting, 0);
+        assert_eq!(report.level, Level::Warn);
+        assert_eq!(
+            report.message,
+            "its arm sat down for a strain three times in half an hour: it rests folded and may rise again in 30 min"
+        );
+        resting.arm_temperatures = [WARM, 40];
+        assert!(health(&resting, 0).message.starts_with("shoulder is warm"));
         // A joint the body commands, too.
         let mut head = glimpse(50);
         head.temperatures = [58, 36, 41];
