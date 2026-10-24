@@ -1,3 +1,21 @@
+## Current checkpoint: 2026-10-24 08:19 +07, reminder/task pair taken
+
+#3278 and #3275 are merged. The outstanding fresh formatting request on
+#3275's landed `25452b88d` is now closed: Linux `cargo fmt --all --check`
+passes, 6,963 source-file hashes unchanged, cleanup verified.
+[Exact landed-tree receipt](verification/head-touch-body-pair-landed-format-20261024/README.md).
+
+Taken on #2809: the unclaimed reminder/task persisted-state pair, actual
+published 6408 and 6498. Schedule's artifacts are byte-identical; Tasks and
+Voice differ. Artifact sizes, hashes and AArch64 ELF headers match the
+public release metadata and decoded manifests. This is not independent
+signature verification. Fixtures are being implemented; no pair result is
+claimed yet. Standard PR ARM64/Clippy and a narrow native pair job will run.
+#2810 physical acceptance still needs its holder/person window; #1812 still
+needs the trusted public key. Neither wait stops this claimed software work.
+
+---
+
 ## Current checkpoint: 2026-10-24 00:28 +07, release-pair native gates green and Body read complete
 
 Ready for lamp-voice: #3278 `baed91ead` gates green; assigned readers and First own disposition
