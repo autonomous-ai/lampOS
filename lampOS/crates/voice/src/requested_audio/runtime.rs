@@ -11,7 +11,7 @@ use std::{
     io,
     path::{Path, PathBuf},
     sync::{
-        Arc, Mutex, OnceLock,
+        Arc, Mutex, MutexGuard, OnceLock, TryLockError,
         atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering},
         mpsc::{self, Receiver, SyncSender},
     },
@@ -21,6 +21,13 @@ use std::{
 
 const MONITOR_EVERY: Duration = Duration::from_millis(20);
 const CACHE_FRESH_US: u64 = 100_000;
+/// How long a reader spins on a clash for the speaker cache ([`Speaker::try_cache`]).
+/// Tests hold the cache from another thread for a millisecond or two, so
+/// theirs is longer, to stay clear of a loaded machine's scheduling.
+#[cfg(not(test))]
+const CLASH_SPIN: Duration = Duration::from_micros(200);
+#[cfg(test)]
+const CLASH_SPIN: Duration = Duration::from_millis(200);
 const EXCHANGE_WAIT: Duration = Duration::from_millis(150);
 const RENEW_US: u64 = 200_000;
 const ACTIVE: u8 = 0;
@@ -112,6 +119,18 @@ impl SpeakerCache {
         (audible.fence == *fence && now_us >= observed && now_us < until).then_some(until)
     }
 
+    /// Why [`Self::deadline`] gave none, for the journal.
+    fn refusal(&self, fence: &Fence, now_us: u64) -> &'static str {
+        match (&self.audible, self.observed_us) {
+            (None, _) | (_, None) => "the speaker was muted, silent or its state unknown",
+            (Some(audible), _) if audible.fence != *fence => "the speaker's state changed",
+            (_, Some(observed)) if now_us < observed => {
+                "the speaker's state was read after the check's own time"
+            }
+            _ => "the speaker's state was stale",
+        }
+    }
+
     fn bind(&self, issued_us: u64, now_us: u64) -> Option<Fence> {
         let audible = self.audible.as_ref()?;
         if issued_us > now_us || audible.valid_since_us > issued_us {
@@ -127,6 +146,27 @@ struct Speaker {
     cache: Mutex<SpeakerCache>,
     #[cfg(test)]
     changed: Condvar,
+}
+
+impl Speaker {
+    /// The cache, for a reader that must not wait on a lock. A clash is
+    /// tried again, spinning and never sleeping, for at most [`CLASH_SPIN`]:
+    /// the monitor writes the cache every 20 ms and the worker reads it every
+    /// 20 ms, each for microseconds, so the two meet often (#2793: on
+    /// lamp-4ace a recording accepted at 13:18:46.68 was cancelled 0.66 s
+    /// later by such a clash). A cache held longer, or poisoned, is none.
+    fn try_cache(&self) -> Option<MutexGuard<'_, SpeakerCache>> {
+        let start = Instant::now();
+        loop {
+            match self.cache.try_lock() {
+                Ok(cache) => return Some(cache),
+                Err(TryLockError::WouldBlock) if start.elapsed() < CLASH_SPIN => {
+                    std::hint::spin_loop();
+                }
+                Err(_) => return None,
+            }
+        }
+    }
 }
 
 struct Running {
@@ -226,11 +266,11 @@ impl Shared {
             } else {
                 self.offer.start_before_us
             };
-            let Ok(cache) = self.speaker.cache.try_lock() else {
+            let Some(cache) = self.speaker.try_cache() else {
                 return Err("the speaker's state was being read");
             };
             let Some(speaker) = cache.deadline(&self.fence, now_us) else {
-                return Err("the speaker's state was stale, changed or unknown");
+                return Err(cache.refusal(&self.fence, now_us));
             };
             drop(cache);
             until = until.min(speaker);
@@ -257,8 +297,9 @@ impl Shared {
     }
 }
 
-/// One original requested recording. No method performs I/O, waits for a lock,
-/// joins a worker, or renews an original time bound.
+/// One original requested recording. No method performs I/O, waits for a lock
+/// (a clash spins at most [`CLASH_SPIN`], never sleeping), joins a worker, or
+/// renews an original time bound.
 pub(crate) struct Ticket {
     shared: Arc<Shared>,
 }
@@ -484,9 +525,7 @@ impl Service {
             .ok()?;
         let Some(fence) = self
             .speaker
-            .cache
-            .try_lock()
-            .ok()
+            .try_cache()
             .and_then(|cache| cache.bind(offer.context.issued_us, now_us))
         else {
             self.busy.release();
@@ -1204,6 +1243,59 @@ mod tests {
         assert!(!failed.live(1000));
     }
 
+    /// lamp-4ace on 24 Oct (#2793): the monitor and the worker each take the
+    /// cache every 20 ms, and one clash cancelled a recording 0.66 s after it
+    /// was accepted. A clash that ends inside the spin is no loss.
+    #[test]
+    fn a_clash_on_the_speaker_cache_shorter_than_the_spin_keeps_permission() {
+        let ticket = fixture(1, 1000, true);
+        assert!(ticket.started(1000));
+        let shared = ticket.shared.clone();
+        let holder = {
+            let shared = shared.clone();
+            let (tell, held) = mpsc::channel();
+            let holder = thread::spawn(move || {
+                let cache = shared.speaker.cache.lock().unwrap();
+                tell.send(()).unwrap();
+                thread::sleep(Duration::from_millis(2));
+                drop(cache);
+            });
+            held.recv().unwrap();
+            holder
+        };
+        assert!(ticket.may_play(1001), "a short clash is no loss");
+        holder.join().unwrap();
+        assert_eq!(shared.terminal.load(Ordering::Acquire), ACTIVE);
+        assert!(shared.cancelled_for.get().is_none());
+        assert!(ticket.may_play(1002));
+    }
+
+    #[test]
+    fn a_refused_speaker_reading_names_its_cause() {
+        let mut cache = SpeakerCache::default();
+        cache.observe(Some(state(1000, 1, 0)), 1000);
+        let fence = cache.bind(1000, 1000).unwrap();
+        assert!(cache.deadline(&fence, 1000).is_some());
+        assert_eq!(
+            cache.refusal(&fence, 999),
+            "the speaker's state was read after the check's own time"
+        );
+        assert_eq!(
+            cache.refusal(&fence, 1000 + CACHE_FRESH_US),
+            "the speaker's state was stale"
+        );
+        let other = Fence {
+            continuity: fence.continuity + 1,
+            ..fence.clone()
+        };
+        assert_eq!(cache.refusal(&other, 1000), "the speaker's state changed");
+        cache.observe(None, 1001);
+        assert_eq!(
+            cache.refusal(&fence, 1001),
+            "the speaker was muted, silent or its state unknown"
+        );
+    }
+
     #[test]
     fn cache_contention_after_start_is_terminal_even_when_the_cache_recovers() {
         let ticket = fixture(1, 1000, true);
@@ -1213,8 +1305,13 @@ mod tests {
         let held = shared.speaker.cache.lock().unwrap();
 
         // This is a nonblocking check on a started, ready ticket with a live
-        // lease. Even brief contention remains a terminal loss of permission.
+        // lease. A cache held past the clash spin remains a terminal loss of
+        // permission.
         assert!(!ticket.may_play(1001));
+        assert_eq!(
+            shared.cancelled_for.get(),
+            Some(&"the speaker's state was being read")
+        );
         assert_eq!(shared.terminal.load(Ordering::Acquire), CANCELLED);
         drop(held);
 
