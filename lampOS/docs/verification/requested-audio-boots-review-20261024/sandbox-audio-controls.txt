@@ -1,0 +1,186 @@
+
+running 53 tests
+coordinator::tests::requested_audio::a_real_bus_mute_generation_is_terminal_even_after_unmute --- FAILED
+coordinator::tests::requested_audio::a_refused_offer_names_the_condition_that_refused_it --- FAILED
+coordinator::tests::requested_audio::an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy --- FAILED
+coordinator::tests::requested_audio::an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_reply --- FAILED
+coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording --- FAILED
+coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news --- FAILED
+coordinator::tests::requested_audio::news_in_a_music_confirmation_is_heard_once_after_both_parts_retire --- FAILED
+coordinator::tests::requested_audio::offers_require_the_current_worker_session_request_and_privacy_identity --- FAILED
+coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement --- FAILED
+coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement --- FAILED
+coordinator::tests::requested_audio::stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader --- FAILED
+coordinator::tests::requested_audio::the_actual_speaker_permit_cannot_outlive_a_short_skills_lease --- FAILED
+coordinator::tests::requested_audio::written_reminder_say_and_offline_turns_never_authorize_requested_recordings --- FAILED
+provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply --- FAILED
+.. 16/53
+provider_worker::tests::requested_audio_waiting_for_ipc_credit_rechecks_camera_scope --- FAILED
+..... 22/53
+requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant --- FAILED
+requested_audio::runtime::tests::drop_during_a_blocked_start_does_not_wait_or_accept_its_late_success --- FAILED
+........ 32/53
+requested_audio::runtime::tests::real_worker_cache_contention_cancels_before_start_and_never_revives --- FAILED
+requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement --- FAILED
+requested_audio::runtime::tests::rejected_baseline_releases_capacity_for_a_new_spoken_offer --- FAILED
+........... 46/53
+second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key --- FAILED
+second_provider::worker::tests::requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry --- FAILED
+. 49/53
+tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes --- FAILED
+.. 52/53
+tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill --- FAILED
+
+failures:
+
+---- coordinator::tests::requested_audio::a_real_bus_mute_generation_is_terminal_even_after_unmute stdout ----
+
+thread 'coordinator::tests::requested_audio::a_real_bus_mute_generation_is_terminal_even_after_unmute' (239584668) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- coordinator::tests::requested_audio::a_refused_offer_names_the_condition_that_refused_it stdout ----
+
+thread 'coordinator::tests::requested_audio::a_refused_offer_names_the_condition_that_refused_it' (239584673) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy stdout ----
+
+thread 'coordinator::tests::requested_audio::an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy' (239584674) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_reply stdout ----
+
+thread 'coordinator::tests::requested_audio::an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_reply' (239584675) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording stdout ----
+
+thread 'coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording' (239584676) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news stdout ----
+
+thread 'coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news' (239584678) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::news_in_a_music_confirmation_is_heard_once_after_both_parts_retire stdout ----
+
+thread 'coordinator::tests::requested_audio::news_in_a_music_confirmation_is_heard_once_after_both_parts_retire' (239584679) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::offers_require_the_current_worker_session_request_and_privacy_identity stdout ----
+
+thread 'coordinator::tests::requested_audio::offers_require_the_current_worker_session_request_and_privacy_identity' (239584681) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement stdout ----
+
+thread 'coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement' (239584683) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement stdout ----
+
+thread 'coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement' (239584684) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader stdout ----
+
+thread 'coordinator::tests::requested_audio::stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader' (239584685) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::the_actual_speaker_permit_cannot_outlive_a_short_skills_lease stdout ----
+
+thread 'coordinator::tests::requested_audio::the_actual_speaker_permit_cannot_outlive_a_short_skills_lease' (239584686) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- coordinator::tests::requested_audio::written_reminder_say_and_offline_turns_never_authorize_requested_recordings stdout ----
+
+thread 'coordinator::tests::requested_audio::written_reminder_say_and_offline_turns_never_authorize_requested_recordings' (239584687) panicked at crates/voice/src/coordinator/tests/requested_audio.rs:52:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply stdout ----
+
+thread 'provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply' (239584688) panicked at crates/voice/src/provider_worker.rs:11680:22:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- provider_worker::tests::requested_audio_waiting_for_ipc_credit_rechecks_camera_scope stdout ----
+
+thread 'provider_worker::tests::requested_audio_waiting_for_ipc_credit_rechecks_camera_scope' (239584691) panicked at crates/voice/src/provider_worker.rs:8370:18:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant stdout ----
+
+thread 'requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant' (239584697) panicked at crates/voice/src/requested_audio/runtime.rs:1307:54:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- requested_audio::runtime::tests::drop_during_a_blocked_start_does_not_wait_or_accept_its_late_success stdout ----
+
+thread 'requested_audio::runtime::tests::drop_during_a_blocked_start_does_not_wait_or_accept_its_late_success' (239584698) panicked at crates/voice/src/requested_audio/runtime.rs:1307:54:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- requested_audio::runtime::tests::real_worker_cache_contention_cancels_before_start_and_never_revives stdout ----
+
+thread 'requested_audio::runtime::tests::real_worker_cache_contention_cancels_before_start_and_never_revives' (239584709) panicked at crates/voice/src/requested_audio/runtime.rs:1307:54:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement stdout ----
+
+thread 'requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement' (239584710) panicked at crates/voice/src/requested_audio/runtime.rs:1307:54:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- requested_audio::runtime::tests::rejected_baseline_releases_capacity_for_a_new_spoken_offer stdout ----
+
+thread 'requested_audio::runtime::tests::rejected_baseline_releases_capacity_for_a_new_spoken_offer' (239584711) panicked at crates/voice/src/requested_audio/runtime.rs:1307:54:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key stdout ----
+
+thread 'second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key' (239584814) panicked at crates/voice/src/second_provider/tests.rs:11101:59:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- second_provider::worker::tests::requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry stdout ----
+
+thread 'second_provider::worker::tests::requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry' (239584815) panicked at crates/voice/src/second_provider/worker.rs:13016:91:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes stdout ----
+
+thread 'tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes' (239584817) panicked at crates/voice/src/tools.rs:2801:72:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill stdout ----
+
+thread 'tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill' (239584822) panicked at crates/voice/src/tools.rs:2801:72:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+
+failures:
+    coordinator::tests::requested_audio::a_real_bus_mute_generation_is_terminal_even_after_unmute
+    coordinator::tests::requested_audio::a_refused_offer_names_the_condition_that_refused_it
+    coordinator::tests::requested_audio::an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy
+    coordinator::tests::requested_audio::an_accepted_offer_survives_ready_session_renewal_and_plays_for_its_original_reply
+    coordinator::tests::requested_audio::an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording
+    coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news
+    coordinator::tests::requested_audio::news_in_a_music_confirmation_is_heard_once_after_both_parts_retire
+    coordinator::tests::requested_audio::offers_require_the_current_worker_session_request_and_privacy_identity
+    coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement
+    coordinator::tests::requested_audio::requested_audio_keeps_voice_state_non_resting_until_final_retirement
+    coordinator::tests::requested_audio::stop_privacy_capture_gap_and_new_owner_cancel_even_a_late_successful_loader
+    coordinator::tests::requested_audio::the_actual_speaker_permit_cannot_outlive_a_short_skills_lease
+    coordinator::tests::requested_audio::written_reminder_say_and_offline_turns_never_authorize_requested_recordings
+    provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply
+    provider_worker::tests::requested_audio_waiting_for_ipc_credit_rechecks_camera_scope
+    requested_audio::runtime::tests::digest_mismatch_and_revoked_renewal_end_without_reusing_a_grant
+    requested_audio::runtime::tests::drop_during_a_blocked_start_does_not_wait_or_accept_its_late_success
+    requested_audio::runtime::tests::real_worker_cache_contention_cancels_before_start_and_never_revives
+    requested_audio::runtime::tests::real_worker_loads_renews_and_finishes_only_after_marked_retirement
+    requested_audio::runtime::tests::rejected_baseline_releases_capacity_for_a_new_spoken_offer
+    second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key
+    second_provider::worker::tests::requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry
+    tools::tests::requested_audio_is_private_and_unavailable_to_legacy_off_and_non_skills_routes
+    tools::tests::requested_audio_uses_the_skills_socket_directly_and_through_use_skill
+
+test result: FAILED. 29 passed; 24 failed; 0 ignored; 0 measured; 3659 filtered out; finished in 0.50s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

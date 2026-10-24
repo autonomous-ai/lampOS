@@ -1,0 +1,22 @@
+{
+  "head": "7fb4feb204ae15b747a49e619239b3c5decd2c84",
+  "arm64_run": 40058695333,
+  "clippy_run": 40058695335,
+  "conclusion": "success",
+  "checkout": {
+    "sha": "931987d6a50822c47857068e0e01a75e9c5023e4",
+    "tree": "d179da4c7942aa838111227941000c72dd18017c",
+    "parents": [
+      "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "7fb4feb204ae15b747a49e619239b3c5decd2c84"
+    ]
+  },
+  "preview_equals_authored_tree": true,
+  "native_log_sha256": "99717885858a44dacf130a8cc4074792dbf6bdd1f720001076d8bd26a72043be",
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:44:35.6013351Z         LEAK [   0.218s] ( 8999/11171) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:45:05.7994634Z      Summary [ 200.924s] 11171 tests run: 11171 passed (1 leaky), 71 skipped",
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T03:45:19.9203233Z test result: 12 passed; 0 failed"
+  ],
+  "limits": "One reported Voice journal LEAK; no lamp or full teardown guarantee."
+}

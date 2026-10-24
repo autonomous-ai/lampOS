@@ -102,3 +102,18 @@ The full local Voice/workspace passes are carried from `390532a53`, not
 claimed rerun for this test/docs addition. Renewed public reads and native
 checks are requested for the new head. The physical sheet now includes all
 of the readers’ P3 contexts; it remains unrun.
+
+## Current head fully read and native green
+
+Both privacy readers carried their READ-OKs to `7fb4feb20`; Third lifted
+the author hold after the second read. Exact Linux formatting passed on
+6,967 unchanged files; Third verified both authored git trees and the raw
+log hash against Second’s published receipt. `current-linux-fmt-reported.json`
+retains that reported execution and cleanup evidence.
+
+ARM64 run 40058695333 succeeded on `7fb4feb20`: **11,171 passed (one
+reported Voice journal LEAK), 71 skipped**, process **12/0**. The preview
+`931987d6a` tree equals the authored tree, based on current `9ed44f88c`.
+Linux Clippy 40058695335 passed. `current-native.json` binds the checkout,
+parents, raw log hash and result. The train owns integration; no lamp action
+or activation follows from these software gates.

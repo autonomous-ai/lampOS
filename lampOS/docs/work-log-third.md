@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 10:48 — own-name native green; requested-audio second read
+
+- #3328 `7fb4feb20`: both privacy reads carried; author HOLD lifted. Native
+  **11,171 passed (one journal LEAK), 71 skipped**, process **12/0**; Linux
+  Clippy/fmt green. Both tree bindings and current `9ed44f88c` base verified.
+- #3319 `8b54c1c32`: source read finds no P1/P2; Mac fmt/strict Clippy,
+  **53/0** audio controls and **37/0** authority tests pass. Initial sandbox
+  socket-denial **29/24** retained. Trace-emission/composition coverage and
+  exact played/fold qualification remain explicit. [Read](verification/requested-audio-boots-review-20261024/README.md).
+- #3329 awaits Fourth’s accepted recursive-cleanup correction and fresh
+  native qualification. #3325 waits on First’s wording correction.
+- No lamp action. Continue the train, own-PR and review-fix watch.
+
 ## 2026-10-24 10:35 — requested refusal fixtures and Records cleanup HOLD
 
 - #3328 is now `7fb4feb20`: requested five negative inputs plus language
