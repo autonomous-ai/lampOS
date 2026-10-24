@@ -1644,6 +1644,14 @@ a start and by lamp-cloud for the app); and lamp-records (a voice session
 folder, taken as a session with nothing refused). The other parts follow, by
 harm.
 
+**Published routine-state readers** (#2809): the manual Skills `release_pair`
+target covers daily claims and on/off preferences with the actual pinned 6408
+and 6498 ARM64 executables, both directions and back to the original reader.
+Private synthetic peers supply the triggers and helper requests. The
+[scope and execution record](verification/routine-state-release-pair-20261024/README.md)
+separates these four cases from ordinary-suite skips and from the still-open
+rested-night, full-loader, installation and physical power-cut boundaries.
+
 What follows is the audit for #1680 at `647f1ee63`, read from the code
 (paths relative to `lampOS/`). The tasks, schedule, eyes and cloud rows
 were also checked with temporary tests, since removed. "Unread" marks what
