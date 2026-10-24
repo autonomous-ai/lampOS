@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-distinct-frame-56cbd4b146f9-clean-20-lamp-memory"
+  ],
+  "elapsed_seconds": 0.1463933260001795,
+  "exit": 0,
+  "pid": 14099,
+  "process_group": 14099,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

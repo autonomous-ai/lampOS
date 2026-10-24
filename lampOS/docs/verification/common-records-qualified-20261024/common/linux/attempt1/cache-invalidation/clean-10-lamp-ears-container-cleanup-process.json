@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-distinct-frame-56cbd4b146f9-clean-10-lamp-ears"
+  ],
+  "elapsed_seconds": 0.15160368000033486,
+  "exit": 0,
+  "pid": 13418,
+  "process_group": 13418,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-records-cap-r3/crates/update#lamp-update@0.1.0` is ignored, cleaning all versions of `lamp-update` found
+warning: url qualifier in `-p path+file:///src-fourth-records-cap-r3/crates/update#lamp-update@0.1.0` ignored, cleaning all versions of `lamp-update` found
+     Removed 142 files, 171.7MiB total

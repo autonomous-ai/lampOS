@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/air#lamp-air@0.1.0` is ignored, cleaning all versions of `lamp-air` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/air#lamp-air@0.1.0` ignored, cleaning all versions of `lamp-air` found
+     Removed 45 files, 3.7MiB total

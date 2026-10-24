@@ -1,0 +1,21 @@
+{
+  "at_unix": 1792844619.57954,
+  "authorized_by": "Fourth: revision3 and completed corrected-Common Mac source/cleanup/target release reviewed; local invalidation approved",
+  "design_sha256": "7f7c954b9cf3c6e8ac5a084a355961eaa9cbfc21c35c5615412c044c781b05b4",
+  "frozen_sha256": "87912289516f78a0089d316a3b68775f2303c4dce8b5823dcd241c7a8ccc4f0d",
+  "no_lamp_action": true,
+  "previous_release": {
+    "diagnostic_only": false,
+    "exit": 0,
+    "expected_sha256": "c0c3ddd8130e36415fe4b0887b865c034dfa6bf116a856d35b12fe1e0c7db03b",
+    "no_cache_freshness_inferred_from_handoff": true,
+    "path": "/private/tmp/fourth-common-distinct-frame-gates-20261024/mac/attempt1/terminal.json",
+    "prior_failure_not_waived": false,
+    "prior_failures": [],
+    "prior_source_stable": true,
+    "sha256": "c0c3ddd8130e36415fe4b0887b865c034dfa6bf116a856d35b12fe1e0c7db03b",
+    "sha256_pin_source": "explicit_root_native_grant",
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target"
+  },
+  "tree": "198e6784abb22eb0377606388ccd76cdcc4e8d07"
+}

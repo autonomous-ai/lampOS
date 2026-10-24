@@ -1,0 +1,17 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/voice#lamp-voice@0.1.0"
+  ],
+  "elapsed_seconds": 0.7085169609999866,
+  "exit": 0,
+  "pid": 12538,
+  "process_group": 12538,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

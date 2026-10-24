@@ -1,0 +1,21 @@
+{
+  "at_unix": 1792843038.29377,
+  "authorized_by": "Fourth: revision3 and completed corrected-Common Linux source/cleanup/target release reviewed; local invalidation approved",
+  "design_sha256": "7f7c954b9cf3c6e8ac5a084a355961eaa9cbfc21c35c5615412c044c781b05b4",
+  "frozen_sha256": "87912289516f78a0089d316a3b68775f2303c4dce8b5823dcd241c7a8ccc4f0d",
+  "no_lamp_action": true,
+  "previous_release": {
+    "diagnostic_only": false,
+    "exit": 0,
+    "expected_sha256": "196e56377476d913a01ab411de77461675db8cf66c0bcb591fe4fc7ac02814d7",
+    "no_cache_freshness_inferred_from_handoff": true,
+    "path": "/private/tmp/fourth-common-distinct-frame-gates-20261024/linux/attempt1/terminal.json",
+    "prior_failure_not_waived": false,
+    "prior_failures": [],
+    "prior_source_stable": true,
+    "sha256": "196e56377476d913a01ab411de77461675db8cf66c0bcb591fe4fc7ac02814d7",
+    "sha256_pin_source": "reviewed_config",
+    "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024"
+  },
+  "tree": "198e6784abb22eb0377606388ccd76cdcc4e8d07"
+}

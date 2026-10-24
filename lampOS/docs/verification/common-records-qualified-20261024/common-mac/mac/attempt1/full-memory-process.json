@@ -1,0 +1,22 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--no-fail-fast",
+    "-p",
+    "lamp-memory",
+    "--",
+    "--format",
+    "pretty",
+    "--test-threads=1"
+  ],
+  "elapsed_seconds": 424.8445951880003,
+  "exit": 0,
+  "pid": 93937,
+  "process_group": 93937,
+  "process_group_absent": true,
+  "timeout_seconds": 5400
+}

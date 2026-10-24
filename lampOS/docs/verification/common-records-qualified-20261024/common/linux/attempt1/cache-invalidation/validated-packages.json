@@ -1,0 +1,2730 @@
+[
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/actions#lamp-actions@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/actions/Cargo.toml",
+    "manifest_relative": "crates/actions/Cargo.toml",
+    "manifest_sha256": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+    "manifest_source_path": "lampOS/crates/actions/Cargo.toml",
+    "name": "lamp-actions",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/actions#lamp-actions@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_actions",
+        "source_git_path": "lampOS/crates/actions/src/lib.rs",
+        "source_relative": "crates/actions/src/lib.rs",
+        "source_sha256": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+        "src_path": "/src-fourth-common-distinct-frame/crates/actions/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-actions",
+        "source_git_path": "lampOS/crates/actions/src/main.rs",
+        "source_relative": "crates/actions/src/main.rs",
+        "source_sha256": "f8ce8e950e6c6517cdcd02c551f3a972502f1e084f7057fcf6db05abbb519ec0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/actions/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/actions/tests/it/main.rs",
+        "source_relative": "crates/actions/tests/it/main.rs",
+        "source_sha256": "cd9420aac036de672f209a4782486e49f8d562c3c210e958c2576434f8a8ee1b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/actions/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/actions/tests/release_pair.rs",
+        "source_relative": "crates/actions/tests/release_pair.rs",
+        "source_sha256": "79914cc7dffae2114e0f72550018a537252f29c63d9ffd6b32548d4ce5d72e82",
+        "src_path": "/src-fourth-common-distinct-frame/crates/actions/tests/release_pair.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "speaker_state",
+        "source_git_path": "lampOS/crates/actions/tests/speaker_state.rs",
+        "source_relative": "crates/actions/tests/speaker_state.rs",
+        "source_sha256": "beb154c0d7f573797a683a8b09aca5dd32de610975bafec4c25fb17055d0b177",
+        "src_path": "/src-fourth-common-distinct-frame/crates/actions/tests/speaker_state.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/addons#lamp-addons@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/addons/Cargo.toml",
+    "manifest_relative": "crates/addons/Cargo.toml",
+    "manifest_sha256": "2313f6976e096857edc27ce74df34a88cab5cbec28576186143ed515232640bd",
+    "manifest_source_path": "lampOS/crates/addons/Cargo.toml",
+    "name": "lamp-addons",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/addons#lamp-addons@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_addons",
+        "source_git_path": "lampOS/crates/addons/src/lib.rs",
+        "source_relative": "crates/addons/src/lib.rs",
+        "source_sha256": "b54552e21523c88db4b4e84882faff88bcfff4395eedd37a3a5a827fa69801b8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/addons/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-addons",
+        "source_git_path": "lampOS/crates/addons/src/main.rs",
+        "source_relative": "crates/addons/src/main.rs",
+        "source_sha256": "115293d404b97d16efa5c4d8680fb8d2366d26255380d1bfff7669ec9830a255",
+        "src_path": "/src-fourth-common-distinct-frame/crates/addons/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "judge",
+        "source_git_path": "lampOS/crates/addons/tests/judge.rs",
+        "source_relative": "crates/addons/tests/judge.rs",
+        "source_sha256": "26fa9cd4376ca5375058741210f798c8389d166bbf0e0aba635ce5ec171165e3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/addons/tests/judge.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/air#lamp-air@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/air/Cargo.toml",
+    "manifest_relative": "crates/air/Cargo.toml",
+    "manifest_sha256": "795020feb9e842ceddc67b334d5088850d7af3f185875d97932e433a4bcf48e8",
+    "manifest_source_path": "lampOS/crates/air/Cargo.toml",
+    "name": "lamp-air",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/air#lamp-air@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_air",
+        "source_git_path": "lampOS/crates/air/src/lib.rs",
+        "source_relative": "crates/air/src/lib.rs",
+        "source_sha256": "22296d365cdd798195565dfe2683d1fa4dc612ba052b25c430bb5c03fb5c95a1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/air/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-air",
+        "source_git_path": "lampOS/crates/air/src/main.rs",
+        "source_relative": "crates/air/src/main.rs",
+        "source_sha256": "7e4c64142e2ba019e4b53463520c410ec831eb1e97523ad54e2f52676a71f0bb",
+        "src_path": "/src-fourth-common-distinct-frame/crates/air/src/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/audio#lamp-audio@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/audio/Cargo.toml",
+    "manifest_relative": "crates/audio/Cargo.toml",
+    "manifest_sha256": "1217da4568c1f6b78abfed2dde059b1e6f0294cfe5bff8b8d637a8840ade331c",
+    "manifest_source_path": "lampOS/crates/audio/Cargo.toml",
+    "name": "lamp-audio",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/audio#lamp-audio@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_audio",
+        "source_git_path": "lampOS/crates/audio/src/lib.rs",
+        "source_relative": "crates/audio/src/lib.rs",
+        "source_sha256": "219df5b434fdeefa7983626c3c6445d84bd9188b85c5131676a5c14686c843f3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/audio/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-audio",
+        "source_git_path": "lampOS/crates/audio/src/main.rs",
+        "source_relative": "crates/audio/src/main.rs",
+        "source_sha256": "67a015c2853b2a56315b0a0f795635b6455b925f872e2b217b45e017a4039b73",
+        "src_path": "/src-fourth-common-distinct-frame/crates/audio/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/audio/tests/it/main.rs",
+        "source_relative": "crates/audio/tests/it/main.rs",
+        "source_sha256": "7450208f96cff1fe6ed3a9fac6538b22af459dc0c05b8cf8f516055262e27aa3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/audio/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/body/Cargo.toml",
+    "manifest_relative": "crates/body/Cargo.toml",
+    "manifest_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+    "manifest_source_path": "lampOS/crates/body/Cargo.toml",
+    "name": "lamp-body",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/body#lamp-body@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "source_git_path": "lampOS/crates/body/src/lib.rs",
+        "source_relative": "crates/body/src/lib.rs",
+        "source_sha256": "d3d2c30cc4c2684f542ecb469a9d8b5eee9f32c963d9e60caf64b54de78e9eb5",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-body",
+        "source_git_path": "lampOS/crates/body/src/bin/lamp-body.rs",
+        "source_relative": "crates/body/src/bin/lamp-body.rs",
+        "source_sha256": "babf765889da252836437bb7d70de8c94f4e10e7c215a9aa2503fde194684291",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/src/bin/lamp-body.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-body-inspect",
+        "source_git_path": "lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+        "source_relative": "crates/body/src/bin/lamp-body-inspect.rs",
+        "source_sha256": "4a62f197e62ef531643730e162c624c2f9ff562bae622582722207e941b04480",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/src/bin/lamp-body-inspect.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-body-measure",
+        "source_git_path": "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+        "source_relative": "crates/body/src/bin/lamp-body-measure.rs",
+        "source_sha256": "6892bc68303be099e2fa462a6f38da4f397c3a8803646f7ff4459d970694f62d",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/src/bin/lamp-body-measure.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-body-mood",
+        "source_git_path": "lampOS/crates/body/src/bin/lamp-body-mood.rs",
+        "source_relative": "crates/body/src/bin/lamp-body-mood.rs",
+        "source_sha256": "962a18ca28278057126e120daab0a5fb5e0184ad8016bcaa8defbf4ea048ad30",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/src/bin/lamp-body-mood.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-body-worker",
+        "source_git_path": "lampOS/crates/body/src/bin/lamp-body-worker.rs",
+        "source_relative": "crates/body/src/bin/lamp-body-worker.rs",
+        "source_sha256": "4f563278ef70e41037c12fd911788fcf3193b92680e8302bfc1fc1d6e8f06ea7",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/src/bin/lamp-body-worker.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "expression_ask",
+        "source_git_path": "lampOS/crates/body/examples/expression_ask.rs",
+        "source_relative": "crates/body/examples/expression_ask.rs",
+        "source_sha256": "61a48990817475d35e8e8f048fe2a06d6f3efd9a71fdea1cf02f084b4348c4a4",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/examples/expression_ask.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "head_plan",
+        "source_git_path": "lampOS/crates/body/examples/head_plan.rs",
+        "source_relative": "crates/body/examples/head_plan.rs",
+        "source_sha256": "fe76e8a27d0b3d01e2e31beb5a0b5474dbebad297fa1df19776b0979bd3f7cb1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/examples/head_plan.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/body/tests/it/main.rs",
+        "source_relative": "crates/body/tests/it/main.rs",
+        "source_sha256": "4281b363940f8cbc823b147db9327656f74d11f802918976814884f18b4886be",
+        "src_path": "/src-fourth-common-distinct-frame/crates/body/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/bus#lamp-bus@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/bus/Cargo.toml",
+    "manifest_relative": "crates/bus/Cargo.toml",
+    "manifest_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+    "manifest_source_path": "lampOS/crates/bus/Cargo.toml",
+    "name": "lamp-bus",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/bus#lamp-bus@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_bus",
+        "source_git_path": "lampOS/crates/bus/src/lib.rs",
+        "source_relative": "crates/bus/src/lib.rs",
+        "source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+        "src_path": "/src-fourth-common-distinct-frame/crates/bus/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-bus",
+        "source_git_path": "lampOS/crates/bus/src/main.rs",
+        "source_relative": "crates/bus/src/main.rs",
+        "source_sha256": "869ffe9be99c7dc03ff4a9675cec6b2a9cf80c85c41ae8f34acbabf14cc1daab",
+        "src_path": "/src-fourth-common-distinct-frame/crates/bus/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/bus/tests/it/main.rs",
+        "source_relative": "crates/bus/tests/it/main.rs",
+        "source_sha256": "d5efc5714265e8de077cdeecdabf5e8cabecde242c851de29fa818a42fede18e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/bus/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/camera#lamp-camera@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/camera/Cargo.toml",
+    "manifest_relative": "crates/camera/Cargo.toml",
+    "manifest_sha256": "fc40d4ec1d0531c4dc7abde83bda7aee98b79d88dfe789db390002f472db43b1",
+    "manifest_source_path": "lampOS/crates/camera/Cargo.toml",
+    "name": "lamp-camera",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/camera#lamp-camera@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_camera",
+        "source_git_path": "lampOS/crates/camera/src/lib.rs",
+        "source_relative": "crates/camera/src/lib.rs",
+        "source_sha256": "b7ecc0a42137a663be28f8fa354f3f89cb184bb154cf617bb7ad7056a575e1a4",
+        "src_path": "/src-fourth-common-distinct-frame/crates/camera/src/lib.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/camera/tests/it/main.rs",
+        "source_relative": "crates/camera/tests/it/main.rs",
+        "source_sha256": "dc7be2b6d5f43c0c3902665dc80906bee46488d5966b9300c08ce01fe677e4a8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/camera/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "custom-build"
+        ],
+        "name": "build-script-build",
+        "source_git_path": "lampOS/crates/camera/build.rs",
+        "source_relative": "crates/camera/build.rs",
+        "source_sha256": "c59f2f7019d8223764515a0c759900904cc6068b6d82dc91b4deb24f7ea168a8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/camera/build.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/cloud#lamp-cloud@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/cloud/Cargo.toml",
+    "manifest_relative": "crates/cloud/Cargo.toml",
+    "manifest_sha256": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+    "manifest_source_path": "lampOS/crates/cloud/Cargo.toml",
+    "name": "lamp-cloud",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/cloud#lamp-cloud@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "source_git_path": "lampOS/crates/cloud/src/lib.rs",
+        "source_relative": "crates/cloud/src/lib.rs",
+        "source_sha256": "dd014c6c915adb59ec63b979dd038e1c7baca99ba2c466b0b9062f816f0644d8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/cloud/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "source_git_path": "lampOS/crates/cloud/src/main.rs",
+        "source_relative": "crates/cloud/src/main.rs",
+        "source_sha256": "befb454ca5360f09e9a3d44d19d1273c12dfd3adc124fe3e833e482cea28600d",
+        "src_path": "/src-fourth-common-distinct-frame/crates/cloud/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/cloud/tests/it/main.rs",
+        "source_relative": "crates/cloud/tests/it/main.rs",
+        "source_sha256": "ed68a6a31d4a02f0ac95bddf4fc0411689ca19f242713e348a43190d4a330147",
+        "src_path": "/src-fourth-common-distinct-frame/crates/cloud/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/cloud/tests/release_pair.rs",
+        "source_relative": "crates/cloud/tests/release_pair.rs",
+        "source_sha256": "1dcb9d5aa2e42b57f21bcfeb0f12ab5db6253b7625ef7cfdab0e729dbbb46418",
+        "src_path": "/src-fourth-common-distinct-frame/crates/cloud/tests/release_pair.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/controls/Cargo.toml",
+    "manifest_relative": "crates/controls/Cargo.toml",
+    "manifest_sha256": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+    "manifest_source_path": "lampOS/crates/controls/Cargo.toml",
+    "name": "lamp-controls",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/controls#lamp-controls@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_controls",
+        "source_git_path": "lampOS/crates/controls/src/lib.rs",
+        "source_relative": "crates/controls/src/lib.rs",
+        "source_sha256": "64df86c174be57c337d8a697772b0db067dca8c0605e8cb4b168ee1ae9b286a8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/controls/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-controls",
+        "source_git_path": "lampOS/crates/controls/src/main.rs",
+        "source_relative": "crates/controls/src/main.rs",
+        "source_sha256": "214a51628bcbf01aa2d1a07b61a80988e8d316fd7b4df0ecc9b5dd3d5757e844",
+        "src_path": "/src-fourth-common-distinct-frame/crates/controls/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "replay_cost",
+        "source_git_path": "lampOS/crates/controls/examples/replay_cost.rs",
+        "source_relative": "crates/controls/examples/replay_cost.rs",
+        "source_sha256": "89dbd5557c93596a1effa3e4961a9f1d1a8232bd32ccd51cc751c718543ef2df",
+        "src_path": "/src-fourth-common-distinct-frame/crates/controls/examples/replay_cost.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/controls/tests/it/main.rs",
+        "source_relative": "crates/controls/tests/it/main.rs",
+        "source_sha256": "b221d2063ed2c01831713a72693fe2cd7e0cf66cf6b7c3a403c5e352021f712a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/controls/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/controls/tests/release_pair.rs",
+        "source_relative": "crates/controls/tests/release_pair.rs",
+        "source_sha256": "b069a9ef44dc1ab5e44aefbdddde1f81eb8e6dc87fa3a10678cbbe6be5213489",
+        "src_path": "/src-fourth-common-distinct-frame/crates/controls/tests/release_pair.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "strip_worker",
+        "source_git_path": "lampOS/crates/controls/tests/strip_worker.rs",
+        "source_relative": "crates/controls/tests/strip_worker.rs",
+        "source_sha256": "36e5b4c7e076134c86fb841309bb39fca0b5eb133b92dac7ef34dbbf1a8552ce",
+        "src_path": "/src-fourth-common-distinct-frame/crates/controls/tests/strip_worker.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/ears#lamp-ears@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/ears/Cargo.toml",
+    "manifest_relative": "crates/ears/Cargo.toml",
+    "manifest_sha256": "15092825ec95e74d0a1fe0317f14b1f7aba793b87e1b1c50fcd5aeac9f319ce3",
+    "manifest_source_path": "lampOS/crates/ears/Cargo.toml",
+    "name": "lamp-ears",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/ears#lamp-ears@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_ears",
+        "source_git_path": "lampOS/crates/ears/src/lib.rs",
+        "source_relative": "crates/ears/src/lib.rs",
+        "source_sha256": "02f0c7559411ce7a9ed58472e2a2ff4813a623199e1e6c78c3d10c8779038592",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ears/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-ears",
+        "source_git_path": "lampOS/crates/ears/src/main.rs",
+        "source_relative": "crates/ears/src/main.rs",
+        "source_sha256": "a13dfdf4933c5b6525f102eb69f53621cf5d710aa97bb2833cd26348b721ce68",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ears/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "score_wav",
+        "source_git_path": "lampOS/crates/ears/examples/score_wav.rs",
+        "source_relative": "crates/ears/examples/score_wav.rs",
+        "source_sha256": "7cca22bf78f79bb4fce58e43a15dbf7129da82fbee06acf9653cc81b37f420f2",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ears/examples/score_wav.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "pcm_bus",
+        "source_git_path": "lampOS/crates/ears/tests/pcm_bus.rs",
+        "source_relative": "crates/ears/tests/pcm_bus.rs",
+        "source_sha256": "7876edf3326ac1bd6bb0ceb1af833d2c04ca6478e7e575788d945814e5501820",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ears/tests/pcm_bus.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/environment#lamp-environment@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/environment/Cargo.toml",
+    "manifest_relative": "crates/environment/Cargo.toml",
+    "manifest_sha256": "d8ccf1efc3d22b827075dad2c24a8f92b1ccfe839bbd6b3f2920a6bd8c2bd52b",
+    "manifest_source_path": "lampOS/crates/environment/Cargo.toml",
+    "name": "lamp-environment",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/environment#lamp-environment@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_environment",
+        "source_git_path": "lampOS/crates/environment/src/lib.rs",
+        "source_relative": "crates/environment/src/lib.rs",
+        "source_sha256": "8aba66d757fb46dd61d6533824f48bc71fc8dc46d5c57cc2db8d4a5bfb03c164",
+        "src_path": "/src-fourth-common-distinct-frame/crates/environment/src/lib.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "snapshot_latency",
+        "source_git_path": "lampOS/crates/environment/examples/snapshot_latency.rs",
+        "source_relative": "crates/environment/examples/snapshot_latency.rs",
+        "source_sha256": "a77649aa62c1706436a80f3b3c2777379f8649b00845b98bf5b24a44913aa0be",
+        "src_path": "/src-fourth-common-distinct-frame/crates/environment/examples/snapshot_latency.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "snapshots",
+        "source_git_path": "lampOS/crates/environment/tests/snapshots.rs",
+        "source_relative": "crates/environment/tests/snapshots.rs",
+        "source_sha256": "64439f290c306500f6c6c96cbf9353ca456e1d48e56142ebba2730cfe931607e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/environment/tests/snapshots.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/expression/Cargo.toml",
+    "manifest_relative": "crates/expression/Cargo.toml",
+    "manifest_sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+    "manifest_source_path": "lampOS/crates/expression/Cargo.toml",
+    "name": "lamp-expression",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/expression#lamp-expression@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "source_git_path": "lampOS/crates/expression/src/lib.rs",
+        "source_relative": "crates/expression/src/lib.rs",
+        "source_sha256": "863fbef6e93f0bceb5724f5f4d91a911589c2bf2e32c12a0872938a10988f614",
+        "src_path": "/src-fourth-common-distinct-frame/crates/expression/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "source_git_path": "lampOS/crates/expression/src/main.rs",
+        "source_relative": "crates/expression/src/main.rs",
+        "source_sha256": "c9795e4b997111045241366b8da0dcbe913b66f83e3801d41c0f4d8ad99e1537",
+        "src_path": "/src-fourth-common-distinct-frame/crates/expression/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "recent_playout_cost",
+        "source_git_path": "lampOS/crates/expression/examples/recent_playout_cost.rs",
+        "source_relative": "crates/expression/examples/recent_playout_cost.rs",
+        "source_sha256": "b90ecd01284b0ba8be2aebb0fccf1fca2b43fd216e9dedf8c89b63d338c98bd3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/expression/examples/recent_playout_cost.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "replay_cost",
+        "source_git_path": "lampOS/crates/expression/examples/replay_cost.rs",
+        "source_relative": "crates/expression/examples/replay_cost.rs",
+        "source_sha256": "13cabe07608834d2e26d01a3fe92942cb78e7d9baa6389d5d4986f894b5c551f",
+        "src_path": "/src-fourth-common-distinct-frame/crates/expression/examples/replay_cost.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "rest_cost",
+        "source_git_path": "lampOS/crates/expression/examples/rest_cost.rs",
+        "source_relative": "crates/expression/examples/rest_cost.rs",
+        "source_sha256": "78635deca8f50acb2bfe80691813957c3cfb967c08a6bb2b88fda8dd2837ca29",
+        "src_path": "/src-fourth-common-distinct-frame/crates/expression/examples/rest_cost.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/expression/tests/it/main.rs",
+        "source_relative": "crates/expression/tests/it/main.rs",
+        "source_sha256": "bdc1773a832be94688cae180361d99946dad6ed8d5f4b7e8a30455a8406d3e7f",
+        "src_path": "/src-fourth-common-distinct-frame/crates/expression/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "runtime",
+        "source_git_path": "lampOS/crates/expression/tests/runtime.rs",
+        "source_relative": "crates/expression/tests/runtime.rs",
+        "source_sha256": "ed1ed5d64f6338357b25bdcbda739985b1c68c501695d20d9bf2e374ce6318e4",
+        "src_path": "/src-fourth-common-distinct-frame/crates/expression/tests/runtime.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/eyes#lamp-eyes@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/eyes/Cargo.toml",
+    "manifest_relative": "crates/eyes/Cargo.toml",
+    "manifest_sha256": "c515c877b91ac81438e15641a2004a064a17fb0410f452564ebebf6c6535c174",
+    "manifest_source_path": "lampOS/crates/eyes/Cargo.toml",
+    "name": "lamp-eyes",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/eyes#lamp-eyes@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_eyes",
+        "source_git_path": "lampOS/crates/eyes/src/lib.rs",
+        "source_relative": "crates/eyes/src/lib.rs",
+        "source_sha256": "cfbc105e7c8a045be90ca1e5572ca70436c589f067dca295d846ad41bfed7776",
+        "src_path": "/src-fourth-common-distinct-frame/crates/eyes/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-eyes",
+        "source_git_path": "lampOS/crates/eyes/src/main.rs",
+        "source_relative": "crates/eyes/src/main.rs",
+        "source_sha256": "e5fba488a5462854b2eeff2d8dd4522e35761c72d6ac34fef94cafb88a46ebbd",
+        "src_path": "/src-fourth-common-distinct-frame/crates/eyes/src/main.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-seems-measure",
+        "source_git_path": "lampOS/crates/eyes/src/bin/seems_measure.rs",
+        "source_relative": "crates/eyes/src/bin/seems_measure.rs",
+        "source_sha256": "c3002cc03d9f43a7501bfb62b9ff39432d1145ea725132d525b4fb451d89f3f2",
+        "src_path": "/src-fourth-common-distinct-frame/crates/eyes/src/bin/seems_measure.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "glance_replay",
+        "source_git_path": "lampOS/crates/eyes/examples/glance_replay.rs",
+        "source_relative": "crates/eyes/examples/glance_replay.rs",
+        "source_sha256": "18d74ea34b9eacbc95e5d13d4f26f04371f3811f1fb97d3a0d16035b3861c9c0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/eyes/examples/glance_replay.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "look",
+        "source_git_path": "lampOS/crates/eyes/examples/look.rs",
+        "source_relative": "crates/eyes/examples/look.rs",
+        "source_sha256": "80399d1a21cfb2dd7613172e7bceb544bdc8065bb6b55fd77b0d429c494e66b8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/eyes/examples/look.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "full_look_replay",
+        "source_git_path": "lampOS/crates/eyes/tests/full_look_replay.rs",
+        "source_relative": "crates/eyes/tests/full_look_replay.rs",
+        "source_sha256": "7cb6358955a639e9638bd95013beb7932fa82a2d959d494e7894fafc578c05f6",
+        "src_path": "/src-fourth-common-distinct-frame/crates/eyes/tests/full_look_replay.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "remember_speaker",
+        "source_git_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+        "source_relative": "crates/eyes/tests/remember_speaker.rs",
+        "source_sha256": "f9944d4e2f9b7aa916ae8754ba900cf5bece558b41e7e17642c5b01a6405dc01",
+        "src_path": "/src-fourth-common-distinct-frame/crates/eyes/tests/remember_speaker.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/gemini#lamp-gemini@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/gemini/Cargo.toml",
+    "manifest_relative": "crates/gemini/Cargo.toml",
+    "manifest_sha256": "9b2f7c250fc853d7736da0f2f8655e89755742b6b0fb3ff7562bbd0a54a0e9e0",
+    "manifest_source_path": "lampOS/crates/gemini/Cargo.toml",
+    "name": "lamp-gemini",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/gemini#lamp-gemini@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_gemini",
+        "source_git_path": "lampOS/crates/gemini/src/lib.rs",
+        "source_relative": "crates/gemini/src/lib.rs",
+        "source_sha256": "055d74a67aa3d865f67c5a82c6379d7b4faab6e99f798ff2de0df96323d614d0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/gemini/src/lib.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "early_end_probe",
+        "source_git_path": "lampOS/crates/gemini/examples/early_end_probe.rs",
+        "source_relative": "crates/gemini/examples/early_end_probe.rs",
+        "source_sha256": "8403c5cf0509fd43dce92552d85f53af943040bd8c3800ea6196d8e290b153e8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/gemini/examples/early_end_probe.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "render_line",
+        "source_git_path": "lampOS/crates/gemini/examples/render_line.rs",
+        "source_relative": "crates/gemini/examples/render_line.rs",
+        "source_sha256": "663b9a1592909d794a8681af8c4f5ee06ca8fab817f0fa96af136418815159b9",
+        "src_path": "/src-fourth-common-distinct-frame/crates/gemini/examples/render_line.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "service_probe",
+        "source_git_path": "lampOS/crates/gemini/examples/service_probe.rs",
+        "source_relative": "crates/gemini/examples/service_probe.rs",
+        "source_sha256": "6fb5ead927501ebc175583b012faf07fa4c8800f5a7facdb70446695316d20e2",
+        "src_path": "/src-fourth-common-distinct-frame/crates/gemini/examples/service_probe.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "transcript_probe",
+        "source_git_path": "lampOS/crates/gemini/examples/transcript_probe.rs",
+        "source_relative": "crates/gemini/examples/transcript_probe.rs",
+        "source_sha256": "6ad9a1a7caabf157251a1a865ea2c161d605d484da3f6ca8cbf8eaa9a1d1419e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/gemini/examples/transcript_probe.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/gemini/tests/it/main.rs",
+        "source_relative": "crates/gemini/tests/it/main.rs",
+        "source_sha256": "a28c0011a89d02e9e41bddfe7c287073cc06f3a33e6857bc8f1c64f4e5ef07d0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/gemini/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/health#lamp-health@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/health/Cargo.toml",
+    "manifest_relative": "crates/health/Cargo.toml",
+    "manifest_sha256": "2e3ce14aeacb0bfe189499392baed7356738e9252279ad502f32ddd84f42a19d",
+    "manifest_source_path": "lampOS/crates/health/Cargo.toml",
+    "name": "lamp-health",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/health#lamp-health@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_health",
+        "source_git_path": "lampOS/crates/health/src/lib.rs",
+        "source_relative": "crates/health/src/lib.rs",
+        "source_sha256": "6b293a33153539952d40271b63bdaa0a00807a1a4ad74bf673187b9c51744b61",
+        "src_path": "/src-fourth-common-distinct-frame/crates/health/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-health",
+        "source_git_path": "lampOS/crates/health/src/main.rs",
+        "source_relative": "crates/health/src/main.rs",
+        "source_sha256": "b24d6fc27563933dbaf7392ac8cb5d64c7bb617b7ee56e3d07f6885b55591d96",
+        "src_path": "/src-fourth-common-distinct-frame/crates/health/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/health/tests/it/main.rs",
+        "source_relative": "crates/health/tests/it/main.rs",
+        "source_sha256": "b81f13ea98f9503bbb07a7c799bf6af9a619efdf40dc4b4e2b432c7ee9941bc9",
+        "src_path": "/src-fourth-common-distinct-frame/crates/health/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/ipc#lamp-ipc@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/ipc/Cargo.toml",
+    "manifest_relative": "crates/ipc/Cargo.toml",
+    "manifest_sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54",
+    "manifest_source_path": "lampOS/crates/ipc/Cargo.toml",
+    "name": "lamp-ipc",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/ipc#lamp-ipc@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_ipc",
+        "source_git_path": "lampOS/crates/ipc/src/lib.rs",
+        "source_relative": "crates/ipc/src/lib.rs",
+        "source_sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ipc/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-ipc-probe",
+        "source_git_path": "lampOS/crates/ipc/src/bin/lamp-ipc-probe.rs",
+        "source_relative": "crates/ipc/src/bin/lamp-ipc-probe.rs",
+        "source_sha256": "87a1fadf206694df348533db1da62e69ed6ae2b8a57d841d57215e56f83260f2",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ipc/src/bin/lamp-ipc-probe.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "probe",
+        "source_git_path": "lampOS/crates/ipc/tests/probe.rs",
+        "source_relative": "crates/ipc/tests/probe.rs",
+        "source_sha256": "19aaf89b46d6605fac91e40dadedf0e30b7b3382fd177a641f5c9125fe481e28",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ipc/tests/probe.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "relay_exit",
+        "source_git_path": "lampOS/crates/ipc/tests/relay_exit.rs",
+        "source_relative": "crates/ipc/tests/relay_exit.rs",
+        "source_sha256": "e4ef2fddac9a867c7761f092c51fff02d7f7ec533c1818b6ce71f7b447bc48b9",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ipc/tests/relay_exit.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "relay_shared",
+        "source_git_path": "lampOS/crates/ipc/tests/relay_shared.rs",
+        "source_relative": "crates/ipc/tests/relay_shared.rs",
+        "source_sha256": "922c6c4e6fedf07c1f7aa2a76b4d8afe5c50fa3a7306c7eebb9d4e35aaaa0a5e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ipc/tests/relay_shared.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "relay_signals",
+        "source_git_path": "lampOS/crates/ipc/tests/relay_signals.rs",
+        "source_relative": "crates/ipc/tests/relay_signals.rs",
+        "source_sha256": "6bc0a9c0ad634b3cda0db17b667f9d6c7ae309cbc29125433e21639f4c02aba3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ipc/tests/relay_signals.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "sockets",
+        "source_git_path": "lampOS/crates/ipc/tests/sockets.rs",
+        "source_relative": "crates/ipc/tests/sockets.rs",
+        "source_sha256": "2eec3c8866cd92b37538d995cbebf050189387e46222fd057db79aa0b3d9e3d0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ipc/tests/sockets.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/keeper#lamp-keeper@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/keeper/Cargo.toml",
+    "manifest_relative": "crates/keeper/Cargo.toml",
+    "manifest_sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44",
+    "manifest_source_path": "lampOS/crates/keeper/Cargo.toml",
+    "name": "lamp-keeper",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/keeper#lamp-keeper@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_keeper",
+        "source_git_path": "lampOS/crates/keeper/src/lib.rs",
+        "source_relative": "crates/keeper/src/lib.rs",
+        "source_sha256": "9c87316d1358df4d45c47f32a283eacef45b5331d99e7337d4ff80ad5d809888",
+        "src_path": "/src-fourth-common-distinct-frame/crates/keeper/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-keeper",
+        "source_git_path": "lampOS/crates/keeper/src/main.rs",
+        "source_relative": "crates/keeper/src/main.rs",
+        "source_sha256": "cdf57f916c990c47bb85f210d11c6588a95551dab42b9a67ca5272d76cda9fa8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/keeper/src/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/lean#lamp-lean@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/lean/Cargo.toml",
+    "manifest_relative": "crates/lean/Cargo.toml",
+    "manifest_sha256": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6",
+    "manifest_source_path": "lampOS/crates/lean/Cargo.toml",
+    "name": "lamp-lean",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/lean#lamp-lean@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_lean",
+        "source_git_path": "lampOS/crates/lean/src/lib.rs",
+        "source_relative": "crates/lean/src/lib.rs",
+        "source_sha256": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/lean/src/lib.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "check",
+        "source_git_path": "lampOS/crates/lean/examples/check.rs",
+        "source_relative": "crates/lean/examples/check.rs",
+        "source_sha256": "4553ed33d78b284242c874116af9e69522fcf06956d072ca435e8877c83a2dc1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/lean/examples/check.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/lean/tests/it/main.rs",
+        "source_relative": "crates/lean/tests/it/main.rs",
+        "source_sha256": "a44d954c613c0f61d951c23afb821e12a40ae88f002d23411d5fcfe17ebe4cf0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/lean/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/local-time#lamp-local-time@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/local-time/Cargo.toml",
+    "manifest_relative": "crates/local-time/Cargo.toml",
+    "manifest_sha256": "d58feea860df9b3d83ec2e5963a2e529cb963f143e4fc9074b44c619626d84ea",
+    "manifest_source_path": "lampOS/crates/local-time/Cargo.toml",
+    "name": "lamp-local-time",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/local-time#lamp-local-time@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_local_time",
+        "source_git_path": "lampOS/crates/local-time/src/lib.rs",
+        "source_relative": "crates/local-time/src/lib.rs",
+        "source_sha256": "24b51e48f1fa051bc201e9b3e75682ed5e4934d35dc9c13bf5ff2f61038787a5",
+        "src_path": "/src-fourth-common-distinct-frame/crates/local-time/src/lib.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "local_time",
+        "source_git_path": "lampOS/crates/local-time/tests/local_time.rs",
+        "source_relative": "crates/local-time/tests/local_time.rs",
+        "source_sha256": "21257ef5e688f16d240bd7187a9aef820749f22a11a110d757dc10e21cac1f50",
+        "src_path": "/src-fourth-common-distinct-frame/crates/local-time/tests/local_time.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/memory/Cargo.toml",
+    "manifest_relative": "crates/memory/Cargo.toml",
+    "manifest_sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+    "manifest_source_path": "lampOS/crates/memory/Cargo.toml",
+    "name": "lamp-memory",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/memory#lamp-memory@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_memory",
+        "source_git_path": "lampOS/crates/memory/src/lib.rs",
+        "source_relative": "crates/memory/src/lib.rs",
+        "source_sha256": "5078be0ba597bae3aa7f4f03412287e0236ec0d7a3dae53b1eaebec4aaf8d6d4",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-memory",
+        "source_git_path": "lampOS/crates/memory/src/main.rs",
+        "source_relative": "crates/memory/src/main.rs",
+        "source_sha256": "62f548e7dffc9f0df01f1ce0e6511dedc6d3303a73df61e9c7cf34f0a80afb24",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/src/main.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-memory-eval",
+        "source_git_path": "lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+        "source_relative": "crates/memory/src/bin/lamp-memory-eval.rs",
+        "source_sha256": "d6ba55483223d64e5c1234bc4e9daa1718b09a9718f92084e71c0ac77739e958",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/src/bin/lamp-memory-eval.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-memory-fixture",
+        "source_git_path": "lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+        "source_relative": "crates/memory/src/bin/lamp-memory-fixture.rs",
+        "source_sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/src/bin/lamp-memory-fixture.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "forget_person",
+        "source_git_path": "lampOS/crates/memory/tests/forget_person.rs",
+        "source_relative": "crates/memory/tests/forget_person.rs",
+        "source_sha256": "945e2f50c331cc3736482a3d3e4a9e4672dbcee2d365279f39c7bded0ed29e2d",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/forget_person.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "forget_shared_exchange",
+        "source_git_path": "lampOS/crates/memory/tests/forget_shared_exchange.rs",
+        "source_relative": "crates/memory/tests/forget_shared_exchange.rs",
+        "source_sha256": "16dc0fcf22d993f21fc9f3c01be696dc2fc5d849149591872428554082e90b2e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/forget_shared_exchange.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "forgot",
+        "source_git_path": "lampOS/crates/memory/tests/forgot.rs",
+        "source_relative": "crates/memory/tests/forgot.rs",
+        "source_sha256": "44163e269b814724ab59079b1a3e40e1f2155cadc086413d9f0b68e4727efe20",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/forgot.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "health_control",
+        "source_git_path": "lampOS/crates/memory/tests/health_control.rs",
+        "source_relative": "crates/memory/tests/health_control.rs",
+        "source_sha256": "e90c17dd703d4d9879732d4b2ead58d725d9e7f712f53fd2e56bd8198c771325",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/health_control.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/memory/tests/it/main.rs",
+        "source_relative": "crates/memory/tests/it/main.rs",
+        "source_sha256": "465969b0a9ca71fb07dd25c84b3a7144c86e55c49ba8521a3fed3bcf94b1a300",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "paraphrase_fixture",
+        "source_git_path": "lampOS/crates/memory/tests/paraphrase_fixture.rs",
+        "source_relative": "crates/memory/tests/paraphrase_fixture.rs",
+        "source_sha256": "27ec7a38d14b7ac2154f20be06340779e689d9cb3d3cd608f01cead6e1dbf5bc",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/paraphrase_fixture.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/memory/tests/release_pair.rs",
+        "source_relative": "crates/memory/tests/release_pair.rs",
+        "source_sha256": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/release_pair.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_early_words",
+        "source_git_path": "lampOS/crates/memory/tests/voice_early_words.rs",
+        "source_relative": "crates/memory/tests/voice_early_words.rs",
+        "source_sha256": "5ee0798795e7894f43cb16ea43a4bf8c671c611e12ff759abd39a7d80ac83863",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_early_words.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_follows_face",
+        "source_git_path": "lampOS/crates/memory/tests/voice_follows_face.rs",
+        "source_relative": "crates/memory/tests/voice_follows_face.rs",
+        "source_sha256": "2195aac49ebd14ea7a64ab04cf55379ca6fc1479127b9760d78aab952c9b01b7",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_follows_face.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_forget",
+        "source_git_path": "lampOS/crates/memory/tests/voice_forget.rs",
+        "source_relative": "crates/memory/tests/voice_forget.rs",
+        "source_sha256": "8f56f3e8c56529ac99e033c3753aa79210ca1a2a045baabf3a5c817be178f7ec",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_forget.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_forget_about",
+        "source_git_path": "lampOS/crates/memory/tests/voice_forget_about.rs",
+        "source_relative": "crates/memory/tests/voice_forget_about.rs",
+        "source_sha256": "ad1915e886140a47098eacebd0ec66b3e066123d1f8334d598ee3f9d17250975",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_forget_about.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_forget_named",
+        "source_git_path": "lampOS/crates/memory/tests/voice_forget_named.rs",
+        "source_relative": "crates/memory/tests/voice_forget_named.rs",
+        "source_sha256": "833f2fb0bde801d5cb1706d19b47d4d131ebc19faa1848afb7ab4b08fdbd71f7",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_forget_named.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_link_used",
+        "source_git_path": "lampOS/crates/memory/tests/voice_link_used.rs",
+        "source_relative": "crates/memory/tests/voice_link_used.rs",
+        "source_sha256": "172997d73b5332b7bdb24fbea99463b3eeec0deebef340eefca84e661173c217",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_link_used.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_observe",
+        "source_git_path": "lampOS/crates/memory/tests/voice_observe.rs",
+        "source_relative": "crates/memory/tests/voice_observe.rs",
+        "source_sha256": "566250815cbf476b6a327c1cac4c3d0dd5f6b4c1800a5fb49568eb40b091356b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_observe.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "voice_since_until",
+        "source_git_path": "lampOS/crates/memory/tests/voice_since_until.rs",
+        "source_relative": "crates/memory/tests/voice_since_until.rs",
+        "source_sha256": "00842b4d720f1b09a7eb1f91a440820767903179c738e84b9ce64381032261f3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/memory/tests/voice_since_until.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/mood#lamp-mood@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/mood/Cargo.toml",
+    "manifest_relative": "crates/mood/Cargo.toml",
+    "manifest_sha256": "2f105fca474e979705906e5aabaf08f60ce6fd843ca24a009bc949955565d540",
+    "manifest_source_path": "lampOS/crates/mood/Cargo.toml",
+    "name": "lamp-mood",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/mood#lamp-mood@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_mood",
+        "source_git_path": "lampOS/crates/mood/src/lib.rs",
+        "source_relative": "crates/mood/src/lib.rs",
+        "source_sha256": "77fdcf14906c12c5a3db45bbc64139aad7f304c3a4176f5c261b88ff1949714f",
+        "src_path": "/src-fourth-common-distinct-frame/crates/mood/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-mood",
+        "source_git_path": "lampOS/crates/mood/src/main.rs",
+        "source_relative": "crates/mood/src/main.rs",
+        "source_sha256": "e890d3df4a9829ef22b6e2a491c173b27a589a95eea2e14045b5dab6c5d8c1f1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/mood/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "replay_day",
+        "source_git_path": "lampOS/crates/mood/examples/replay_day.rs",
+        "source_relative": "crates/mood/examples/replay_day.rs",
+        "source_sha256": "0524271630d62415cbe38f74763995389861cf106b5b766f4f4aadd0342bccd0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/mood/examples/replay_day.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/mood/tests/it/main.rs",
+        "source_relative": "crates/mood/tests/it/main.rs",
+        "source_sha256": "61c5bc9b35eefa583b3151b9088f97f6d3a2e03bba55d8e77e17ff6b2b5f9c4e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/mood/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/msgs#lamp-msgs@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/msgs/Cargo.toml",
+    "manifest_relative": "crates/msgs/Cargo.toml",
+    "manifest_sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec",
+    "manifest_source_path": "lampOS/crates/msgs/Cargo.toml",
+    "name": "lamp-msgs",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/msgs#lamp-msgs@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_msgs",
+        "source_git_path": "lampOS/crates/msgs/src/lib.rs",
+        "source_relative": "crates/msgs/src/lib.rs",
+        "source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/msgs/src/lib.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/msgs/tests/it/main.rs",
+        "source_relative": "crates/msgs/tests/it/main.rs",
+        "source_sha256": "c219aef2fb8c5900ea2a9bb7f4e4c5212b5d662446502985e3cc859881ae657c",
+        "src_path": "/src-fourth-common-distinct-frame/crates/msgs/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/name#lamp-name@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/name/Cargo.toml",
+    "manifest_relative": "crates/name/Cargo.toml",
+    "manifest_sha256": "fbd95fe8ac4d9a80188f7de3e06b88ac5f192de56c8fc2db063a4255a9d25e7f",
+    "manifest_source_path": "lampOS/crates/name/Cargo.toml",
+    "name": "lamp-name",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/name#lamp-name@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_name",
+        "source_git_path": "lampOS/crates/name/src/lib.rs",
+        "source_relative": "crates/name/src/lib.rs",
+        "source_sha256": "c82ddffdf8b995fd8381a427d7c7b99ed01d30d16c88c9d57cbe513303edf329",
+        "src_path": "/src-fourth-common-distinct-frame/crates/name/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-name",
+        "source_git_path": "lampOS/crates/name/src/main.rs",
+        "source_relative": "crates/name/src/main.rs",
+        "source_sha256": "a383a7f51a029003f5a7a4e0b25b2da6c9b000c328ea397698073338b8006dfe",
+        "src_path": "/src-fourth-common-distinct-frame/crates/name/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "stop_words_replay",
+        "source_git_path": "lampOS/crates/name/examples/stop_words_replay.rs",
+        "source_relative": "crates/name/examples/stop_words_replay.rs",
+        "source_sha256": "5e47e9098f9192fc8469e22cd55fb03af5624e6eeb2cdb661e2fd3ef2015ab13",
+        "src_path": "/src-fourth-common-distinct-frame/crates/name/examples/stop_words_replay.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/name/tests/it/main.rs",
+        "source_relative": "crates/name/tests/it/main.rs",
+        "source_sha256": "9f4ce01b5a0c24b0f1169b84e96e1b67d282cc88a1b1e3a5a165b75f91bc2fa3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/name/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/near-call#lamp-near-call@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/near-call/Cargo.toml",
+    "manifest_relative": "crates/near-call/Cargo.toml",
+    "manifest_sha256": "3b375ca80370b7fb22c6b9a596b424d2cd9ecfa0f2324faeab9d898af9988816",
+    "manifest_source_path": "lampOS/crates/near-call/Cargo.toml",
+    "name": "lamp-near-call",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/near-call#lamp-near-call@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_near_call",
+        "source_git_path": "lampOS/crates/near-call/src/lib.rs",
+        "source_relative": "crates/near-call/src/lib.rs",
+        "source_sha256": "10b2507a2d5e010481ec15ac3d6feed78403ace37f104739fbc7b9104918b6c5",
+        "src_path": "/src-fourth-common-distinct-frame/crates/near-call/src/lib.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/observer#lamp-observer@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/observer/Cargo.toml",
+    "manifest_relative": "crates/observer/Cargo.toml",
+    "manifest_sha256": "5cd6a10993b4922534b8a9546a33444465eb5323e5a3c14a73f875027f21201b",
+    "manifest_source_path": "lampOS/crates/observer/Cargo.toml",
+    "name": "lamp-observer",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/observer#lamp-observer@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_observer",
+        "source_git_path": "lampOS/crates/observer/src/lib.rs",
+        "source_relative": "crates/observer/src/lib.rs",
+        "source_sha256": "05dc6052fc10cfd166deae58adad42ed4c278ef26d2ab143b900f02e59a7b194",
+        "src_path": "/src-fourth-common-distinct-frame/crates/observer/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-observer",
+        "source_git_path": "lampOS/crates/observer/src/main.rs",
+        "source_relative": "crates/observer/src/main.rs",
+        "source_sha256": "bb74ee91c47ccfea38af8424e2138d225bd6803746356f222ec2e84e9d8f4206",
+        "src_path": "/src-fourth-common-distinct-frame/crates/observer/src/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/peek#lamp-peek@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/peek/Cargo.toml",
+    "manifest_relative": "crates/peek/Cargo.toml",
+    "manifest_sha256": "6f5014cd4095e438afda490a0c5aa12492780f5265729b6d58ec8e3b5e47ae8b",
+    "manifest_source_path": "lampOS/crates/peek/Cargo.toml",
+    "name": "lamp-peek",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/peek#lamp-peek@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_peek",
+        "source_git_path": "lampOS/crates/peek/src/lib.rs",
+        "source_relative": "crates/peek/src/lib.rs",
+        "source_sha256": "0c926aadf878060013a47d2f46f7cd15cc220262a85a83c09acbbb4f6886f3c1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/peek/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-peek",
+        "source_git_path": "lampOS/crates/peek/src/main.rs",
+        "source_relative": "crates/peek/src/main.rs",
+        "source_sha256": "1346634c9da28298bae75d43a878d4472bdc0b3dd814531c99516ecf6b309164",
+        "src_path": "/src-fourth-common-distinct-frame/crates/peek/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "peek",
+        "source_git_path": "lampOS/crates/peek/tests/peek.rs",
+        "source_relative": "crates/peek/tests/peek.rs",
+        "source_sha256": "1b889fcb390b64b0fa119d6666dfabfd773e8cc4239e82b14ca41c4e15364c19",
+        "src_path": "/src-fourth-common-distinct-frame/crates/peek/tests/peek.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/policy#lamp-policy@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/policy/Cargo.toml",
+    "manifest_relative": "crates/policy/Cargo.toml",
+    "manifest_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+    "manifest_source_path": "lampOS/crates/policy/Cargo.toml",
+    "name": "lamp-policy",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/policy#lamp-policy@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_policy",
+        "source_git_path": "lampOS/crates/policy/src/lib.rs",
+        "source_relative": "crates/policy/src/lib.rs",
+        "source_sha256": "7bb49b0580659000447b63d275fd1f30e15f0affeabb71c03f89a00f3ec61c9c",
+        "src_path": "/src-fourth-common-distinct-frame/crates/policy/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-policy",
+        "source_git_path": "lampOS/crates/policy/src/main.rs",
+        "source_relative": "crates/policy/src/main.rs",
+        "source_sha256": "8e35c386b6b1f90337a32fa3c09e0ba98adec3c26f048af708938223fb4d85a1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/policy/src/main.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-policy-fit",
+        "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-fit.rs",
+        "source_relative": "crates/policy/src/bin/lamp-policy-fit.rs",
+        "source_sha256": "db77bab79eea1d7180f4da0ee5acb2d713d626fc7a1a05adc9c95eb64dd72744",
+        "src_path": "/src-fourth-common-distinct-frame/crates/policy/src/bin/lamp-policy-fit.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-policy-judges",
+        "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-judges.rs",
+        "source_relative": "crates/policy/src/bin/lamp-policy-judges.rs",
+        "source_sha256": "aa1b62b28ece93096eaf5941483a9b7e6aa83180669068bff16a172aa999bc4b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/policy/src/bin/lamp-policy-judges.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-policy-replay",
+        "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-replay.rs",
+        "source_relative": "crates/policy/src/bin/lamp-policy-replay.rs",
+        "source_sha256": "84c695dc20eba347ac9b5c5d8041af7b9554cab135a96cac06bfc81d9eeb89db",
+        "src_path": "/src-fourth-common-distinct-frame/crates/policy/src/bin/lamp-policy-replay.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "progress_cost",
+        "source_git_path": "lampOS/crates/policy/examples/progress_cost.rs",
+        "source_relative": "crates/policy/examples/progress_cost.rs",
+        "source_sha256": "1a7f4d3d1ff41a7cded4703d9274fba7c73221b67ec95ef4bd75b08f597daa2f",
+        "src_path": "/src-fourth-common-distinct-frame/crates/policy/examples/progress_cost.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/policy/tests/it/main.rs",
+        "source_relative": "crates/policy/tests/it/main.rs",
+        "source_sha256": "b45d4dad128b546bb5985772d2f9509cad5f5bf7bda740719b00d5e6c27e24ff",
+        "src_path": "/src-fourth-common-distinct-frame/crates/policy/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/records#lamp-records@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/records/Cargo.toml",
+    "manifest_relative": "crates/records/Cargo.toml",
+    "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+    "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+    "name": "lamp-records",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/records#lamp-records@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_records",
+        "source_git_path": "lampOS/crates/records/src/lib.rs",
+        "source_relative": "crates/records/src/lib.rs",
+        "source_sha256": "a7c4a9fbf5e86fea89c2e8b1874e1d56ff0440b02af0b8aed8638411b26ee567",
+        "src_path": "/src-fourth-common-distinct-frame/crates/records/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-records",
+        "source_git_path": "lampOS/crates/records/src/main.rs",
+        "source_relative": "crates/records/src/main.rs",
+        "source_sha256": "3ece939073d2832b2484f4b4778f6f05bfa845b8a12ce5241fe185c6070391c2",
+        "src_path": "/src-fourth-common-distinct-frame/crates/records/src/main.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-records-fixture",
+        "source_git_path": "lampOS/crates/records/src/bin/lamp-records-fixture.rs",
+        "source_relative": "crates/records/src/bin/lamp-records-fixture.rs",
+        "source_sha256": "56ed3d6bd78679b9f93b911ba531487fc02507abd88f4903939920aa360604d7",
+        "src_path": "/src-fourth-common-distinct-frame/crates/records/src/bin/lamp-records-fixture.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "records",
+        "source_git_path": "lampOS/crates/records/tests/records.rs",
+        "source_relative": "crates/records/tests/records.rs",
+        "source_sha256": "99d03253c4df2b6eae4b39cdb61d748409cb1af79c32e6fe038cd4b01f8186ae",
+        "src_path": "/src-fourth-common-distinct-frame/crates/records/tests/records.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "records_control",
+        "source_git_path": "lampOS/crates/records/tests/records_control.rs",
+        "source_relative": "crates/records/tests/records_control.rs",
+        "source_sha256": "1ecc41bc77f6d8aa167828e4fc36e45e520f3108a44e09420f9f5a363b82dbf8",
+        "src_path": "/src-fourth-common-distinct-frame/crates/records/tests/records_control.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair_systemd",
+        "source_git_path": "lampOS/crates/records/tests/release_pair_systemd.rs",
+        "source_relative": "crates/records/tests/release_pair_systemd.rs",
+        "source_sha256": "c48d5ad96a246a4a1a1cc671e78f546ff44f7991a4a739bce09e4ae4a087ad52",
+        "src_path": "/src-fourth-common-distinct-frame/crates/records/tests/release_pair_systemd.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/ring#lamp-ring@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/ring/Cargo.toml",
+    "manifest_relative": "crates/ring/Cargo.toml",
+    "manifest_sha256": "3e66786b7841a5d26c563f428e4705f9b09566b3af51df46e41bec02015c4e5d",
+    "manifest_source_path": "lampOS/crates/ring/Cargo.toml",
+    "name": "lamp-ring",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/ring#lamp-ring@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_ring",
+        "source_git_path": "lampOS/crates/ring/src/lib.rs",
+        "source_relative": "crates/ring/src/lib.rs",
+        "source_sha256": "cc695499ce6a98bd3329b4ecf27632d9a2bdd5b0da31bbf1204adb9bc8daeefe",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ring/src/lib.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "pixel_map",
+        "source_git_path": "lampOS/crates/ring/examples/pixel_map.rs",
+        "source_relative": "crates/ring/examples/pixel_map.rs",
+        "source_sha256": "f0c0e2c39771f1fc9fee913cfba1bd4df9ee09d910f63dcbe4bf786ee34d763b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/ring/examples/pixel_map.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/same-voice#lamp-same-voice@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/same-voice/Cargo.toml",
+    "manifest_relative": "crates/same-voice/Cargo.toml",
+    "manifest_sha256": "156eaaf0b32f316690d229b66a2b4f02d9ee0790527205bdc3f72a3b17b142f3",
+    "manifest_source_path": "lampOS/crates/same-voice/Cargo.toml",
+    "name": "lamp-same-voice",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/same-voice#lamp-same-voice@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_same_voice",
+        "source_git_path": "lampOS/crates/same-voice/src/lib.rs",
+        "source_relative": "crates/same-voice/src/lib.rs",
+        "source_sha256": "2b5ede0988398b3887e8ce0992de29dcca303138956b335968262b7fa5b1fbaa",
+        "src_path": "/src-fourth-common-distinct-frame/crates/same-voice/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-same-voice",
+        "source_git_path": "lampOS/crates/same-voice/src/main.rs",
+        "source_relative": "crates/same-voice/src/main.rs",
+        "source_sha256": "62dac7728db674b4ac586ee227e2c4df051dc287a0e19ab91eaa3b0ba31fe6e1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/same-voice/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "priority",
+        "source_git_path": "lampOS/crates/same-voice/tests/priority.rs",
+        "source_relative": "crates/same-voice/tests/priority.rs",
+        "source_sha256": "62442113fe95da1aae21d27796a6ff5fd75ab05fe346b5d9d37f8fc995b67d8a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/same-voice/tests/priority.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/schedule#lamp-schedule@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/schedule/Cargo.toml",
+    "manifest_relative": "crates/schedule/Cargo.toml",
+    "manifest_sha256": "b96f73df3f89b8c76c3278216bad8f5ecec36e69d3e14a13dbc0dbb0425ca73f",
+    "manifest_source_path": "lampOS/crates/schedule/Cargo.toml",
+    "name": "lamp-schedule",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/schedule#lamp-schedule@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_schedule",
+        "source_git_path": "lampOS/crates/schedule/src/lib.rs",
+        "source_relative": "crates/schedule/src/lib.rs",
+        "source_sha256": "fccb1e9ba835a2b0be00a8f7dab37d21aee1dc0dc35aa6f075bb98b702993cf2",
+        "src_path": "/src-fourth-common-distinct-frame/crates/schedule/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-schedule",
+        "source_git_path": "lampOS/crates/schedule/src/main.rs",
+        "source_relative": "crates/schedule/src/main.rs",
+        "source_sha256": "616c45b844d65b173c67d19649bab70559dea448dd2a5df8a2e2b034ab326d7d",
+        "src_path": "/src-fourth-common-distinct-frame/crates/schedule/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "schedule_check",
+        "source_git_path": "lampOS/crates/schedule/examples/schedule_check.rs",
+        "source_relative": "crates/schedule/examples/schedule_check.rs",
+        "source_sha256": "9619afcbb5bf5a563a73a3b35a77cc59e0c7ded04687c911e22f34e519f8997c",
+        "src_path": "/src-fourth-common-distinct-frame/crates/schedule/examples/schedule_check.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "forward",
+        "source_git_path": "lampOS/crates/schedule/tests/forward.rs",
+        "source_relative": "crates/schedule/tests/forward.rs",
+        "source_sha256": "64dc5227167d7e7874c1f995c89cc53d082dab9bf2c37599761d82630d58af49",
+        "src_path": "/src-fourth-common-distinct-frame/crates/schedule/tests/forward.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/schedule/tests/it/main.rs",
+        "source_relative": "crates/schedule/tests/it/main.rs",
+        "source_sha256": "6e21783d2194a395eb00258f9cb69c78ea0c46c5f8dbf61fd8afd01a668c23b6",
+        "src_path": "/src-fourth-common-distinct-frame/crates/schedule/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/schedule/tests/release_pair.rs",
+        "source_relative": "crates/schedule/tests/release_pair.rs",
+        "source_sha256": "5c7ad16de34efafc0226f3a4d12c1eed40a5b0e0546b8f0641c3f1ccb8600968",
+        "src_path": "/src-fourth-common-distinct-frame/crates/schedule/tests/release_pair.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "storage_children",
+        "source_git_path": "lampOS/crates/schedule/tests/storage_children.rs",
+        "source_relative": "crates/schedule/tests/storage_children.rs",
+        "source_sha256": "fe766f543f032e9e2db68454fe78f28c719560576efd59932df67aa6b506d44d",
+        "src_path": "/src-fourth-common-distinct-frame/crates/schedule/tests/storage_children.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/selftest#lamp-selftest@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/selftest/Cargo.toml",
+    "manifest_relative": "crates/selftest/Cargo.toml",
+    "manifest_sha256": "ed7f0e2eaa35e588ba085dc8a4bbfba36ff6ed0c077cdcdc6181d0e7709f15e1",
+    "manifest_source_path": "lampOS/crates/selftest/Cargo.toml",
+    "name": "lamp-selftest",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/selftest#lamp-selftest@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_selftest",
+        "source_git_path": "lampOS/crates/selftest/src/lib.rs",
+        "source_relative": "crates/selftest/src/lib.rs",
+        "source_sha256": "e42ca3a9d197bee43b72bd6ed2436641df842826e2e15c2757805afedf5f429a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/selftest/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-selftest",
+        "source_git_path": "lampOS/crates/selftest/src/main.rs",
+        "source_relative": "crates/selftest/src/main.rs",
+        "source_sha256": "32663096ab6bd19f21507703c6f790dc2bcca27669b9f3c6fe1ab8a5e73e9a52",
+        "src_path": "/src-fourth-common-distinct-frame/crates/selftest/src/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/settings#lamp-settings@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/settings/Cargo.toml",
+    "manifest_relative": "crates/settings/Cargo.toml",
+    "manifest_sha256": "2a81f720c4a925b4b353575e48a187e6d71af8dde3677f3cfda7e534fb71241f",
+    "manifest_source_path": "lampOS/crates/settings/Cargo.toml",
+    "name": "lamp-settings",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/settings#lamp-settings@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_settings",
+        "source_git_path": "lampOS/crates/settings/src/lib.rs",
+        "source_relative": "crates/settings/src/lib.rs",
+        "source_sha256": "9cf5d6c7b1c41659b2c01c93a2b8733d08aac3d9ca0ecc84f8e55252c76718c0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/settings/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-settings",
+        "source_git_path": "lampOS/crates/settings/src/main.rs",
+        "source_relative": "crates/settings/src/main.rs",
+        "source_sha256": "112d209deda9d5cd12d1d8d2a2b43aa97d8a2836c4152a0e50d13a8888c4cf63",
+        "src_path": "/src-fourth-common-distinct-frame/crates/settings/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/settings/tests/it/main.rs",
+        "source_relative": "crates/settings/tests/it/main.rs",
+        "source_sha256": "e9bdc3bee8e525691f7473301ee6106207cb3860733ec6437cfb1057ee5d6dce",
+        "src_path": "/src-fourth-common-distinct-frame/crates/settings/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/settings/tests/release_pair.rs",
+        "source_relative": "crates/settings/tests/release_pair.rs",
+        "source_sha256": "b71d5ed2366b651a1be1e9446320b69df4f832558c1f77e921b104ad21f75b01",
+        "src_path": "/src-fourth-common-distinct-frame/crates/settings/tests/release_pair.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/setup#lamp-setup@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/setup/Cargo.toml",
+    "manifest_relative": "crates/setup/Cargo.toml",
+    "manifest_sha256": "586d2dffe23e80f94d8d75ab9f7a05e7b40e39bb9ae929eea379b5f188ddcd4e",
+    "manifest_source_path": "lampOS/crates/setup/Cargo.toml",
+    "name": "lamp-setup",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/setup#lamp-setup@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_setup",
+        "source_git_path": "lampOS/crates/setup/src/lib.rs",
+        "source_relative": "crates/setup/src/lib.rs",
+        "source_sha256": "abf976ee5416277d90bad6e9aac99e49c721aa5c62ae952faefbf0006dd78a37",
+        "src_path": "/src-fourth-common-distinct-frame/crates/setup/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-setup",
+        "source_git_path": "lampOS/crates/setup/src/main.rs",
+        "source_relative": "crates/setup/src/main.rs",
+        "source_sha256": "f6ecbedc006226671ab9406a2ac30a32416abdb8c2222ea323dab01f0e09b689",
+        "src_path": "/src-fourth-common-distinct-frame/crates/setup/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/setup/tests/it/main.rs",
+        "source_relative": "crates/setup/tests/it/main.rs",
+        "source_sha256": "f33f6aa023c963937fa387965046ae6b07ff3593dbc94230b3103effc10b8f79",
+        "src_path": "/src-fourth-common-distinct-frame/crates/setup/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "wake",
+        "source_git_path": "lampOS/crates/setup/tests/wake.rs",
+        "source_relative": "crates/setup/tests/wake.rs",
+        "source_sha256": "ba56d0940098f25e7e3987438d8c9794b4f1673f9a095f6a2a58eb36177a1978",
+        "src_path": "/src-fourth-common-distinct-frame/crates/setup/tests/wake.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/skills/Cargo.toml",
+    "manifest_relative": "crates/skills/Cargo.toml",
+    "manifest_sha256": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b",
+    "manifest_source_path": "lampOS/crates/skills/Cargo.toml",
+    "name": "lamp-skills",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/skills#lamp-skills@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "source_git_path": "lampOS/crates/skills/src/lib.rs",
+        "source_relative": "crates/skills/src/lib.rs",
+        "source_sha256": "796af9814ea9e5fd7eaa2f0482dc185fd530ea5889bd5a04aaf274cee9325b8a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/skills/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "source_git_path": "lampOS/crates/skills/src/main.rs",
+        "source_relative": "crates/skills/src/main.rs",
+        "source_sha256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+        "src_path": "/src-fourth-common-distinct-frame/crates/skills/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "render_relaxing_music",
+        "source_git_path": "lampOS/crates/skills/examples/render_relaxing_music.rs",
+        "source_relative": "crates/skills/examples/render_relaxing_music.rs",
+        "source_sha256": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/skills/examples/render_relaxing_music.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/skills/tests/it/main.rs",
+        "source_relative": "crates/skills/tests/it/main.rs",
+        "source_sha256": "a501e8a910fa65091b055e273b89fb9510aa34b265881cc6510c00498ff7b13e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/skills/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/skills/tests/release_pair.rs",
+        "source_relative": "crates/skills/tests/release_pair.rs",
+        "source_sha256": "57274d36361ee00e041e1cdade89e358b281b7f17657d7d62bcc9add14b1e700",
+        "src_path": "/src-fourth-common-distinct-frame/crates/skills/tests/release_pair.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "requested_audio",
+        "source_git_path": "lampOS/crates/skills/tests/requested_audio.rs",
+        "source_relative": "crates/skills/tests/requested_audio.rs",
+        "source_sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36",
+        "src_path": "/src-fourth-common-distinct-frame/crates/skills/tests/requested_audio.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/sound-fixtures#lamp-sound-fixtures@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/sound-fixtures/Cargo.toml",
+    "manifest_relative": "crates/sound-fixtures/Cargo.toml",
+    "manifest_sha256": "b790403fada9e341620a67350d6c09844ff2e243ec44c8b549ef7b1f461fd28f",
+    "manifest_source_path": "lampOS/crates/sound-fixtures/Cargo.toml",
+    "name": "lamp-sound-fixtures",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/sound-fixtures#lamp-sound-fixtures@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_sound_fixtures",
+        "source_git_path": "lampOS/crates/sound-fixtures/src/lib.rs",
+        "source_relative": "crates/sound-fixtures/src/lib.rs",
+        "source_sha256": "eff15fc8665050cdb2dc1b720bee6d6705e47325c8a3f462036c10c6d57d955b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/sound-fixtures/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-sound-fixtures",
+        "source_git_path": "lampOS/crates/sound-fixtures/src/main.rs",
+        "source_relative": "crates/sound-fixtures/src/main.rs",
+        "source_sha256": "f845b47a44a0bcd07a928e51d537177a06833dfad36ef6dcdf4bec035ace2835",
+        "src_path": "/src-fourth-common-distinct-frame/crates/sound-fixtures/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "cache_and_mix",
+        "source_git_path": "lampOS/crates/sound-fixtures/tests/cache_and_mix.rs",
+        "source_relative": "crates/sound-fixtures/tests/cache_and_mix.rs",
+        "source_sha256": "8c3df36e8d1d58e765d8e3513390aacc68267b114ac0c2dace92a5546e590d67",
+        "src_path": "/src-fourth-common-distinct-frame/crates/sound-fixtures/tests/cache_and_mix.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/station#lamp-station@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/station/Cargo.toml",
+    "manifest_relative": "crates/station/Cargo.toml",
+    "manifest_sha256": "636baa8ceca9e7cc87349170ffd3b9bbbace785b00ddf3421214522b82fc26a3",
+    "manifest_source_path": "lampOS/crates/station/Cargo.toml",
+    "name": "lamp-station",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/station#lamp-station@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_station",
+        "source_git_path": "lampOS/crates/station/src/lib.rs",
+        "source_relative": "crates/station/src/lib.rs",
+        "source_sha256": "116cbb184818298e405d0455148760dfbcb4bcccdb7791dfda82f7f884977741",
+        "src_path": "/src-fourth-common-distinct-frame/crates/station/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-station",
+        "source_git_path": "lampOS/crates/station/src/main.rs",
+        "source_relative": "crates/station/src/main.rs",
+        "source_sha256": "f5c080c5e68521887366c9a608e0e6211f788b30d013a3c50e3b005c9ff89121",
+        "src_path": "/src-fourth-common-distinct-frame/crates/station/src/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/surround#lamp-surround@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/surround/Cargo.toml",
+    "manifest_relative": "crates/surround/Cargo.toml",
+    "manifest_sha256": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+    "manifest_source_path": "lampOS/crates/surround/Cargo.toml",
+    "name": "lamp-surround",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/surround#lamp-surround@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_surround",
+        "source_git_path": "lampOS/crates/surround/src/lib.rs",
+        "source_relative": "crates/surround/src/lib.rs",
+        "source_sha256": "823b78549925e01520e13c4b0446168319e07f8ea7eb266b1d1d557687d35cd6",
+        "src_path": "/src-fourth-common-distinct-frame/crates/surround/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-surround",
+        "source_git_path": "lampOS/crates/surround/src/main.rs",
+        "source_relative": "crates/surround/src/main.rs",
+        "source_sha256": "fc4a856b82c188bd01b0373e5bed7b72ca4bc4871c257e2bdb74982ff49de94e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/surround/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "operator_bench",
+        "source_git_path": "lampOS/crates/surround/examples/operator_bench.rs",
+        "source_relative": "crates/surround/examples/operator_bench.rs",
+        "source_sha256": "3af9116cb31f5e306b95cae3b69229a405ac07898bb27d31f2f665a7c7f5e75b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/surround/examples/operator_bench.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "update_replay",
+        "source_git_path": "lampOS/crates/surround/examples/update_replay.rs",
+        "source_relative": "crates/surround/examples/update_replay.rs",
+        "source_sha256": "f64599fa236d49f5665d9bae6e83379496e4de1e7c23c617d9cd7fe231b66a16",
+        "src_path": "/src-fourth-common-distinct-frame/crates/surround/examples/update_replay.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/surround/tests/it/main.rs",
+        "source_relative": "crates/surround/tests/it/main.rs",
+        "source_sha256": "71ad94c56c2121cb09042984febf16580aaf93c7fd558a81fda441614a0d509b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/surround/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/tasks#lamp-tasks@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/tasks/Cargo.toml",
+    "manifest_relative": "crates/tasks/Cargo.toml",
+    "manifest_sha256": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9",
+    "manifest_source_path": "lampOS/crates/tasks/Cargo.toml",
+    "name": "lamp-tasks",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/tasks#lamp-tasks@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_tasks",
+        "source_git_path": "lampOS/crates/tasks/src/lib.rs",
+        "source_relative": "crates/tasks/src/lib.rs",
+        "source_sha256": "f91b0c597b9eaf7327a0a2541c511c653eb3534e3825c3ea0047e2f54ceb1e02",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-tasks",
+        "source_git_path": "lampOS/crates/tasks/src/main.rs",
+        "source_relative": "crates/tasks/src/main.rs",
+        "source_sha256": "37f60a138cf70469d51c258f618cc571b0728b0237c61861677a469d62a750ca",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/src/main.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-tasks-harness-fixture",
+        "source_git_path": "lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+        "source_relative": "crates/tasks/tests/fixtures/harness_cli.rs",
+        "source_sha256": "3dd97fae305c6beb17fabb12f126af2b2947723be33df3d47ca64b470385f2f4",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/tests/fixtures/harness_cli.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "progress_cost",
+        "source_git_path": "lampOS/crates/tasks/examples/progress_cost.rs",
+        "source_relative": "crates/tasks/examples/progress_cost.rs",
+        "source_sha256": "984059c8503a32c85e6c19d6260d478a3460c3c78fe540c4b675270db8522e97",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/examples/progress_cost.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "tasks_check",
+        "source_git_path": "lampOS/crates/tasks/examples/tasks_check.rs",
+        "source_relative": "crates/tasks/examples/tasks_check.rs",
+        "source_sha256": "9cb7589c602fc89318c039128024891f3e7b070de7457ba12d71aa985302afca",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/examples/tasks_check.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "harness",
+        "source_git_path": "lampOS/crates/tasks/tests/harness.rs",
+        "source_relative": "crates/tasks/tests/harness.rs",
+        "source_sha256": "5d7d1b6ec9523537fd6cdbbb16476d4b67179e86604e698fb857e878b5202f6b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/tests/harness.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/tasks/tests/release_pair.rs",
+        "source_relative": "crates/tasks/tests/release_pair.rs",
+        "source_sha256": "da2987d45edf9aaabcea3b9c808f531dcaf891deee77484576c3cd510c72230e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/tests/release_pair.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "runtime",
+        "source_git_path": "lampOS/crates/tasks/tests/runtime.rs",
+        "source_relative": "crates/tasks/tests/runtime.rs",
+        "source_sha256": "98b0e818b2ce4975f10f0b0f5eb3fcb1427e6e348434847757b8b3362a83265b",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/tests/runtime.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "runtime_failures",
+        "source_git_path": "lampOS/crates/tasks/tests/runtime_failures.rs",
+        "source_relative": "crates/tasks/tests/runtime_failures.rs",
+        "source_sha256": "ec649bfe47475243d8227a9e069b022937d0ddc4b39bf8257ef8d7d09f621ab0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/tests/runtime_failures.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "store",
+        "source_git_path": "lampOS/crates/tasks/tests/store.rs",
+        "source_relative": "crates/tasks/tests/store.rs",
+        "source_sha256": "d77290b52126d436f4f526b998b6bb938df289d553732c0cf7cf017a2961526e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/tasks/tests/store.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/turn-end#lamp-turn-end@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/turn-end/Cargo.toml",
+    "manifest_relative": "crates/turn-end/Cargo.toml",
+    "manifest_sha256": "00baa6bc919c905199d1a3581e19195cd0b0292fc29d8bd6a77d1b80a5ee4153",
+    "manifest_source_path": "lampOS/crates/turn-end/Cargo.toml",
+    "name": "lamp-turn-end",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/turn-end#lamp-turn-end@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_turn_end",
+        "source_git_path": "lampOS/crates/turn-end/src/lib.rs",
+        "source_relative": "crates/turn-end/src/lib.rs",
+        "source_sha256": "bbd5160c06bab053e034f87fbcef76106e9e511eaecfa203a9c600a5790fe1cf",
+        "src_path": "/src-fourth-common-distinct-frame/crates/turn-end/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-turn-end",
+        "source_git_path": "lampOS/crates/turn-end/src/main.rs",
+        "source_relative": "crates/turn-end/src/main.rs",
+        "source_sha256": "ecfc17ae665217bd95a2aa185ca7be1e7b215678d753bb1e6816866be45dce37",
+        "src_path": "/src-fourth-common-distinct-frame/crates/turn-end/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/turn-end/tests/it/main.rs",
+        "source_relative": "crates/turn-end/tests/it/main.rs",
+        "source_sha256": "a8534fa83d278ad8630d52fa22b0885090ec1ff55d76a5149111309ef146aad9",
+        "src_path": "/src-fourth-common-distinct-frame/crates/turn-end/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/turn-end-wire/Cargo.toml",
+    "manifest_relative": "crates/turn-end-wire/Cargo.toml",
+    "manifest_sha256": "cbe9801fc8288a139af537fac219710a2a8a4d74aa061057d3e7c9092e9eb6f2",
+    "manifest_source_path": "lampOS/crates/turn-end-wire/Cargo.toml",
+    "name": "lamp-turn-end-wire",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_turn_end_wire",
+        "source_git_path": "lampOS/crates/turn-end-wire/src/lib.rs",
+        "source_relative": "crates/turn-end-wire/src/lib.rs",
+        "source_sha256": "9a320a7f4fbde07363c4d6ecdb446e5db988359be9e50f1a02b575183067ad81",
+        "src_path": "/src-fourth-common-distinct-frame/crates/turn-end-wire/src/lib.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "process",
+        "source_git_path": "lampOS/crates/turn-end-wire/tests/process.rs",
+        "source_relative": "crates/turn-end-wire/tests/process.rs",
+        "source_sha256": "52017665a517187d94ef1ecc2fb1a725900a542e5523816fd87f6ba9db5a6ac5",
+        "src_path": "/src-fourth-common-distinct-frame/crates/turn-end-wire/tests/process.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/turn-owner/Cargo.toml",
+    "manifest_relative": "crates/turn-owner/Cargo.toml",
+    "manifest_sha256": "ec4874833178228f469757f2a652bb9f16408cd2bcdfa0552e75c94e216d76d4",
+    "manifest_source_path": "lampOS/crates/turn-owner/Cargo.toml",
+    "name": "lamp-turn-owner",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_turn_owner",
+        "source_git_path": "lampOS/crates/turn-owner/src/lib.rs",
+        "source_relative": "crates/turn-owner/src/lib.rs",
+        "source_sha256": "5f375e273e59c81368b0874cffb188b45b8880b8484e0d56ed3c9d454780bb84",
+        "src_path": "/src-fourth-common-distinct-frame/crates/turn-owner/src/lib.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/turn-owner/tests/it/main.rs",
+        "source_relative": "crates/turn-owner/tests/it/main.rs",
+        "source_sha256": "d58b463916331ac0439ff8c76951784f86da2b7ac72e1d9d32929e14026b1118",
+        "src_path": "/src-fourth-common-distinct-frame/crates/turn-owner/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/update/Cargo.toml",
+    "manifest_relative": "crates/update/Cargo.toml",
+    "manifest_sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+    "manifest_source_path": "lampOS/crates/update/Cargo.toml",
+    "name": "lamp-update",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/update#lamp-update@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "source_git_path": "lampOS/crates/update/src/lib.rs",
+        "source_relative": "crates/update/src/lib.rs",
+        "source_sha256": "d2abedede0921948295a1a00b673dd6c47669d87a275e0430c812eec3251c99a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "source_git_path": "lampOS/crates/update/src/main.rs",
+        "source_relative": "crates/update/src/main.rs",
+        "source_sha256": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/src/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "functions",
+        "source_git_path": "lampOS/crates/update/tests/functions.rs",
+        "source_relative": "crates/update/tests/functions.rs",
+        "source_sha256": "fd3eaf0401da1f84f75d3f2be7937cda9a0536c7972fe65e5260455126708d66",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/tests/functions.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "install",
+        "source_git_path": "lampOS/crates/update/tests/install.rs",
+        "source_relative": "crates/update/tests/install.rs",
+        "source_sha256": "48dc786269f9d3e8730e29a57dd72ce3c2e9903d0beea08b4a247165bdaf1202",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/tests/install.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/update/tests/it/main.rs",
+        "source_relative": "crates/update/tests/it/main.rs",
+        "source_sha256": "7b486c660aa349e676019b3f55ae292947be9381241ae5436c7ee86225683535",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/update/tests/release_pair.rs",
+        "source_relative": "crates/update/tests/release_pair.rs",
+        "source_sha256": "6ff8c240b6064654ab3640e6bee009ae0f9c5c13a8ef2d3569e17d79df7a1812",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/tests/release_pair.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "round",
+        "source_git_path": "lampOS/crates/update/tests/round.rs",
+        "source_relative": "crates/update/tests/round.rs",
+        "source_sha256": "fb4d5b1a8d1c2b378168dd915b9922c4b195af723a4d13445610bb578ed83ff2",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/tests/round.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "self-cli-exec",
+        "source_git_path": "lampOS/crates/update/tests/self_cli_exec.rs",
+        "source_relative": "crates/update/tests/self_cli_exec.rs",
+        "source_sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/tests/self_cli_exec.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "self-process-cuts",
+        "source_git_path": "lampOS/crates/update/tests/self_process_cuts.rs",
+        "source_relative": "crates/update/tests/self_process_cuts.rs",
+        "source_sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3",
+        "src_path": "/src-fourth-common-distinct-frame/crates/update/tests/self_process_cuts.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/voice/Cargo.toml",
+    "manifest_relative": "crates/voice/Cargo.toml",
+    "manifest_sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+    "manifest_source_path": "lampOS/crates/voice/Cargo.toml",
+    "name": "lamp-voice",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/voice#lamp-voice@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "source_git_path": "lampOS/crates/voice/src/lib.rs",
+        "source_relative": "crates/voice/src/lib.rs",
+        "source_sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "source_git_path": "lampOS/crates/voice/src/main.rs",
+        "source_relative": "crates/voice/src/main.rs",
+        "source_sha256": "88a7bd21940cca0b1936c3dec4c3652459364d2f0c6c32c0e9d6abe65e5a8386",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "admission_latency",
+        "source_git_path": "lampOS/crates/voice/examples/admission_latency.rs",
+        "source_relative": "crates/voice/examples/admission_latency.rs",
+        "source_sha256": "25753d599be75bda5dd69a7a80a8f9d420421fe8717965e36aef3fe76aa8c528",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/admission_latency.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "duplex_lab",
+        "source_git_path": "lampOS/crates/voice/examples/duplex_lab.rs",
+        "source_relative": "crates/voice/examples/duplex_lab.rs",
+        "source_sha256": "876436f9040347542318827109b9f591b8b4c48fc16d80d45da3398c8a0b8cb0",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/duplex_lab.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "head_qualification_operator",
+        "source_git_path": "lampOS/crates/voice/examples/head_qualification_operator.rs",
+        "source_relative": "crates/voice/examples/head_qualification_operator.rs",
+        "source_sha256": "196e988c1ceacd8a7ca548b3ed9bc8496d1443681a975e4cc25e5e7518310e71",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/head_qualification_operator.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "hearing_replay",
+        "source_git_path": "lampOS/crates/voice/examples/hearing_replay.rs",
+        "source_relative": "crates/voice/examples/hearing_replay.rs",
+        "source_sha256": "1b1f0dbe57f662a6ee836f1e40c3746ab56411106725ae0290a2db54d63a042a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/hearing_replay.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "probe_handover",
+        "source_git_path": "lampOS/crates/voice/examples/probe_handover.rs",
+        "source_relative": "crates/voice/examples/probe_handover.rs",
+        "source_sha256": "2a804a16dea0eb9e8e462aa656b7421005454d5634a3c825948d94a4aebb455e",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/probe_handover.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "reference_pace",
+        "source_git_path": "lampOS/crates/voice/examples/reference_pace.rs",
+        "source_relative": "crates/voice/examples/reference_pace.rs",
+        "source_sha256": "dd7676a92e35df1eae61a8611f909a70f9145820227edb59cd417c4b25b3d601",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/reference_pace.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "render_line_second",
+        "source_git_path": "lampOS/crates/voice/examples/render_line_second.rs",
+        "source_relative": "crates/voice/examples/render_line_second.rs",
+        "source_sha256": "ac54479cab86d543c2bc14b4bc2a4c69a7f82bcb320392571a0d69cad0c026bb",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/render_line_second.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "ring_process_probe",
+        "source_git_path": "lampOS/crates/voice/examples/ring_process_probe.rs",
+        "source_relative": "crates/voice/examples/ring_process_probe.rs",
+        "source_sha256": "b1da3708261286f87ff6f976f61b3bda0b1e13a89a916838d0e4f83bfa27cf63",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/ring_process_probe.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "stop_words_stt_replay",
+        "source_git_path": "lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "source_relative": "crates/voice/examples/stop_words_stt_replay.rs",
+        "source_sha256": "79cd05bfc08e3cbd990e77bc6cd1ce597bfb57489dfe3c59d4c13046c4ef9844",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/examples/stop_words_stt_replay.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/voice/tests/it/main.rs",
+        "source_relative": "crates/voice/tests/it/main.rs",
+        "source_sha256": "f740e457cb8a087344c00e9135bb3dc064cd176e968ec32f052a57e7b041f56f",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/tests/it/main.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "release_pair",
+        "source_git_path": "lampOS/crates/voice/tests/release_pair.rs",
+        "source_relative": "crates/voice/tests/release_pair.rs",
+        "source_sha256": "40fdc2fe7bf92b7cee67bba5eb2c9c7aba45acfb82befb374c9f1f01952bcba9",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice/tests/release_pair.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/voice-eval/Cargo.toml",
+    "manifest_relative": "crates/voice-eval/Cargo.toml",
+    "manifest_sha256": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7",
+    "manifest_source_path": "lampOS/crates/voice-eval/Cargo.toml",
+    "name": "lamp-voice-eval",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice_eval",
+        "source_git_path": "lampOS/crates/voice-eval/src/lib.rs",
+        "source_relative": "crates/voice-eval/src/lib.rs",
+        "source_sha256": "750058165d44965d5b68b911057537f83d80036e5f74e5f5a74d1db81376b560",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice-eval/src/lib.rs"
+      },
+      {
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-voice-eval",
+        "source_git_path": "lampOS/crates/voice-eval/src/main.rs",
+        "source_relative": "crates/voice-eval/src/main.rs",
+        "source_sha256": "61b18db109fe9b1157bb1089e9037c9c05b6c576f659a0e4885f9ae8221c2eb1",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice-eval/src/main.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "same_voice_pairs",
+        "source_git_path": "lampOS/crates/voice-eval/examples/same_voice_pairs.rs",
+        "source_relative": "crates/voice-eval/examples/same_voice_pairs.rs",
+        "source_sha256": "8735328db65d8a1a153aa031605945f849e80fc1499a67491607daf1b662a860",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice-eval/examples/same_voice_pairs.rs"
+      },
+      {
+        "kind": [
+          "example"
+        ],
+        "name": "turn_end_replay",
+        "source_git_path": "lampOS/crates/voice-eval/examples/turn_end_replay.rs",
+        "source_relative": "crates/voice-eval/examples/turn_end_replay.rs",
+        "source_sha256": "b2630eee74c24a8c8ab4a41e008dace56334d45e79e7f356c6772c06e5748a0a",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice-eval/examples/turn_end_replay.rs"
+      },
+      {
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "source_git_path": "lampOS/crates/voice-eval/tests/it/main.rs",
+        "source_relative": "crates/voice-eval/tests/it/main.rs",
+        "source_sha256": "e6b90fc49f9a73ed9d62fd9e4a80d8a815874da8af5d20364949e44fe4decd95",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice-eval/tests/it/main.rs"
+      }
+    ],
+    "version": "0.1.0"
+  },
+  {
+    "clean_spec": "path+file:///src-fourth-common-distinct-frame/crates/voice-processes#lamp-voice-processes@0.1.0",
+    "manifest_path": "/src-fourth-common-distinct-frame/crates/voice-processes/Cargo.toml",
+    "manifest_relative": "crates/voice-processes/Cargo.toml",
+    "manifest_sha256": "300431dab9923809f63632cca6a107171c8df39a8e8e50efe6c93275d85761b3",
+    "manifest_source_path": "lampOS/crates/voice-processes/Cargo.toml",
+    "name": "lamp-voice-processes",
+    "package_id": "path+file:///src-fourth-common-distinct-frame/crates/voice-processes#lamp-voice-processes@0.1.0",
+    "source_kind": "validated_local_workspace",
+    "targets": [
+      {
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_voice_processes",
+        "source_git_path": "lampOS/crates/voice-processes/src/lib.rs",
+        "source_relative": "crates/voice-processes/src/lib.rs",
+        "source_sha256": "aad51f3dac5d4decfa49c05739007bc73da2778f43aa25cf528eb00d09b89e81",
+        "src_path": "/src-fourth-common-distinct-frame/crates/voice-processes/src/lib.rs"
+      }
+    ],
+    "version": "0.1.0"
+  }
+]

@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-records-cap-r3/crates/skills#lamp-skills@0.1.0` is ignored, cleaning all versions of `lamp-skills` found
+warning: url qualifier in `-p path+file:///src-fourth-records-cap-r3/crates/skills#lamp-skills@0.1.0` ignored, cleaning all versions of `lamp-skills` found
+     Removed 108 files, 201.3MiB total

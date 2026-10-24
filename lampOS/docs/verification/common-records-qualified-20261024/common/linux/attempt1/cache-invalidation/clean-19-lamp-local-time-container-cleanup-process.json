@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-distinct-frame-56cbd4b146f9-clean-19-lamp-local-time"
+  ],
+  "elapsed_seconds": 0.14862541399998008,
+  "exit": 0,
+  "pid": 14085,
+  "process_group": 14085,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

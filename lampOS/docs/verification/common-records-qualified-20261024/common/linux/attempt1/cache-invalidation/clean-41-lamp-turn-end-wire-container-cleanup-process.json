@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-distinct-frame-56cbd4b146f9-clean-41-lamp-turn-end-wire"
+  ],
+  "elapsed_seconds": 0.141412124999988,
+  "exit": 0,
+  "pid": 15191,
+  "process_group": 15191,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

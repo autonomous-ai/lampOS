@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-records-cap-r3-9b100a036049-clean-01-lamp-actions"
+  ],
+  "elapsed_seconds": 0.1532874130007258,
+  "exit": 0,
+  "pid": 51995,
+  "process_group": 51995,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

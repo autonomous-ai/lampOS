@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-records-cap-r3/crates/body#lamp-body@0.1.0` is ignored, cleaning all versions of `lamp-body` found
+warning: url qualifier in `-p path+file:///src-fourth-records-cap-r3/crates/body#lamp-body@0.1.0` ignored, cleaning all versions of `lamp-body` found
+     Removed 151 files, 98.9MiB total

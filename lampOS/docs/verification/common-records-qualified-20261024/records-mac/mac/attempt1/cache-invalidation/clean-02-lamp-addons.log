@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/addons#lamp-addons@0.1.0` is ignored, cleaning all versions of `lamp-addons` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/addons#lamp-addons@0.1.0` ignored, cleaning all versions of `lamp-addons` found
+     Removed 59 files, 13.9MiB total

@@ -1,0 +1,15 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "elapsed_seconds": 11.936720022000372,
+  "exit": 0,
+  "pid": 12624,
+  "process_group": 12624,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

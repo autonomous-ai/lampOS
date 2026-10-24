@@ -1,0 +1,49 @@
+{
+  "all_outside_owned_paths_exact_base": true,
+  "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "branch": "fourth/records-cap-controls-20261024",
+  "git_tree_and_index_reconstructed_from_freeze": {
+    "reconstructed_semantic_index_sha256": "e3775798d06de7dd966b216ec52bec09b1e2866afb82846ea6a9b2d23ced8097",
+    "reconstructed_tree": "198e6784abb22eb0377606388ccd76cdcc4e8d07",
+    "source_files": 10442
+  },
+  "outside_owned_path_count": 10440,
+  "owned_path_count": 2,
+  "owned_paths": {
+    "lampOS/crates/records/tests/support/release_pair/host.rs": {
+      "bytes": 27844,
+      "git_blob": "4fb673617ca967bbab2a631342401f31b91c91c7",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792842053265060137,
+      "sha256": "33fedeb4650bf4a0549277b81bd760a7d22a74065be368f96925ca12a8057f30"
+    },
+    "lampOS/docs/verification/records-release-pair-20261024/README.md": {
+      "bytes": 16415,
+      "git_blob": "0fd3326906a4ee3214eefb308e911b10ea5b6fb8",
+      "git_mode": "100644",
+      "kind": "file",
+      "mode": 420,
+      "mtime_ns": 1792842053265367069,
+      "sha256": "5c0423cdc2160f7d5a568141161b2af0bda231aa09b173ae8f67dbd62cfae045"
+    }
+  },
+  "prepared_helper_hashes": {
+    "cache.py": {
+      "bytes": 10654,
+      "published_code": false,
+      "sha256": "de6f8b4418b61605846aa230022754f045a557feb2eeae7cc3c1adb840e221e9"
+    },
+    "gate.py": {
+      "bytes": 32858,
+      "published_code": false,
+      "sha256": "1548d93d7f047d010a4cb83db44f8f5d6bafb42671076bff87aad0573fb8819a"
+    }
+  },
+  "raw_freeze_bytes": 3698489,
+  "raw_freeze_sha256": "87912289516f78a0089d316a3b68775f2303c4dce8b5823dcd241c7a8ccc4f0d",
+  "source_files": 10442,
+  "source_root": "/private/tmp/fourth-records-cap-controls-20261024",
+  "tree": "198e6784abb22eb0377606388ccd76cdcc4e8d07"
+}

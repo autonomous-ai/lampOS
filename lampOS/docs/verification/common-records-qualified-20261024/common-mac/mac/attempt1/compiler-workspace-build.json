@@ -1,0 +1,3997 @@
+{
+  "compiler_log_sha256": "8e4c73dfc991aa01eca6b0ab188e06f3036a57fc929402cce79c8d862707880b",
+  "external_artifact_messages_ignored": 342,
+  "fresh_compilation_evidence": "Cargo compiler-artifact fresh:false, excluding custom-build targets, with exact validated Package ID/manifest/target/source binding",
+  "observed_output_files": [
+    {
+      "bytes": 5392720,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_bus.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_bus.rlib",
+      "sha256": "f96811b3f9495122d7a7039545b785ad299514bce4cecb44dbffa356bdd2e76a"
+    },
+    {
+      "bytes": 562678,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_bus-9c7cec355077c3b8.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_bus-9c7cec355077c3b8.rmeta",
+      "sha256": "416c27efaf844d2d013b3b26401568082af191b85424ba0c11a4f9dcb6b34f4a"
+    },
+    {
+      "bytes": 13839536,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_msgs.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_msgs.rlib",
+      "sha256": "09085fe0448306e821d31c0a59f0a1f70d60c685b4af8f079f6a27c97364cb45"
+    },
+    {
+      "bytes": 6176165,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_msgs-9598e8e5fa9955a2.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_msgs-9598e8e5fa9955a2.rmeta",
+      "sha256": "585d221a95f3547c92401733f27edb1d4c32c8b88e24aa6c1d01bd1ed87e3c41"
+    },
+    {
+      "bytes": 917952,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ipc.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ipc.rlib",
+      "sha256": "dbfd39776d7fad49982082e94a42431abd62b9dde3f9739e1a6afdb029bf697e"
+    },
+    {
+      "bytes": 73743,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ipc-baf9bc3d80c50028.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ipc-baf9bc3d80c50028.rmeta",
+      "sha256": "38876396fcd1642fb1fecdb9e66efeff0afd6a3a6126b93d5239a8417e6a5266"
+    },
+    {
+      "bytes": 657120,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_local_time.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_local_time.rlib",
+      "sha256": "28457e25f35eef7984a6c15215bb9ff60693c506554bd235c037260c45440161"
+    },
+    {
+      "bytes": 37365,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_local_time-4fdef9b558006fab.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_local_time-4fdef9b558006fab.rmeta",
+      "sha256": "967c9592a08d050ac11df7bfe995446376828e7d8c9312bd4b0044fa7fe4fa89"
+    },
+    {
+      "bytes": 798888,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_owner.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_owner.rlib",
+      "sha256": "024a9d5d4e3e423421bf262317041f5762fc51eb6d3527266d2e046c84fe9425"
+    },
+    {
+      "bytes": 514344,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_owner-10ea992f66d041a7.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_owner-10ea992f66d041a7.rmeta",
+      "sha256": "87bbe4031e54e251d06dfd5a938c4bb88b1881f4a56b6800a389c67cd4a7db50"
+    },
+    {
+      "bytes": 31814072,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_update.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_update.rlib",
+      "sha256": "3d4955df92ffe1c31b804007ab76c81d88b6d26b1a4081bde043f93d1d2d4dcb"
+    },
+    {
+      "bytes": 2443097,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_update-cc859c76a6b99081.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_update-cc859c76a6b99081.rmeta",
+      "sha256": "4cd075ff8d180c9a1502b2cc6b0c7f5354630c57bae8975949591a2dfda76089"
+    },
+    {
+      "bytes": 2759976,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_keeper.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_keeper.rlib",
+      "sha256": "4d04aa3cfe6350c4eda475c7f2afed6a4e5a727cf8814a8f6938dc181741aec1"
+    },
+    {
+      "bytes": 229250,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_keeper-0b521bea6530da26.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_keeper-0b521bea6530da26.rmeta",
+      "sha256": "14f583241ea470e08f60d98900d3cc52a881d252682b7a374a9cd2458cb87b4c"
+    },
+    {
+      "bytes": 1541128,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_lean.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_lean.rlib",
+      "sha256": "9e664663daea53f27b2d65bfaac7ec95c51faee8979a80107f54040487a8d423"
+    },
+    {
+      "bytes": 293475,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_lean-dc5a342d33cebb19.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_lean-dc5a342d33cebb19.rmeta",
+      "sha256": "c107d32ae60b43cfbf5a4afd1343c346542b162b56d21baf28e455fbc1bb34ec"
+    },
+    {
+      "bytes": 10574264,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_body.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_body.rlib",
+      "sha256": "1e3bd90477a1d1e88eae6d92fe5fc46d40d597a3f4f6e47ba41e9b187c170f0a"
+    },
+    {
+      "bytes": 3342310,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_body-ad15f9c528df222c.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_body-ad15f9c528df222c.rmeta",
+      "sha256": "2519f4b333d7a75f735e472b34a6036dd1d941cb3058581e372b8a1bee21f364"
+    },
+    {
+      "bytes": 593872,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/build/lamp-camera-e659e2d16e3fae9b/build-script-build",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/build/lamp-camera-e659e2d16e3fae9b/build-script-build",
+      "sha256": "9c3b08a8c128e8c0b7ca597c1b3f1c25fe6aa216f893e878a9e84debe650943f"
+    },
+    {
+      "bytes": 1362168,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_end_wire.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_end_wire.rlib",
+      "sha256": "9627dbd2de7723d956b086ee0f8e25f3ad571820c3956e77555b6573b0450911"
+    },
+    {
+      "bytes": 188958,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_end_wire-8811b127b5c08a99.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_end_wire-8811b127b5c08a99.rmeta",
+      "sha256": "91b793e8667f9114fca4c592c49652c328859a38e229a4cf3f451e033344273f"
+    },
+    {
+      "bytes": 92808,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice_processes.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice_processes.rlib",
+      "sha256": "dfdd79fb094d497a95b98091da2c13b2aff37f3f4151b67eb6f57bf9f1ebeeb4"
+    },
+    {
+      "bytes": 33477,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice_processes-5f4a229bc11e36ab.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice_processes-5f4a229bc11e36ab.rmeta",
+      "sha256": "f6b6c01bf5f335eca2c0affa8ca99f0d2777032c79cdf8494719f865043ae2d2"
+    },
+    {
+      "bytes": 2629864,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_camera.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_camera.rlib",
+      "sha256": "9cf9f8bdf0380cbae2018ce2e5799900f20d5cd441e3c7d5090d4580456f0157"
+    },
+    {
+      "bytes": 994278,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_camera-7133d088d77b7ad8.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_camera-7133d088d77b7ad8.rmeta",
+      "sha256": "ebcadea1ab5c6e58f5503216e798d2c4d059f20fda724605b0550e33f115140b"
+    },
+    {
+      "bytes": 11849512,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_schedule.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_schedule.rlib",
+      "sha256": "5add1627b886b47e234b67b2a153250298ae6584a316fcad1547514e26d6082b"
+    },
+    {
+      "bytes": 2847831,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_schedule-a3a22c9af0fa4864.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_schedule-a3a22c9af0fa4864.rmeta",
+      "sha256": "0bc54b325170a7d6c8028325695f71a8cf3367a68de7ec3709b17f357d2970bc"
+    },
+    {
+      "bytes": 14793816,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_gemini.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_gemini.rlib",
+      "sha256": "6c16e7aa5643a1fa20b3c8c33d3ac1396470b455b546bbc6a164af5e594bf111"
+    },
+    {
+      "bytes": 1786746,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_gemini-bec8d74052ed3bb1.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_gemini-bec8d74052ed3bb1.rmeta",
+      "sha256": "64ff14c57563eebd6b0d1bfad1bbd55c6890ce9319f8fb1310941da0cac66fa4"
+    },
+    {
+      "bytes": 437800,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ring.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ring.rlib",
+      "sha256": "0d96d3cadbe60b97fa4c86a8da17624540b204480d25180e69e797f7b31cb436"
+    },
+    {
+      "bytes": 207015,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ring-b280d09c9a944b6b.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ring-b280d09c9a944b6b.rmeta",
+      "sha256": "74a6c2642fe8bcf6e2b72cdecd03431ccfd789dc964015b10dcffbe8d8bf03b6"
+    },
+    {
+      "bytes": 11749504,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_audio.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_audio.rlib",
+      "sha256": "e48c65d1b1e775d164fb2b9f24318273a565d73e66f72a64ffbb8654fd923df7"
+    },
+    {
+      "bytes": 1885074,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_audio-56b70536d2a096e9.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_audio-56b70536d2a096e9.rmeta",
+      "sha256": "ccb480d260a34c7534a6a92cb628735419dbc355878e8b7645fc1beff9250aad"
+    },
+    {
+      "bytes": 12624184,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_controls.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_controls.rlib",
+      "sha256": "028160f538fdecab0ec358c9cd7a8f359f474f6ce60cd3db6ffa019d4144f17b"
+    },
+    {
+      "bytes": 2705910,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_controls-ea929326e1c932ae.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_controls-ea929326e1c932ae.rmeta",
+      "sha256": "b1978ded284ad9ec7bc9491080c2c68bceac1fec3ebc7ce4f51d66e68b089fb4"
+    },
+    {
+      "bytes": 7873952,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_health.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_health.rlib",
+      "sha256": "4320718c10ce8612f0373f6bcd008c644ef5ed116e5d5225367b7bdf7637d22f"
+    },
+    {
+      "bytes": 335543,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_health-ba5655823eebb866.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_health-ba5655823eebb866.rmeta",
+      "sha256": "8e482e9b5c17e7b2846e83a88abd611518024bf18bf4b871868f6c85a8552970"
+    },
+    {
+      "bytes": 724592,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_near_call.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_near_call.rlib",
+      "sha256": "96daa0ac1d4fbdbc607477971edf7550998368069afcfb1980c1eaed7817ac27"
+    },
+    {
+      "bytes": 97585,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_near_call-118727f50d0e6f44.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_near_call-118727f50d0e6f44.rmeta",
+      "sha256": "144e529577031b9d67e08be5eca1fce4552b8426663c472a95e3e3f605e3bc5f"
+    },
+    {
+      "bytes": 195867936,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice.rlib",
+      "sha256": "588e4af82b43388b3852c742d977fdcb45d8076b6327282cafd5a632ae4580dd"
+    },
+    {
+      "bytes": 22803185,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice-79b994d23a850c94.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice-79b994d23a850c94.rmeta",
+      "sha256": "27fec3ba0f107939660b2e4b4b137429ec77a0076d942f767e5b4a2ac69b8d98"
+    },
+    {
+      "bytes": 17283304,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_expression.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_expression.rlib",
+      "sha256": "92d133fa6e43618343f790220f1fcdde4dee3f232c3c5ef1606b6852c8dc5aa6"
+    },
+    {
+      "bytes": 1998560,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_expression-6d012759a0a33c41.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_expression-6d012759a0a33c41.rmeta",
+      "sha256": "722b366a77349aa873115041175f619cf253aa9b1171f7cc46744ec943eaed37"
+    },
+    {
+      "bytes": 14195136,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_memory.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_memory.rlib",
+      "sha256": "e4e5f2f789f2395697117abbe095f4672b8c2de9b289d36ce299385022c0f8b1"
+    },
+    {
+      "bytes": 1598680,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_memory-0b198cdc447b5a58.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_memory-0b198cdc447b5a58.rmeta",
+      "sha256": "a79d366c79e047643063a4f0b0d29db95b82d8540156e043a59304c1f9c136ee"
+    },
+    {
+      "bytes": 6292816,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_end.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_end.rlib",
+      "sha256": "5f2b4b2f95463a805dd9ae5cff9c98edc9117b0997a3f5857e5deb48480052d4"
+    },
+    {
+      "bytes": 150568,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_end-efa1bc391a136b8a.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_end-efa1bc391a136b8a.rmeta",
+      "sha256": "d3422b8649d2debef6109fcb86a7bf829fb3c778f66af252cb33a7d9ae05badc"
+    },
+    {
+      "bytes": 26428360,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_policy.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_policy.rlib",
+      "sha256": "8664bddf83fdf5454b77efdf77619b88bdf54db84a3e49a9ac619ec0387ef2e9"
+    },
+    {
+      "bytes": 2385896,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_policy-ddb307de7b72feba.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_policy-ddb307de7b72feba.rmeta",
+      "sha256": "4ca20e994497e57a107373bc72e37de24e00e2a3b3105f920edc48772010a3bf"
+    },
+    {
+      "bytes": 8245912,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_records.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_records.rlib",
+      "sha256": "001cea3b9479b30af58a19350c012375c4c93f8945a32f81915801f0a8078e65"
+    },
+    {
+      "bytes": 873462,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_records-7f034273e7437b22.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_records-7f034273e7437b22.rmeta",
+      "sha256": "3c739fca8382d233a150e64c4efa488a43319d4d0aa25e42ed876fc073610730"
+    },
+    {
+      "bytes": 5608184,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_observer.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_observer.rlib",
+      "sha256": "476950f35e3da69fc1fcf9793230e7c202b73a8285c6ce21d5b748f62560c3ad"
+    },
+    {
+      "bytes": 378143,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_observer-0fd8605b28e57cfd.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_observer-0fd8605b28e57cfd.rmeta",
+      "sha256": "b10a9af0b51236dcaee34e0b7c3b6b5c500ba22d25a4786f446d327d094f5596"
+    },
+    {
+      "bytes": 35723240,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_skills.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_skills.rlib",
+      "sha256": "78c90918dec928be454d796965fed6201e1628dd8c081fb549b63243287c0ded"
+    },
+    {
+      "bytes": 3222459,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_skills-1914464247f30e36.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_skills-1914464247f30e36.rmeta",
+      "sha256": "f86cabeddec5f1e0393a8d14505d9cdefe70d389292f4ee1a16ec346d3ba0724"
+    },
+    {
+      "bytes": 4528600,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_actions.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_actions.rlib",
+      "sha256": "be4c2640425ec838a10487630bc6f6d16c1d774d406d539cfdf51f4914154b54"
+    },
+    {
+      "bytes": 952681,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_actions-100d8c6ce6879110.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_actions-100d8c6ce6879110.rmeta",
+      "sha256": "365fd3018a2c42840b9420cd5a79faa8f8d146ce4f0dbb0cb507f00a85741318"
+    },
+    {
+      "bytes": 4278704,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_sound_fixtures.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_sound_fixtures.rlib",
+      "sha256": "ce871fe80268cfc32b1b72ebaf6307ae20e2e32709ee8ebee203df1bfd4e8b71"
+    },
+    {
+      "bytes": 495895,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_sound_fixtures-536fcb6a2214d88a.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_sound_fixtures-536fcb6a2214d88a.rmeta",
+      "sha256": "5166ccc10623ef3370263c45d7f876e97559bf8d57a58e11169838df48cd90b8"
+    },
+    {
+      "bytes": 703608,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_air.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_air.rlib",
+      "sha256": "2d752407c70cf07feb2f147a0fe8f3ff428577e1b99c22840672362c26ecb72e"
+    },
+    {
+      "bytes": 69874,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_air-04e9aca14bd3727b.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_air-04e9aca14bd3727b.rmeta",
+      "sha256": "693023d173b4ff3d303ff0c1c476a386962c9667d857f159989ad49c2e42a2a5"
+    },
+    {
+      "bytes": 15861208,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_eyes.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_eyes.rlib",
+      "sha256": "5b83c1612bac990c0f26be5de708e3e2754851e5db7791f273746511a0f4ad65"
+    },
+    {
+      "bytes": 1762138,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_eyes-7a8d6a4f2f357478.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_eyes-7a8d6a4f2f357478.rmeta",
+      "sha256": "241bcab215d0d1b9bec00db4835cadd5afc70065d8d9d496b0df90dbc3d862a3"
+    },
+    {
+      "bytes": 23083648,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_tasks.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_tasks.rlib",
+      "sha256": "3ddc7e06df69289bff663593881a6ef118082e336cb82f7546ca6c6a7a31ae56"
+    },
+    {
+      "bytes": 2800588,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_tasks-b0af808da18cb93b.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_tasks-b0af808da18cb93b.rmeta",
+      "sha256": "59995926e17451bffcaaab4d493a252bf29573af22c38d65e41b3fa5daf39341"
+    },
+    {
+      "bytes": 33189184,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_surround.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_surround.rlib",
+      "sha256": "e19f915f920b6c3015ebaaf255bae1c9132f2583198e39efaf58840ed8d7d388"
+    },
+    {
+      "bytes": 5635485,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_surround-a512dc2efcbff3a7.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_surround-a512dc2efcbff3a7.rmeta",
+      "sha256": "7df92b88784f21537be8575ffb0ddc5b3a99b5c0c8d54fd5238239c7fed1dd42"
+    },
+    {
+      "bytes": 13865008,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_cloud.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_cloud.rlib",
+      "sha256": "4d2c6311c0b227c6a10d6651304fcf1eb0fd4ded9f7fc006e428c009f2f0d66f"
+    },
+    {
+      "bytes": 1470034,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_cloud-ef63ae6698c6e037.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_cloud-ef63ae6698c6e037.rmeta",
+      "sha256": "b280268caf8cdad740a23bc786c945050005ce2646ed1d59d013120df094ea7a"
+    },
+    {
+      "bytes": 8218400,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_selftest.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_selftest.rlib",
+      "sha256": "ebe0c8aa67d65775de8e22a585ec85167027034b6517808a8cccbfe85fbf8c96"
+    },
+    {
+      "bytes": 422348,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_selftest-4cb349f88e31102e.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_selftest-4cb349f88e31102e.rmeta",
+      "sha256": "6419b0ae3eb16a3f413de340bdbe09769c579e3ca2da88ef29f40d5545ecfeec"
+    },
+    {
+      "bytes": 48571712,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice_eval.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice_eval.rlib",
+      "sha256": "929f0069e9dcc51e064f61a848ef3f7016e7bb8944e54598c6b9c82024a3525a"
+    },
+    {
+      "bytes": 6568129,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice_eval-396636b566bd6ed7.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice_eval-396636b566bd6ed7.rmeta",
+      "sha256": "d4717409fa9ea13bb6ca53b474b9b84c44baf5e572bde3c1c1d09438f2801c4c"
+    },
+    {
+      "bytes": 3678408,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_settings.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_settings.rlib",
+      "sha256": "d7387becf5bb26304d53fd192f08e9e5d2d9de4e814579f3d60d964cd6d8d69b"
+    },
+    {
+      "bytes": 721014,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_settings-f473b0fc79d312c0.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_settings-f473b0fc79d312c0.rmeta",
+      "sha256": "42c09a59a7ca273fee9f4490df05f516d263dc14b314ba4a9d27291a58f2e24b"
+    },
+    {
+      "bytes": 11021448,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_peek.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_peek.rlib",
+      "sha256": "0241511628597950046ee1f1fc64ec5c959db398c4e8e5d888dacc2841fb99c4"
+    },
+    {
+      "bytes": 364255,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_peek-6b3c4976c8386378.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_peek-6b3c4976c8386378.rmeta",
+      "sha256": "67e00a870d9536783ecf12a3092f200317555a543cd8b8b74c108ac2c0b4d45f"
+    },
+    {
+      "bytes": 12695992,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_setup.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_setup.rlib",
+      "sha256": "e903f267ce51d2b1460f71c0466bfa9935525cc0f671b8b612d9613524b0af3c"
+    },
+    {
+      "bytes": 1198453,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_setup-19363c432658b21a.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_setup-19363c432658b21a.rmeta",
+      "sha256": "1cfc6400b494fe5a704eb99d08b0c0d212027833b8be1c8eacb6c67db6c4c89f"
+    },
+    {
+      "bytes": 1685152,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_same_voice.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_same_voice.rlib",
+      "sha256": "aa71147f1fce502b262278352944e3b70f856c3646628b675906c7bb65b0e5a5"
+    },
+    {
+      "bytes": 63736,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_same_voice-ebcf99b2caed8488.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_same_voice-ebcf99b2caed8488.rmeta",
+      "sha256": "373609d2bbb254c43e557b86e05e392da73a75d6b72ee0c74185c0790d0f692d"
+    },
+    {
+      "bytes": 2665760,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ears.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ears.rlib",
+      "sha256": "6718d55dd13d51b752e57e7a2f13cb3657d9f03706633f8dd3f50bf156de7367"
+    },
+    {
+      "bytes": 223655,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ears-1518790ddb1566da.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ears-1518790ddb1566da.rmeta",
+      "sha256": "43014cb6c4f2da0ad74f15689bcab44399c8df21d2f63377496494b16b8d02a0"
+    },
+    {
+      "bytes": 3143424,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_name.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_name.rlib",
+      "sha256": "3511cdf914594dc012400e07945cd7559272c9cec7c2d1e37910838e97c97832"
+    },
+    {
+      "bytes": 143341,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_name-9d75fef5a93b704d.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_name-9d75fef5a93b704d.rmeta",
+      "sha256": "52147c90a74887b50b4268afb2732f76bfe8c77171daca77b39160bce1bd467a"
+    },
+    {
+      "bytes": 8579952,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_station.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_station.rlib",
+      "sha256": "63c0d7c37d36aca6ead4083388100ba962a00cf05a6e389ebee996b387567bfb"
+    },
+    {
+      "bytes": 1154070,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_station-f092543ca8a7b6fe.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_station-f092543ca8a7b6fe.rmeta",
+      "sha256": "09b6632b05db874853ffa968754497a101289abcbdf6b541d24c72a03bf485d3"
+    },
+    {
+      "bytes": 2847520,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_addons.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_addons.rlib",
+      "sha256": "ffc53bfce576964342f47c6f9d2d819a7bdd87c07f7125d4ffa82fef4e0deb45"
+    },
+    {
+      "bytes": 171272,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_addons-ed38f5c95658041d.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_addons-ed38f5c95658041d.rmeta",
+      "sha256": "af50d373af9e881425535f0926b8422c1dcee48a50e9888bcd1e3d0ef16b091a"
+    },
+    {
+      "bytes": 6286776,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_mood.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_mood.rlib",
+      "sha256": "b5ea1e89f53df7c02d06ca4c7536749710abe17439eda4a4e93c3082c84d5181"
+    },
+    {
+      "bytes": 678914,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_mood-a7766847e0962d6c.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_mood-a7766847e0962d6c.rmeta",
+      "sha256": "7d9490bd39e88226810d618e4050bcb63364c9b2aa88968700c3817f9be26d3e"
+    },
+    {
+      "bytes": 4569576,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-mood",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-mood",
+      "sha256": "d5366d0ceab57b21d649a6b19b10b6bc1acce5fbd5fa43f2436fa5947007489b"
+    },
+    {
+      "bytes": 2794304,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-addons",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-addons",
+      "sha256": "9aad471b54df5e95fa6835c4c5fba236a5dee7b64198b9d23488efcc8d79d429"
+    },
+    {
+      "bytes": 4967352,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-station",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-station",
+      "sha256": "048fcb107cc413c0a3b15a601b41a4b7676a271db6170386c0987053b063f959"
+    },
+    {
+      "bytes": 91175408,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-name",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-name",
+      "sha256": "a9f10bc406c4851e54eb4718ff13a739c01e145cec73663720b2232f2b6a4bfe"
+    },
+    {
+      "bytes": 74588152,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ears",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ears",
+      "sha256": "300342f0416fb4f103a0730ce9dc2c3838d862ba0f908c385fa8632cc4f23905"
+    },
+    {
+      "bytes": 89572816,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-same-voice",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-same-voice",
+      "sha256": "c7d75b37f2a087a7d2e892f23ba09789f5743e01699a7a5816dfd5b702051c6a"
+    },
+    {
+      "bytes": 20078096,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-setup",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-setup",
+      "sha256": "d5ca35966be5d8eb7fd38969138307ecb2fd563d60854ce909caf75c6a179979"
+    },
+    {
+      "bytes": 8054008,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-peek",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-peek",
+      "sha256": "60ae2cb1e4907366fc403525edfc7904edca8ebef1d0306e3dec9ac5ba11b517"
+    },
+    {
+      "bytes": 3756544,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-settings",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-settings",
+      "sha256": "f78b2bc700e521cd15f52edae0bab2c20c31c09fa3b71b2d1fc74f0b67e00978"
+    },
+    {
+      "bytes": 36275616,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice-eval",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice-eval",
+      "sha256": "a0805ad2bdabfe3d6193766a2c332ab68f106283d3799eee7f9ca24832fde8d2"
+    },
+    {
+      "bytes": 3938408,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-selftest",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-selftest",
+      "sha256": "b63ce43922e3dc03dc7e3ab9fd6948125f48c3aa4e2ea9d580f211d0b01304dc"
+    },
+    {
+      "bytes": 29452184,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-cloud",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-cloud",
+      "sha256": "21c297198daf0828f2033b41ce23429daddba971adbc1c92d50f4605718719b6"
+    },
+    {
+      "bytes": 35483760,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-surround",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-surround",
+      "sha256": "6007c63ae540dd1c73beae0737d90716de30af375a581667c6a65f7bac61b39e"
+    },
+    {
+      "bytes": 1363896,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks-harness-fixture",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks-harness-fixture",
+      "sha256": "48496d62d0d8f0dd19013a1ae1b056330bd2124c9370d3791581b463702e8cbd"
+    },
+    {
+      "bytes": 10111512,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks",
+      "sha256": "29b781247e15ed07eb21a94a4de051672b1d29c866d43fb2a8475f21848912b5"
+    },
+    {
+      "bytes": 74851072,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-seems-measure",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-seems-measure",
+      "sha256": "db4339c6cba5ae2a93d00ff5265e3b43fda4ad7a0d267ba8515caec005d151c3"
+    },
+    {
+      "bytes": 74913408,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-eyes",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-eyes",
+      "sha256": "5339bd575c555b8fd588db36f23bdafe670a0dacbca9dff1272618d5d572cebd"
+    },
+    {
+      "bytes": 804952,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-air",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-air",
+      "sha256": "40787e2ed4958d0b67ce91b0aafdac08307ae62c792b5c02c21577fc5e250c99"
+    },
+    {
+      "bytes": 2368088,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-sound-fixtures",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-sound-fixtures",
+      "sha256": "decf97edcffcfa52dcd3ec3e08c6ccf8768766fb4d24e2230fecda91a478c68d"
+    },
+    {
+      "bytes": 7709752,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-actions",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-actions",
+      "sha256": "085387a47bc8aed707e96fd4246989df0fc674811192803bb2bbcaceec7e29f2"
+    },
+    {
+      "bytes": 24762376,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-skills",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-skills",
+      "sha256": "5eed8b445450856e6269b0a3db2fa7950a08a4f10eae20ca0b39347005570d84"
+    },
+    {
+      "bytes": 3867800,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-observer",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-observer",
+      "sha256": "a233304969f13000073f36d1065a1b53585d0c06ac51bf61e4aae04624f52dee"
+    },
+    {
+      "bytes": 3530160,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records",
+      "sha256": "469613af49594d62ce7b719cadbbf2e36b2df575d7ac4e9db843b82efaa7070f"
+    },
+    {
+      "bytes": 3633024,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records-fixture",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records-fixture",
+      "sha256": "7b6c97b80514dfc44facf8700555f807a540119c0d1517c536432ff184cf5467"
+    },
+    {
+      "bytes": 8026216,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-replay",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-replay",
+      "sha256": "845d89330d19c587f607b7f9dbab9451da18be0dc41e4550ee8850a55f6a7e79"
+    },
+    {
+      "bytes": 11913000,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-judges",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-judges",
+      "sha256": "d603b8edc19526e8b39a0a25f46747e4017a246e5698578a36a0c9bdf6aa42f0"
+    },
+    {
+      "bytes": 2372600,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-fit",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-fit",
+      "sha256": "03cc778951d657dd0ec3dc3d6ae174c0f06b0a370df2cbb6750f9f5a57a526da"
+    },
+    {
+      "bytes": 13527680,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy",
+      "sha256": "de6b361c3192cf32fcec47af69e5e4ac2f5b96c573eb75380c26b76652a1ffd3"
+    },
+    {
+      "bytes": 91869272,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-turn-end",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-turn-end",
+      "sha256": "22db6102ee178130f910c9beda023195c61049583f956464f61aa75f0af64256"
+    },
+    {
+      "bytes": 4913624,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-eval",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-eval",
+      "sha256": "e644738af7b2090abcad0e15790c1e5399cad8a9902ba0d42efb3f5693b0536b"
+    },
+    {
+      "bytes": 9083840,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory",
+      "sha256": "d0132f842d7e8edb32eba171db1aa536be9ccfaaa95f53891c3e3dec76ac1b06"
+    },
+    {
+      "bytes": 9414544,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-fixture",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-fixture",
+      "sha256": "3fff02e62ce14ac0799636601839ac50c62058fc7811c0208413ad657bfc5202"
+    },
+    {
+      "bytes": 10467048,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-expression",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-expression",
+      "sha256": "c23e501f464a26feffefa97f5aefea7fb670d34ebf430d51375d823712b23a21"
+    },
+    {
+      "bytes": 52464216,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice",
+      "sha256": "30a3f55355af8135577c32cdd8c31cbb9779bb87dcd2ad4704ad8a8cb78e1fe7"
+    },
+    {
+      "bytes": 3561656,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-health",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-health",
+      "sha256": "37e8b1bb4e6fddbfb71ae3402c34f95e533bab0ee20a154400437c2759f87880"
+    },
+    {
+      "bytes": 6157864,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-controls",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-controls",
+      "sha256": "f5699d98b080a912afccbf1d45b6ef88d25d3960592de239a38fd0e9cc121485"
+    },
+    {
+      "bytes": 5880272,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-audio",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-audio",
+      "sha256": "27a0d7eee68efd08ce99ac8b581623830e1084427a2eafa0d9c3d8844197433c"
+    },
+    {
+      "bytes": 8339456,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-schedule",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-schedule",
+      "sha256": "1ef712f79e77e8fe1c8ec8a8d32f103a9e98a4bc4f1728b6af10e54266c02e43"
+    },
+    {
+      "bytes": 523040,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-mood",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-mood",
+      "sha256": "dd747c98cec8b7e81d733e92a96bb1f87943226b890c6ebf56f58f98f8ee405a"
+    },
+    {
+      "bytes": 717952,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-worker",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-worker",
+      "sha256": "82123d9ac37022e6bfa28b38f201e1ae0a920736adbd317170fd5931740ccc00"
+    },
+    {
+      "bytes": 1067816,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body",
+      "sha256": "7225da7ec0f8422f6a7e5b688f1896d329c630525e31401eb46850f5c96a2d64"
+    },
+    {
+      "bytes": 903480,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-measure",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-measure",
+      "sha256": "b6894522231771a9fb6afd976764f89f1ad415c07ab618ba926e4a580856ab2a"
+    },
+    {
+      "bytes": 661248,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-inspect",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-inspect",
+      "sha256": "a3d6cdf534a53ceac1887262c9cdfc13b45b724c927c7031876cbf8e99052b4c"
+    },
+    {
+      "bytes": 8300544,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-keeper",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-keeper",
+      "sha256": "efdca16c7b05d668d4f49e133aa18bbd162b7a956896f14dd28f54b09ba6e5b7"
+    },
+    {
+      "bytes": 13258720,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-update",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-update",
+      "sha256": "9ff53b42da8e17ead57dccb134d45868795c9cbbf3c9be5da95d667b59e56cb2"
+    },
+    {
+      "bytes": 428672,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_environment.rlib",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_environment.rlib",
+      "sha256": "cd5a0b96a0ea7297cf1f1b35c96c659e49183f8410419040af692afbac5a21e6"
+    },
+    {
+      "bytes": 168042,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_environment-79c29b00fdcede0e.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_environment-79c29b00fdcede0e.rmeta",
+      "sha256": "60256defc6b03b346f03dfa0d8fd9a2aaa7ce3f3924c388c0889ab4a55084657"
+    },
+    {
+      "bytes": 1099384,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ipc-probe",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ipc-probe",
+      "sha256": "c60d80984048a253b868fff444f9c5edce6922572a424e6bd298c088432a16ef"
+    },
+    {
+      "bytes": 2350896,
+      "exists_after_stage": true,
+      "host_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-bus",
+      "kind": "regular_file",
+      "reported_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-bus",
+      "sha256": "1338dc44bdb78f153f98c445435dcc51503744ab5c06ad581032a9a29e9e2832"
+    }
+  ],
+  "stage": "workspace-build",
+  "validated_package_plan_sha256": "f09a14106263ac67427e8cf27122185a1b016649dec98a13250838aa6c499074",
+  "workspace_artifacts": [
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_bus.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_bus-9c7cec355077c3b8.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/bus/Cargo.toml",
+      "manifest_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+      "manifest_source_path": "lampOS/crates/bus/Cargo.toml",
+      "name": "lamp-bus",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/bus#lamp-bus@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/bus/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/bus/src/lib.rs",
+      "source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_bus",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_msgs.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_msgs-9598e8e5fa9955a2.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/msgs/Cargo.toml",
+      "manifest_sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec",
+      "manifest_source_path": "lampOS/crates/msgs/Cargo.toml",
+      "name": "lamp-msgs",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/msgs/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/msgs/src/lib.rs",
+      "source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_msgs",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ipc.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ipc-baf9bc3d80c50028.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ipc/Cargo.toml",
+      "manifest_sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54",
+      "manifest_source_path": "lampOS/crates/ipc/Cargo.toml",
+      "name": "lamp-ipc",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/ipc/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ipc/src/lib.rs",
+      "source_sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_ipc",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_local_time.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_local_time-4fdef9b558006fab.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/local-time/Cargo.toml",
+      "manifest_sha256": "d58feea860df9b3d83ec2e5963a2e529cb963f143e4fc9074b44c619626d84ea",
+      "manifest_source_path": "lampOS/crates/local-time/Cargo.toml",
+      "name": "lamp-local-time",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/local-time/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/local-time/src/lib.rs",
+      "source_sha256": "24b51e48f1fa051bc201e9b3e75682ed5e4934d35dc9c13bf5ff2f61038787a5",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_local_time",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_owner.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_owner-10ea992f66d041a7.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-owner/Cargo.toml",
+      "manifest_sha256": "ec4874833178228f469757f2a652bb9f16408cd2bcdfa0552e75c94e216d76d4",
+      "manifest_source_path": "lampOS/crates/turn-owner/Cargo.toml",
+      "name": "lamp-turn-owner",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/turn-owner/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-owner/src/lib.rs",
+      "source_sha256": "5f375e273e59c81368b0874cffb188b45b8880b8484e0d56ed3c9d454780bb84",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_turn_owner",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_update.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_update-cc859c76a6b99081.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update/Cargo.toml",
+      "manifest_sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+      "manifest_source_path": "lampOS/crates/update/Cargo.toml",
+      "name": "lamp-update",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/update/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update/src/lib.rs",
+      "source_sha256": "d2abedede0921948295a1a00b673dd6c47669d87a275e0430c812eec3251c99a",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_update",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_keeper.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_keeper-0b521bea6530da26.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/keeper/Cargo.toml",
+      "manifest_sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44",
+      "manifest_source_path": "lampOS/crates/keeper/Cargo.toml",
+      "name": "lamp-keeper",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/keeper/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/keeper/src/lib.rs",
+      "source_sha256": "9c87316d1358df4d45c47f32a283eacef45b5331d99e7337d4ff80ad5d809888",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_keeper",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_lean.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_lean-dc5a342d33cebb19.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/lean/Cargo.toml",
+      "manifest_sha256": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6",
+      "manifest_source_path": "lampOS/crates/lean/Cargo.toml",
+      "name": "lamp-lean",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/lean#lamp-lean@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/lean/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/lean/src/lib.rs",
+      "source_sha256": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_lean",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_body.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_body-ad15f9c528df222c.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/Cargo.toml",
+      "manifest_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "manifest_source_path": "lampOS/crates/body/Cargo.toml",
+      "name": "lamp-body",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/body/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/src/lib.rs",
+      "source_sha256": "d3d2c30cc4c2684f542ecb469a9d8b5eee9f32c963d9e60caf64b54de78e9eb5",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_body",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": true,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/build/lamp-camera-e659e2d16e3fae9b/build-script-build"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/camera/Cargo.toml",
+      "manifest_sha256": "fc40d4ec1d0531c4dc7abde83bda7aee98b79d88dfe789db390002f472db43b1",
+      "manifest_source_path": "lampOS/crates/camera/Cargo.toml",
+      "name": "lamp-camera",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/camera#lamp-camera@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": false,
+      "source_git_path": "lampOS/crates/camera/build.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/camera/build.rs",
+      "source_sha256": "c59f2f7019d8223764515a0c759900904cc6068b6d82dc91b4deb24f7ea168a8",
+      "stage": "workspace-build",
+      "target_kind": [
+        "custom-build"
+      ],
+      "target_name": "build-script-build",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_end_wire.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_end_wire-8811b127b5c08a99.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end-wire/Cargo.toml",
+      "manifest_sha256": "cbe9801fc8288a139af537fac219710a2a8a4d74aa061057d3e7c9092e9eb6f2",
+      "manifest_source_path": "lampOS/crates/turn-end-wire/Cargo.toml",
+      "name": "lamp-turn-end-wire",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/turn-end-wire/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end-wire/src/lib.rs",
+      "source_sha256": "9a320a7f4fbde07363c4d6ecdb446e5db988359be9e50f1a02b575183067ad81",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_turn_end_wire",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice_processes.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice_processes-5f4a229bc11e36ab.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-processes/Cargo.toml",
+      "manifest_sha256": "300431dab9923809f63632cca6a107171c8df39a8e8e50efe6c93275d85761b3",
+      "manifest_source_path": "lampOS/crates/voice-processes/Cargo.toml",
+      "name": "lamp-voice-processes",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/voice-processes/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-processes/src/lib.rs",
+      "source_sha256": "aad51f3dac5d4decfa49c05739007bc73da2778f43aa25cf528eb00d09b89e81",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_voice_processes",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_camera.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_camera-7133d088d77b7ad8.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/camera/Cargo.toml",
+      "manifest_sha256": "fc40d4ec1d0531c4dc7abde83bda7aee98b79d88dfe789db390002f472db43b1",
+      "manifest_source_path": "lampOS/crates/camera/Cargo.toml",
+      "name": "lamp-camera",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/camera#lamp-camera@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/camera/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/camera/src/lib.rs",
+      "source_sha256": "b7ecc0a42137a663be28f8fa354f3f89cb184bb154cf617bb7ad7056a575e1a4",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_camera",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_schedule.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_schedule-a3a22c9af0fa4864.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/schedule/Cargo.toml",
+      "manifest_sha256": "b96f73df3f89b8c76c3278216bad8f5ecec36e69d3e14a13dbc0dbb0425ca73f",
+      "manifest_source_path": "lampOS/crates/schedule/Cargo.toml",
+      "name": "lamp-schedule",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/schedule#lamp-schedule@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/schedule/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/schedule/src/lib.rs",
+      "source_sha256": "fccb1e9ba835a2b0be00a8f7dab37d21aee1dc0dc35aa6f075bb98b702993cf2",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_schedule",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_gemini.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_gemini-bec8d74052ed3bb1.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/gemini/Cargo.toml",
+      "manifest_sha256": "9b2f7c250fc853d7736da0f2f8655e89755742b6b0fb3ff7562bbd0a54a0e9e0",
+      "manifest_source_path": "lampOS/crates/gemini/Cargo.toml",
+      "name": "lamp-gemini",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/gemini#lamp-gemini@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/gemini/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/gemini/src/lib.rs",
+      "source_sha256": "055d74a67aa3d865f67c5a82c6379d7b4faab6e99f798ff2de0df96323d614d0",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_gemini",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ring.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ring-b280d09c9a944b6b.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ring/Cargo.toml",
+      "manifest_sha256": "3e66786b7841a5d26c563f428e4705f9b09566b3af51df46e41bec02015c4e5d",
+      "manifest_source_path": "lampOS/crates/ring/Cargo.toml",
+      "name": "lamp-ring",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ring#lamp-ring@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/ring/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ring/src/lib.rs",
+      "source_sha256": "cc695499ce6a98bd3329b4ecf27632d9a2bdd5b0da31bbf1204adb9bc8daeefe",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_ring",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_audio.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_audio-56b70536d2a096e9.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/audio/Cargo.toml",
+      "manifest_sha256": "1217da4568c1f6b78abfed2dde059b1e6f0294cfe5bff8b8d637a8840ade331c",
+      "manifest_source_path": "lampOS/crates/audio/Cargo.toml",
+      "name": "lamp-audio",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/audio#lamp-audio@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/audio/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/audio/src/lib.rs",
+      "source_sha256": "219df5b434fdeefa7983626c3c6445d84bd9188b85c5131676a5c14686c843f3",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_audio",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_controls.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_controls-ea929326e1c932ae.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/controls/Cargo.toml",
+      "manifest_sha256": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+      "manifest_source_path": "lampOS/crates/controls/Cargo.toml",
+      "name": "lamp-controls",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/controls#lamp-controls@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/controls/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/controls/src/lib.rs",
+      "source_sha256": "64df86c174be57c337d8a697772b0db067dca8c0605e8cb4b168ee1ae9b286a8",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_controls",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_health.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_health-ba5655823eebb866.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/health/Cargo.toml",
+      "manifest_sha256": "2e3ce14aeacb0bfe189499392baed7356738e9252279ad502f32ddd84f42a19d",
+      "manifest_source_path": "lampOS/crates/health/Cargo.toml",
+      "name": "lamp-health",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/health#lamp-health@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/health/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/health/src/lib.rs",
+      "source_sha256": "6b293a33153539952d40271b63bdaa0a00807a1a4ad74bf673187b9c51744b61",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_health",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_near_call.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_near_call-118727f50d0e6f44.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/near-call/Cargo.toml",
+      "manifest_sha256": "3b375ca80370b7fb22c6b9a596b424d2cd9ecfa0f2324faeab9d898af9988816",
+      "manifest_source_path": "lampOS/crates/near-call/Cargo.toml",
+      "name": "lamp-near-call",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/near-call#lamp-near-call@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/near-call/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/near-call/src/lib.rs",
+      "source_sha256": "10b2507a2d5e010481ec15ac3d6feed78403ace37f104739fbc7b9104918b6c5",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_near_call",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice-79b994d23a850c94.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice/Cargo.toml",
+      "manifest_sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+      "manifest_source_path": "lampOS/crates/voice/Cargo.toml",
+      "name": "lamp-voice",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/voice/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice/src/lib.rs",
+      "source_sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_voice",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_expression.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_expression-6d012759a0a33c41.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/expression/Cargo.toml",
+      "manifest_sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+      "manifest_source_path": "lampOS/crates/expression/Cargo.toml",
+      "name": "lamp-expression",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/expression#lamp-expression@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/expression/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/expression/src/lib.rs",
+      "source_sha256": "863fbef6e93f0bceb5724f5f4d91a911589c2bf2e32c12a0872938a10988f614",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_expression",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_memory.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_memory-0b198cdc447b5a58.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/Cargo.toml",
+      "manifest_sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+      "manifest_source_path": "lampOS/crates/memory/Cargo.toml",
+      "name": "lamp-memory",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory#lamp-memory@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/memory/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/src/lib.rs",
+      "source_sha256": "5078be0ba597bae3aa7f4f03412287e0236ec0d7a3dae53b1eaebec4aaf8d6d4",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_memory",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_turn_end.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_turn_end-efa1bc391a136b8a.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end/Cargo.toml",
+      "manifest_sha256": "00baa6bc919c905199d1a3581e19195cd0b0292fc29d8bd6a77d1b80a5ee4153",
+      "manifest_source_path": "lampOS/crates/turn-end/Cargo.toml",
+      "name": "lamp-turn-end",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end#lamp-turn-end@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/turn-end/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end/src/lib.rs",
+      "source_sha256": "bbd5160c06bab053e034f87fbcef76106e9e511eaecfa203a9c600a5790fe1cf",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_turn_end",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_policy.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_policy-ddb307de7b72feba.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/Cargo.toml",
+      "manifest_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+      "manifest_source_path": "lampOS/crates/policy/Cargo.toml",
+      "name": "lamp-policy",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/policy/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/src/lib.rs",
+      "source_sha256": "7bb49b0580659000447b63d275fd1f30e15f0affeabb71c03f89a00f3ec61c9c",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_policy",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_records.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_records-7f034273e7437b22.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records/src/lib.rs",
+      "source_sha256": "a7c4a9fbf5e86fea89c2e8b1874e1d56ff0440b02af0b8aed8638411b26ee567",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_records",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_observer.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_observer-0fd8605b28e57cfd.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/observer/Cargo.toml",
+      "manifest_sha256": "5cd6a10993b4922534b8a9546a33444465eb5323e5a3c14a73f875027f21201b",
+      "manifest_source_path": "lampOS/crates/observer/Cargo.toml",
+      "name": "lamp-observer",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/observer#lamp-observer@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/observer/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/observer/src/lib.rs",
+      "source_sha256": "05dc6052fc10cfd166deae58adad42ed4c278ef26d2ab143b900f02e59a7b194",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_observer",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_skills.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_skills-1914464247f30e36.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/skills/Cargo.toml",
+      "manifest_sha256": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b",
+      "manifest_source_path": "lampOS/crates/skills/Cargo.toml",
+      "name": "lamp-skills",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/skills#lamp-skills@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/skills/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/skills/src/lib.rs",
+      "source_sha256": "796af9814ea9e5fd7eaa2f0482dc185fd530ea5889bd5a04aaf274cee9325b8a",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_skills",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_actions.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_actions-100d8c6ce6879110.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/actions/Cargo.toml",
+      "manifest_sha256": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+      "manifest_source_path": "lampOS/crates/actions/Cargo.toml",
+      "name": "lamp-actions",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/actions#lamp-actions@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/actions/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/actions/src/lib.rs",
+      "source_sha256": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_actions",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_sound_fixtures.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_sound_fixtures-536fcb6a2214d88a.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/sound-fixtures/Cargo.toml",
+      "manifest_sha256": "b790403fada9e341620a67350d6c09844ff2e243ec44c8b549ef7b1f461fd28f",
+      "manifest_source_path": "lampOS/crates/sound-fixtures/Cargo.toml",
+      "name": "lamp-sound-fixtures",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/sound-fixtures#lamp-sound-fixtures@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/sound-fixtures/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/sound-fixtures/src/lib.rs",
+      "source_sha256": "eff15fc8665050cdb2dc1b720bee6d6705e47325c8a3f462036c10c6d57d955b",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_sound_fixtures",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_air.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_air-04e9aca14bd3727b.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/air/Cargo.toml",
+      "manifest_sha256": "795020feb9e842ceddc67b334d5088850d7af3f185875d97932e433a4bcf48e8",
+      "manifest_source_path": "lampOS/crates/air/Cargo.toml",
+      "name": "lamp-air",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/air#lamp-air@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/air/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/air/src/lib.rs",
+      "source_sha256": "22296d365cdd798195565dfe2683d1fa4dc612ba052b25c430bb5c03fb5c95a1",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_air",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_eyes.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_eyes-7a8d6a4f2f357478.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes/Cargo.toml",
+      "manifest_sha256": "c515c877b91ac81438e15641a2004a064a17fb0410f452564ebebf6c6535c174",
+      "manifest_source_path": "lampOS/crates/eyes/Cargo.toml",
+      "name": "lamp-eyes",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes#lamp-eyes@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/eyes/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes/src/lib.rs",
+      "source_sha256": "cfbc105e7c8a045be90ca1e5572ca70436c589f067dca295d846ad41bfed7776",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_eyes",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_tasks.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_tasks-b0af808da18cb93b.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks/Cargo.toml",
+      "manifest_sha256": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9",
+      "manifest_source_path": "lampOS/crates/tasks/Cargo.toml",
+      "name": "lamp-tasks",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/tasks/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks/src/lib.rs",
+      "source_sha256": "f91b0c597b9eaf7327a0a2541c511c653eb3534e3825c3ea0047e2f54ceb1e02",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_tasks",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_surround.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_surround-a512dc2efcbff3a7.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/surround/Cargo.toml",
+      "manifest_sha256": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+      "manifest_source_path": "lampOS/crates/surround/Cargo.toml",
+      "name": "lamp-surround",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/surround#lamp-surround@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/surround/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/surround/src/lib.rs",
+      "source_sha256": "823b78549925e01520e13c4b0446168319e07f8ea7eb266b1d1d557687d35cd6",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_surround",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_cloud.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_cloud-ef63ae6698c6e037.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/cloud/Cargo.toml",
+      "manifest_sha256": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+      "manifest_source_path": "lampOS/crates/cloud/Cargo.toml",
+      "name": "lamp-cloud",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/cloud/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/cloud/src/lib.rs",
+      "source_sha256": "dd014c6c915adb59ec63b979dd038e1c7baca99ba2c466b0b9062f816f0644d8",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_cloud",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_selftest.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_selftest-4cb349f88e31102e.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/selftest/Cargo.toml",
+      "manifest_sha256": "ed7f0e2eaa35e588ba085dc8a4bbfba36ff6ed0c077cdcdc6181d0e7709f15e1",
+      "manifest_source_path": "lampOS/crates/selftest/Cargo.toml",
+      "name": "lamp-selftest",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/selftest#lamp-selftest@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/selftest/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/selftest/src/lib.rs",
+      "source_sha256": "e42ca3a9d197bee43b72bd6ed2436641df842826e2e15c2757805afedf5f429a",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_selftest",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_voice_eval.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_voice_eval-396636b566bd6ed7.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "manifest_sha256": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7",
+      "manifest_source_path": "lampOS/crates/voice-eval/Cargo.toml",
+      "name": "lamp-voice-eval",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/voice-eval/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-eval/src/lib.rs",
+      "source_sha256": "750058165d44965d5b68b911057537f83d80036e5f74e5f5a74d1db81376b560",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_voice_eval",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_settings.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_settings-f473b0fc79d312c0.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/settings/Cargo.toml",
+      "manifest_sha256": "2a81f720c4a925b4b353575e48a187e6d71af8dde3677f3cfda7e534fb71241f",
+      "manifest_source_path": "lampOS/crates/settings/Cargo.toml",
+      "name": "lamp-settings",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/settings#lamp-settings@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/settings/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/settings/src/lib.rs",
+      "source_sha256": "9cf5d6c7b1c41659b2c01c93a2b8733d08aac3d9ca0ecc84f8e55252c76718c0",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_settings",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_peek.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_peek-6b3c4976c8386378.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/peek/Cargo.toml",
+      "manifest_sha256": "6f5014cd4095e438afda490a0c5aa12492780f5265729b6d58ec8e3b5e47ae8b",
+      "manifest_source_path": "lampOS/crates/peek/Cargo.toml",
+      "name": "lamp-peek",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/peek#lamp-peek@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/peek/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/peek/src/lib.rs",
+      "source_sha256": "0c926aadf878060013a47d2f46f7cd15cc220262a85a83c09acbbb4f6886f3c1",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_peek",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_setup.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_setup-19363c432658b21a.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/setup/Cargo.toml",
+      "manifest_sha256": "586d2dffe23e80f94d8d75ab9f7a05e7b40e39bb9ae929eea379b5f188ddcd4e",
+      "manifest_source_path": "lampOS/crates/setup/Cargo.toml",
+      "name": "lamp-setup",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/setup#lamp-setup@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/setup/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/setup/src/lib.rs",
+      "source_sha256": "abf976ee5416277d90bad6e9aac99e49c721aa5c62ae952faefbf0006dd78a37",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_setup",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_same_voice.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_same_voice-ebcf99b2caed8488.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/same-voice/Cargo.toml",
+      "manifest_sha256": "156eaaf0b32f316690d229b66a2b4f02d9ee0790527205bdc3f72a3b17b142f3",
+      "manifest_source_path": "lampOS/crates/same-voice/Cargo.toml",
+      "name": "lamp-same-voice",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/same-voice/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/same-voice/src/lib.rs",
+      "source_sha256": "2b5ede0988398b3887e8ce0992de29dcca303138956b335968262b7fa5b1fbaa",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_same_voice",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_ears.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_ears-1518790ddb1566da.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ears/Cargo.toml",
+      "manifest_sha256": "15092825ec95e74d0a1fe0317f14b1f7aba793b87e1b1c50fcd5aeac9f319ce3",
+      "manifest_source_path": "lampOS/crates/ears/Cargo.toml",
+      "name": "lamp-ears",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ears#lamp-ears@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/ears/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ears/src/lib.rs",
+      "source_sha256": "02f0c7559411ce7a9ed58472e2a2ff4813a623199e1e6c78c3d10c8779038592",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_ears",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_name.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_name-9d75fef5a93b704d.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/name/Cargo.toml",
+      "manifest_sha256": "fbd95fe8ac4d9a80188f7de3e06b88ac5f192de56c8fc2db063a4255a9d25e7f",
+      "manifest_source_path": "lampOS/crates/name/Cargo.toml",
+      "name": "lamp-name",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/name#lamp-name@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/name/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/name/src/lib.rs",
+      "source_sha256": "c82ddffdf8b995fd8381a427d7c7b99ed01d30d16c88c9d57cbe513303edf329",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_name",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_station.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_station-f092543ca8a7b6fe.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/station/Cargo.toml",
+      "manifest_sha256": "636baa8ceca9e7cc87349170ffd3b9bbbace785b00ddf3421214522b82fc26a3",
+      "manifest_source_path": "lampOS/crates/station/Cargo.toml",
+      "name": "lamp-station",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/station#lamp-station@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/station/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/station/src/lib.rs",
+      "source_sha256": "116cbb184818298e405d0455148760dfbcb4bcccdb7791dfda82f7f884977741",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_station",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_addons.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_addons-ed38f5c95658041d.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/addons/Cargo.toml",
+      "manifest_sha256": "2313f6976e096857edc27ce74df34a88cab5cbec28576186143ed515232640bd",
+      "manifest_source_path": "lampOS/crates/addons/Cargo.toml",
+      "name": "lamp-addons",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/addons#lamp-addons@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/addons/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/addons/src/lib.rs",
+      "source_sha256": "b54552e21523c88db4b4e84882faff88bcfff4395eedd37a3a5a827fa69801b8",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_addons",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_mood.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_mood-a7766847e0962d6c.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/mood/Cargo.toml",
+      "manifest_sha256": "2f105fca474e979705906e5aabaf08f60ce6fd843ca24a009bc949955565d540",
+      "manifest_source_path": "lampOS/crates/mood/Cargo.toml",
+      "name": "lamp-mood",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/mood#lamp-mood@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/mood/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/mood/src/lib.rs",
+      "source_sha256": "77fdcf14906c12c5a3db45bbc64139aad7f304c3a4176f5c261b88ff1949714f",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_mood",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-mood",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-mood"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/mood/Cargo.toml",
+      "manifest_sha256": "2f105fca474e979705906e5aabaf08f60ce6fd843ca24a009bc949955565d540",
+      "manifest_source_path": "lampOS/crates/mood/Cargo.toml",
+      "name": "lamp-mood",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/mood#lamp-mood@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/mood/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/mood/src/main.rs",
+      "source_sha256": "e890d3df4a9829ef22b6e2a491c173b27a589a95eea2e14045b5dab6c5d8c1f1",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-mood",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-addons",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-addons"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/addons/Cargo.toml",
+      "manifest_sha256": "2313f6976e096857edc27ce74df34a88cab5cbec28576186143ed515232640bd",
+      "manifest_source_path": "lampOS/crates/addons/Cargo.toml",
+      "name": "lamp-addons",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/addons#lamp-addons@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/addons/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/addons/src/main.rs",
+      "source_sha256": "115293d404b97d16efa5c4d8680fb8d2366d26255380d1bfff7669ec9830a255",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-addons",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-station",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-station"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/station/Cargo.toml",
+      "manifest_sha256": "636baa8ceca9e7cc87349170ffd3b9bbbace785b00ddf3421214522b82fc26a3",
+      "manifest_source_path": "lampOS/crates/station/Cargo.toml",
+      "name": "lamp-station",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/station#lamp-station@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/station/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/station/src/main.rs",
+      "source_sha256": "f5c080c5e68521887366c9a608e0e6211f788b30d013a3c50e3b005c9ff89121",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-station",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-name",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-name"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/name/Cargo.toml",
+      "manifest_sha256": "fbd95fe8ac4d9a80188f7de3e06b88ac5f192de56c8fc2db063a4255a9d25e7f",
+      "manifest_source_path": "lampOS/crates/name/Cargo.toml",
+      "name": "lamp-name",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/name#lamp-name@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/name/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/name/src/main.rs",
+      "source_sha256": "a383a7f51a029003f5a7a4e0b25b2da6c9b000c328ea397698073338b8006dfe",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-name",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ears",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ears"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ears/Cargo.toml",
+      "manifest_sha256": "15092825ec95e74d0a1fe0317f14b1f7aba793b87e1b1c50fcd5aeac9f319ce3",
+      "manifest_source_path": "lampOS/crates/ears/Cargo.toml",
+      "name": "lamp-ears",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ears#lamp-ears@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/ears/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ears/src/main.rs",
+      "source_sha256": "a13dfdf4933c5b6525f102eb69f53621cf5d710aa97bb2833cd26348b721ce68",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-ears",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-same-voice",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-same-voice"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/same-voice/Cargo.toml",
+      "manifest_sha256": "156eaaf0b32f316690d229b66a2b4f02d9ee0790527205bdc3f72a3b17b142f3",
+      "manifest_source_path": "lampOS/crates/same-voice/Cargo.toml",
+      "name": "lamp-same-voice",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/same-voice/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/same-voice/src/main.rs",
+      "source_sha256": "62dac7728db674b4ac586ee227e2c4df051dc287a0e19ab91eaa3b0ba31fe6e1",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-same-voice",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-setup",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-setup"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/setup/Cargo.toml",
+      "manifest_sha256": "586d2dffe23e80f94d8d75ab9f7a05e7b40e39bb9ae929eea379b5f188ddcd4e",
+      "manifest_source_path": "lampOS/crates/setup/Cargo.toml",
+      "name": "lamp-setup",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/setup#lamp-setup@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/setup/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/setup/src/main.rs",
+      "source_sha256": "f6ecbedc006226671ab9406a2ac30a32416abdb8c2222ea323dab01f0e09b689",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-setup",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-peek",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-peek"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/peek/Cargo.toml",
+      "manifest_sha256": "6f5014cd4095e438afda490a0c5aa12492780f5265729b6d58ec8e3b5e47ae8b",
+      "manifest_source_path": "lampOS/crates/peek/Cargo.toml",
+      "name": "lamp-peek",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/peek#lamp-peek@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/peek/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/peek/src/main.rs",
+      "source_sha256": "1346634c9da28298bae75d43a878d4472bdc0b3dd814531c99516ecf6b309164",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-peek",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-settings",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-settings"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/settings/Cargo.toml",
+      "manifest_sha256": "2a81f720c4a925b4b353575e48a187e6d71af8dde3677f3cfda7e534fb71241f",
+      "manifest_source_path": "lampOS/crates/settings/Cargo.toml",
+      "name": "lamp-settings",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/settings#lamp-settings@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/settings/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/settings/src/main.rs",
+      "source_sha256": "112d209deda9d5cd12d1d8d2a2b43aa97d8a2836c4152a0e50d13a8888c4cf63",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-settings",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice-eval",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice-eval"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "manifest_sha256": "eeb211074c1d8a2813ebb0c73422f20385fc56922480163d0303df43e3e59cb7",
+      "manifest_source_path": "lampOS/crates/voice-eval/Cargo.toml",
+      "name": "lamp-voice-eval",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/voice-eval/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice-eval/src/main.rs",
+      "source_sha256": "61b18db109fe9b1157bb1089e9037c9c05b6c576f659a0e4885f9ae8221c2eb1",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-voice-eval",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-selftest",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-selftest"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/selftest/Cargo.toml",
+      "manifest_sha256": "ed7f0e2eaa35e588ba085dc8a4bbfba36ff6ed0c077cdcdc6181d0e7709f15e1",
+      "manifest_source_path": "lampOS/crates/selftest/Cargo.toml",
+      "name": "lamp-selftest",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/selftest#lamp-selftest@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/selftest/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/selftest/src/main.rs",
+      "source_sha256": "32663096ab6bd19f21507703c6f790dc2bcca27669b9f3c6fe1ab8a5e73e9a52",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-selftest",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-cloud",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-cloud"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/cloud/Cargo.toml",
+      "manifest_sha256": "57a154cf64d7adc8b5e21be9338f57d6da62b1ed01497647ace3a7aa495009d8",
+      "manifest_source_path": "lampOS/crates/cloud/Cargo.toml",
+      "name": "lamp-cloud",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/cloud/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/cloud/src/main.rs",
+      "source_sha256": "befb454ca5360f09e9a3d44d19d1273c12dfd3adc124fe3e833e482cea28600d",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-cloud",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-surround",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-surround"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/surround/Cargo.toml",
+      "manifest_sha256": "df922e176c16c3166befe98c1914117a10bd3b8ae1a0bedfb30d758ba12e2f73",
+      "manifest_source_path": "lampOS/crates/surround/Cargo.toml",
+      "name": "lamp-surround",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/surround#lamp-surround@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/surround/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/surround/src/main.rs",
+      "source_sha256": "fc4a856b82c188bd01b0373e5bed7b72ca4bc4871c257e2bdb74982ff49de94e",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-surround",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks-harness-fixture",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks-harness-fixture"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks/Cargo.toml",
+      "manifest_sha256": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9",
+      "manifest_source_path": "lampOS/crates/tasks/Cargo.toml",
+      "name": "lamp-tasks",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+      "source_sha256": "3dd97fae305c6beb17fabb12f126af2b2947723be33df3d47ca64b470385f2f4",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-tasks-harness-fixture",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-tasks"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks/Cargo.toml",
+      "manifest_sha256": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9",
+      "manifest_source_path": "lampOS/crates/tasks/Cargo.toml",
+      "name": "lamp-tasks",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/tasks/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/tasks/src/main.rs",
+      "source_sha256": "37f60a138cf70469d51c258f618cc571b0728b0237c61861677a469d62a750ca",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-tasks",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-seems-measure",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-seems-measure"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes/Cargo.toml",
+      "manifest_sha256": "c515c877b91ac81438e15641a2004a064a17fb0410f452564ebebf6c6535c174",
+      "manifest_source_path": "lampOS/crates/eyes/Cargo.toml",
+      "name": "lamp-eyes",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes#lamp-eyes@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/eyes/src/bin/seems_measure.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes/src/bin/seems_measure.rs",
+      "source_sha256": "c3002cc03d9f43a7501bfb62b9ff39432d1145ea725132d525b4fb451d89f3f2",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-seems-measure",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-eyes",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-eyes"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes/Cargo.toml",
+      "manifest_sha256": "c515c877b91ac81438e15641a2004a064a17fb0410f452564ebebf6c6535c174",
+      "manifest_source_path": "lampOS/crates/eyes/Cargo.toml",
+      "name": "lamp-eyes",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes#lamp-eyes@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/eyes/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/eyes/src/main.rs",
+      "source_sha256": "e5fba488a5462854b2eeff2d8dd4522e35761c72d6ac34fef94cafb88a46ebbd",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-eyes",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-air",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-air"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/air/Cargo.toml",
+      "manifest_sha256": "795020feb9e842ceddc67b334d5088850d7af3f185875d97932e433a4bcf48e8",
+      "manifest_source_path": "lampOS/crates/air/Cargo.toml",
+      "name": "lamp-air",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/air#lamp-air@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/air/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/air/src/main.rs",
+      "source_sha256": "7e4c64142e2ba019e4b53463520c410ec831eb1e97523ad54e2f52676a71f0bb",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-air",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-sound-fixtures",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-sound-fixtures"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/sound-fixtures/Cargo.toml",
+      "manifest_sha256": "b790403fada9e341620a67350d6c09844ff2e243ec44c8b549ef7b1f461fd28f",
+      "manifest_source_path": "lampOS/crates/sound-fixtures/Cargo.toml",
+      "name": "lamp-sound-fixtures",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/sound-fixtures#lamp-sound-fixtures@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/sound-fixtures/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/sound-fixtures/src/main.rs",
+      "source_sha256": "f845b47a44a0bcd07a928e51d537177a06833dfad36ef6dcdf4bec035ace2835",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-sound-fixtures",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-actions",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-actions"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/actions/Cargo.toml",
+      "manifest_sha256": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+      "manifest_source_path": "lampOS/crates/actions/Cargo.toml",
+      "name": "lamp-actions",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/actions#lamp-actions@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/actions/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/actions/src/main.rs",
+      "source_sha256": "f8ce8e950e6c6517cdcd02c551f3a972502f1e084f7057fcf6db05abbb519ec0",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-actions",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-skills",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-skills"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/skills/Cargo.toml",
+      "manifest_sha256": "8588ef3204b62820ca39258ce078a6feb84f8282dc99aca0ca7a071004a7130b",
+      "manifest_source_path": "lampOS/crates/skills/Cargo.toml",
+      "name": "lamp-skills",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/skills#lamp-skills@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/skills/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/skills/src/main.rs",
+      "source_sha256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-skills",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-observer",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-observer"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/observer/Cargo.toml",
+      "manifest_sha256": "5cd6a10993b4922534b8a9546a33444465eb5323e5a3c14a73f875027f21201b",
+      "manifest_source_path": "lampOS/crates/observer/Cargo.toml",
+      "name": "lamp-observer",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/observer#lamp-observer@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/observer/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/observer/src/main.rs",
+      "source_sha256": "bb74ee91c47ccfea38af8424e2138d225bd6803746356f222ec2e84e9d8f4206",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-observer",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records/src/main.rs",
+      "source_sha256": "3ece939073d2832b2484f4b4778f6f05bfa845b8a12ce5241fe185c6070391c2",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-records",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records-fixture",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-records-fixture"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/bin/lamp-records-fixture.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/records/src/bin/lamp-records-fixture.rs",
+      "source_sha256": "56ed3d6bd78679b9f93b911ba531487fc02507abd88f4903939920aa360604d7",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-records-fixture",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-replay",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-replay"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/Cargo.toml",
+      "manifest_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+      "manifest_source_path": "lampOS/crates/policy/Cargo.toml",
+      "name": "lamp-policy",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-replay.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/src/bin/lamp-policy-replay.rs",
+      "source_sha256": "84c695dc20eba347ac9b5c5d8041af7b9554cab135a96cac06bfc81d9eeb89db",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-policy-replay",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-judges",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-judges"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/Cargo.toml",
+      "manifest_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+      "manifest_source_path": "lampOS/crates/policy/Cargo.toml",
+      "name": "lamp-policy",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-judges.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/src/bin/lamp-policy-judges.rs",
+      "source_sha256": "aa1b62b28ece93096eaf5941483a9b7e6aa83180669068bff16a172aa999bc4b",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-policy-judges",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-fit",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy-fit"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/Cargo.toml",
+      "manifest_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+      "manifest_source_path": "lampOS/crates/policy/Cargo.toml",
+      "name": "lamp-policy",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-fit.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/src/bin/lamp-policy-fit.rs",
+      "source_sha256": "db77bab79eea1d7180f4da0ee5acb2d713d626fc7a1a05adc9c95eb64dd72744",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-policy-fit",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-policy"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/Cargo.toml",
+      "manifest_sha256": "b1b4605a1ed8c783eee8a8aa746a16e07ae3c35212892b76bd52609f24a10e82",
+      "manifest_source_path": "lampOS/crates/policy/Cargo.toml",
+      "name": "lamp-policy",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/policy/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/policy/src/main.rs",
+      "source_sha256": "8e35c386b6b1f90337a32fa3c09e0ba98adec3c26f048af708938223fb4d85a1",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-policy",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-turn-end",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-turn-end"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end/Cargo.toml",
+      "manifest_sha256": "00baa6bc919c905199d1a3581e19195cd0b0292fc29d8bd6a77d1b80a5ee4153",
+      "manifest_source_path": "lampOS/crates/turn-end/Cargo.toml",
+      "name": "lamp-turn-end",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end#lamp-turn-end@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/turn-end/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/turn-end/src/main.rs",
+      "source_sha256": "ecfc17ae665217bd95a2aa185ca7be1e7b215678d753bb1e6816866be45dce37",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-turn-end",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-eval",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-eval"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/Cargo.toml",
+      "manifest_sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+      "manifest_source_path": "lampOS/crates/memory/Cargo.toml",
+      "name": "lamp-memory",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory#lamp-memory@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+      "source_sha256": "d6ba55483223d64e5c1234bc4e9daa1718b09a9718f92084e71c0ac77739e958",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-memory-eval",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/Cargo.toml",
+      "manifest_sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+      "manifest_source_path": "lampOS/crates/memory/Cargo.toml",
+      "name": "lamp-memory",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory#lamp-memory@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/memory/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/src/main.rs",
+      "source_sha256": "62f548e7dffc9f0df01f1ce0e6511dedc6d3303a73df61e9c7cf34f0a80afb24",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-memory",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-fixture",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-memory-fixture"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/Cargo.toml",
+      "manifest_sha256": "aef3519411f1e2fed21a93d645fc26a617a66ccda5733a10d8d2a69f683b3553",
+      "manifest_source_path": "lampOS/crates/memory/Cargo.toml",
+      "name": "lamp-memory",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory#lamp-memory@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+      "source_sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-memory-fixture",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-expression",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-expression"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/expression/Cargo.toml",
+      "manifest_sha256": "2c0dd67e2a2c85585b029bf807fc102ecdc375bc607ddd97fde3d514e6cf5cf4",
+      "manifest_source_path": "lampOS/crates/expression/Cargo.toml",
+      "name": "lamp-expression",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/expression#lamp-expression@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/expression/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/expression/src/main.rs",
+      "source_sha256": "c9795e4b997111045241366b8da0dcbe913b66f83e3801d41c0f4d8ad99e1537",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-expression",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-voice"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice/Cargo.toml",
+      "manifest_sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776",
+      "manifest_source_path": "lampOS/crates/voice/Cargo.toml",
+      "name": "lamp-voice",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/voice/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice/src/main.rs",
+      "source_sha256": "88a7bd21940cca0b1936c3dec4c3652459364d2f0c6c32c0e9d6abe65e5a8386",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-voice",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-health",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-health"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/health/Cargo.toml",
+      "manifest_sha256": "2e3ce14aeacb0bfe189499392baed7356738e9252279ad502f32ddd84f42a19d",
+      "manifest_source_path": "lampOS/crates/health/Cargo.toml",
+      "name": "lamp-health",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/health#lamp-health@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/health/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/health/src/main.rs",
+      "source_sha256": "b24d6fc27563933dbaf7392ac8cb5d64c7bb617b7ee56e3d07f6885b55591d96",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-health",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-controls",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-controls"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/controls/Cargo.toml",
+      "manifest_sha256": "14f43466f1273d70000af04ad0b12a5fb2c420bce9d8cb36110666d6a8cc94d4",
+      "manifest_source_path": "lampOS/crates/controls/Cargo.toml",
+      "name": "lamp-controls",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/controls#lamp-controls@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/controls/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/controls/src/main.rs",
+      "source_sha256": "214a51628bcbf01aa2d1a07b61a80988e8d316fd7b4df0ecc9b5dd3d5757e844",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-controls",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-audio",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-audio"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/audio/Cargo.toml",
+      "manifest_sha256": "1217da4568c1f6b78abfed2dde059b1e6f0294cfe5bff8b8d637a8840ade331c",
+      "manifest_source_path": "lampOS/crates/audio/Cargo.toml",
+      "name": "lamp-audio",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/audio#lamp-audio@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/audio/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/audio/src/main.rs",
+      "source_sha256": "67a015c2853b2a56315b0a0f795635b6455b925f872e2b217b45e017a4039b73",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-audio",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-schedule",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-schedule"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/schedule/Cargo.toml",
+      "manifest_sha256": "b96f73df3f89b8c76c3278216bad8f5ecec36e69d3e14a13dbc0dbb0425ca73f",
+      "manifest_source_path": "lampOS/crates/schedule/Cargo.toml",
+      "name": "lamp-schedule",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/schedule#lamp-schedule@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/schedule/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/schedule/src/main.rs",
+      "source_sha256": "616c45b844d65b173c67d19649bab70559dea448dd2a5df8a2e2b034ab326d7d",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-schedule",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-mood",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-mood"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/Cargo.toml",
+      "manifest_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "manifest_source_path": "lampOS/crates/body/Cargo.toml",
+      "name": "lamp-body",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/body/src/bin/lamp-body-mood.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+      "source_sha256": "962a18ca28278057126e120daab0a5fb5e0184ad8016bcaa8defbf4ea048ad30",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-body-mood",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-worker",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-worker"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/Cargo.toml",
+      "manifest_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "manifest_source_path": "lampOS/crates/body/Cargo.toml",
+      "name": "lamp-body",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/body/src/bin/lamp-body-worker.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+      "source_sha256": "4f563278ef70e41037c12fd911788fcf3193b92680e8302bfc1fc1d6e8f06ea7",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-body-worker",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/Cargo.toml",
+      "manifest_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "manifest_source_path": "lampOS/crates/body/Cargo.toml",
+      "name": "lamp-body",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/body/src/bin/lamp-body.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/src/bin/lamp-body.rs",
+      "source_sha256": "babf765889da252836437bb7d70de8c94f4e10e7c215a9aa2503fde194684291",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-body",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-measure",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-measure"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/Cargo.toml",
+      "manifest_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "manifest_source_path": "lampOS/crates/body/Cargo.toml",
+      "name": "lamp-body",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+      "source_sha256": "6892bc68303be099e2fa462a6f38da4f397c3a8803646f7ff4459d970694f62d",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-body-measure",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-inspect",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-body-inspect"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/Cargo.toml",
+      "manifest_sha256": "611ad97f3f8a30483b5b970fa9b5aa3657fd34e541238c2dcc46f500aa710227",
+      "manifest_source_path": "lampOS/crates/body/Cargo.toml",
+      "name": "lamp-body",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+      "source_sha256": "4a62f197e62ef531643730e162c624c2f9ff562bae622582722207e941b04480",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-body-inspect",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-keeper",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-keeper"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/keeper/Cargo.toml",
+      "manifest_sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44",
+      "manifest_source_path": "lampOS/crates/keeper/Cargo.toml",
+      "name": "lamp-keeper",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/keeper/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/keeper/src/main.rs",
+      "source_sha256": "cdf57f916c990c47bb85f210d11c6588a95551dab42b9a67ca5272d76cda9fa8",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-keeper",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-update",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-update"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update/Cargo.toml",
+      "manifest_sha256": "2e791c3e5eb8fc99f4ade7a0a6c484c60a0f988a5bf25c37a25176c6bf7a7792",
+      "manifest_source_path": "lampOS/crates/update/Cargo.toml",
+      "name": "lamp-update",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/update/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update/src/main.rs",
+      "source_sha256": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-update",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/liblamp_environment.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/liblamp_environment-79c29b00fdcede0e.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/environment/Cargo.toml",
+      "manifest_sha256": "d8ccf1efc3d22b827075dad2c24a8f92b1ccfe839bbd6b3f2920a6bd8c2bd52b",
+      "manifest_source_path": "lampOS/crates/environment/Cargo.toml",
+      "name": "lamp-environment",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/environment#lamp-environment@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/environment/src/lib.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/environment/src/lib.rs",
+      "source_sha256": "8aba66d757fb46dd61d6533824f48bc71fc8dc46d5c57cc2db8d4a5bfb03c164",
+      "stage": "workspace-build",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_environment",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ipc-probe",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-ipc-probe"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ipc/Cargo.toml",
+      "manifest_sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54",
+      "manifest_source_path": "lampOS/crates/ipc/Cargo.toml",
+      "name": "lamp-ipc",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/ipc/src/bin/lamp-ipc-probe.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/ipc/src/bin/lamp-ipc-probe.rs",
+      "source_sha256": "87a1fadf206694df348533db1da62e69ed6ae2b8a57d841d57215e56f83260f2",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-ipc-probe",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-bus",
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/lamp-bus"
+      ],
+      "fresh": false,
+      "manifest_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/bus/Cargo.toml",
+      "manifest_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+      "manifest_source_path": "lampOS/crates/bus/Cargo.toml",
+      "name": "lamp-bus",
+      "package_id": "path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/bus#lamp-bus@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/bus/src/main.rs",
+      "source_path": "/private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/bus/src/main.rs",
+      "source_sha256": "869ffe9be99c7dc03ff4a9675cec6b2a9cf80c85c41ae8f34acbabf14cc1daab",
+      "stage": "workspace-build",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-bus",
+      "version": "0.1.0"
+    }
+  ]
+}

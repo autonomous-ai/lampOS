@@ -1,0 +1,17 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/addons#lamp-addons@0.1.0"
+  ],
+  "elapsed_seconds": 0.2569615200009139,
+  "exit": 0,
+  "pid": 11963,
+  "process_group": 11963,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

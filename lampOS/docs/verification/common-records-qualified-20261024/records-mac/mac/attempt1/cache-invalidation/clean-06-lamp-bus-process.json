@@ -1,0 +1,17 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/bus#lamp-bus@0.1.0"
+  ],
+  "elapsed_seconds": 0.30834719000267796,
+  "exit": 0,
+  "pid": 11976,
+  "process_group": 11976,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

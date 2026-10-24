@@ -1,0 +1,18 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "build",
+    "-q",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--message-format=json-render-diagnostics"
+  ],
+  "elapsed_seconds": 261.66565182400154,
+  "exit": 0,
+  "pid": 17102,
+  "process_group": 17102,
+  "process_group_absent": true,
+  "timeout_seconds": 5400
+}

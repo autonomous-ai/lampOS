@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update#lamp-update@0.1.0` is ignored, cleaning all versions of `lamp-update` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/update#lamp-update@0.1.0` ignored, cleaning all versions of `lamp-update` found
+     Removed 261 files, 360.7MiB total

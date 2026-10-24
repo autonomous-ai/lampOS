@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-distinct-frame-56cbd4b146f9-clean-36-lamp-sound-fixtures"
+  ],
+  "elapsed_seconds": 0.1424810640000942,
+  "exit": 0,
+  "pid": 14327,
+  "process_group": 14327,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

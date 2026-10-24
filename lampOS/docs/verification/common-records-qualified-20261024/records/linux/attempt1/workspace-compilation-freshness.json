@@ -1,0 +1,1257 @@
+{
+  "all_local_members_freshly_compiled": true,
+  "boundary": "Union of post-invalidation Clippy and workspace build; a later fresh:true or absent build artifact is allowed only when another validated stage already compiled the member.",
+  "expected_local_members": 46,
+  "members_with_observed_fresh_compilation": 46,
+  "packages": [
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/actions/src/lib.rs",
+          "source_sha256": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_actions"
+        },
+        {
+          "source_git_path": "lampOS/crates/actions/src/main.rs",
+          "source_sha256": "f8ce8e950e6c6517cdcd02c551f3a972502f1e084f7057fcf6db05abbb519ec0",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-actions"
+        }
+      ],
+      "name": "lamp-actions",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/actions#lamp-actions@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/addons/src/lib.rs",
+          "source_sha256": "b54552e21523c88db4b4e84882faff88bcfff4395eedd37a3a5a827fa69801b8",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_addons"
+        },
+        {
+          "source_git_path": "lampOS/crates/addons/src/main.rs",
+          "source_sha256": "115293d404b97d16efa5c4d8680fb8d2366d26255380d1bfff7669ec9830a255",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-addons"
+        }
+      ],
+      "name": "lamp-addons",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/addons#lamp-addons@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/air/src/lib.rs",
+          "source_sha256": "22296d365cdd798195565dfe2683d1fa4dc612ba052b25c430bb5c03fb5c95a1",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_air"
+        },
+        {
+          "source_git_path": "lampOS/crates/air/src/main.rs",
+          "source_sha256": "7e4c64142e2ba019e4b53463520c410ec831eb1e97523ad54e2f52676a71f0bb",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-air"
+        }
+      ],
+      "name": "lamp-air",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/air#lamp-air@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/audio/src/lib.rs",
+          "source_sha256": "219df5b434fdeefa7983626c3c6445d84bd9188b85c5131676a5c14686c843f3",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_audio"
+        },
+        {
+          "source_git_path": "lampOS/crates/audio/src/main.rs",
+          "source_sha256": "67a015c2853b2a56315b0a0f795635b6455b925f872e2b217b45e017a4039b73",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-audio"
+        }
+      ],
+      "name": "lamp-audio",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/audio#lamp-audio@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/body/src/lib.rs",
+          "source_sha256": "d3d2c30cc4c2684f542ecb469a9d8b5eee9f32c963d9e60caf64b54de78e9eb5",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_body"
+        },
+        {
+          "source_git_path": "lampOS/crates/body/src/bin/lamp-body-mood.rs",
+          "source_sha256": "962a18ca28278057126e120daab0a5fb5e0184ad8016bcaa8defbf4ea048ad30",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-body-mood"
+        },
+        {
+          "source_git_path": "lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+          "source_sha256": "4a62f197e62ef531643730e162c624c2f9ff562bae622582722207e941b04480",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-body-inspect"
+        },
+        {
+          "source_git_path": "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+          "source_sha256": "6892bc68303be099e2fa462a6f38da4f397c3a8803646f7ff4459d970694f62d",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-body-measure"
+        },
+        {
+          "source_git_path": "lampOS/crates/body/src/bin/lamp-body-worker.rs",
+          "source_sha256": "4f563278ef70e41037c12fd911788fcf3193b92680e8302bfc1fc1d6e8f06ea7",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-body-worker"
+        },
+        {
+          "source_git_path": "lampOS/crates/body/src/bin/lamp-body.rs",
+          "source_sha256": "babf765889da252836437bb7d70de8c94f4e10e7c215a9aa2503fde194684291",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-body"
+        }
+      ],
+      "name": "lamp-body",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/body#lamp-body@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/bus/src/lib.rs",
+          "source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+          "stage": "clippy",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_bus"
+        },
+        {
+          "source_git_path": "lampOS/crates/bus/src/lib.rs",
+          "source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_bus"
+        },
+        {
+          "source_git_path": "lampOS/crates/bus/src/main.rs",
+          "source_sha256": "869ffe9be99c7dc03ff4a9675cec6b2a9cf80c85c41ae8f34acbabf14cc1daab",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-bus"
+        }
+      ],
+      "name": "lamp-bus",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/bus#lamp-bus@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/camera/src/lib.rs",
+          "source_sha256": "b7ecc0a42137a663be28f8fa354f3f89cb184bb154cf617bb7ad7056a575e1a4",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_camera"
+        }
+      ],
+      "name": "lamp-camera",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/camera#lamp-camera@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/cloud/src/lib.rs",
+          "source_sha256": "dd014c6c915adb59ec63b979dd038e1c7baca99ba2c466b0b9062f816f0644d8",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_cloud"
+        },
+        {
+          "source_git_path": "lampOS/crates/cloud/src/main.rs",
+          "source_sha256": "befb454ca5360f09e9a3d44d19d1273c12dfd3adc124fe3e833e482cea28600d",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-cloud"
+        }
+      ],
+      "name": "lamp-cloud",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/cloud#lamp-cloud@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/controls/src/lib.rs",
+          "source_sha256": "64df86c174be57c337d8a697772b0db067dca8c0605e8cb4b168ee1ae9b286a8",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_controls"
+        },
+        {
+          "source_git_path": "lampOS/crates/controls/src/main.rs",
+          "source_sha256": "214a51628bcbf01aa2d1a07b61a80988e8d316fd7b4df0ecc9b5dd3d5757e844",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-controls"
+        }
+      ],
+      "name": "lamp-controls",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/controls#lamp-controls@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/ears/src/lib.rs",
+          "source_sha256": "02f0c7559411ce7a9ed58472e2a2ff4813a623199e1e6c78c3d10c8779038592",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_ears"
+        },
+        {
+          "source_git_path": "lampOS/crates/ears/src/main.rs",
+          "source_sha256": "a13dfdf4933c5b6525f102eb69f53621cf5d710aa97bb2833cd26348b721ce68",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-ears"
+        }
+      ],
+      "name": "lamp-ears",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/ears#lamp-ears@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/environment/src/lib.rs",
+          "source_sha256": "8aba66d757fb46dd61d6533824f48bc71fc8dc46d5c57cc2db8d4a5bfb03c164",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_environment"
+        }
+      ],
+      "name": "lamp-environment",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/environment#lamp-environment@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/expression/src/lib.rs",
+          "source_sha256": "863fbef6e93f0bceb5724f5f4d91a911589c2bf2e32c12a0872938a10988f614",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_expression"
+        },
+        {
+          "source_git_path": "lampOS/crates/expression/src/main.rs",
+          "source_sha256": "c9795e4b997111045241366b8da0dcbe913b66f83e3801d41c0f4d8ad99e1537",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-expression"
+        }
+      ],
+      "name": "lamp-expression",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/expression#lamp-expression@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/eyes/src/lib.rs",
+          "source_sha256": "cfbc105e7c8a045be90ca1e5572ca70436c589f067dca295d846ad41bfed7776",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_eyes"
+        },
+        {
+          "source_git_path": "lampOS/crates/eyes/src/main.rs",
+          "source_sha256": "15fcd743ceff1eeff95ac27482c92b5c1703378ec12dd88b0056249b0c740434",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-eyes"
+        },
+        {
+          "source_git_path": "lampOS/crates/eyes/src/bin/seems_measure.rs",
+          "source_sha256": "c3002cc03d9f43a7501bfb62b9ff39432d1145ea725132d525b4fb451d89f3f2",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-seems-measure"
+        }
+      ],
+      "name": "lamp-eyes",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/eyes#lamp-eyes@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/gemini/src/lib.rs",
+          "source_sha256": "055d74a67aa3d865f67c5a82c6379d7b4faab6e99f798ff2de0df96323d614d0",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_gemini"
+        }
+      ],
+      "name": "lamp-gemini",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/gemini#lamp-gemini@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/health/src/lib.rs",
+          "source_sha256": "6b293a33153539952d40271b63bdaa0a00807a1a4ad74bf673187b9c51744b61",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_health"
+        },
+        {
+          "source_git_path": "lampOS/crates/health/src/main.rs",
+          "source_sha256": "b24d6fc27563933dbaf7392ac8cb5d64c7bb617b7ee56e3d07f6885b55591d96",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-health"
+        }
+      ],
+      "name": "lamp-health",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/health#lamp-health@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/ipc/src/lib.rs",
+          "source_sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_ipc"
+        },
+        {
+          "source_git_path": "lampOS/crates/ipc/src/bin/lamp-ipc-probe.rs",
+          "source_sha256": "87a1fadf206694df348533db1da62e69ed6ae2b8a57d841d57215e56f83260f2",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-ipc-probe"
+        }
+      ],
+      "name": "lamp-ipc",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/ipc#lamp-ipc@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/keeper/src/lib.rs",
+          "source_sha256": "9c87316d1358df4d45c47f32a283eacef45b5331d99e7337d4ff80ad5d809888",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_keeper"
+        },
+        {
+          "source_git_path": "lampOS/crates/keeper/src/main.rs",
+          "source_sha256": "cdf57f916c990c47bb85f210d11c6588a95551dab42b9a67ca5272d76cda9fa8",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-keeper"
+        }
+      ],
+      "name": "lamp-keeper",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/keeper#lamp-keeper@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/lean/src/lib.rs",
+          "source_sha256": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_lean"
+        }
+      ],
+      "name": "lamp-lean",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/lean#lamp-lean@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/local-time/src/lib.rs",
+          "source_sha256": "24b51e48f1fa051bc201e9b3e75682ed5e4934d35dc9c13bf5ff2f61038787a5",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_local_time"
+        }
+      ],
+      "name": "lamp-local-time",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/local-time#lamp-local-time@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/memory/src/lib.rs",
+          "source_sha256": "5078be0ba597bae3aa7f4f03412287e0236ec0d7a3dae53b1eaebec4aaf8d6d4",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_memory"
+        },
+        {
+          "source_git_path": "lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+          "source_sha256": "d6ba55483223d64e5c1234bc4e9daa1718b09a9718f92084e71c0ac77739e958",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-memory-eval"
+        },
+        {
+          "source_git_path": "lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+          "source_sha256": "2885b1d48defea67e2381f46f944aaf38c2035a67820eb68ac64c9b899c1dc2a",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-memory-fixture"
+        },
+        {
+          "source_git_path": "lampOS/crates/memory/src/main.rs",
+          "source_sha256": "62f548e7dffc9f0df01f1ce0e6511dedc6d3303a73df61e9c7cf34f0a80afb24",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-memory"
+        }
+      ],
+      "name": "lamp-memory",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/memory#lamp-memory@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/mood/src/lib.rs",
+          "source_sha256": "77fdcf14906c12c5a3db45bbc64139aad7f304c3a4176f5c261b88ff1949714f",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_mood"
+        },
+        {
+          "source_git_path": "lampOS/crates/mood/src/main.rs",
+          "source_sha256": "e890d3df4a9829ef22b6e2a491c173b27a589a95eea2e14045b5dab6c5d8c1f1",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-mood"
+        }
+      ],
+      "name": "lamp-mood",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/mood#lamp-mood@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/msgs/src/lib.rs",
+          "source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+          "stage": "clippy",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_msgs"
+        },
+        {
+          "source_git_path": "lampOS/crates/msgs/src/lib.rs",
+          "source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_msgs"
+        }
+      ],
+      "name": "lamp-msgs",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/msgs#lamp-msgs@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/name/src/lib.rs",
+          "source_sha256": "c82ddffdf8b995fd8381a427d7c7b99ed01d30d16c88c9d57cbe513303edf329",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_name"
+        },
+        {
+          "source_git_path": "lampOS/crates/name/src/main.rs",
+          "source_sha256": "a383a7f51a029003f5a7a4e0b25b2da6c9b000c328ea397698073338b8006dfe",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-name"
+        }
+      ],
+      "name": "lamp-name",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/name#lamp-name@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/near-call/src/lib.rs",
+          "source_sha256": "10b2507a2d5e010481ec15ac3d6feed78403ace37f104739fbc7b9104918b6c5",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_near_call"
+        }
+      ],
+      "name": "lamp-near-call",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/near-call#lamp-near-call@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/observer/src/lib.rs",
+          "source_sha256": "05dc6052fc10cfd166deae58adad42ed4c278ef26d2ab143b900f02e59a7b194",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_observer"
+        },
+        {
+          "source_git_path": "lampOS/crates/observer/src/main.rs",
+          "source_sha256": "bb74ee91c47ccfea38af8424e2138d225bd6803746356f222ec2e84e9d8f4206",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-observer"
+        }
+      ],
+      "name": "lamp-observer",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/observer#lamp-observer@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/peek/src/lib.rs",
+          "source_sha256": "0c926aadf878060013a47d2f46f7cd15cc220262a85a83c09acbbb4f6886f3c1",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_peek"
+        },
+        {
+          "source_git_path": "lampOS/crates/peek/src/main.rs",
+          "source_sha256": "1346634c9da28298bae75d43a878d4472bdc0b3dd814531c99516ecf6b309164",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-peek"
+        }
+      ],
+      "name": "lamp-peek",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/peek#lamp-peek@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/policy/src/lib.rs",
+          "source_sha256": "7bb49b0580659000447b63d275fd1f30e15f0affeabb71c03f89a00f3ec61c9c",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_policy"
+        },
+        {
+          "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-judges.rs",
+          "source_sha256": "aa1b62b28ece93096eaf5941483a9b7e6aa83180669068bff16a172aa999bc4b",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-policy-judges"
+        },
+        {
+          "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-fit.rs",
+          "source_sha256": "db77bab79eea1d7180f4da0ee5acb2d713d626fc7a1a05adc9c95eb64dd72744",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-policy-fit"
+        },
+        {
+          "source_git_path": "lampOS/crates/policy/src/main.rs",
+          "source_sha256": "8e35c386b6b1f90337a32fa3c09e0ba98adec3c26f048af708938223fb4d85a1",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-policy"
+        },
+        {
+          "source_git_path": "lampOS/crates/policy/src/bin/lamp-policy-replay.rs",
+          "source_sha256": "84c695dc20eba347ac9b5c5d8041af7b9554cab135a96cac06bfc81d9eeb89db",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-policy-replay"
+        }
+      ],
+      "name": "lamp-policy",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/policy#lamp-policy@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/records/src/lib.rs",
+          "source_sha256": "a7c4a9fbf5e86fea89c2e8b1874e1d56ff0440b02af0b8aed8638411b26ee567",
+          "stage": "clippy",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_records"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/src/main.rs",
+          "source_sha256": "3ece939073d2832b2484f4b4778f6f05bfa845b8a12ce5241fe185c6070391c2",
+          "stage": "clippy",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-records"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/src/main.rs",
+          "source_sha256": "3ece939073d2832b2484f4b4778f6f05bfa845b8a12ce5241fe185c6070391c2",
+          "stage": "clippy",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-records"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/src/bin/lamp-records-fixture.rs",
+          "source_sha256": "56ed3d6bd78679b9f93b911ba531487fc02507abd88f4903939920aa360604d7",
+          "stage": "clippy",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-records-fixture"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/tests/records_control.rs",
+          "source_sha256": "1ecc41bc77f6d8aa167828e4fc36e45e520f3108a44e09420f9f5a363b82dbf8",
+          "stage": "clippy",
+          "target_kind": [
+            "test"
+          ],
+          "target_name": "records_control"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/tests/release_pair_systemd.rs",
+          "source_sha256": "c48d5ad96a246a4a1a1cc671e78f546ff44f7991a4a739bce09e4ae4a087ad52",
+          "stage": "clippy",
+          "target_kind": [
+            "test"
+          ],
+          "target_name": "release_pair_systemd"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/tests/records.rs",
+          "source_sha256": "99d03253c4df2b6eae4b39cdb61d748409cb1af79c32e6fe038cd4b01f8186ae",
+          "stage": "clippy",
+          "target_kind": [
+            "test"
+          ],
+          "target_name": "records"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/src/lib.rs",
+          "source_sha256": "a7c4a9fbf5e86fea89c2e8b1874e1d56ff0440b02af0b8aed8638411b26ee567",
+          "stage": "clippy",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_records"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/src/lib.rs",
+          "source_sha256": "a7c4a9fbf5e86fea89c2e8b1874e1d56ff0440b02af0b8aed8638411b26ee567",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_records"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/src/bin/lamp-records-fixture.rs",
+          "source_sha256": "56ed3d6bd78679b9f93b911ba531487fc02507abd88f4903939920aa360604d7",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-records-fixture"
+        },
+        {
+          "source_git_path": "lampOS/crates/records/src/main.rs",
+          "source_sha256": "3ece939073d2832b2484f4b4778f6f05bfa845b8a12ce5241fe185c6070391c2",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-records"
+        }
+      ],
+      "name": "lamp-records",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/ring/src/lib.rs",
+          "source_sha256": "cc695499ce6a98bd3329b4ecf27632d9a2bdd5b0da31bbf1204adb9bc8daeefe",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_ring"
+        }
+      ],
+      "name": "lamp-ring",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/ring#lamp-ring@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/same-voice/src/lib.rs",
+          "source_sha256": "2b5ede0988398b3887e8ce0992de29dcca303138956b335968262b7fa5b1fbaa",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_same_voice"
+        },
+        {
+          "source_git_path": "lampOS/crates/same-voice/src/main.rs",
+          "source_sha256": "62dac7728db674b4ac586ee227e2c4df051dc287a0e19ab91eaa3b0ba31fe6e1",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-same-voice"
+        }
+      ],
+      "name": "lamp-same-voice",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/same-voice#lamp-same-voice@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/schedule/src/lib.rs",
+          "source_sha256": "fccb1e9ba835a2b0be00a8f7dab37d21aee1dc0dc35aa6f075bb98b702993cf2",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_schedule"
+        },
+        {
+          "source_git_path": "lampOS/crates/schedule/src/main.rs",
+          "source_sha256": "616c45b844d65b173c67d19649bab70559dea448dd2a5df8a2e2b034ab326d7d",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-schedule"
+        }
+      ],
+      "name": "lamp-schedule",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/schedule#lamp-schedule@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/selftest/src/lib.rs",
+          "source_sha256": "e42ca3a9d197bee43b72bd6ed2436641df842826e2e15c2757805afedf5f429a",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_selftest"
+        },
+        {
+          "source_git_path": "lampOS/crates/selftest/src/main.rs",
+          "source_sha256": "32663096ab6bd19f21507703c6f790dc2bcca27669b9f3c6fe1ab8a5e73e9a52",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-selftest"
+        }
+      ],
+      "name": "lamp-selftest",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/selftest#lamp-selftest@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/settings/src/lib.rs",
+          "source_sha256": "9cf5d6c7b1c41659b2c01c93a2b8733d08aac3d9ca0ecc84f8e55252c76718c0",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_settings"
+        },
+        {
+          "source_git_path": "lampOS/crates/settings/src/main.rs",
+          "source_sha256": "112d209deda9d5cd12d1d8d2a2b43aa97d8a2836c4152a0e50d13a8888c4cf63",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-settings"
+        }
+      ],
+      "name": "lamp-settings",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/settings#lamp-settings@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/setup/src/lib.rs",
+          "source_sha256": "abf976ee5416277d90bad6e9aac99e49c721aa5c62ae952faefbf0006dd78a37",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_setup"
+        },
+        {
+          "source_git_path": "lampOS/crates/setup/src/main.rs",
+          "source_sha256": "f6ecbedc006226671ab9406a2ac30a32416abdb8c2222ea323dab01f0e09b689",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-setup"
+        }
+      ],
+      "name": "lamp-setup",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/setup#lamp-setup@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/skills/src/lib.rs",
+          "source_sha256": "796af9814ea9e5fd7eaa2f0482dc185fd530ea5889bd5a04aaf274cee9325b8a",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_skills"
+        },
+        {
+          "source_git_path": "lampOS/crates/skills/src/main.rs",
+          "source_sha256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-skills"
+        }
+      ],
+      "name": "lamp-skills",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/skills#lamp-skills@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/sound-fixtures/src/lib.rs",
+          "source_sha256": "eff15fc8665050cdb2dc1b720bee6d6705e47325c8a3f462036c10c6d57d955b",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_sound_fixtures"
+        },
+        {
+          "source_git_path": "lampOS/crates/sound-fixtures/src/main.rs",
+          "source_sha256": "f845b47a44a0bcd07a928e51d537177a06833dfad36ef6dcdf4bec035ace2835",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-sound-fixtures"
+        }
+      ],
+      "name": "lamp-sound-fixtures",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/sound-fixtures#lamp-sound-fixtures@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/station/src/lib.rs",
+          "source_sha256": "116cbb184818298e405d0455148760dfbcb4bcccdb7791dfda82f7f884977741",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_station"
+        },
+        {
+          "source_git_path": "lampOS/crates/station/src/main.rs",
+          "source_sha256": "f5c080c5e68521887366c9a608e0e6211f788b30d013a3c50e3b005c9ff89121",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-station"
+        }
+      ],
+      "name": "lamp-station",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/station#lamp-station@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/surround/src/lib.rs",
+          "source_sha256": "823b78549925e01520e13c4b0446168319e07f8ea7eb266b1d1d557687d35cd6",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_surround"
+        },
+        {
+          "source_git_path": "lampOS/crates/surround/src/main.rs",
+          "source_sha256": "fc4a856b82c188bd01b0373e5bed7b72ca4bc4871c257e2bdb74982ff49de94e",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-surround"
+        }
+      ],
+      "name": "lamp-surround",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/surround#lamp-surround@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/tasks/src/lib.rs",
+          "source_sha256": "f91b0c597b9eaf7327a0a2541c511c653eb3534e3825c3ea0047e2f54ceb1e02",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_tasks"
+        },
+        {
+          "source_git_path": "lampOS/crates/tasks/src/main.rs",
+          "source_sha256": "37f60a138cf70469d51c258f618cc571b0728b0237c61861677a469d62a750ca",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-tasks"
+        },
+        {
+          "source_git_path": "lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+          "source_sha256": "3dd97fae305c6beb17fabb12f126af2b2947723be33df3d47ca64b470385f2f4",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-tasks-harness-fixture"
+        }
+      ],
+      "name": "lamp-tasks",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/tasks#lamp-tasks@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/turn-end/src/lib.rs",
+          "source_sha256": "bbd5160c06bab053e034f87fbcef76106e9e511eaecfa203a9c600a5790fe1cf",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_turn_end"
+        },
+        {
+          "source_git_path": "lampOS/crates/turn-end/src/main.rs",
+          "source_sha256": "ecfc17ae665217bd95a2aa185ca7be1e7b215678d753bb1e6816866be45dce37",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-turn-end"
+        }
+      ],
+      "name": "lamp-turn-end",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/turn-end#lamp-turn-end@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/turn-end-wire/src/lib.rs",
+          "source_sha256": "9a320a7f4fbde07363c4d6ecdb446e5db988359be9e50f1a02b575183067ad81",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_turn_end_wire"
+        }
+      ],
+      "name": "lamp-turn-end-wire",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/turn-end-wire#lamp-turn-end-wire@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/turn-owner/src/lib.rs",
+          "source_sha256": "5f375e273e59c81368b0874cffb188b45b8880b8484e0d56ed3c9d454780bb84",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_turn_owner"
+        }
+      ],
+      "name": "lamp-turn-owner",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/turn-owner#lamp-turn-owner@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/update/src/lib.rs",
+          "source_sha256": "d2abedede0921948295a1a00b673dd6c47669d87a275e0430c812eec3251c99a",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_update"
+        },
+        {
+          "source_git_path": "lampOS/crates/update/src/main.rs",
+          "source_sha256": "f841cce11f5583b06d5c4d695feb506d1455ced2338f62de34bbfabbbcc91277",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-update"
+        }
+      ],
+      "name": "lamp-update",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/update#lamp-update@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/voice/src/lib.rs",
+          "source_sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_voice"
+        },
+        {
+          "source_git_path": "lampOS/crates/voice/src/main.rs",
+          "source_sha256": "7aa5e89e08d6a5b122b98db0172eea81026df0a8b87533a37eee89acbf2b973c",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-voice"
+        }
+      ],
+      "name": "lamp-voice",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/voice#lamp-voice@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/voice-eval/src/lib.rs",
+          "source_sha256": "750058165d44965d5b68b911057537f83d80036e5f74e5f5a74d1db81376b560",
+          "stage": "workspace-build",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_voice_eval"
+        },
+        {
+          "source_git_path": "lampOS/crates/voice-eval/src/main.rs",
+          "source_sha256": "61b18db109fe9b1157bb1089e9037c9c05b6c576f659a0e4885f9ae8221c2eb1",
+          "stage": "workspace-build",
+          "target_kind": [
+            "bin"
+          ],
+          "target_name": "lamp-voice-eval"
+        }
+      ],
+      "name": "lamp-voice-eval",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/voice-eval#lamp-voice-eval@0.1.0"
+    },
+    {
+      "fresh_compilations": [
+        {
+          "source_git_path": "lampOS/crates/voice-processes/src/lib.rs",
+          "source_sha256": "aad51f3dac5d4decfa49c05739007bc73da2778f43aa25cf528eb00d09b89e81",
+          "stage": "clippy",
+          "target_kind": [
+            "lib"
+          ],
+          "target_name": "lamp_voice_processes"
+        }
+      ],
+      "name": "lamp-voice-processes",
+      "observed_fresh_compilation": true,
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/voice-processes#lamp-voice-processes@0.1.0"
+    }
+  ]
+}

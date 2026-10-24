@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice#lamp-voice@0.1.0` is ignored, cleaning all versions of `lamp-voice` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-common-distinct-frame-20261024/lampOS/crates/voice#lamp-voice@0.1.0` ignored, cleaning all versions of `lamp-voice` found
+     Removed 429 files, 3.4GiB total

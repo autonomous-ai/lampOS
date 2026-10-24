@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-distinct-frame-56cbd4b146f9-clean-44-lamp-voice"
+  ],
+  "elapsed_seconds": 0.13920727799995802,
+  "exit": 0,
+  "pid": 15357,
+  "process_group": 15357,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

@@ -1,0 +1,23 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clippy",
+    "-q",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-records",
+    "--all-targets",
+    "--message-format=json-render-diagnostics",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "elapsed_seconds": 9.477345641000284,
+  "exit": 0,
+  "pid": 13163,
+  "process_group": 13163,
+  "process_group_absent": true,
+  "timeout_seconds": 5400
+}

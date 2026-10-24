@@ -1,0 +1,8 @@
+{
+  "command_arguments_are_structured_not_shell": true,
+  "metadata_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "metadata_stdout_sha256": "2a733230baca05239bfa7bd521e07287a6bb56d642992d528052332ea97f05c7",
+  "scope": "Exact local workspace canonical Package IDs only; registry/git/excluded path dependencies are not cleaned",
+  "validated_plan_sha256": "a2582025e9ce34adbdfd81b4b52923c33780394deaa2b9420479f7d0aa5cdfe5",
+  "workspace_members": 46
+}

@@ -1,0 +1,429 @@
+{
+  "compiler_log_sha256": "d7fec2373b10285ff42097b225f11a79a77d5082cc65a6296ebf79fce296efb6",
+  "external_artifact_messages_ignored": 31,
+  "fresh_compilation_evidence": "Cargo compiler-artifact fresh:false, excluding custom-build targets, with exact validated Package ID/manifest/target/source binding",
+  "observed_output_files": [
+    {
+      "bytes": 316995,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_bus-c3162f9c8c15e484.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_bus-c3162f9c8c15e484.rmeta",
+      "sha256": "0ab3720926fcdb9449c1b85a673c80280c7cde50435743a16ccb64767379a87e"
+    },
+    {
+      "bytes": 2978621,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_msgs-9b2347bf91c3e77e.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_msgs-9b2347bf91c3e77e.rmeta",
+      "sha256": "1fbe6df09dc84a0fbdcbc7a62211d8a3117269c4f516d1197a896d21a92c8807"
+    },
+    {
+      "bytes": 28277,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_voice_processes-1abf41ab7a46c887.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_voice_processes-1abf41ab7a46c887.rmeta",
+      "sha256": "10e356a12cdc647e9d235ea5fd9cf71b026ad2181f96b4716ee09a59c084919f"
+    },
+    {
+      "bytes": 474414,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_records-5458a1c7460917fc.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_records-5458a1c7460917fc.rmeta",
+      "sha256": "fa1b22781530aec6be176a53c4b2a46d172103911d2608c93db9ef9194b5957d"
+    },
+    {
+      "bytes": 0,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_records-77712b356347c3f3.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_records-77712b356347c3f3.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_records-621e6c78849fd0d5.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_records-621e6c78849fd0d5.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_records_fixture-484558a87aa6a1c1.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_records_fixture-484558a87aa6a1c1.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/librecords_control-4e620d0573a5f087.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/librecords_control-4e620d0573a5f087.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/librelease_pair_systemd-8961a6bc8666edcc.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/librelease_pair_systemd-8961a6bc8666edcc.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/librecords-d25ee1c7250a182d.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/librecords-d25ee1c7250a182d.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "exists_after_stage": true,
+      "host_path": "/private/tmp/fourth-memory-recovery-linux-target-20261024/debug/deps/liblamp_records-b3604b1a3a6ba039.rmeta",
+      "kind": "regular_file",
+      "reported_path": "/target/debug/deps/liblamp_records-b3604b1a3a6ba039.rmeta",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "stage": "clippy",
+  "validated_package_plan_sha256": "69b2a1bdd08128df02e7628a1f9f1ffde99ef4bc0b2cf884a7b1c412a456e8cb",
+  "workspace_artifacts": [
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_bus-c3162f9c8c15e484.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/bus/Cargo.toml",
+      "manifest_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+      "manifest_source_path": "lampOS/crates/bus/Cargo.toml",
+      "name": "lamp-bus",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/bus#lamp-bus@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/bus/src/lib.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/bus/src/lib.rs",
+      "source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+      "stage": "clippy",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_bus",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_msgs-9b2347bf91c3e77e.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/msgs/Cargo.toml",
+      "manifest_sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec",
+      "manifest_source_path": "lampOS/crates/msgs/Cargo.toml",
+      "name": "lamp-msgs",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/msgs#lamp-msgs@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/msgs/src/lib.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/msgs/src/lib.rs",
+      "source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+      "stage": "clippy",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_msgs",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_voice_processes-1abf41ab7a46c887.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/voice-processes/Cargo.toml",
+      "manifest_sha256": "300431dab9923809f63632cca6a107171c8df39a8e8e50efe6c93275d85761b3",
+      "manifest_source_path": "lampOS/crates/voice-processes/Cargo.toml",
+      "name": "lamp-voice-processes",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/voice-processes#lamp-voice-processes@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/voice-processes/src/lib.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/voice-processes/src/lib.rs",
+      "source_sha256": "aad51f3dac5d4decfa49c05739007bc73da2778f43aa25cf528eb00d09b89e81",
+      "stage": "clippy",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_voice_processes",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_records-5458a1c7460917fc.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/lib.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/src/lib.rs",
+      "source_sha256": "a7c4a9fbf5e86fea89c2e8b1874e1d56ff0440b02af0b8aed8638411b26ee567",
+      "stage": "clippy",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_records",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_records-77712b356347c3f3.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/main.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/src/main.rs",
+      "source_sha256": "3ece939073d2832b2484f4b4778f6f05bfa845b8a12ce5241fe185c6070391c2",
+      "stage": "clippy",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-records",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_records-621e6c78849fd0d5.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/main.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/src/main.rs",
+      "source_sha256": "3ece939073d2832b2484f4b4778f6f05bfa845b8a12ce5241fe185c6070391c2",
+      "stage": "clippy",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-records",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_records_fixture-484558a87aa6a1c1.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/bin/lamp-records-fixture.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/src/bin/lamp-records-fixture.rs",
+      "source_sha256": "56ed3d6bd78679b9f93b911ba531487fc02507abd88f4903939920aa360604d7",
+      "stage": "clippy",
+      "target_kind": [
+        "bin"
+      ],
+      "target_name": "lamp-records-fixture",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/librecords_control-4e620d0573a5f087.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/tests/records_control.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/tests/records_control.rs",
+      "source_sha256": "1ecc41bc77f6d8aa167828e4fc36e45e520f3108a44e09420f9f5a363b82dbf8",
+      "stage": "clippy",
+      "target_kind": [
+        "test"
+      ],
+      "target_name": "records_control",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/librelease_pair_systemd-8961a6bc8666edcc.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/tests/release_pair_systemd.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/tests/release_pair_systemd.rs",
+      "source_sha256": "c48d5ad96a246a4a1a1cc671e78f546ff44f7991a4a739bce09e4ae4a087ad52",
+      "stage": "clippy",
+      "target_kind": [
+        "test"
+      ],
+      "target_name": "release_pair_systemd",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/librecords-d25ee1c7250a182d.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/tests/records.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/tests/records.rs",
+      "source_sha256": "99d03253c4df2b6eae4b39cdb61d748409cb1af79c32e6fe038cd4b01f8186ae",
+      "stage": "clippy",
+      "target_kind": [
+        "test"
+      ],
+      "target_name": "records",
+      "version": "0.1.0"
+    },
+    {
+      "custom_build": false,
+      "executable": null,
+      "filenames": [
+        "/target/debug/deps/liblamp_records-b3604b1a3a6ba039.rmeta"
+      ],
+      "fresh": false,
+      "manifest_path": "/src-fourth-records-cap-r3/crates/records/Cargo.toml",
+      "manifest_sha256": "861b9cb0111913fa919503dd1935fa364f8ab4df39353f6865b1f9fe34817b99",
+      "manifest_source_path": "lampOS/crates/records/Cargo.toml",
+      "name": "lamp-records",
+      "package_id": "path+file:///src-fourth-records-cap-r3/crates/records#lamp-records@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "qualifies_fresh_compilation": true,
+      "source_git_path": "lampOS/crates/records/src/lib.rs",
+      "source_path": "/src-fourth-records-cap-r3/crates/records/src/lib.rs",
+      "source_sha256": "a7c4a9fbf5e86fea89c2e8b1874e1d56ff0440b02af0b8aed8638411b26ee567",
+      "stage": "clippy",
+      "target_kind": [
+        "lib"
+      ],
+      "target_name": "lamp_records",
+      "version": "0.1.0"
+    }
+  ]
+}

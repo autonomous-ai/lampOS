@@ -1,0 +1,27 @@
+{
+  "at_unix": 1792840082.253797,
+  "authorized_by": "Fourth: pinned interrupted Linux gate source/cleanup/target release verified; corrected source and local invalidation reviewed",
+  "design_sha256": "db0f1f15dfb3630a5cfc7241aefd4c11c1c76bd0fb7d6ce36adc1312ed9297e8",
+  "frozen_sha256": "c8da474482bad17d8390728b8a202be79817b5e5cdb6933f011499338ebdbcc4",
+  "no_lamp_action": true,
+  "previous_release": {
+    "diagnostic_only": false,
+    "exit": 125,
+    "no_cache_freshness_inferred_from_handoff": true,
+    "path": "/private/tmp/fourth-common-fresh-cache-gates-20261024/linux/attempt1/terminal.json",
+    "prior_failure_not_waived": true,
+    "prior_failures": [
+      {
+        "compile_error": false,
+        "effective_exit": 125,
+        "infrastructure_failure": true,
+        "primary_exit": 125,
+        "stage": "full-voice"
+      }
+    ],
+    "prior_source_stable": true,
+    "sha256": "6e0385f66e7985fdc2fdc5a0c2b90d049a0e7a8f54e87da4368c5c9f180079aa",
+    "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024"
+  },
+  "tree": "665d44694def1048095deb236a27d9677dc084fa"
+}

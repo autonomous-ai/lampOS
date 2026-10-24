@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/selftest#lamp-selftest@0.1.0` is ignored, cleaning all versions of `lamp-selftest` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/selftest#lamp-selftest@0.1.0` ignored, cleaning all versions of `lamp-selftest` found
+     Removed 58 files, 31.2MiB total

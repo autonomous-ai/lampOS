@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-common-distinct-frame-56cbd4b146f9-full-skills"
+  ],
+  "elapsed_seconds": 0.10836563599877991,
+  "exit": 0,
+  "pid": 18403,
+  "process_group": 18403,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

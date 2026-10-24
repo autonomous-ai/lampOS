@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/schedule#lamp-schedule@0.1.0` is ignored, cleaning all versions of `lamp-schedule` found
+warning: url qualifier in `-p path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/schedule#lamp-schedule@0.1.0` ignored, cleaning all versions of `lamp-schedule` found
+     Removed 151 files, 98.9MiB total

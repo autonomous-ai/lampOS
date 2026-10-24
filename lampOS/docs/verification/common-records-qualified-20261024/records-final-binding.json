@@ -1,0 +1,9 @@
+{
+  "tested_tree": "198e6784abb22eb0377606388ccd76cdcc4e8d07",
+  "final_tree": "c2e7857fc8b1f2a8dcb83378028e36397f7e321f",
+  "parent": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+  "documentation_only_delta": [
+    "lampOS/docs/verification/records-release-pair-20261024/README.md"
+  ],
+  "all_runtime_test_blobs_and_modes_equal": true
+}

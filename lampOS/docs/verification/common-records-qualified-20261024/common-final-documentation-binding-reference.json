@@ -1,0 +1,15 @@
+{
+  "authored_commit": "8ed223f4eb442b717302cf65b2f04988e08aa3a2",
+  "authored_tree": "b1a718942553a039f2f4540dc044b240ea79ee01",
+  "binding_is_separate_from_host_qualification": true,
+  "collector_did_not_read_current_authored_source_git_index_or_refs": true,
+  "independent_authored_tree_parity_verification_not_claimed_by_this_collector": true,
+  "other_runtime_test_and_source_blobs_exact_reported": 10378,
+  "postqualification_documentation_description": [
+    "result README",
+    "expanded Vietnamese overview"
+  ],
+  "postqualification_documentation_files": 2,
+  "supplied_by": "Root",
+  "tested_tree": "665d44694def1048095deb236a27d9677dc084fa"
+}

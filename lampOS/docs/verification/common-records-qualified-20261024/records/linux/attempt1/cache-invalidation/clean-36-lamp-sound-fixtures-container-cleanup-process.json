@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/local/bin/podman",
+    "rm",
+    "-f",
+    "--ignore",
+    "fourth-records-cap-r3-9b100a036049-clean-36-lamp-sound-fixtures"
+  ],
+  "elapsed_seconds": 0.12159910300033516,
+  "exit": 0,
+  "pid": 55168,
+  "process_group": 55168,
+  "process_group_absent": true,
+  "timeout_seconds": 30
+}

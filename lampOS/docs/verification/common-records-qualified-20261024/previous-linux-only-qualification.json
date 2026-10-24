@@ -1,0 +1,444 @@
+{
+  "gates": [
+    {
+      "actual_compilation_members": 46,
+      "all_host_process_groups_and_owned_containers_cleaned": true,
+      "base": "9872cb69288b9e113bb95e6b25140a60a1e91e19",
+      "compiler_bindings_independently_reparsed": true,
+      "controls": [
+        {
+          "expected_cargo_target": "unittests src/main.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/main.rs",
+              "name": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+              "status": "ok"
+            }
+          ],
+          "name": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+              "status": "ok"
+            }
+          ],
+          "name": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::missing_reads_do_not_recount_a_published_speaking_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::recovery_after_a_missing_read_counts_a_new_frame",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "unittests src/lib.rs",
+          "matches": [
+            {
+              "cargo_target": "unittests src/lib.rs",
+              "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+              "status": "ok"
+            }
+          ],
+          "name": "speaking_faces::tests::repeated_missing_reads_keep_the_original_empty_look_rate",
+          "observed_once_passed": true
+        }
+      ],
+      "linux_only": true,
+      "manual_actual_release_cases": [],
+      "name": "common",
+      "no_current_target_binary_read": true,
+      "no_mac_stream_read_or_copy": true,
+      "not_full_acceptance": true,
+      "owned_paths": 36,
+      "source_files": 10380,
+      "source_guard_verified": true,
+      "source_tree_and_index_reconstructed": true,
+      "stages": [
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "17a9df824c9150f34683bb9594e67abbe0b36bdc4ffbf5525479ef6d575ec11d",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "required_control_count": 0,
+          "stage": "fmt"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "708714472dc81ec053d78b1f641738758f790f6c5144a7780c50cc0bfd3be3c7",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "911039105505919e23d7a410b5f2a3bc79ad52e3a2a3a000d5f77656e4d79b90",
+          "required_control_count": 0,
+          "stage": "clippy"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "d5d81b6d0bc861728b8bcb27c6e1f2a41747951804f506a68d7ed3bf8b071334",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "0e474fbb489bbc32ccc80c353dec400de88cccc440f706fd6110ab4b2ceb967b",
+          "required_control_count": 0,
+          "stage": "workspace-build"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 360
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "ed265b8cb77f2ec3384392193199e77766924adbb8623d2a07ddb2a59dda0dc8",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 360
+          },
+          "raw_stdout_sha256": "5d5858f6d1993cfa3d903370b07e5e060b2b79cddcd7dedbfc72362763e04ee4",
+          "required_control_count": 1,
+          "stage": "full-eyes"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4181
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "72bdd84b98e219ac80778ec1fe6e4cc2dc15eb45dae5c4a720f7d3231f09679f",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 24,
+            "passed": 4181
+          },
+          "raw_stdout_sha256": "0f7c9299a6b15e26398598e255030079449effce188e2fce00df1ff06d586dc7",
+          "required_control_count": 4,
+          "stage": "full-voice"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 4,
+            "passed": 388
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "5450bea35e87682469017ccf7a8df750fd3903c43c14b883225301d2cfbfae1f",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 4,
+            "passed": 388
+          },
+          "raw_stdout_sha256": "d68cf4ea3e4cc519d22521630fac347c6339305c922260ac24706e928c870d1f",
+          "required_control_count": 0,
+          "stage": "full-update"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 7,
+            "passed": 519
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "09f8aed4695a905dca5f01252e67dc6fffa666099cf8828ebd2b6a7b8e248249",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 7,
+            "passed": 519
+          },
+          "raw_stdout_sha256": "8444b500feca770908dab01808cde12b0a3b7a48ef511da59f0f37c363275ae7",
+          "required_control_count": 0,
+          "stage": "full-skills"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 8,
+            "passed": 324
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "b17288b6d791aaf2e8c83443a693f2c5bd4b152bc02a2d9bf2c9d62afe045df8",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 8,
+            "passed": 324
+          },
+          "raw_stdout_sha256": "d9bb0f6e467fc264d3a2eb56fc10a0ad8765e2f797272711323514190f828720",
+          "required_control_count": 0,
+          "stage": "full-memory"
+        }
+      ],
+      "terminal_sha256": "196e56377476d913a01ab411de77461675db8cf66c0bcb591fe4fc7ac02814d7",
+      "tree": "665d44694def1048095deb236a27d9677dc084fa"
+    },
+    {
+      "actual_compilation_members": 46,
+      "all_host_process_groups_and_owned_containers_cleaned": true,
+      "base": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "compiler_bindings_independently_reparsed": true,
+      "controls": [
+        {
+          "expected_cargo_target": "tests/release_pair_systemd.rs",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "pair::host::cgroup_tests::empty_parent_with_live_descendant_refuses_cleanup",
+              "status": "ok"
+            }
+          ],
+          "name": "pair::host::cgroup_tests::empty_parent_with_live_descendant_refuses_cleanup",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "tests/release_pair_systemd.rs",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "pair::host::cgroup_tests::genuine_empty_subtree_and_absent_exact_group_allow_cleanup",
+              "status": "ok"
+            }
+          ],
+          "name": "pair::host::cgroup_tests::genuine_empty_subtree_and_absent_exact_group_allow_cleanup",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "tests/release_pair_systemd.rs",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "pair::host::cgroup_tests::missing_or_invalid_events_and_live_parent_refuse_cleanup",
+              "status": "ok"
+            }
+          ],
+          "name": "pair::host::cgroup_tests::missing_or_invalid_events_and_live_parent_refuse_cleanup",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "tests/release_pair_systemd.rs",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "pair::host::cgroup_tests::absent_group_without_unified_v2_proof_refuses_cleanup",
+              "status": "ok"
+            }
+          ],
+          "name": "pair::host::cgroup_tests::absent_group_without_unified_v2_proof_refuses_cleanup",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "tests/release_pair_systemd.rs",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "pair::host::cgroup_tests::symlinks_and_unexpected_group_paths_refuse_cleanup",
+              "status": "ok"
+            }
+          ],
+          "name": "pair::host::cgroup_tests::symlinks_and_unexpected_group_paths_refuse_cleanup",
+          "observed_once_passed": true
+        },
+        {
+          "expected_cargo_target": "tests/release_pair_systemd.rs",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "pair::host::cgroup_tests::oversized_evidence_refuses_cleanup",
+              "status": "ok"
+            }
+          ],
+          "name": "pair::host::cgroup_tests::oversized_evidence_refuses_cleanup",
+          "observed_once_passed": true
+        }
+      ],
+      "linux_only": true,
+      "manual_actual_release_cases": [
+        {
+          "expected": "ignored exactly once",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "records_6408_prunes_6449_private_sessions_and_preserves_live_invocation",
+              "status": "ignored"
+            }
+          ],
+          "name": "records_6408_prunes_6449_private_sessions_and_preserves_live_invocation",
+          "ordinary_selection_correct": true
+        },
+        {
+          "expected": "ignored exactly once",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "records_6449_prunes_6408_private_sessions_and_preserves_live_invocation",
+              "status": "ignored"
+            }
+          ],
+          "name": "records_6449_prunes_6408_private_sessions_and_preserves_live_invocation",
+          "ordinary_selection_correct": true
+        },
+        {
+          "expected": "ignored exactly once",
+          "matches": [
+            {
+              "cargo_target": "tests/release_pair_systemd.rs",
+              "name": "records_6408_refuses_6449_shared_layout_and_6449_can_resume",
+              "status": "ignored"
+            }
+          ],
+          "name": "records_6408_refuses_6449_shared_layout_and_6449_can_resume",
+          "ordinary_selection_correct": true
+        }
+      ],
+      "name": "records",
+      "no_current_target_binary_read": true,
+      "no_mac_stream_read_or_copy": true,
+      "not_full_acceptance": true,
+      "owned_paths": 2,
+      "source_files": 10442,
+      "source_guard_verified": true,
+      "source_tree_and_index_reconstructed": true,
+      "stages": [
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "4c57b5825e98383ad5e0ef17b2c15887a067e5a64bd13dc61c3e09c3b2ba62f1",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "required_control_count": 0,
+          "stage": "fmt"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "76aa4153a9ceb5bee803312d3b239c2500eba35ba1017af6d7e1b45fac24d054",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "d7fec2373b10285ff42097b225f11a79a77d5082cc65a6296ebf79fce296efb6",
+          "required_control_count": 0,
+          "stage": "clippy"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 193
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "c0f1c57ab3d9061ebc1ed7f27477764f7a5f44eb13921a2ca4eeef33c2c32c44",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 5,
+            "passed": 193
+          },
+          "raw_stdout_sha256": "70c4857aa998e09ba9c1ce5b7a5f9444b493cfe32c850668f5cbf687aefe4b13",
+          "required_control_count": 6,
+          "stage": "full-records"
+        },
+        {
+          "effective_exit": 0,
+          "final_target_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "primary_exit": 0,
+          "process_receipt_sha256": "4bff791d32c1d7d7a7817b0a69fdae5e9f2df31ba6c4b1365b39a5ea90fc94d6",
+          "raw_counts": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          },
+          "raw_stdout_sha256": "a001166b460f49a3b1327c1feb3469b06cbbb9e8d9ac7716e8ae35bc2d3a8824",
+          "required_control_count": 0,
+          "stage": "workspace-build"
+        }
+      ],
+      "terminal_sha256": "00c0764a6c0197c800411c2541f9364611643a9ba6c3ddc979280b660f0e376b",
+      "tree": "198e6784abb22eb0377606388ccd76cdcc4e8d07"
+    }
+  ],
+  "historical_failures_not_waived": true,
+  "linux_results_verified": true,
+  "not_claimed": [
+    "full Mac qualification",
+    "new ARM64 qualification",
+    "lamp behavior",
+    "latency",
+    "readiness",
+    "product activation"
+  ],
+  "verification_boundary": "Completed Linux raw receipts independently reparsed. Original source/target/cache/index/refs/mtimes not read or changed; recorded binary hashes are validated as receipts, not rehashed from active caches."
+}

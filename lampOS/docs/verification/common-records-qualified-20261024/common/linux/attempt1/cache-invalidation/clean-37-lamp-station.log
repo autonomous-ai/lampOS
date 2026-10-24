@@ -1,0 +1,3 @@
+warning: version qualifier in `-p path+file:///src-fourth-common-distinct-frame/crates/station#lamp-station@0.1.0` is ignored, cleaning all versions of `lamp-station` found
+warning: url qualifier in `-p path+file:///src-fourth-common-distinct-frame/crates/station#lamp-station@0.1.0` ignored, cleaning all versions of `lamp-station` found
+     Removed 41 files, 20.2MiB total

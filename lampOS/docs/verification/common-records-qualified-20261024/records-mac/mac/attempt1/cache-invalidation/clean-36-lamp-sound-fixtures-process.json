@@ -1,0 +1,17 @@
+{
+  "cleanup_confirmed": true,
+  "command": [
+    "cargo",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "path+file:///private/tmp/fourth-records-cap-controls-20261024/lampOS/crates/sound-fixtures#lamp-sound-fixtures@0.1.0"
+  ],
+  "elapsed_seconds": 0.24555174999841256,
+  "exit": 0,
+  "pid": 12492,
+  "process_group": 12492,
+  "process_group_absent": true,
+  "timeout_seconds": 300
+}

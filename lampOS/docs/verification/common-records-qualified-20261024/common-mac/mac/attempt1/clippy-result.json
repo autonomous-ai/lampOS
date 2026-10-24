@@ -1,0 +1,48 @@
+{
+  "compile_error_in_test_stage": false,
+  "effective_exit": 0,
+  "execution": {
+    "cleanup_confirmed": true,
+    "command": [
+      "cargo",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "--workspace",
+      "--all-targets",
+      "--message-format=json-render-diagnostics",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "elapsed_seconds": 320.8676889189992,
+    "exit": 0,
+    "pid": 14102,
+    "process_group": 14102,
+    "process_group_absent": true,
+    "timeout_seconds": 5400
+  },
+  "infrastructure_failure": false,
+  "kind": "compile",
+  "output": {
+    "cargo_target_sections": [],
+    "count_boundary": "Raw sums may include nested isolated-child output. Final-target sums select the last summary per observed Cargo Running/Doc-tests section; inspect raw sections for any nested Cargo headers.",
+    "final_target_aggregate": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    },
+    "named_results": [],
+    "raw_aggregate": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    },
+    "raw_summaries": [],
+    "selected_final_target_summaries": []
+  },
+  "primary_exit": 0,
+  "required_controls": [],
+  "stage": "clippy"
+}

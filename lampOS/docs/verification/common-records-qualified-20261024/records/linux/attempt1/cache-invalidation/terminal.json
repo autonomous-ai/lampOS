@@ -1,0 +1,16 @@
+{
+  "exit": 0,
+  "expected_local_members": 46,
+  "operations_sha256": "64dc32f121574d2e419923af12acdbb891c7bfe9ba1dc7c88e5c5707c596b63e",
+  "platform": "linux",
+  "registry_git_dependency_outputs_not_selected_for_clean": true,
+  "separate_prerequisite_not_test_pass": true,
+  "source_mtimes_not_rewritten": true,
+  "source_stable": true,
+  "successful_local_cleans": 46,
+  "target": "/private/tmp/fourth-memory-recovery-linux-target-20261024",
+  "target_release_permitted": true,
+  "total_elapsed_seconds": 127.02977332599949,
+  "tree": "198e6784abb22eb0377606388ccd76cdcc4e8d07",
+  "validated_local_members": 46
+}
