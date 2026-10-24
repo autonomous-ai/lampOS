@@ -189,6 +189,19 @@ the original call ID and context; it does not issue a new deadline. A current
 Memory lease alone cannot authorize a recording, and an audio context cannot
 restore a revoked scope.
 
+The coordinator records each offer the second worker hands it as
+`requested_audio_offered`, with `accepted`. A refused one also has `refused`,
+the first condition that refused it, and the journal says
+`request N: requested audio refused: <why>` once. The conditions, in order:
+requested audio off or unavailable; not the turn in hand; not a spoken turn;
+the turn's one offer already made; the turn's provider speech not started;
+the provider idle; the turn's speech not the provider's; a local-only,
+reminder or Say turn; the speaker belonging to another owner; the microphone
+not allowed; an offer that does not check; another worker boot, request,
+provider session or privacy generation; and last, a recording that could not
+be prepared. On lamp-4ace on 24 Oct a first "play me something to relax" was
+refused with nothing to say which (#2793).
+
 The same socket accepts two private operations:
 
 - `audio_authorize`, with the complete `offer` and `phase` of `start` or
