@@ -1,0 +1,49 @@
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	﻿2026-10-24T02:18:37.1710150Z ##[group]Run set -euo pipefail
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1710736Z [36;1mset -euo pipefail[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1711322Z [36;1mgit -c safe.directory="$GITHUB_WORKSPACE" ls-files -z | sort -z | xargs -0 sha256sum > /tmp/pair-output/source-before.sha256[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1711891Z [36;1mresult=0[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1712173Z [36;1mfor part in skills; do[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1712453Z [36;1m  set +e[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1712816Z [36;1m  cargo test --locked --release -p "lamp-$part" --test release_pair \[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1713331Z [36;1m    -- --ignored --nocapture --test-threads=1 \[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1713724Z [36;1m    2>&1 | tee "/tmp/pair-output/$part-tests.log"[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1714132Z [36;1m  part_result=${PIPESTATUS[0]}[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1714419Z [36;1m  set -e[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1714764Z [36;1m  printf '%s\n' "$part_result" > "/tmp/pair-output/$part-exit"[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1715198Z [36;1m  if [ "$part_result" -ne 0 ]; then result=1; fi[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1715619Z [36;1mdone[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1715924Z [36;1mprintf '%s\n' "$result" > /tmp/pair-output/test-exit[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1716541Z [36;1mgit -c safe.directory="$GITHUB_WORKSPACE" ls-files -z | sort -z | xargs -0 sha256sum > /tmp/pair-output/source-after.sha256[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1717315Z [36;1mcmp /tmp/pair-output/source-before.sha256 /tmp/pair-output/source-after.sha256[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1717782Z [36;1mexit "$result"[0m
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1718324Z shell: bash --noprofile --norc -e -o pipefail {0}
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1718661Z env:
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1718879Z   CARGO_HOME: /github/home/.cargo
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1719610Z   PAIR_PR_HEAD: 1ee2df9407b8e6430f00c0c270e92548e28cbbce
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1719962Z   LAMP_COMPAT_OUTPUT: /tmp/pair-output
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1720324Z   LAMP_COMPAT_SKILLS_6408: /tmp/pair-artifacts/6408/lamp-skills
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1720803Z   LAMP_COMPAT_SKILLS_6498: /tmp/pair-artifacts/6498/lamp-skills
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.1721176Z ##[endgroup]
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.8551586Z info: syncing channel updates for 1.96.0-aarch64-unknown-linux-gnu
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.9858688Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:37.9968852Z info: downloading component clippy
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:38.5878737Z     Updating crates.io index
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:38.5885573Z     Updating git repository `https://github.com/RustAudio/cpal.git`
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4278273Z error: failed to get `serde_core` as a dependency of package `serde v1.0.229`
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4280116Z     ... which satisfies dependency `serde = "^1.0"` (locked to 1.0.229) of package `lamp-sound-fixtures v0.1.0 (/__w/lampOS/lampOS/lampOS/crates/sound-fixtures)`
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4280683Z 
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4280843Z Caused by:
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4281091Z   failed to load source for dependency `serde_core`
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4281390Z 
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4281487Z Caused by:
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4281715Z   unable to update registry `crates-io`
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4281928Z 
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4282058Z Caused by:
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4282307Z   download of se/rd/serde_core failed
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4282505Z 
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4282596Z Caused by:
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4282866Z   curl failed
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4282985Z 
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4283087Z Caused by:
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:40.4283331Z   [16] Error in the HTTP2 framing layer
+published 6408 and 6498 routine readers on ARM64	execute the published writers and opposite readers	2026-10-24T02:18:41.0374400Z ##[error]Process completed with exit code 1.
