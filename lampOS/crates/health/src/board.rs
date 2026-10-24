@@ -39,6 +39,16 @@ pub const WARN_BELOW_PASSIVE_C: i64 = 0;
 /// A zone this close below its critical trip point is an error. At that
 /// point the board turns itself off.
 pub const ERROR_BELOW_CRITICAL_C: i64 = 10;
+/// A zone whose critical point is this low or lower is the lamp's case
+/// (`skin_zone`, off at 50), not a processor: it is an error only this close
+/// below that point, and a warning from [`WARN_BELOW_LOW_CRITICAL_C`] under
+/// it. Ten under 50 is the case's working heat: on lamp-4ace on 24 Oct it
+/// read 40 to 42 °C all afternoon with the voice and eyes at work, its
+/// health said error, and the lamp drooped as unwell 18 times in three
+/// hours (the not-feeling-well skill).
+pub const LOW_CRITICAL_C: i64 = 60;
+pub const ERROR_BELOW_LOW_CRITICAL_C: i64 = 4;
+pub const WARN_BELOW_LOW_CRITICAL_C: i64 = 8;
 /// A zone that names no trip point of its own is a warning from here.
 pub const WARN_WITHOUT_TRIPS_C: i64 = 80;
 /// And an error from here: where the board's processor zones have their
@@ -333,8 +343,16 @@ impl Zone {
                 None
             };
         }
+        let low = self
+            .critical_milli_c
+            .is_some_and(|critical| critical <= LOW_CRITICAL_C * 1_000);
+        let below_critical = if low {
+            ERROR_BELOW_LOW_CRITICAL_C
+        } else {
+            ERROR_BELOW_CRITICAL_C
+        };
         if let Some(critical) = self.critical_milli_c
-            && self.milli_c >= critical - ERROR_BELOW_CRITICAL_C * 1_000
+            && self.milli_c >= critical - below_critical * 1_000
         {
             return error(format!(
                 "{name} is at {at} °C: the board turns itself off at {}",
@@ -355,6 +373,15 @@ impl Zone {
             return warn(format!(
                 "{name} is at {at} °C: the board slows itself down from {}",
                 degrees(first)
+            ));
+        }
+        if let Some(critical) = self.critical_milli_c
+            && low
+            && self.milli_c >= critical - WARN_BELOW_LOW_CRITICAL_C * 1_000
+        {
+            return warn(format!(
+                "{name} is at {at} °C: warm, and the board turns itself off at {}",
+                degrees(critical)
             ));
         }
         None
