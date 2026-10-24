@@ -1,0 +1,36 @@
+{
+  "tag": "lampos-lamp-voice-6592",
+  "published_at": "2026-10-24T09:26:46Z",
+  "decoded_not_signature_verified": true,
+  "sequence": 6592,
+  "commit": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+  "key_label_not_a_trust_anchor": "54213f8d3aa2f241",
+  "manifest_matches_envelope_payload": true,
+  "files": 32,
+  "units_by_lamp": {
+    "lamp-4ace": 16,
+    "lamp-52e6": 12
+  },
+  "optional_sections_present": {
+    "models": false,
+    "settings": false,
+    "image": false
+  },
+  "inputs": [
+    {
+      "name": "manifest.json",
+      "asset_id": 671832142,
+      "bytes": 10042,
+      "sha256": "f755aeac99be7144ddeff10ea650e924c426d89344850b9b1df8739c8a7d8695",
+      "github_asset_digest_matched": true
+    },
+    {
+      "name": "lampos-manifest.json",
+      "asset_id": 671832137,
+      "bytes": 13563,
+      "sha256": "8d5e4b88940e01bfad773dec261b621d861c937e6efe4f3dccb9828a32c79bbc",
+      "github_asset_digest_matched": true
+    }
+  ],
+  "limits": "No positive signature verification, payload downloads/verification, installation, rollback or device acceptance in this observation."
+}
