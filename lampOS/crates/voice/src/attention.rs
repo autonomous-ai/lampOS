@@ -582,8 +582,15 @@ const STAND_INS: &[&str] = &[
 /// writes "Lamp" so, Gemini's transcript doesn't, and Linh and Lin are
 /// common names, so "Lin, pass me that." between people stays held on a
 /// Live lamp.
+///
+/// "Louvre" is the word written for "Lamp," most often: 27 of the played
+/// lines on lamp-4ace from 22 to 25 October, every one said as "Lamp" or
+/// "Hey Lamp". 15 of them were held, 11 as said to someone it calls by
+/// name ("Louvre, what did I just ask you?" five times of five). Nobody's
+/// name, and lamp-name heard none of those five, so the near rule
+/// (`LAMP_NAME_NEAR`) could not take it.
 const STAND_ALONE_INS: &[&str] = &[
-    "lynn", "len", "lin", "lump", "land", "line", "palin", "palan",
+    "lynn", "len", "lin", "lump", "land", "line", "palin", "palan", "louvre",
 ];
 
 /// [`STAND_ALONE_INS`] when they count, else none.
@@ -3858,6 +3865,8 @@ mod tests {
             "Palin, set a timer for five minutes.",
             "Len, what's the weather?",
             "Lin, what time is it?",
+            "Louvre, what did I just ask you?",
+            "Hey, Louvre. What time is it in London right now?",
         ] {
             assert!(!addresses_someone_else_on(heard, true), "{heard}");
             assert!(called_by_name_on(heard, true), "{heard}");
@@ -3865,6 +3874,7 @@ mod tests {
         for heard in [
             "Line up the meetings for me.",
             "We should land the plan soon.",
+            "We went to the Louvre in May.",
         ] {
             assert!(!called_by_name_on(heard, true), "{heard}");
         }
@@ -3926,6 +3936,15 @@ mod tests {
                     Some(Verdict::Play(_))
                 ),
                 "the second route, {room:?}"
+            );
+            // 25 Oct: held five times of five on lamp-4ace as said to
+            // someone it calls by name.
+            assert!(
+                matches!(
+                    judged("Louvre, what did I just ask you?", true, room),
+                    Some(Verdict::Play(_))
+                ),
+                "Louvre on the second route, {room:?}"
             );
         }
     }
@@ -4693,6 +4712,7 @@ mod tests {
             "lamp",
             "Hey Lamp,",
             "Hey, Lynn.",
+            "Louvre.",
             "Okay. Lamp?",
             "Lamb.",
         ] {
