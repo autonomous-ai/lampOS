@@ -1,0 +1,427 @@
+{
+  "excluded_count": 70,
+  "excluded_files": [
+    {
+      "bytes": 8192,
+      "path": "sr-5ajYy8/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "7f70d97943a36b583ffe0e6d77a7d566413a29837d6fbdd4fb1c3f6d84394536"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-5ajYy8/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "6cfca16ed83bd92746178b0442fa27c440c933003b0712a04ab07dd3c76886dc"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-5ajYy8/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "6cfca16ed83bd92746178b0442fa27c440c933003b0712a04ab07dd3c76886dc"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-5ajYy8/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "7f70d97943a36b583ffe0e6d77a7d566413a29837d6fbdd4fb1c3f6d84394536"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-5ajYy8/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "7f70d97943a36b583ffe0e6d77a7d566413a29837d6fbdd4fb1c3f6d84394536"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BHk9zP/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "2b82a577423c8bd564c7b56354ff66e76276144017bb441f219201b8bfb788cf"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BHk9zP/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "a3e726de92c6c2215f10a3561bab7909de279691ce264c5f9d12996c05a5b4d0"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BHk9zP/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "a3e726de92c6c2215f10a3561bab7909de279691ce264c5f9d12996c05a5b4d0"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BHk9zP/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "2b82a577423c8bd564c7b56354ff66e76276144017bb441f219201b8bfb788cf"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BHk9zP/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "2b82a577423c8bd564c7b56354ff66e76276144017bb441f219201b8bfb788cf"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BR3DEG/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "b7f378009c27abe1745f0c25a4bcb3edbb714638e15df6781ade31a687597e06"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BR3DEG/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "6147b705621c531bcae3ed4d6efe4ebc0ca6409d416a08d49b4cba5a1a14f41f"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BR3DEG/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "6147b705621c531bcae3ed4d6efe4ebc0ca6409d416a08d49b4cba5a1a14f41f"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BR3DEG/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "b7f378009c27abe1745f0c25a4bcb3edbb714638e15df6781ade31a687597e06"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-BR3DEG/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "b7f378009c27abe1745f0c25a4bcb3edbb714638e15df6781ade31a687597e06"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-MiUqM0/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "20367065be0f2810c0461dcf8a6e3ca49b622c5487ee58b99926b084481f697d"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-MiUqM0/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "cf36e5aa3eec49d16465ae4153b5be0059ba3c8c9db2441e7a55a7ace3e661c8"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-MiUqM0/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "cf36e5aa3eec49d16465ae4153b5be0059ba3c8c9db2441e7a55a7ace3e661c8"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-MiUqM0/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "20367065be0f2810c0461dcf8a6e3ca49b622c5487ee58b99926b084481f697d"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-MiUqM0/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "20367065be0f2810c0461dcf8a6e3ca49b622c5487ee58b99926b084481f697d"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-a7TlvF/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "28fecee079f98deb1f9f059abf2c8f22e1b15ef4d0cbeddd160d9277b3114768"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-a7TlvF/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "432e0427462c63510b8ff768108370f58d71554ba6ee4894e1032cb50f175885"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-a7TlvF/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "432e0427462c63510b8ff768108370f58d71554ba6ee4894e1032cb50f175885"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-a7TlvF/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "28fecee079f98deb1f9f059abf2c8f22e1b15ef4d0cbeddd160d9277b3114768"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-a7TlvF/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "28fecee079f98deb1f9f059abf2c8f22e1b15ef4d0cbeddd160d9277b3114768"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-fZpkjh/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "3b862dfb145ef8ec1d27375e9b625e029bd6d404a07b304beb6ba2b26dd929b0"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-fZpkjh/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "67ffff28d692e2e786d8aa041422042c94cadaaeb06b3ca2c691bf788f79267b"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-fZpkjh/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "67ffff28d692e2e786d8aa041422042c94cadaaeb06b3ca2c691bf788f79267b"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-fZpkjh/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "3b862dfb145ef8ec1d27375e9b625e029bd6d404a07b304beb6ba2b26dd929b0"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-fZpkjh/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "3b862dfb145ef8ec1d27375e9b625e029bd6d404a07b304beb6ba2b26dd929b0"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-h1QUdT/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "55ab4865dcd6fd3d3b14296701169d9dd8c2e10cc2f41872a00e5270514ed66e"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-h1QUdT/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "0ee56594ff0403c8d830b4491a4dd0129ca14a9f2b9b6800c11d71fe5802b1f2"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-h1QUdT/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "0ee56594ff0403c8d830b4491a4dd0129ca14a9f2b9b6800c11d71fe5802b1f2"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-h1QUdT/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "55ab4865dcd6fd3d3b14296701169d9dd8c2e10cc2f41872a00e5270514ed66e"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-h1QUdT/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "55ab4865dcd6fd3d3b14296701169d9dd8c2e10cc2f41872a00e5270514ed66e"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-oHJ6Fx/store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "0df7cc89dd6734e3c541873b5c89883de2b7d7c26f2b3eb8e22af04763a1bf31"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-oHJ6Fx/store-after-1/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "04baf96a28efad6e514f971d15b358ad1f4df22c4fa4d84d3e19aba637026a52"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-oHJ6Fx/store-after-2/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "04baf96a28efad6e514f971d15b358ad1f4df22c4fa4d84d3e19aba637026a52"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-oHJ6Fx/store-after-3/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "0df7cc89dd6734e3c541873b5c89883de2b7d7c26f2b3eb8e22af04763a1bf31"
+    },
+    {
+      "bytes": 8192,
+      "path": "sr-oHJ6Fx/store-after-4/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "0df7cc89dd6734e3c541873b5c89883de2b7d7c26f2b3eb8e22af04763a1bf31"
+    },
+    {
+      "bytes": 49152,
+      "path": "tasks-6408-to-6498-pNFWqf/claude/store/tasks.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "4f9c47f9714ef7bf075b59eceff99a8b68c001ebb9765e90ee0e70711028ef3b"
+    },
+    {
+      "bytes": 24576,
+      "path": "tasks-6408-to-6498-pNFWqf/devin/store/tasks.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "7d193339ad1b99a9eaaf595a8e3697a5a7d51ec9cf5b767f6aadbf41353c0148"
+    },
+    {
+      "bytes": 24576,
+      "path": "tasks-6408-to-6498-pNFWqf/devin-cloud/store/tasks.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "332ccf97a6208f62c8b6491d961b0b281dcd45ee5de60592552d0f3d0e2a81c2"
+    },
+    {
+      "bytes": 24576,
+      "path": "tasks-6498-to-6408-Mw5IoY/claude/store/tasks.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "4733c2183f5dabdae4d624c9a68e9a0cdc1cee8bf889fff3e8df2019b082d1c4"
+    },
+    {
+      "bytes": 24576,
+      "path": "tasks-6498-to-6408-Mw5IoY/devin/store/tasks.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "423e991f8a0d015ad095d96fc464ae146f0a7c451941746309e59b07b02864ba"
+    },
+    {
+      "bytes": 24576,
+      "path": "tasks-6498-to-6408-Mw5IoY/devin-cloud/store/tasks.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "42bc4ccc103d6b08ee86abbb63725133be69b2bb29b63d503b43cb05abd62224"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-011510e25198/cut-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "eabb8b35ebca82b0540bc2c560efdd59099442b2b550371340b789c99def7502"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-011510e25198/ledger/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "ac8202d4ee8e0cbbbe0f33a2ee0bd0fa62838d676dfce312cac7cfb5e97736fa"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-011510e25198/recovered-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "ac8202d4ee8e0cbbbe0f33a2ee0bd0fa62838d676dfce312cac7cfb5e97736fa"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-011510e25198/returned-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "ac8202d4ee8e0cbbbe0f33a2ee0bd0fa62838d676dfce312cac7cfb5e97736fa"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-3f1cdd08d3e0/cut-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "11227543cff51ca1008162aec838289ea044a25d1b9666f5de848c7c6cd6bb8e"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-3f1cdd08d3e0/ledger/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "61b3669ee24855672ee844f603113eef19a8ccfed7805c21e0d2dd4b45320a7c"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-3f1cdd08d3e0/recovered-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "61b3669ee24855672ee844f603113eef19a8ccfed7805c21e0d2dd4b45320a7c"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-3f1cdd08d3e0/returned-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "61b3669ee24855672ee844f603113eef19a8ccfed7805c21e0d2dd4b45320a7c"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-435482f1b806/cut-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "9729b542ab05d105194134b0884332010e6c708ba759213d0f504e54f2f7afe8"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-435482f1b806/ledger/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "46d356f249be759e1e990229de478544c9041c77c4d6af1433dc9903d119b2e2"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-435482f1b806/recovered-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "46d356f249be759e1e990229de478544c9041c77c4d6af1433dc9903d119b2e2"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-435482f1b806/returned-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "46d356f249be759e1e990229de478544c9041c77c4d6af1433dc9903d119b2e2"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-4422e7dd0c07/cut-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "9f6f8d07396cbb9527bee3995ebef1276bfec6abe95289db2c0d858e1beaa78d"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-4422e7dd0c07/ledger/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "ddfc007e491b330043b83b6f48478b3c62f2a4ba717183d2c975b83844ab8804"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-4422e7dd0c07/recovered-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "ddfc007e491b330043b83b6f48478b3c62f2a4ba717183d2c975b83844ab8804"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-4422e7dd0c07/returned-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "ddfc007e491b330043b83b6f48478b3c62f2a4ba717183d2c975b83844ab8804"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5188a82fadfb/cut-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "88bdb245ae47f77d547caa9c47b3179e166b2e640d503ce6b87a75e512abdffa"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5188a82fadfb/ledger/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "4883732a7822ef38f70db07624b7b73f0f8fdd4c7f19eede96b54bc521912169"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5188a82fadfb/recovered-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "4883732a7822ef38f70db07624b7b73f0f8fdd4c7f19eede96b54bc521912169"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5188a82fadfb/returned-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "4883732a7822ef38f70db07624b7b73f0f8fdd4c7f19eede96b54bc521912169"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5d25ac9e930a/cut-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "ddc49d702cdf0e0c8c62bcc93ef5c94cc65a5871e03c91afac979a7ba769337b"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5d25ac9e930a/ledger/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "b58e36655c60ec89f685a384ae70f948d2dcd59a2a925b44cd837166aea7e80f"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5d25ac9e930a/recovered-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "b58e36655c60ec89f685a384ae70f948d2dcd59a2a925b44cd837166aea7e80f"
+    },
+    {
+      "bytes": 8192,
+      "path": "vr-5d25ac9e930a/returned-store/schedule.sqlite3",
+      "reason": "Executable or database binary",
+      "sha256": "b58e36655c60ec89f685a384ae70f948d2dcd59a2a925b44cd837166aea7e80f"
+    }
+  ],
+  "format": 1,
+  "note": "Omitted binary case storage remains bound by the verified private ZIP. Full source manifests and authored blob maps are represented by hashes and their complete comparison in ci.json. Raw API objects and full workflow logs are not copied."
+}

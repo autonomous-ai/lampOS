@@ -1,0 +1,1204 @@
+{
+  "archive": {
+    "bytes": 704862,
+    "case_archive_members": 472,
+    "exit": 0,
+    "file": "pair/artifact.zip",
+    "id": 12545139282,
+    "seconds": 3.031,
+    "sha256": "c215d652bf0891bb9a51c2dba2f28ab91953b18907d448771937f7e9f0e44468",
+    "tar_sha256": "df2758179b1c37f57cac0992eb21617e2b1902e5840571e9a0ab270942214239"
+  },
+  "authored_root_tree": "d2c1b1ac6633cde9ddc5b505e188935df43320eb",
+  "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "cases": {
+    "schedule": [
+      {
+        "case": "sr-5ajYy8",
+        "changed_boot_identity": true,
+        "first": 6498,
+        "last_receipt": "snooze",
+        "second": 6408,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "6cfca16ed83bd92746178b0442fa27c440c933003b0712a04ab07dd3c76886dc",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "6cfca16ed83bd92746178b0442fa27c440c933003b0712a04ab07dd3c76886dc",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "7f70d97943a36b583ffe0e6d77a7d566413a29837d6fbdd4fb1c3f6d84394536",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "7f70d97943a36b583ffe0e6d77a7d566413a29837d6fbdd4fb1c3f6d84394536",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "82358c112d6e236fcc22773ef834cacfece28c76f7154a083aa0153a2ceb7038"
+      },
+      {
+        "case": "sr-BHk9zP",
+        "changed_boot_identity": true,
+        "first": 6408,
+        "last_receipt": "ack",
+        "second": 6498,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "a3e726de92c6c2215f10a3561bab7909de279691ce264c5f9d12996c05a5b4d0",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "a3e726de92c6c2215f10a3561bab7909de279691ce264c5f9d12996c05a5b4d0",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "2b82a577423c8bd564c7b56354ff66e76276144017bb441f219201b8bfb788cf",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "2b82a577423c8bd564c7b56354ff66e76276144017bb441f219201b8bfb788cf",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "4186675479ffcfa845c492ea22934d35753ce8173a7abc0206ce4dcd7ec3196a"
+      },
+      {
+        "case": "sr-BR3DEG",
+        "changed_boot_identity": false,
+        "first": 6408,
+        "last_receipt": "ack",
+        "second": 6498,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "6147b705621c531bcae3ed4d6efe4ebc0ca6409d416a08d49b4cba5a1a14f41f",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "6147b705621c531bcae3ed4d6efe4ebc0ca6409d416a08d49b4cba5a1a14f41f",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "b7f378009c27abe1745f0c25a4bcb3edbb714638e15df6781ade31a687597e06",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "b7f378009c27abe1745f0c25a4bcb3edbb714638e15df6781ade31a687597e06",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "7b4a47c086e49c87025de243c4808d308e497a4629c0b940d6459e86cc42b4d8"
+      },
+      {
+        "case": "sr-MiUqM0",
+        "changed_boot_identity": false,
+        "first": 6408,
+        "last_receipt": "snooze",
+        "second": 6498,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "cf36e5aa3eec49d16465ae4153b5be0059ba3c8c9db2441e7a55a7ace3e661c8",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "cf36e5aa3eec49d16465ae4153b5be0059ba3c8c9db2441e7a55a7ace3e661c8",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "20367065be0f2810c0461dcf8a6e3ca49b622c5487ee58b99926b084481f697d",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "20367065be0f2810c0461dcf8a6e3ca49b622c5487ee58b99926b084481f697d",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "4155e2a0545993e5ee092ae07b458e8e75bd17dd7de855d3a8d154033028b344"
+      },
+      {
+        "case": "sr-a7TlvF",
+        "changed_boot_identity": false,
+        "first": 6498,
+        "last_receipt": "ack",
+        "second": 6408,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "432e0427462c63510b8ff768108370f58d71554ba6ee4894e1032cb50f175885",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "432e0427462c63510b8ff768108370f58d71554ba6ee4894e1032cb50f175885",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "28fecee079f98deb1f9f059abf2c8f22e1b15ef4d0cbeddd160d9277b3114768",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "28fecee079f98deb1f9f059abf2c8f22e1b15ef4d0cbeddd160d9277b3114768",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "2f29ab5de6573c9c851fdbee341c6e6b830b4e4b5ce7e467f0652c23e2bc85e4"
+      },
+      {
+        "case": "sr-fZpkjh",
+        "changed_boot_identity": true,
+        "first": 6408,
+        "last_receipt": "snooze",
+        "second": 6498,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "67ffff28d692e2e786d8aa041422042c94cadaaeb06b3ca2c691bf788f79267b",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "67ffff28d692e2e786d8aa041422042c94cadaaeb06b3ca2c691bf788f79267b",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "3b862dfb145ef8ec1d27375e9b625e029bd6d404a07b304beb6ba2b26dd929b0",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "3b862dfb145ef8ec1d27375e9b625e029bd6d404a07b304beb6ba2b26dd929b0",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "9b76b8b87882a2b0d3ed30b41cc45ce426f1a03e4d85093930c5fc18013efaf0"
+      },
+      {
+        "case": "sr-h1QUdT",
+        "changed_boot_identity": false,
+        "first": 6498,
+        "last_receipt": "snooze",
+        "second": 6408,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "0ee56594ff0403c8d830b4491a4dd0129ca14a9f2b9b6800c11d71fe5802b1f2",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "0ee56594ff0403c8d830b4491a4dd0129ca14a9f2b9b6800c11d71fe5802b1f2",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "55ab4865dcd6fd3d3b14296701169d9dd8c2e10cc2f41872a00e5270514ed66e",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "55ab4865dcd6fd3d3b14296701169d9dd8c2e10cc2f41872a00e5270514ed66e",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "ba77956801c61b442f73d334a5adf3afdfedfe3e44ce6790e1df6cb6fde3eff6"
+      },
+      {
+        "case": "sr-oHJ6Fx",
+        "changed_boot_identity": true,
+        "first": 6498,
+        "last_receipt": "ack",
+        "second": 6408,
+        "snapshot_checks": [
+          {
+            "bytes": 8192,
+            "sha256": "04baf96a28efad6e514f971d15b358ad1f4df22c4fa4d84d3e19aba637026a52",
+            "stage": 1
+          },
+          {
+            "bytes": 8192,
+            "sha256": "04baf96a28efad6e514f971d15b358ad1f4df22c4fa4d84d3e19aba637026a52",
+            "stage": 2
+          },
+          {
+            "bytes": 8192,
+            "sha256": "0df7cc89dd6734e3c541873b5c89883de2b7d7c26f2b3eb8e22af04763a1bf31",
+            "stage": 3
+          },
+          {
+            "bytes": 8192,
+            "sha256": "0df7cc89dd6734e3c541873b5c89883de2b7d7c26f2b3eb8e22af04763a1bf31",
+            "stage": 4
+          }
+        ],
+        "state": "Stable store, pending id1 and snoozed id2 preserved; completed id3 absent; opposite id4 and receipts retained.",
+        "successful_waited_exits": 4,
+        "transcript_sha256": "acde41b1168e360d5e678819d7151ab350e29094bc66962141e204fb9d0b4246"
+      }
+    ],
+    "tasks": [
+      {
+        "accepted_tasks": 2,
+        "case": "tasks-6408-to-6498-pNFWqf",
+        "companions_unchanged": true,
+        "completion": "unverified",
+        "cut": {
+          "held_cli": {
+            "pid": 7352,
+            "reaped": true,
+            "signal": 9,
+            "starttime": 1387305
+          },
+          "tasks_pid": 7336,
+          "tasks_reaped": true,
+          "tasks_signal": 9
+        },
+        "engine": "claude",
+        "launch_calls": 3,
+        "observations": 2,
+        "old_escaped_prompt_preserved": true,
+        "opposite": 6498,
+        "opposite_write_reopened": true,
+        "refusals": [
+          "untrusted",
+          "stale_session",
+          "bad_text"
+        ],
+        "replayed_launches": 0,
+        "requests_sha256": "067eeff85cc375adcb91e144d5a6d2ff1f4c7251ef181b7bd82b0f6a3a53edbc",
+        "schema": 1,
+        "seconds": 0.642183419,
+        "snapshots_checked": 3,
+        "state_checked": "Accepted launch/observation data survive; claimed speech becomes uncertain; attempting becomes uncertain; queued/prepared become invalidated; opposite cancelled write reopens.",
+        "store_id_preserved": true,
+        "writer": 6408
+      },
+      {
+        "accepted_tasks": 2,
+        "case": "tasks-6408-to-6498-pNFWqf",
+        "companions_unchanged": true,
+        "completion": "unverified",
+        "cut": {
+          "held_cli": {
+            "pid": 7387,
+            "reaped": true,
+            "signal": 9,
+            "starttime": 1387371
+          },
+          "tasks_pid": 7371,
+          "tasks_reaped": true,
+          "tasks_signal": 9
+        },
+        "engine": "devin",
+        "launch_calls": 3,
+        "observations": 2,
+        "old_escaped_prompt_preserved": false,
+        "opposite": 6498,
+        "opposite_write_reopened": true,
+        "refusals": [
+          "untrusted",
+          "stale_session"
+        ],
+        "replayed_launches": 0,
+        "requests_sha256": "cb2d1173e9cea6abb3726adb1d9323f693363d657ae3ac587ee977ab29c4f80a",
+        "schema": 2,
+        "seconds": 0.693909326,
+        "snapshots_checked": 3,
+        "state_checked": "Accepted launch/observation data survive; claimed speech becomes uncertain; attempting becomes uncertain; queued/prepared become invalidated; opposite cancelled write reopens.",
+        "store_id_preserved": true,
+        "writer": 6408
+      },
+      {
+        "accepted_tasks": 2,
+        "case": "tasks-6408-to-6498-pNFWqf",
+        "companions_unchanged": true,
+        "completion": "unverified",
+        "cut": {
+          "held_cli": {
+            "pid": 7422,
+            "reaped": true,
+            "signal": 9,
+            "starttime": 1387439
+          },
+          "tasks_pid": 7406,
+          "tasks_reaped": true,
+          "tasks_signal": 9
+        },
+        "engine": "devin-cloud",
+        "launch_calls": 3,
+        "observations": 2,
+        "old_escaped_prompt_preserved": false,
+        "opposite": 6498,
+        "opposite_write_reopened": true,
+        "refusals": [
+          "untrusted",
+          "stale_session"
+        ],
+        "replayed_launches": 0,
+        "requests_sha256": "59f03da3e97c84e53bb898365621262cc282484cc23b35af4c325bde5f42f7f7",
+        "schema": 3,
+        "seconds": 0.666763867,
+        "snapshots_checked": 3,
+        "state_checked": "Accepted launch/observation data survive; claimed speech becomes uncertain; attempting becomes uncertain; queued/prepared become invalidated; opposite cancelled write reopens.",
+        "store_id_preserved": true,
+        "writer": 6408
+      },
+      {
+        "accepted_tasks": 2,
+        "case": "tasks-6498-to-6408-Mw5IoY",
+        "companions_unchanged": true,
+        "completion": "unverified",
+        "cut": {
+          "held_cli": {
+            "pid": 7246,
+            "reaped": true,
+            "signal": 9,
+            "starttime": 1387095
+          },
+          "tasks_pid": 7230,
+          "tasks_reaped": true,
+          "tasks_signal": 9
+        },
+        "engine": "claude",
+        "launch_calls": 3,
+        "observations": 2,
+        "old_escaped_prompt_preserved": false,
+        "opposite": 6408,
+        "opposite_write_reopened": true,
+        "refusals": [
+          "untrusted",
+          "stale_session"
+        ],
+        "replayed_launches": 0,
+        "requests_sha256": "df4ee1e031482b406ca662148f272cec1011bc16d759113c31dc0024d162203d",
+        "schema": 1,
+        "seconds": 0.686620137,
+        "snapshots_checked": 3,
+        "state_checked": "Accepted launch/observation data survive; claimed speech becomes uncertain; attempting becomes uncertain; queued/prepared become invalidated; opposite cancelled write reopens.",
+        "store_id_preserved": true,
+        "writer": 6498
+      },
+      {
+        "accepted_tasks": 2,
+        "case": "tasks-6498-to-6408-Mw5IoY",
+        "companions_unchanged": true,
+        "completion": "unverified",
+        "cut": {
+          "held_cli": {
+            "pid": 7281,
+            "reaped": true,
+            "signal": 9,
+            "starttime": 1387164
+          },
+          "tasks_pid": 7265,
+          "tasks_reaped": true,
+          "tasks_signal": 9
+        },
+        "engine": "devin",
+        "launch_calls": 3,
+        "observations": 2,
+        "old_escaped_prompt_preserved": false,
+        "opposite": 6408,
+        "opposite_write_reopened": true,
+        "refusals": [
+          "untrusted",
+          "stale_session"
+        ],
+        "replayed_launches": 0,
+        "requests_sha256": "64be1fa8330ebb52405bd99fef82ee081ff6d918f76b79762c59b006ec6bace9",
+        "schema": 2,
+        "seconds": 0.646210885,
+        "snapshots_checked": 3,
+        "state_checked": "Accepted launch/observation data survive; claimed speech becomes uncertain; attempting becomes uncertain; queued/prepared become invalidated; opposite cancelled write reopens.",
+        "store_id_preserved": true,
+        "writer": 6498
+      },
+      {
+        "accepted_tasks": 2,
+        "case": "tasks-6498-to-6408-Mw5IoY",
+        "companions_unchanged": true,
+        "completion": "unverified",
+        "cut": {
+          "held_cli": {
+            "pid": 7316,
+            "reaped": true,
+            "signal": 9,
+            "starttime": 1387232
+          },
+          "tasks_pid": 7300,
+          "tasks_reaped": true,
+          "tasks_signal": 9
+        },
+        "engine": "devin-cloud",
+        "launch_calls": 3,
+        "observations": 2,
+        "old_escaped_prompt_preserved": false,
+        "opposite": 6408,
+        "opposite_write_reopened": true,
+        "refusals": [
+          "untrusted",
+          "stale_session"
+        ],
+        "replayed_launches": 0,
+        "requests_sha256": "e2e713a5ae6c69eaaa967c6c5fcaba04ab4f2f713f676bbe62b48ceb28db287a",
+        "schema": 3,
+        "seconds": 0.681939625,
+        "snapshots_checked": 3,
+        "state_checked": "Accepted launch/observation data survive; claimed speech becomes uncertain; attempting becomes uncertain; queued/prepared become invalidated; opposite cancelled write reopens.",
+        "store_id_preserved": true,
+        "writer": 6498
+      }
+    ],
+    "voice": [
+      {
+        "ack_commits": 1,
+        "case": "vr-011510e25198",
+        "cut": "ack-intent",
+        "matched_signal9_reaps": 3,
+        "reader": 6498,
+        "recovered_and_returned_entries": 0,
+        "snapshot_files_hash_size_checked": 3,
+        "transcript_sha256": "38060288e20a57864690b1424bff4421d8b2a144b2f6a005e51226635be11953",
+        "writer": 6408
+      },
+      {
+        "ack_commits": 1,
+        "case": "vr-3f1cdd08d3e0",
+        "cut": "ack-intent",
+        "matched_signal9_reaps": 3,
+        "reader": 6408,
+        "recovered_and_returned_entries": 0,
+        "snapshot_files_hash_size_checked": 3,
+        "transcript_sha256": "0bd6197022a196512ea7f2449cef45d9c19faaed421a80f1ad796c6e64e2ec01",
+        "writer": 6498
+      },
+      {
+        "ack_commits": 1,
+        "case": "vr-435482f1b806",
+        "cut": "completed",
+        "matched_signal9_reaps": 3,
+        "reader": 6498,
+        "recovered_and_returned_entries": 0,
+        "snapshot_files_hash_size_checked": 3,
+        "transcript_sha256": "c6c0aabc7cd8ba0ec4229ecd56dc21c993f9824804635a3ae89ad3ef2b592f1f",
+        "writer": 6408
+      },
+      {
+        "ack_commits": 1,
+        "case": "vr-4422e7dd0c07",
+        "cut": "unfinished",
+        "matched_signal9_reaps": 3,
+        "reader": 6408,
+        "recovered_and_returned_entries": 0,
+        "snapshot_files_hash_size_checked": 3,
+        "transcript_sha256": "ccd6be5b16cc81e39e2ae5eff72359e944510b257a4caf396e19560a503d167b",
+        "writer": 6498
+      },
+      {
+        "ack_commits": 1,
+        "case": "vr-5188a82fadfb",
+        "cut": "completed",
+        "matched_signal9_reaps": 3,
+        "reader": 6408,
+        "recovered_and_returned_entries": 0,
+        "snapshot_files_hash_size_checked": 3,
+        "transcript_sha256": "7257778ea48fd0dcccdf3bb4241f024b2617d88ed26c943133390edca0b48025",
+        "writer": 6498
+      },
+      {
+        "ack_commits": 1,
+        "case": "vr-5d25ac9e930a",
+        "cut": "unfinished",
+        "matched_signal9_reaps": 3,
+        "reader": 6498,
+        "recovered_and_returned_entries": 0,
+        "snapshot_files_hash_size_checked": 3,
+        "transcript_sha256": "4772fb675a5da9571e28502842474bebc75b4331f6592b5d2290dd6abbdf2cd8",
+        "writer": 6408
+      }
+    ]
+  },
+  "export_scope": "Compact derived qualification; every mapped case/provenance file is copied byte-for-byte. Dedicated test logs change extension only.",
+  "head": "4ba9d959ff8e3da495e699dc9edf6cdbf6e6d528",
+  "limits": [
+    "Dedicated released-binary cases, ordinary native ARM64 and strict x86 Clippy qualify only the exact named head and tested merge.",
+    "Schedule release6408 and6498 executable payloads are byte-identical; no Schedule implementation-delta claim.",
+    "Tasks uses fake Harness and Voice. Completion remains unverified. Explicit Tasks/held-backend cut reaps do not independently enumerate every transient subprocess.",
+    "Voice uses real released delivery-ledger consumers with authored Schedule API and completion events. No physical speech or audio.",
+    "Synthetic boot identifiers and trust flags are not a physical reboot, real provider, updater installation or power-loss durability test.",
+    "CI fixtures verified release pins before/after; this audit verified retained metadata and archive/state bytes, without independently redownloading executable releases.",
+    "Raw identity-bearing API objects, full workflow logs, archives and executable payloads are retained privately; only derived safe metadata and case text are selected for publication.",
+    "The ordinary nextest total includes one LEAK-marked pass; its captured nested output is not counted again. Skipped names are not listed in the run log."
+  ],
+  "merge_api_sha256": "9465212d457d831385955249d28bb83124f7380b80f4338d413896baa8514a8b",
+  "platform": "Linux aarch64",
+  "prior_partial_qualification_sha256": "521e263775e97daccfb39e7ed8b802953eea25171aa6a0f9a9f07f0bfb75efa2",
+  "qualification_source_sha256": "ad0a7037631587d64b85ba597dc3c31281626012c49f611d40d9bd0c3b8ea037",
+  "release_pins": {
+    "schedule": {
+      "6408": [
+        "10ff8a223ad58da2afba2fa798bf9b07199c6af05fa0ffc678b8d714e49b7570",
+        4493144
+      ],
+      "6498": [
+        "10ff8a223ad58da2afba2fa798bf9b07199c6af05fa0ffc678b8d714e49b7570",
+        4493144
+      ]
+    },
+    "tasks": {
+      "6408": [
+        "7286dde761ab03155d0f867c3c8965759a010c5434e52df7d16756b32bbea003",
+        4723536
+      ],
+      "6498": [
+        "385d06c433a474ded979fc5953a8e6cc4aec254f37f7ebe32eb86b3bf027a371",
+        4728024
+      ]
+    },
+    "voice": {
+      "6408": [
+        "af7cd0d1e384ebddcca2b58eea94176c80aba573a5f47f4cd95cc8ce1a7ad084",
+        28375944
+      ],
+      "6498": [
+        "67ab7d3fd77bca2b6e5cf962bc0ec7a7db3520de1de3620f25e3899cb3a5a1f2",
+        28403184
+      ]
+    }
+  },
+  "release_sources": {
+    "6408": "ee53765c8d014eb00e41c1a5a7054d2546c18bdb",
+    "6498": "846b3d203fc00ec3886d71f7673d8cc29cc4a634"
+  },
+  "runs": {
+    "arm": {
+      "artifact_metadata": [
+        {
+          "digest": "sha256:15639b1345e3a470f2cd40ba2375076fee2d5ab81ba363300a6d6a90c042080b",
+          "expired": false,
+          "id": 12545938661,
+          "name": "lampos-arm64-4ba9d959ff8e3da495e699dc9edf6cdbf6e6d528",
+          "size_in_bytes": 115941396
+        }
+      ],
+      "checkout_lines": [
+        270,
+        273
+      ],
+      "commands": [
+        "cargo nextest run --locked --release --workspace --profile pr --no-tests=pass -j num-cpus --partition hash:1/1 -E \"not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))\"",
+        "cargo test --locked --release --workspace --doc -- --test-threads=1",
+        "cargo test --locked --release -p lamp-ipc --test relay_signals",
+        "cargo test --locked --release -p lamp-turn-end-wire --test process"
+      ],
+      "conclusion": "success",
+      "doctests": {
+        "failed": 0,
+        "ignored": 0,
+        "log_lines": [
+          12265,
+          12548
+        ],
+        "passed": 4
+      },
+      "head": "4ba9d959ff8e3da495e699dc9edf6cdbf6e6d528",
+      "id": 40057006981,
+      "nextest": {
+        "counting": "Only numbered result rows before the single nextest summary. Captured nested test output is not added.",
+        "failed": 0,
+        "leaky_passes": 1,
+        "nonpass_rows": [
+          {
+            "line": 9658,
+            "text": "LEAK [   0.234s] ( 8992/11164) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+          }
+        ],
+        "passed": 11164,
+        "seconds": 201.221,
+        "skipped": 83,
+        "skipped_names": "Not emitted by this run.",
+        "status_rows": {
+          "LEAK": 1,
+          "PASS": 11163
+        },
+        "summary_line": 11832
+      },
+      "package": {
+        "binaries": 47,
+        "examples": 2,
+        "line": 12572,
+        "payloads": 49,
+        "verification": "Build and metadata only; ordinary ARM artifact payload was not downloaded."
+      },
+      "process_harness": {
+        "failed": 0,
+        "passed": 12,
+        "rows": [
+          {
+            "line": 12554,
+            "text": "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2010 ms)"
+          },
+          {
+            "line": 12555,
+            "text": "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)"
+          },
+          {
+            "line": 12556,
+            "text": "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)"
+          },
+          {
+            "line": 12557,
+            "text": "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)"
+          },
+          {
+            "line": 12558,
+            "text": "test missing_model_is_final_and_never_restarted ... ok (162 ms)"
+          },
+          {
+            "line": 12559,
+            "text": "test missing_executable_fails_at_once ... ok (2 ms)"
+          },
+          {
+            "line": 12560,
+            "text": "test startup_failures_are_final ... ok (411 ms)"
+          },
+          {
+            "line": 12561,
+            "text": "test serving_failures_are_replaced_within_budget ... ok (514 ms)"
+          },
+          {
+            "line": 12562,
+            "text": "test protocol_violations_are_replaced ... ok (177 ms)"
+          },
+          {
+            "line": 12563,
+            "text": "test cancelled_answers_are_never_delivered ... ok (155 ms)"
+          },
+          {
+            "line": 12564,
+            "text": "test close_during_inference_never_waits ... ok (233 ms)"
+          },
+          {
+            "line": 12566,
+            "text": "test sustained_requests_stay_bounded ... ok (690 ms)"
+          }
+        ],
+        "summary_line": 12567
+      },
+      "publication": "skipped",
+      "python_publisher_artifact_cli": [
+        {
+          "failed": 0,
+          "line": 315,
+          "passed": 35,
+          "seconds": 0.253
+        },
+        {
+          "failed": 0,
+          "line": 385,
+          "passed": 12,
+          "seconds": 0.821
+        },
+        {
+          "failed": 0,
+          "line": 611,
+          "passed": 7,
+          "seconds": 0.411
+        }
+      ],
+      "raw_sha256": {
+        "artifacts.json": "4055a2d7236defb2c4cd35c1f0937a361ec5482ede6a47d60a1de85396abedf0",
+        "run.json": "50bf1080681116d776939297698402653581788c10a71c744be70bf8d315c2f6",
+        "run.log": "9704ca0aee79e641d65b1a2aada53305abb205576ad2bd857f20ed4689304a03"
+      },
+      "relay_signals": {
+        "line": 12550,
+        "result": "passed"
+      },
+      "tested_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tested_merge": "ee65e8fcd7c61b6d2298d27fbf0771fca67696e4",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40057006981",
+      "warning_normalization": "Only the public CI workspace prefix is replaced by CI_WORKSPACE; raw log hash and line numbers bind original text.",
+      "warnings": [
+        {
+          "line": 135,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 402,
+          "text": "(node:8625) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 405,
+          "text": "(node:8625) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 483,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 488,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 493,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 498,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 634,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost"
+        },
+        {
+          "line": 639,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/replay_cost.dwp"
+        },
+        {
+          "line": 644,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost"
+        },
+        {
+          "line": 649,
+          "text": "warning: output filename collision at CI_WORKSPACE/lampOS/target/release/examples/progress_cost.dwp"
+        },
+        {
+          "line": 12583,
+          "text": "(node:55940) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 12589,
+          "text": "(node:55940) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 12625,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ],
+      "watch_transport": "The parent watcher exited 0. This receipt independently verified the completed successful run and downloaded final log."
+    },
+    "clippy": {
+      "artifact_metadata": [],
+      "checkout_lines": [
+        342,
+        345
+      ],
+      "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+      "conclusion": "success",
+      "head": "4ba9d959ff8e3da495e699dc9edf6cdbf6e6d528",
+      "id": 40057007027,
+      "raw_sha256": {
+        "artifacts.json": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c",
+        "run.json": "83d6ad68414fbf1aed5a3f73ab96a459c4ef900f141b5f6e19c023865a26b91e",
+        "run.log": "74db6ddcac735bd19c41341d839785c1a3bff7804c2dfc709c2a10577d58c4a6"
+      },
+      "rust_diagnostics": [],
+      "tested_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tested_merge": "ee65e8fcd7c61b6d2298d27fbf0771fca67696e4",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40057007027",
+      "warning_normalization": "Only the public CI workspace prefix is replaced by CI_WORKSPACE; raw log hash and line numbers bind original text.",
+      "warnings": [
+        {
+          "line": 181,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 408,
+          "text": "(node:8564) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 411,
+          "text": "(node:8564) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 500,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    },
+    "pair": {
+      "artifact_metadata": [
+        {
+          "digest": "sha256:c215d652bf0891bb9a51c2dba2f28ab91953b18907d448771937f7e9f0e44468",
+          "expired": false,
+          "id": 12545139282,
+          "name": "lampos-state-pair-4ba9d959ff8e3da495e699dc9edf6cdbf6e6d528",
+          "size_in_bytes": 704862
+        }
+      ],
+      "checkout_lines": [
+        181,
+        184
+      ],
+      "commands": [
+        "cargo test --locked --release -p lamp-schedule --test release_pair -- --ignored --nocapture --test-threads=1",
+        "cargo test --locked --release -p lamp-tasks --test release_pair -- --ignored --nocapture --test-threads=1",
+        "cargo test --locked --release -p lamp-voice --test release_pair -- --ignored --nocapture --test-threads=1"
+      ],
+      "conclusion": "success",
+      "head": "4ba9d959ff8e3da495e699dc9edf6cdbf6e6d528",
+      "id": 40057006999,
+      "raw_sha256": {
+        "artifacts.json": "37951b1429215b1566192db8eacd767487144fbeb0bcd7f53775b83f2bdbf409",
+        "run.json": "5ffbd3612b0d804fab15283a160e15a82c43cbb6f3c5df6258625dbf682f0ef2",
+        "run.log": "88b488136ed1560e81379a2284b7e649c13cb2f5825e69d6d6abb3119eb6053e"
+      },
+      "tested_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+      "tested_merge": "ee65e8fcd7c61b6d2298d27fbf0771fca67696e4",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40057006999",
+      "warning_normalization": "Only the public CI workspace prefix is replaced by CI_WORKSPACE; raw log hash and line numbers bind original text.",
+      "warnings": [
+        {
+          "line": 334,
+          "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+        },
+        {
+          "line": 378,
+          "text": "(node:5422) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 489,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 490,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 491,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 492,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 493,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 494,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 495,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 496,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 497,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 498,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 499,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 500,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 501,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 502,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 503,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 504,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 505,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 506,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 507,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 508,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 509,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 510,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 511,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 512,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 513,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 514,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 515,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 516,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 517,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 518,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 519,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 520,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 521,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 522,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 523,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 524,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 525,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 526,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 527,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 528,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 529,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 530,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 531,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 532,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 533,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 534,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 535,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 536,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 537,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 538,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 539,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 540,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 541,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 542,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 543,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 544,
+          "text": "warning: spurious network error (3 tries remaining): [55] Failed sending data to the peer (Send failure: Broken pipe)"
+        },
+        {
+          "line": 545,
+          "text": "warning: spurious network error (3 tries remaining): [16] Error in the HTTP2 framing layer (Send failure: Connection reset by peer)"
+        },
+        {
+          "line": 546,
+          "text": "warning: spurious network error (3 tries remaining): [16] Error in the HTTP2 framing layer"
+        },
+        {
+          "line": 1219,
+          "text": "(node:13036) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+        },
+        {
+          "line": 1225,
+          "text": "(node:13036) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+        },
+        {
+          "line": 1253,
+          "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+        }
+      ]
+    }
+  },
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "source_comparison": {
+    "authored_map_sha256": "bffd496ed41d2335059ee28068f703cc56e5c1fc733db1e3902e6a6a31f9043c",
+    "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+    "before_after_identical": true,
+    "blob_bytes": 184542457,
+    "captured_manifest_sha256": "1602067bf67f3d89336f837b50ded1ca5e21312f7aed104a53c6ce0e6c00f606",
+    "distinct_blobs": 5866,
+    "extra": 0,
+    "files": 6977,
+    "head": "4ba9d959ff8e3da495e699dc9edf6cdbf6e6d528",
+    "lampos_tree": "0de9aac617e81a74e29a22d5471ba0ec5bef31ed",
+    "method": "git ls-tree -rz HEAD:lampOS; git cat-file --batch-check and one --batch over every distinct blob, with GIT_NO_LAZY_FETCH=1; SHA-256 of each exact blob payload",
+    "mismatched": 0,
+    "missing": 0,
+    "root_tree": "d2c1b1ac6633cde9ddc5b505e188935df43320eb",
+    "scope": "Every captured tracked lampOS path; all regular blobs, no symlink or submodule in the inventory.",
+    "seconds": 0.498
+  },
+  "status": "Qualified at the exact recorded current head and tested merge; no claim for a later rebase.",
+  "summary": {
+    "failed": 0,
+    "ignored": 0,
+    "schedule_scenarios": 8,
+    "schedule_snapshots_read_only_checked": 32,
+    "schedule_successful_waited_exits": 32,
+    "source_files_matched": 6977,
+    "tasks_explicit_cut_reaps": 12,
+    "tasks_schema_direction_cases": 6,
+    "tasks_snapshot_hashes_checked": 18,
+    "top_level_tests_passed": 12,
+    "voice_cut_direction_cases": 6,
+    "voice_signal9_reaps": 18,
+    "voice_snapshot_file_hashes_checked": 18
+  },
+  "tested_merge": "ee65e8fcd7c61b6d2298d27fbf0771fca67696e4",
+  "tests": {
+    "schedule": {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "log_sha256": "25b39f19ffa1f107e13d9194c320be58d116b39e2d86eac1ed2410b2543637aa",
+      "passed": 4,
+      "seconds": 11.87
+    },
+    "tasks": {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "log_sha256": "1904bbcf440769cfdf047e45940b50923cdeb34444c836866e1060b0115b6fa1",
+      "passed": 2,
+      "seconds": 4.23
+    },
+    "voice": {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "log_sha256": "5a521e3e5999ab911e5ec0b8f3b22c2b19af97c0502d8e931c6368950d1ff850",
+      "passed": 6,
+      "seconds": 14.72
+    }
+  }
+}

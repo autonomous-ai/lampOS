@@ -1,0 +1,4 @@
+lamp-voice schedule-consumer: started
+lamp-voice schedule-consumer: due reminders unavailable: Schedule due is missing
+lamp-voice schedule-consumer: due reminders available
+lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 1)

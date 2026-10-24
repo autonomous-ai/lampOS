@@ -1,0 +1,6 @@
+lamp-voice schedule-consumer: started
+lamp-voice schedule-consumer: reminder id 1 delivery 1: prepared by an earlier voice and never said: to be offered again
+lamp-voice schedule-consumer: due reminders available
+lamp-voice schedule-consumer: reminder id 1 delivery 1: due, offered to the voice (attempt 2)
+lamp-voice schedule-consumer: reminder id 1 delivery 1: said; its completion is kept, to be acknowledged
+lamp-voice schedule-consumer: reminder id 1 delivery 1: resolved (AckConfirmed { revision: 3 }), not offered

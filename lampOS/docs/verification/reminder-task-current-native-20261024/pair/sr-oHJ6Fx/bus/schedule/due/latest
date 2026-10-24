@@ -1,0 +1,2 @@
+{"topic":"schedule/due","kind":"latest","enc":"json","type":"lamp_msgs/ScheduleDue","source":"schedule","boot":"87f8557dc6749879","seq":1,"at_us":13848480785,"at_unix_ms":1792811357169,"expires_ms":3000}
+{"stamp":{"clock_id":"release-pair-boot-b","at_us":13848480785,"sequence":1},"store_id":"dbfa239831a17fdc820fdd9ead8c9e51","revision":7,"enabled":true,"ready":true,"pending":1,"waiting_for_clock":0,"oldest":{"id":1,"delivery":1,"due_unix_ms":1792811356848,"late_by_ms":320,"late":false}}
