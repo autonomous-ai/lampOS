@@ -1,0 +1,8 @@
+{
+  "run": 40083987635,
+  "tested_merge": "1afef874944a4dee33856dfc1280da635c2d819c",
+  "selected_pass_lines": 12,
+  "primary_log_sha256": "95898f1768453cfccb97e24feb494e0b5686e04e030d183920bb3de240ee0c57",
+  "not_a_new_execution": true,
+  "scope": "synthetic/native CI controls, not a running lamp or systemd sandbox qualification"
+}

@@ -1,3 +1,22 @@
+## Current checkpoint: 2026-10-24 17:21 +07, Surround submitted and updater audit
+
+#3361 `e14e3c51b` is **ready**, current Reviewer-two READ-OK clears HOLD,
+all author gates green, NEXT TRAIN Queue 6382983199. Counts/evidence below
+remain exact; current integration belongs to the train. No manual merge.
+
+Item 6 updater [static product/service audit](verification/update-product-contract-20261024/README.md)
+checks 16 byte-identical files across release 6592, qualified native preview
+and current `5238a6ecd`, with 12 already-passing native recovery/unit controls.
+No runtime drift in the sampled sources. Normal apply does not turn on the
+four optional updater capabilities; updater/helper unit refresh is not part
+of release 6592's per-lamp unit payload. Live effective units/sandbox,
+fallback/timer, trust and update/rollback still need the holder's observations.
+No device or default change was made. #2809's sheet is already on #2396.
+Next: report this concrete audit, continue new own/train findings, and route
+the ship-critical holder/person/key/isolated-route inputs with First/Migrate/Fifth.
+
+---
+
 ## Current checkpoint: 2026-10-24 17:12 +07, Surround author qualification complete
 
 #3361 `e14e3c51b` has every author gate green: Mac **268/0/2 ignored**,
