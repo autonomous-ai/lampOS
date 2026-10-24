@@ -1,0 +1,367 @@
+   Compiling futures-channel v0.3.34
+   Compiling futures-io v0.3.34
+   Compiling subtle v2.6.1
+   Compiling tokio v1.53.1
+   Compiling zerofrom v0.1.8
+   Compiling ring v0.17.14
+   Compiling serde v1.0.229
+   Compiling tracing v0.1.44
+   Compiling thiserror v2.0.21
+   Compiling aho-corasick v1.1.5
+   Compiling regex-syntax v0.8.11
+   Compiling pin-project v1.1.13
+   Compiling yoke v0.8.3
+   Compiling aws-lc-sys v0.46.0
+   Compiling bstr v1.13.1
+   Compiling untrusted v0.7.1
+   Compiling futures-util v0.3.34
+   Compiling tempfile v3.27.0
+   Compiling jiff v0.2.38
+   Compiling olpc-cjson v0.1.4
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling rustls-webpki v0.103.15
+   Compiling regex-automata v0.4.18
+   Compiling aws-lc-rs v1.18.2
+   Compiling lamp-bus v0.1.0 (/private/tmp/second-surround-release-pair-20261024/lampOS/crates/bus)
+   Compiling serde_plain v1.0.2
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling icu_locale_core v2.3.0
+   Compiling rustls v0.23.45
+   Compiling icu_collections v2.3.0
+   Compiling snafu v0.8.9
+   Compiling pem v3.0.6
+   Compiling hex v0.4.3
+   Compiling typed-path v0.9.3
+   Compiling lamp-msgs v0.1.0 (/private/tmp/second-surround-release-pair-20261024/lampOS/crates/msgs)
+   Compiling lamp-ipc v0.1.0 (/private/tmp/second-surround-release-pair-20261024/lampOS/crates/ipc)
+   Compiling futures-executor v0.3.34
+   Compiling icu_provider v2.3.1
+   Compiling globset v0.4.20
+   Compiling futures v0.3.34
+   Compiling hyper v1.12.0
+   Compiling icu_properties v2.3.0
+   Compiling icu_normalizer v2.3.0
+   Compiling tower v0.5.3
+   Compiling tokio-util v0.7.20
+   Compiling signature v2.2.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling ed25519 v2.2.3
+   Compiling hyper-util v0.1.21
+   Compiling idna_adapter v1.2.2
+   Compiling ed25519-dalek v2.2.0
+   Compiling idna v1.1.0
+   Compiling tokio-rustls v0.26.6
+   Compiling tungstenite v0.30.0
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling axum v0.8.9
+   Compiling url v2.5.8
+   Compiling hyper-rustls v0.27.10
+   Compiling tokio-tungstenite v0.30.0
+   Compiling tower-http v0.6.11
+   Compiling tough v0.24.0 (/private/tmp/second-surround-release-pair-20261024/lampOS/vendor/tough)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/second-surround-release-pair-20261024/lampOS/crates/gemini)
+   Compiling reqwest v0.13.5
+   Compiling lamp-surround v0.1.0 (/private/tmp/second-surround-release-pair-20261024/lampOS/crates/surround)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.72s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_surround-4e9c8675c769d49d)
+
+running 2 tests
+test owner::tests::real_peer_credentials_must_match_the_expected_uid ... ok
+test owner::tests::socket_owned_by_a_different_expected_uid_is_refused_before_connecting ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_surround-e0a43fcff19b62d7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/it/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-21d45e18afbc6487)
+
+running 263 tests
+test atomic::a_partial_uncommitted_temp_does_not_replace_the_journal ... ok
+test atomic::exposed_files_and_directories_are_not_silently_repaired ... ok
+test atomic::failure_before_publication_preserves_the_committed_record ... ok
+test atomic::leaf_and_ancestor_symlinks_are_refused_without_touching_their_targets ... ok
+test atomic::linked_temp_cannot_truncate_any_record ... ok
+test atomic::only_one_writer_holds_the_directory_until_drop ... ok
+test atomic::relative_and_parent_paths_are_refused ... ok
+test atomic::remove_does_not_remove_other_files ... ok
+test atomic::replacement_is_whole_private_and_bounded ... ok
+test cli::doctor_and_plan_are_explicitly_read_only_even_for_an_enabled_configuration ... ok
+test cli::help_bad_flags_and_private_config_errors_have_no_side_effects ... ok
+test cli::invalid_loopback_origin_fails_before_any_adapter_or_operation_is_created ... ok
+test cli::serve_without_both_switches_opens_page_but_does_not_create_maintenance_state ... ok
+test config::a_document_from_a_later_build_is_read - should panic ... ok
+test config::endpoint_credentials_and_timeout_errors_are_rejected_before_write ... ok
+test config::malformed_oversized_and_symlink_documents_are_never_accepted ... ok
+test config::private_debug_hides_endpoint_paths_and_model ... ok
+test config::private_paths_and_secret_bounds_are_enforced ... ok
+test config::provider_validation_reuses_known_thinking_and_context_constraints ... ok
+test config::unknown_fields_and_versions_fail_without_echoing_private_input ... ok
+test config::voice_file_has_exact_payload_without_surround_metadata_or_secrets ... ok
+test configuration::a_damaged_current_generation_does_not_block_healthy_rollback ... ok
+test configuration::a_damaged_previous_generation_does_not_hide_healthy_current ... ok
+test configuration::a_generation_is_never_overwritten_and_partial_staging_never_replaces_candidate ... ok
+test configuration::collection_resumes_after_partial_delete_but_never_deletes_links_or_unknown_files ... ok
+test configuration::compare_select_preserves_previous_and_needs_explicit_enablement ... ok
+test configuration::invalid_input_does_not_allocate_a_directory_and_empty_optional_instructions_work ... ok
+test configuration::publication_failure_leaves_old_selection_and_retry_cannot_mutate_the_orphan ... ok
+test configuration::repeated_staging_reclaims_superseded_data_and_keeps_current_previous_and_candidate ... ok
+test configuration::secret_or_payload_tampering_and_link_substitution_fail_before_selection ... ok
+test configuration::stage_publishes_a_whole_private_generation_without_activating_it ... ok
+test http_limit::a_partial_body_hits_total_handling_deadline_and_releases_its_request_slot ... ok
+test http_limit::accepted_stream_count_is_bounded_and_drop_admits_a_replacement ... ok
+test http_limit::bounds_cannot_be_disabled_or_lifted_by_configuration ... ok
+test http_limit::full_write_pool_refuses_before_body_extraction_and_status_keeps_its_own_slots ... ok
+test http_limit::no_header_and_trickled_header_connections_expire_and_new_clients_recover ... ok
+test http_limit::transport_deadline_also_refuses_writes_after_expiry ... ok
+test network::ap_retry_waits_120_seconds_and_never_disconnects_clients_or_unknown_count ... ok
+test network::automatic_checkpoint_expiry_does_not_permanently_block_fresh_setup ... ok
+test network::commit_requires_fresh_candidate_lan_and_never_uses_an_unrelated_fallback ... ok
+test network::continuous_known_loss_uses_elapsed_90_seconds_not_a_probe_count ... ok
+test network::failed_activation_restores_checkpoint_and_bad_device_never_means_all_devices ... ok
+test network::failed_rollback_blocks_replacement_and_is_not_acknowledged ... ok
+test network::input_bounds_and_explicit_selection_are_required ... ok
+test network::local_lan_success_cancels_recovery_even_without_cloud ... ok
+test network::lost_save_reply_is_uncertain_even_before_checkpoint_destroy ... ok
+test network::newer_probe_is_read_only_and_superseded_commit_cannot_destroy_its_candidate ... ok
+test network::own_join_restores_ap_at_45_seconds_even_when_every_later_probe_fails ... ok
+test network::probe_gaps_and_unknown_link_do_not_prove_continuous_loss ... ok
+test network::recovery_and_retry_preserve_lan_restored_by_rollback_or_refuse_a_failed_probe ... ok
+test network::recovery_cannot_rollback_a_healthy_uncommitted_candidate ... ok
+test network::recovery_rejects_stale_reordered_other_boot_and_backwards_time ... ok
+test network::restoration_or_checkpoint_expiry_cannot_prove_removal_of_uncertain_saved_credentials ... ok
+test network::runtime_failure_or_recovery_request_cannot_replace_a_healthy_lan_with_ap ... ok
+test network::saved_profile_followed_by_failed_checkpoint_destroy_is_not_a_commit_or_rollback_ack ... ok
+test network::saved_retry_has_checkpoint_and_does_not_resave_existing_credentials ... ok
+test network::supersession_rolls_back_before_a_new_join_and_old_receipts_cannot_mutate ... ok
+test network::unsupported_and_scripted_adapters_never_fake_activation_and_are_bounded ... ok
+test network::wifi_mutation_checkpoints_only_the_selected_device_and_commits_only_its_profile ... ok
+test operator::disabled_operation_never_reaches_worker ... ok
+test operator::duplicate_or_malformed_cookie_cannot_authenticate ... ok
+test operator::foreign_missing_duplicate_host_and_origins_and_query_secrets_are_refused ... ok
+test operator::login_attempts_are_bounded_and_never_echo_credentials ... ok
+test operator::malformed_oversized_and_unknown_requests_are_redacted ... ok
+test operator::nonlocal_plaintext_origins_and_weak_codes_are_not_allowed ... ok
+test operator::only_four_sessions_are_kept_and_logout_revokes_all ... ok
+test operator::page_is_self_contained_and_status_requires_authentication ... ok
+test operator::sessions_expire_exactly_and_clock_reversal_revokes_them ... ok
+test operator::storage_refusal_is_not_an_accepted_operation ... ok
+test operator::worker_must_admit_before_http_ack_and_status_is_independent ... ok
+test owner::changing_socket_inode_after_connect_refuses_before_any_command_is_sent ... ok
+test owner::configuration_requires_exact_binding_full_quiet_exit_cas_and_fresh_new_owner ... ok
+test owner::configuration_rollback_must_prove_previous_selection_and_its_fresh_owner ... ok
+test owner::disabled_never_connects_and_constructor_only_checks_configuration ... ok
+test owner::durable_configuration_rollback_is_explicit_and_never_reported_as_applied ... ok
+test owner::error_messages_are_fixed_and_contain_no_peer_text ... ok
+test owner::exactly_bounded_single_frame_is_accepted_and_old_periodic_samples_keep_their_own_age ... ok
+test owner::foreign_version_id_clock_session_and_reply_kind_are_rejected ... ok
+test owner::four_typed_roundtrips_preserve_commands_and_required_deadlines ... ok
+test owner::future_pre_request_stale_and_nested_receipts_are_checked_at_arrival ... ok
+test owner::invalid_requests_and_excessive_frames_do_not_connect ... ok
+test owner::malformed_unknown_fields_oversized_missing_newline_and_extra_frames_are_rejected ... ok
+test owner::missing_refused_regular_file_and_insecure_sockets_remain_unavailable_or_unsafe ... ok
+test owner::monotonic_reversal_and_expired_intents_refuse_dispatch_and_late_receipts ... ok
+test owner::newline_without_end_of_response_does_not_escape_the_deadline ... ok
+test owner::probe_needs_fresh_voice_capability_and_preserves_privacy_inhibition ... ok
+test owner::quiet_waits_can_accumulate_45_seconds_after_admission_without_extending_the_120_second_limit ... ok
+test owner::rejected_or_incomplete_configuration_never_promotes_a_generation ... ok
+test owner::reset_receipts_keep_exact_request_and_leave_barrier_validation_to_the_reset_machine ... ok
+test owner::retrying_update_and_reset_actions_keeps_their_original_absolute_deadline ... ok
+test owner::socket_links_parent_links_and_public_parent_directories_are_rejected ... ok
+test owner::timeout_caps_stalled_clock_while_other_async_work_remains_responsive ... ok
+test owner::update_receipts_keep_exact_step_guard_and_owner_failure_is_private ... ok
+test release::accepted_feed_identity_and_provisioned_anchor_cannot_silently_change ... ok
+test release::cancellation_during_binary_staging_keeps_the_clock_recovery_journal ... ok
+test release::compatibility_names_counts_and_lengths_fail_closed ... ok
+test release::complete_pending_metadata_is_recovered_but_corrupt_partial_metadata_fails_closed ... ok
+test release::corrupt_trust_or_missing_initialization_marker_never_silently_reset ... ok
+test release::delegated_targets_are_rejected_before_any_delegated_fetch_or_cache_write ... ok
+test release::expired_feed_does_not_disable_previously_accepted_offline_recovery ... ok
+test release::hardlinked_repository_target_and_symlink_ancestor_are_rejected ... ok
+test release::incomplete_binary_staging_preserves_old_set_and_retries_without_replacing_it ... ok
+test release::insecure_urls_credentials_queries_and_manifest_paths_are_rejected ... ok
+test release::interrupted_root_cache_reconstructs_consecutive_signed_proofs ... ok
+test release::later_tuf_observed_utc_survives_restart_even_without_an_accepted_update ... ok
+test release::malformed_rotation_does_not_poison_the_last_trusted_root ... ok
+test release::manifest_and_binary_tampering_never_produce_a_descriptor ... ok
+test release::metadata_and_target_byte_caps_are_independent_of_signed_lengths ... ok
+test release::no_provisioned_anchor_and_untrusted_anchor_both_refuse ... ok
+test release::offline_recovery_rehashes_and_rejects_writable_or_missing_binaries ... ok
+test release::overflowing_root_version_is_rejected_before_library_arithmetic ... ok
+test release::persistent_checksum_cannot_replace_signed_manifest_authentication ... ok
+test release::repository_and_installed_symlinks_are_never_followed ... ok
+test release::retained_set_and_binary_directory_bounds_do_not_erase_rollback_releases ... ok
+test release::root_rotation_is_retained_when_later_metadata_fails ... ok
+test release::rotation_requires_old_and_new_thresholds_and_consecutive_version ... ok
+test release::signatures_and_all_three_tuf_role_expiries_are_enforced ... ok
+test release::stage_disk_obstruction_is_reported_and_never_acknowledged ... ok
+test release::target_count_request_count_and_deadline_are_bounded ... ok
+test release::timestamp_key_rotation_resets_fast_forward_floors_even_when_an_old_key_remains ... ok
+test release::tuf_versions_release_sequence_and_same_sequence_substitution_are_fenced ... ok
+test release::unknown_backwards_and_disagreeing_utc_refuse ... ok
+test release::valid_root_rotation_survives_restart_and_old_key_revocation ... ok
+test release::verified_set_is_complete_immutable_hash_addressed_and_recoverable ... ok
+test reset::a_partial_erase_never_becomes_success_or_undoes_already_confirmed_stores ... ok
+test reset::a_record_from_a_later_build_is_read - should panic ... ok
+test reset::all_owners_prepare_before_any_store_is_emptied_and_every_empty_binds_its_owner ... ok
+test reset::clock_regression_disables_dispatch_and_persists_incomplete_when_possible ... ok
+test reset::completed_reset_reopens_without_repeating_erasure_or_rewriting_the_record ... ok
+test reset::corrupt_oversized_or_linked_state_is_refused_without_destroying_evidence ... ok
+test reset::directory_lock_prevents_another_writer_and_time_overflow_creates_no_intent ... ok
+test reset::disabled_open_is_read_only_and_confirmation_is_required_before_any_intent ... ok
+test reset::empty_requires_readback_and_a_still_frozen_matching_owner ... ok
+test reset::failed_ack_write_retains_the_same_idempotent_empty_request_for_recovery ... ok
+test reset::failed_intent_write_returns_no_action_and_preserves_the_previous_journal ... ok
+test reset::failed_recovery_write_exposes_no_reusable_old_reset_object ... ok
+test reset::foreign_future_pre_intent_stale_and_duplicate_receipts_do_not_advance ... ok
+test reset::identity_history_prevents_a_b_a_reuse_and_is_bounded_without_eviction ... ok
+test reset::malformed_store_order_ids_and_arbitrary_paths_are_rejected_without_a_record ... ok
+test reset::persisted_completion_preparation_phase_and_pending_intent_invariants_are_checked ... ok
+test reset::power_cut_before_or_after_each_prepare_and_empty_reprepares_all_and_deduplicates_erasure ... ok
+test reset::receipt_age_and_request_deadline_have_explicit_exclusive_boundaries ... ok
+test reset::reset_never_walks_or_removes_another_owners_files ... ok
+test reset::restarting_requires_a_new_session_even_between_requests_and_a_new_boot_invalidates_barriers ... ok
+test reset::voice_prepare_can_wait_for_quiet_but_retries_keep_the_original_deadline_and_other_actions_stay_short ... ok
+test reset::voice_requires_quiet_closed_and_durable_frozen_barrier_before_any_other_owner ... ok
+test runtime::diagnostic_separates_surround_health_from_lamp_readiness_and_contains_no_paths ... ok
+test runtime::explicit_network_enable_still_needs_build_and_platform_support ... ok
+test runtime::listener_is_private_single_owner_and_cleans_only_its_own_inode ... ok
+test runtime::private_config_read_refuses_symlinks_and_public_files ... ok
+test runtime::readiness_expires_during_slow_work_and_inhibition_never_becomes_listening ... ok
+test runtime::release_urls_are_fixed_https_bases_not_caller_supplied_credentials ... ok
+test runtime::roots_cannot_overlap_or_share_listener_writer_lock ... ok
+test runtime::sample_is_disabled_and_no_board_fact_is_invented ... ok
+test runtime::stale_private_socket_recovers_but_files_links_and_live_sockets_are_retained ... ok
+test runtime::wrong_versions_unknown_fields_weak_origins_and_bad_paths_fail_closed ... ok
+test selection::a_pointer_from_a_later_build_is_read - should panic ... ok
+test selection::changed_candidate_files_are_rehashed_before_any_pointer_change ... ok
+test selection::collection_preserves_explicit_candidate_highest_signed_sequence_and_utc_floors ... ok
+test selection::collection_refuses_foreign_files_symlinks_and_unknown_protection_before_pruning ... ok
+test selection::collection_removes_interrupted_staging_but_never_rewrites_current_binary ... ok
+test selection::collection_supports_more_than_sixteen_updates_and_always_keeps_current_and_previous ... ok
+test selection::damaged_current_binary_does_not_prevent_selecting_a_healthy_previous_set ... ok
+test selection::disk_error_does_not_acknowledge_or_replace_the_previous_pointer ... ok
+test selection::first_install_is_optional_and_disabled_selection_refuses_changes ... ok
+test selection::forged_mixed_binary_set_is_rejected_even_with_a_recomputed_record_checksum ... ok
+test selection::generation_compare_rejects_stale_and_aba_changes ... ok
+test selection::interrupted_collection_leaves_only_unaccepted_files_and_retry_removes_them ... ok
+test selection::missing_corrupt_and_symlinked_selection_records_fail_closed ... ok
+test selection::one_atomic_record_selects_exactly_three_hashes_and_resolves_only_verified_paths ... ok
+test selection::restart_recovers_the_whole_record_and_preserves_the_previous_set ... ok
+test selection::selection_lock_contention_and_shared_trust_directory_are_rejected ... ok
+test selection::uncommitted_temporary_record_never_becomes_the_current_selection ... ok
+test setup::a_new_preparing_or_unknown_receipt_withdraws_ready_without_reopening_setup ... ok
+test setup::address_is_persisted_before_cloud_and_runtime_and_survives_runtime_failure ... ok
+test setup::backwards_future_stale_and_other_boot_receipts_do_not_advance_sequences ... ok
+test setup::corrupt_unknown_and_inconsistent_records_fail_closed ... ok
+test setup::elapsed_deadline_wins_over_a_late_success_even_without_ticks ... ok
+test setup::failed_probe_withdrawals_are_durable_separate_and_do_not_write_on_every_tick ... ok
+test setup::failed_write_does_not_acknowledge_or_change_visible_progress ... ok
+test setup::local_only_and_ap_addresses_cannot_be_readiness ... ok
+test setup::preparation_heartbeats_cannot_extend_runtime_deadline ... ok
+test setup::progress_from_a_later_build_is_read - should panic ... ok
+test setup::restart_persists_interrupted_and_never_replays_active_or_ready_claims ... ok
+test setup::runtime_ready_requires_fresh_selected_lan_and_not_cloud_alone ... ok
+test setup::supersession_and_reused_attempt_id_cannot_adopt_old_result ... ok
+test setup::wired_is_verified_and_empty_address_or_ap_never_means_lan ... ok
+test setup::withdrawal_preserves_preparation_deadlines_and_expired_lan_cannot_revive_runtime ... ok
+test setup::wrong_key_needs_two_distinct_sequenced_observations ... ok
+test startup::body_eyes_voice_start_order_does_not_wait_for_optional_readiness_or_network ... ok
+test startup::confirmed_failed_launches_are_bounded_and_backed_off ... ok
+test startup::healthy_privacy_inhibit_is_never_listening_and_expires ... ok
+test startup::late_actual_readiness_can_recover_a_timeout_without_a_second_writer ... ok
+test startup::missing_binary_configuration_and_calibration_are_precise_and_local ... ok
+test startup::missing_report_cannot_be_called_exit_or_trigger_a_replacement ... ok
+test startup::resumed_readiness_revokes_a_quiet_fence_and_missing_history_is_not_quiet ... ok
+test startup::retired_sessions_and_generations_cannot_revive_on_replacement ... ok
+test startup::runtime_reports_exact_degradation_without_claiming_a_different_capability ... ok
+test startup::stale_future_reordered_and_other_clock_receipts_do_not_poison_sequence ... ok
+test startup::startup_and_binding_have_one_owner_and_reject_unsolicited_receipts ... ok
+test startup::strict_public_wire_types_reject_unknown_fields_duplicates_and_fabricated_health ... ok
+test startup::successful_exec_or_binding_alone_never_proves_readiness ... ok
+test startup::supervisor_is_off_unless_explicitly_enabled ... ok
+test startup::verified_body_exit_without_rest_cannot_restart_but_voice_is_independent ... ok
+test startup::voice_exit_without_quiet_and_later_retired_owner_quiet_cannot_authorize_restart ... ok
+test startup::voice_restart_requires_complete_45_seconds_and_closed_admission_before_exit ... ok
+test tls_provider::adding_surround_preserves_the_existing_voices_implicit_tls_provider ... ok
+test update::a_wrong_switch_or_reused_start_session_never_advances ... ok
+test update::absent_body_without_new_qualified_evidence_blocks_recovery_without_forced_stop ... ok
+test update::absent_workers_and_resting_are_independent_required_first_install_proofs ... ok
+test update::body_rest_also_requires_new_goals_blocked_and_stop_requires_the_same_token ... ok
+test update::capability_reports_must_be_fresh_at_receipt_and_for_each_actual_owner ... ok
+test update::clock_reset_fails_closed_and_a_new_boot_must_reconcile_with_fresh_receipts ... ok
+test update::concurrent_requests_never_replace_the_original_previous_release ... ok
+test update::corrupted_persisted_direction_guards_and_outcomes_are_rejected_on_load ... ok
+test update::disabling_a_loaded_transaction_cannot_dispatch_its_old_side_effect ... ok
+test update::every_effect_requires_saved_current_intent_and_keeps_a_stable_dedup_key ... ok
+test update::failing_each_phase_preserves_previous_set_and_blocks_the_failed_candidate ... ok
+test update::failure_at_every_recovery_phase_stays_incomplete_without_a_second_automatic_attempt ... ok
+test update::first_install_failure_removes_the_failed_set_and_does_not_claim_rollback_to_a_nonexistent_release ... ok
+test update::first_install_power_cuts_at_every_phase_recover_to_no_installed_set ... ok
+test update::foreign_duplicate_future_stale_and_pre_intent_receipts_do_not_advance ... ok
+test update::healthy_privacy_inhibition_is_explicit_and_never_forces_capture_on ... ok
+test update::late_timeout_is_one_recovery_attempt_and_failure_stops_automatic_work ... ok
+test update::malformed_state_ids_oversized_ledgers_and_clock_overflow_are_rejected ... ok
+test update::manual_rollback_obeys_the_same_quiet_and_rest_boundaries ... ok
+test update::missing_or_foreign_owner_protocol_never_forges_a_rest_or_worker_exit ... ok
+test update::power_cut_before_or_after_every_effect_requires_fresh_inspection_and_old_receipts_are_dead ... ok
+test update::power_cuts_at_each_rollback_phase_keep_the_original_recovery_target ... ok
+test update::quiet_requires_a_complete_window_for_both_heard_and_said_at_the_exact_boundary ... ok
+test update::readiness_cannot_be_committed_after_it_ages_while_releasing_ownership ... ok
+test update::recovery_failure_preserves_an_explicit_incomplete_journal ... ok
+test update::restarts_and_operator_recovery_retries_have_a_fixed_budget ... ok
+test update::speech_between_quiet_check_and_exclusive_quiesce_prevents_voice_stop ... ok
+test update::state_from_a_later_build_is_read - should panic ... ok
+test update::successful_update_stops_in_order_switches_one_set_and_verifies_every_capability ... ok
+test update::unexpected_current_release_or_mixed_owner_releases_are_not_overwritten ... ok
+test update::updates_are_disabled_without_an_explicit_switch ... ok
+test worker::active_update_on_restart_reconciles_and_never_reports_unproven_success ... ok
+test worker::admission_disk_error_refuses_before_any_adapter_or_configuration_write ... ok
+test worker::admitted_lifecycle_work_immediately_withdraws_listening_at_an_unchanged_clock ... ok
+test worker::configuration_applies_only_after_private_owner_selection_and_fresh_capability_proof ... ok
+test worker::disabled_worker_is_read_only_and_never_touches_an_adapter ... ok
+test worker::duplicate_operation_identity_is_not_reexecuted ... ok
+test worker::durable_admission_precedes_work_and_dropped_http_caller_does_not_cancel_it ... ok
+test worker::ethernet_or_setup_ap_is_not_a_successful_wifi_candidate ... ok
+test worker::failed_manual_rollback_recovers_original_but_is_not_a_successful_requested_change ... ok
+test worker::idle_read_only_refresh_observes_later_ready_and_withdraws_failed_proof_without_rejoining ... ok
+test worker::one_lifetime_worker_lock_prevents_competing_maintenance_writers ... ok
+test worker::probe_retains_original_voice_observation_age ... ok
+test worker::provider_generation_is_staged_and_status_never_contains_secrets_or_claims_activation ... ok
+test worker::recent_id_retention_never_exhausts_routine_probes_and_generation_survives_restart ... ok
+test worker::reset_actions_have_distinct_stable_rpc_ids_and_durable_intent_before_each_owner_effect ... ok
+test worker::reset_failure_is_durable_and_blocks_unrelated_work_until_explicit_resume ... ok
+test worker::reset_requires_literal_confirmation_and_never_resets_on_a_generic_request ... ok
+test worker::restart_marks_unfinished_admission_interrupted_without_resurrecting_input ... ok
+test worker::signed_release_staging_requires_fresh_owner_utc_and_apply_failure_never_switches_locally ... ok
+test worker::slow_network_does_not_hold_status_lock_and_join_has_a_fixed_deadline ... ok
+test worker::stalled_idle_read_only_probe_is_preempted_for_durable_admission ... ok
+test worker::transport_success_without_configuration_activation_proof_is_failure ... ok
+test worker::uncertain_wifi_commit_is_check_status_and_only_reprobes_selected_lan ... ok
+test worker::wifi_commit_requires_selected_candidate_lan_and_keeps_runtime_distinct ... ok
+test worker::worker_clock_regression_and_invalid_store_nesting_fail_closed ... ok
+
+test result: ok. 263 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 65.43s
+
+     Running tests/release_pair.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-bfaeed21ef4cba51)
+
+running 5 tests
+test current_cli_candidate_smoke ... ok
+test http_complete_reply_is_framed ... ok
+test http_dribbling_reply_cannot_renew_deadline ... ok
+test release_6408_surround_candidates_cross_6498_and_return ... ignored, requires pinned actual releases in an isolated native Linux ARM64 container
+test release_6498_surround_candidates_cross_6408_and_return ... ignored, requires pinned actual releases in an isolated native Linux ARM64 container
+
+test result: ok. 3 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 45.17s
+
+   Doc-tests lamp_surround
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

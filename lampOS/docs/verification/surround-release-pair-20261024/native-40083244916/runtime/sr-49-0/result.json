@@ -1,0 +1,20 @@
+{
+  "actual_released_pair": true,
+  "candidate_writes": 3,
+  "children_reaped": 7,
+  "exchanges": 25,
+  "groups_absent": 7,
+  "hardware_or_device_acceptance": false,
+  "identical_selected_artifacts": true,
+  "no_automatic_reexecution": true,
+  "no_selected_configuration": true,
+  "operation_ids": [
+    "546e8956b4085bab48064636ce6de8e8",
+    "0c488f26869ae94fd9ee340a92c74508",
+    "cdffad5139d604bff768192703dc8ad8"
+  ],
+  "result": "passed",
+  "synthetic_request_refusals": 3,
+  "synthetic_stored_refusals": 2,
+  "test": "release_6408_surround_candidates_cross_6498_and_return"
+}

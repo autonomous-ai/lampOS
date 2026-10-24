@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-24 16:54 +07, Surround pair qualified
+
+Draft #3361 `806e4006c` has Mac **268/0/2 ignored**, formatting and strict
+Surround Clippy; exact source-only Linux fmt passes on 7,016 unchanged files.
+Official isolated pair **2/0/0 ignored/3 filtered** and strict Linux Clippy
+pass. [Safe proof and bindings](verification/surround-release-pair-20261024/README.md)
+retain 14 reaps/absent groups, 50 HTTP exchanges, all 10,375 native tracked
+hashes, precise merge parents, container removal and API artifact digest.
+Ordinary ARM64 and Reviewer-two's independent read remain active. No
+configuration applied or selected, no provider, device or physical claim.
+
+The generic push Go job failed `TestLastVoiceSampleStillRemovesProfile` with
+an unexpected asynchronous voice request; the separate PR Go job passed.
+No Go files differ in this five-file lampOS test/workflow slice. Cause is
+not established and no unrelated repair is mixed in. Both outcomes retained
+privately; lampOS native results stay separately attributed.
+
+#3347 and #3330 are landed through trains 80 and 81. #2810's attended lamp
+window/artifact selection and #1812's trusted public key remain external.
+Next: ordinary ARM proof and any own reader findings, then the next eligible
+piece/read; no base-drift-only rebase or manual merge.
+
+---
+
 ## Current checkpoint: 2026-10-24 16:43 +07, published pairs landed
 
 Train 80 landed #3347 (Settings) at `9872cb692`; train 81 landed #3330
