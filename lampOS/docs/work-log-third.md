@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 15:10 — Controls current head cleared
+
+- #3346 `d3a291bf8` fresh native pair **2/0**, 36 matched starts/reaps;
+  ordinary **11,196 PASS plus 1 LEAK / 92 skipped**, process **12/0**,
+  Linux Clippy pass. Exact authored-tree preview, source maps and all
+  retained stream/receipt comparisons verify. Lead READ-OK on this head.
+- [Current native audit](verification/controls-release-pair-20261024/native-doc-audit.json).
+  NEXT TRAIN decision follows; no base-only HOLD, physical/latency claim
+  or distinct-implementation claim for the identical released payloads.
+- #3344 remains cleared for the train. Separate epoch interleavings now
+  focused **26/0**, fmt/strict Clippy pass; full serial Voice runs before
+  commit. Its initial sandbox socket/poison diagnostic stays separate.
+
 ## 2026-10-24 15:05 — privacy hold lifted and Controls native verified
 
 - #3344 `f653bc5bd` author HOLD lifted after Lead/Second privacy READ-OK;

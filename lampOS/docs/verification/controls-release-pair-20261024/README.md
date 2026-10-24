@@ -39,3 +39,14 @@ Documentation-only d3a291bf8 now states single-implementation replay and
 historical native status explicitly; all Rust/Cargo/workflow bytes match.
 Current-head CI/read carry remain separate. No hanging-child cleanup
 negative control or live output quota is claimed. No hardware qualification.
+
+## Current documentation head d3a291bf8
+
+Fresh dedicated 40076478172 passes **2/0/0 ignored/1 filtered** with the same
+36 matched command identities, 24 successes/12 expected refusals, complete
+pins comparisons and 18 equal positive replays. All 195 regular evidence
+files and unchanged 10,347-path source maps verify. Preview d3546344a has
+the authored tree. Fresh ordinary 40076478157 is **11,196 PASS plus one LEAK,
+92 skipped**, process 12/0; Linux Clippy 40076478159 passes. The earlier
+27b3695f0 run stays separately labelled. Lead READ-OK carries to this exact
+two-document-only head; no source, fixture or workflow changed.
