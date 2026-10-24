@@ -1,0 +1,5 @@
+{
+  "source_bytes": 222,
+  "source_sha256": "f7190bb9de96f271768c96a1fb31eae532c94f161de78abe3ecc4eb14586db84",
+  "utf8": "{\n  \"original_status_loop_byte_identical\": true,\n  \"entire_candidate_controls_prefix_unchanged\": true,\n  \"controller_has_empty_injection_schedule\": true,\n  \"original_panic_not_replaced_or_caught_inside_old_helper\": true\n}\n"
+}

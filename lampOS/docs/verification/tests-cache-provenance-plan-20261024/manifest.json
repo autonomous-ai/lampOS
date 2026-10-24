@@ -1,0 +1,39 @@
+{
+  "files": [
+    {
+      "path": "gate-plan.json",
+      "bytes": 22976,
+      "sha256": "308adc52effb2439855ce55ade9c2f42a0418f0261d411a5549c22e0bcd7718c"
+    },
+    {
+      "path": "gate-dependencies.json",
+      "bytes": 50332,
+      "sha256": "0b27f2e9396d9bd1bcf749778ece881da3f07566e5060774506095bae43c90a5"
+    },
+    {
+      "path": "old-counterfactual-plan.json",
+      "bytes": 4092,
+      "sha256": "e98d7c57567ac27d16e8e80ecdfebc814c22d7d073d9472ac3f2c9a738e888ae"
+    },
+    {
+      "path": "old-counterfactual.patch.json",
+      "bytes": 5611,
+      "sha256": "570b9f83063b4d6ef3b742a9c95cf3442b244f8f7dd363eb0f1bfa4716f70403"
+    },
+    {
+      "path": "old-counterfactual-static.json",
+      "bytes": 363,
+      "sha256": "501406ae855ce2b678a2b9709851829918d3293999f96fb3820f24404de23b7b"
+    },
+    {
+      "path": "current-clock-mtime-refresh.json",
+      "bytes": 1821,
+      "sha256": "99640d5bcd0a1804b470a8e1d324abb68d564c967ae2fc2fd2fa1ec98a323307"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2410,
+      "sha256": "812dc61e1aa26b166b7b2a80e432033c2cd153c957e2d25d1aeb9aded7c5bbd4"
+    }
+  ]
+}

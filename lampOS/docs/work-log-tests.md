@@ -4210,3 +4210,9 @@ baseline, not a new local measurement.
 Ready for lamp-voice: no
 
 Under #1569, source-reviewed a timeout-only diagnostic and a separate test-only startup/output/exit collector. The old two-second-after-spawn boundary is explicitly replaced in the candidate by first-byte startup and absolute exit/EOF bounds; product and recovery assertions remain unchanged. Added negative controls for startup, nonrenewing later bytes, held EOF and explicit direct-child reaping receipts. Nothing compiled, formatted or executed; no cause or historical qualification claim. Exact patch/plan snapshots: [preparation](verification/tests-update-event-preparation-20261024/). Current clock gate retains exclusive Cargo ownership.
+
+## 24 October, 17:28 — Cargo provenance check and future cleanup plan
+
+Ready for lamp-voice: no
+
+Read Fourth's demonstrated stale-library finding and put current clock qualification behind actual local-library compiler provenance checks. Preserved the active run; its source-timestamp refresh is explicitly disclosed rather than described as unchanged metadata. Future source switches will clear only generated workspace-package outputs, preserve dependencies/source metadata, and retain current-library compilation/reuse records. Added an unapplied exact-old-loop held-output control. No new Cargo, formatter, test, cleanup or binary execution ran in this preparation. [Exact plan and disclosure](verification/tests-cache-provenance-plan-20261024/).
