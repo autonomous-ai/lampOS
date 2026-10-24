@@ -16,7 +16,9 @@ all eight authored files matching tested merge `76ad068a7` are checked.
 Source maps remain unchanged across 10,347 tracked paths; this review does
 not independently compare every captured base blob to Git. Transient
 per-command data preservation additionally relies on executed fixture assertions.
-Ordinary ARM64 remains a separate pending gate at this publication.
+Official ordinary ARM64 **40075828246** also passes **11,196 PASS plus
+one LEAK**, 92 skipped, with strict Linux Clippy **40075828298** green.
+Primary full-log hashes and terminal metadata are retained in the audit.
 
 No new P1/P2 found. The fixture owns a private process group per command,
 requires reap and absent group before success, and retains bounded failure

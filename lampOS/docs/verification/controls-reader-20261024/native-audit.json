@@ -64,5 +64,24 @@
   ],
   "source_maps_unchanged": true,
   "tracked_paths": 10347,
-  "scope": "retained official evidence audited; no released executable run by reviewer; transient per-command preservation additionally relies on executed fixture assertions"
+  "scope": "retained official evidence audited; no released executable run by reviewer; transient per-command preservation additionally relies on executed fixture assertions",
+  "ordinary_workflow": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "headSha": "27b3695f0235bc7a721dfb216cd21203c249491d",
+    "status": "completed",
+    "run": 40075828246,
+    "private_primary_log_sha256": "6f2c87d7825a221af0faad63d5a2f112f54e2584fbf5fc98335653ecba9e7d1b"
+  },
+  "clippy_workflow": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "headSha": "27b3695f0235bc7a721dfb216cd21203c249491d",
+    "status": "completed",
+    "run": 40075828298,
+    "private_primary_log_sha256": "f577902ad767b642c1e3a83a8ef84cceb904df80e2eb922d51436f9292301698"
+  },
+  "ordinary_summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T07:58:36.6464084Z      Summary [ 200.490s] 11197 tests run: 11197 passed (1 leaky), 92 skipped"
+  ]
 }
