@@ -1,0 +1,12 @@
+{
+  "authored_head": "990919c8d4508887ec8e8930bf8a721714591693",
+  "candidate_gate_recorded_parent": "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+  "source_files": 6994,
+  "all_captured_files_match_committed_checkout": true,
+  "source_tree": "0c89a7320f87c96eba77b8afcd07a6b79805e4d3",
+  "workflow_sha256": "d6079423f68387013e759b5c7d996bf413cb666948b623224237ba28a2303790",
+  "earlier_unpublished_commit": "848e99e25871971c1f01953316b9ff08b9180986",
+  "workflow_only_amend": "correct sr-* result receipt glob; YAML and eight shell blocks revalidated",
+  "linux_fmt_execution_head": "848e99e25871971c1f01953316b9ff08b9180986",
+  "linux_fmt_lampOS_tree_identical_to_authored": true
+}

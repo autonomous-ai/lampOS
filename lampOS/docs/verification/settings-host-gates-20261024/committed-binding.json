@@ -1,0 +1,8 @@
+{
+  "authored_head": "848e99e25871971c1f01953316b9ff08b9180986",
+  "candidate_gate_recorded_parent": "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+  "source_files": 6994,
+  "all_captured_files_match_committed_checkout": true,
+  "source_tree": "0c89a7320f87c96eba77b8afcd07a6b79805e4d3",
+  "workflow_sha256": "18438d53d9fc7eb3bb2499e5f36ecf2b975308086b6a5025abcfc228c7a274e9"
+}

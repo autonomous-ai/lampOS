@@ -1,0 +1,1 @@
+YAML parsed; 8 shell blocks pass bash -n; actionlint unavailable in local PATH.

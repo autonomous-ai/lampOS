@@ -1,0 +1,64 @@
+{
+  "head": "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+  "base": "authored-parent recorded by git; native preview separately bound",
+  "crates": [
+    "lamp-settings"
+  ],
+  "steps": [
+    {
+      "stage": "fmt",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 6.095
+    },
+    {
+      "stage": "clippy",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-settings",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 0.416
+    },
+    {
+      "stage": "tests",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-settings",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 8.138,
+      "totals": {
+        "passed": 48,
+        "failed": 0,
+        "ignored": 3,
+        "filtered": 0
+      }
+    }
+  ],
+  "source_count": 6994,
+  "source_unchanged": true,
+  "result": "passed"
+}

@@ -1,0 +1,97 @@
+   Compiling libc v0.2.190
+   Compiling lamp-voice-processes v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/voice-processes)
+   Compiling serde_json v1.0.151
+   Compiling errno v0.3.14
+   Compiling cpufeatures v0.2.17
+   Compiling getrandom v0.4.3
+   Compiling lamp-bus v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/bus)
+   Compiling sha2 v0.10.9
+   Compiling rustix v1.1.5
+   Compiling signal-hook-registry v1.4.8
+   Compiling signal-hook v0.4.4
+   Compiling lamp-msgs v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/msgs)
+   Compiling tempfile v3.27.0
+   Compiling lamp-records v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/records)
+   Compiling lamp-settings v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/settings)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.87s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_settings-56c09b7c412fa1fe)
+
+running 32 tests
+test engine::tests::a_state_from_a_later_build_is_read - should panic ... ok
+test engine::tests::failed_save_before_or_after_replacement_poisoned_until_reopen ... ok
+test engine::tests::invalid_atomic_batch_and_read_only_values_leave_all_state_unchanged ... ok
+test engine::tests::malformed_and_inconsistent_state_is_never_reset ... ok
+test engine::tests::missing_state_gets_defaults_and_reopening_preserves_identity ... ok
+test engine::tests::no_op_has_a_receipt_and_evicted_retries_cannot_pass_the_stale_guard ... ok
+test engine::tests::oversized_library_mutation_fails_before_storage_without_poisoning ... ok
+test engine::tests::reordered_atomic_changes_have_the_same_request_fingerprint ... ok
+test engine::tests::same_revision_rivals_have_one_winner_and_retry_is_durable ... ok
+test engine::tests::sixteen_maximum_wire_mutations_fit_with_a_large_admitted_catalog ... ok
+test model::tests::catalog_admission_reserves_space_for_values_and_full_retry_window ... ok
+test model::tests::first_three_have_existing_units_defaults_and_limits ... ok
+test model::tests::invalid_catalogs_fail_without_normalizing_names_or_defaults ... ok
+test model::tests::numeric_kinds_bounds_and_nonfinite_values_are_exact ... ok
+test model::tests::text_is_bounded_in_utf8_bytes_and_choices_are_explicit ... ok
+test model::tests::unknown_fields_duplicate_fields_and_wrong_json_kinds_are_refused ... ok
+test protocol::tests::a_bare_ok_or_another_commit_does_not_confirm_a_set ... ok
+test protocol::tests::reads_and_status_need_their_own_fields_and_an_honest_reliability ... ok
+test protocol::tests::strict_bounded_requests_have_no_hidden_apply_or_authority_flag ... ok
+test store::tests::data_temp_and_lock_refuse_links_special_files_and_public_permissions ... ok
+test store::tests::directory_and_lock_replacements_are_detected_before_save ... ok
+test store::tests::document_bound_is_checked_before_parse_or_write ... ok
+test store::tests::failed_records_write_poison_requires_reopen ... ok
+test store::tests::known_temporary_is_recovered_without_accumulating_residue ... ok
+test store::tests::noncanonical_missing_and_untrusted_directories_are_refused ... ok
+test store::tests::oversized_files_and_invalid_json_never_become_loaded_state ... ok
+test store::tests::oversized_temporary_is_refused_without_deleting_it ... ok
+test store::tests::owner_lock_excludes_another_process ... ok
+test store::tests::owner_lock_is_lifetime_exclusive_and_persists_for_reopen ... ok
+test store::tests::state_replacement_outside_owner_is_detected ... ok
+test store::tests::state_round_trips_without_erasing_duplicate_fields ... ok
+test store::tests::writable_ancestor_is_refused_even_when_final_directory_is_private ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running unittests src/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_settings-71908938e4b944dd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/it/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-d77ac1a38a921996)
+
+running 14 tests
+test client::closed_truncated_nonobject_malformed_and_multiple_replies_are_ambiguous ... ok
+test client::complete_request_without_reply_times_out_without_retrying_or_exposing_payload ... ok
+test client::exact_reply_limit_is_accepted_and_one_more_byte_is_refused ... ok
+test client::fragmented_reply_preserves_escaped_content_and_accepts_trailing_whitespace ... ok
+test client::invalid_or_oversized_requests_are_refused_before_connecting ... ok
+test client::invalid_paths_and_expired_deadline_never_connect ... ok
+test client::maximum_request_is_sent_once_and_partial_response_cannot_reset_deadline ... ok
+test client::missing_stale_and_nonsocket_endpoints_are_unavailable_without_sending ... ok
+test client::multiple_hops_share_one_absolute_deadline ... ok
+test runtime::concurrent_editors_get_one_commit_and_retry_survives_recovery ... ok
+test runtime::expired_client_does_not_cancel_a_started_durable_save ... ok
+test runtime::read_keeps_progressing_while_storage_waits_and_failure_is_not_rollback ... ok
+test runtime::save_round_trip_latency_on_this_machine ... ignored, host measurement: socket and private-directory save on this machine
+test runtime::slow_input_and_bad_lines_do_not_block_another_reader ... ok
+
+test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.28s
+
+     Running tests/release_pair.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-bc7dbb53dc880989)
+
+running 5 tests
+test current_settings_cli_store_smoke ... ok
+test fixture::settings_fixture_complete_reply_within_original_deadline ... ok
+test fixture::settings_fixture_dribbling_reply_cannot_renew_original_deadline ... ok
+test release_6408_settings_reads_6498_and_6498_reads_return ... ignored, manual native Linux/aarch64 released Settings pair; retained private evidence
+test release_6498_settings_reads_6408_and_6408_reads_return ... ignored, manual native Linux/aarch64 released Settings pair; retained private evidence
+
+test result: ok. 3 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.20s
+
+   Doc-tests lamp_settings
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
