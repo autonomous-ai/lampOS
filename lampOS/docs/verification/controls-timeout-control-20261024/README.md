@@ -21,3 +21,9 @@ The dedicated cases intentionally filter the ordinary fixture, so they do not ex
 ## Reader and formatting disposition
 
 Lead READ-OK covers authored 714c30820. Reviewer-two separately ran Mac fmt/strict Controls Clippy/full serial 509/0/3 with unchanged source and found no P1/P2. Their Linux fmt gate finding is valid: those original workflows do not run formatting. Third claimed the workflow fix on separate branch third/linux-format-gate (d57c27792); its actual Linux execution and Second's exact-source manual formatting request remain separate from these successful test/Clippy results. No retroactive formatting pass is claimed.
+
+## Exact authored-head Linux formatting completed
+
+Second published the separate [source-only Linux formatting packet](https://github.com/autonomous-ai/lampOS/tree/a4c6b7b95/lampOS/docs/verification/controls-cleanup-linux-format-reader-20261024). Third read its report and primary structured receipts, verified all three published receipt hashes against export.json, and checked repository/lampOS tree IDs against authored 714c30820. Formatter exit is 0, all 7,020 source hashes remain unchanged, and the owned container removal/absence check passes. This was Second execution, no ARM build/test or device execution. It closes the earlier exact-head formatting qualification; the original CI jobs still did not run formatting retroactively.
+
+Controls #3369 landed through train 86 as lamp-voice b23ae5339. All four authored changed files also equal subsequently fetched lamp-voice 2f40cf898. Original ordinary ARM64 retained one leaky Voice journal test (same_voice::tests::each_line_the_check_says_is_said_to_its_journal); it is not erased by the successful gate. No physical acceptance is added.
