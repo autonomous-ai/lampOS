@@ -2479,8 +2479,21 @@ after a take-over, but now for every turn:
   talk not for the lamp. On lamp-4ace on 20 Oct, told the note,
   "Remember that my favourite colour is green." got `not_for_me` and
   nothing was kept (#1712, the first builder at 04:54 and their yes at
-  05:01). The journal adds `, only as the conversation going on: the model is told so`
-  to `its answer is played`. Gemini Live hears who is talking to whom; this
+  05:01). Nor is a line begun over the lamp's own answer
+  (`ProviderInput::Start`'s `over_the_lamps_voice`, not over the wait
+  sound; `Heeding::began_over`, which the rule's hearing hook now learns
+  whenever `not_for_me` is offered): a cut-in over its voice is said to
+  it, and it gets `DECLINE_NOTE` like any line without the lamp's name.
+  On lamp-52e6 on 24 Oct, told the note, "Sorry, can you say that last
+  part again?", said over the lamp's story, got `not_for_me` and silence.
+  Two other people's talk over the lamp is left to `DECLINE_NOTE`'s
+  "plainly people talking to each other", and a yes to someone else
+  over it to `LAMP_OTHERS_ANSWER`; the busy-room holds are unchanged.
+  With `LAMP_CUT_IN_TOLD=on` such a line is told `cut_in_told::NOTE` with
+  no note saying the opposite beside it. The journal adds `, only as the
+  conversation going on: the model is told so` to `its answer is played`,
+  or `, only as the conversation going on, begun over the lamp's answer:
+  the model is not told it may be people's talk`. Gemini Live hears who is talking to whom; this
   route's model reads one line of words, and on lamp-4ace on 19 Oct it
   answered colleagues' talk after a named request six times, where Live
   answered it once. Each answer kept the conversation going, and with no
