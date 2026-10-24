@@ -1,0 +1,2 @@
+    Checking lamp-settings v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/settings)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s

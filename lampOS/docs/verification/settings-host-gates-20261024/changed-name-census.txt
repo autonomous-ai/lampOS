@@ -1,0 +1,8 @@
+lampOS/crates/settings/tests/release_pair.rs:12:fn release_6498_settings_reads_6408_and_6408_reads_return() {
+lampOS/crates/settings/tests/release_pair.rs:14:        "release_6498_settings_reads_6408_and_6408_reads_return",
+lampOS/crates/settings/tests/release_pair.rs:21:fn release_6408_settings_reads_6498_and_6498_reads_return() {
+lampOS/crates/settings/tests/release_pair.rs:23:        "release_6408_settings_reads_6498_and_6498_reads_return",
+lampOS/crates/settings/tests/release_pair/fixture.rs:120:                std::env::var_os(format!("LAMP_COMPAT_SETTINGS_{release}"))
+lampOS/crates/settings/tests/release_pair/fixture.rs:651:fn settings_fixture_complete_reply_within_original_deadline() {
+lampOS/crates/settings/tests/release_pair/fixture.rs:661:fn settings_fixture_dribbling_reply_cannot_renew_original_deadline() {
+lampOS/crates/update/tests/release_pair.rs:743:            json!({"result":"passed", "writer":writer, "recoverer":reader, "release_6408_sha256":OLD_SHA, "release_6449_sha256":CURRENT_SHA, "cut":"first ordinary restart, after real journal/settings/unit/link writes", "writer_shell_wait_status":137, "signal_sent":"SIGKILL to verified owned process group", "recovery_exit":1, "next_round_exit":1, "network":"none", "systemctl":"fixture", "physical_power_cut":false})

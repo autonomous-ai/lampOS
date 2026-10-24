@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-24 15:19 +07, Settings qualification pushed
+
+New claimed #2809 Settings slice is draft #3347 `990919c8d`. Actual published
+6408/6498 servers will exercise private guarded values/receipts both ways and
+back; no current domain reader substitutes. Expected per direction: seven
+exact reaps and 34 RPCs. Unknown fields/version/tagged values remain strict
+refusal controls, not forward-tolerance claims. Mac **48/0/3 ignored**, fmt,
+strict Clippy and identical-tree source-only Linux fmt pass. Workflow YAML and
+eight shell blocks validate. [Host receipts](verification/settings-host-gates-20261024/README.md)
+retain both pre/post deadline-correction candidates and exact commit bindings.
+Official dedicated/ordinary ARM64 and Linux Clippy now gate acceptance.
+
+#3342 `e81c64854` has both current READ-OKs; its stage-label P3 is closed,
+all gates green, NEXT TRAIN posted. #3327 and #3334 are likewise submitted.
+#3330 remains draft for actual parent integration and final conflict carry.
+No base-drift-only carry. #3344 privacy and #3346 Controls independent reads
+are delivered with all author/native/local gates green and limits retained.
+
+Second owns no lamp. #1812 trusted key and #2810 attended lamp window remain
+external blocks. Next: Settings native evidence and review, own incoming
+findings, then package final carry as soon as #3327 lands. Status stays here;
+Queue is claims, blocks and integration decisions only.
+
+---
+
 ## Current checkpoint: 2026-10-24 15:03 +07, corrected Cloud gates green and two reads delivered
 
 #3342 `e81c64854` fixes explicit stage metadata; all 14 native spawns agree

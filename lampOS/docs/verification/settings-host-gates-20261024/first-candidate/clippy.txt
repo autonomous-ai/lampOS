@@ -1,0 +1,16 @@
+   Compiling libc v0.2.190
+   Compiling rustix v1.1.5
+    Checking lamp-voice-processes v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/voice-processes)
+    Checking serde_json v1.0.151
+    Checking lamp-bus v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/bus)
+    Checking errno v0.3.14
+    Checking cpufeatures v0.2.17
+    Checking getrandom v0.4.3
+    Checking sha2 v0.10.9
+    Checking signal-hook-registry v1.4.8
+    Checking signal-hook v0.4.4
+    Checking lamp-msgs v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/msgs)
+    Checking tempfile v3.27.0
+    Checking lamp-records v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/records)
+    Checking lamp-settings v0.1.0 (/private/tmp/second-settings-release-pair-20261024/lampOS/crates/settings)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.16s
