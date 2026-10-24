@@ -1,0 +1,8 @@
+{
+  "previous_head": "b33ade24771fb8e72f56df4ca1155eb591534d45",
+  "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+  "old_sha256": "349a819a82cb6830f30ef0ea1f1e2d4079a0523c4a21779ad7b7fb33ab1a4fe3",
+  "new_sha256": "c9eaa46f810a98a2bc8452c52c9996df107be906efe6fe57d5ff8921d39c3247",
+  "exactly_one_comment_replaced": true,
+  "no_executable_or_assertion_changes": true
+}

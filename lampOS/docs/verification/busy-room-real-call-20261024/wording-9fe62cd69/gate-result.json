@@ -1,0 +1,107 @@
+{
+  "stages": [
+    {
+      "tag": "fmt",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 6.273
+    },
+    {
+      "tag": "clean-selected",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice"
+      ],
+      "exit": 0,
+      "seconds": 1.096
+    },
+    {
+      "tag": "clippy",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 39.352
+    },
+    {
+      "tag": "test-compile",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 49.793
+    },
+    {
+      "tag": "busy-controls",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_busy_room",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 9.241
+    },
+    {
+      "tag": "literal-control",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "the_real_name_call_keeps_positions",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 0.212
+    }
+  ],
+  "unix_bind": "passed",
+  "cleaned_workspace_packages": [
+    "lamp-voice"
+  ],
+  "source_unchanged": true
+}

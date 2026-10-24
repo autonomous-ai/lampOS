@@ -55,3 +55,12 @@ This carry stays draft pending current execution/read disposition and
 native checks. No timeout, assertion, clock or TTL was relaxed; no retry
 until green. There was no full local workspace gate, original artifact
 execution, lamp action or physical/acoustic qualification.
+
+## Artifact export correction
+
+The first exported summaries had empty artifact arrays because a reused filter
+matched the proof-folder name instead of the worktree. They could not prove
+the advertised compiler identities. Re-projecting the same retained raw logs
+now gives 42 local Clippy and 40 test-compile artifacts, all `fresh=false`.
+Full private log hashes are unchanged; no gate or case was rerun. This
+corrects the evidence for c185843f7, not the later pending P3 revision.

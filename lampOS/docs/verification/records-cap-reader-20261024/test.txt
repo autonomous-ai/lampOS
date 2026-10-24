@@ -1,0 +1,226 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_records-f79e7eab1c32c9d3)
+
+running 138 tests
+test config::tests::broad_ambiguous_and_overlapping_paths_are_rejected ... ok
+test config::tests::customer_defaults_are_explicit_and_off ... ok
+test config::tests::malformed_service_and_limits_are_rejected ... ok
+test config::tests::session_read_group_applies_to_one_root_and_fingerprints_each_group ... ok
+test config::tests::session_read_group_is_a_recognized_explicit_per_root_policy ... ok
+test config::tests::session_read_group_local_resolver_is_exact_unique_and_bounded ... ok
+test config::tests::session_read_group_local_resolver_propagates_read_failure ... ok
+test config::tests::session_read_group_never_makes_an_unknown_root_kind_or_unsafe_path_valid ... ok
+test config::tests::session_read_group_omitted_or_null_keeps_the_private_default ... ok
+test config::tests::session_read_group_rejects_malformed_names_and_wrong_json_types ... ok
+test config::tests::the_products_config_is_valid_and_bounds_the_voices_sessions ... ok
+test config::tests::the_products_config_one_release_ahead_is_read_or_told_newer ... ok
+test config::tests::unknown_fields_and_kinds_do_not_enable_generic_cleanup ... ok
+test guard::implementation::tests::a_live_empty_command_or_missing_metadata_still_refuses ... ok
+test guard::implementation::tests::a_single_recheck_distinguishes_exit_from_empty_live_arguments ... ok
+test guard::implementation::tests::a_voice_binary_that_resolves_to_another_program_is_refused ... ok
+test guard::implementation::tests::a_voice_started_through_a_current_link_is_its_own_main_process ... ok
+test guard::implementation::tests::absent_stat_and_esrch_are_gone_but_denied_or_invalid_stat_refuse ... ok
+test guard::implementation::tests::an_exited_main_process_still_refuses_even_if_its_invocation_is_known ... ok
+test guard::implementation::tests::an_exiting_flag_does_not_hide_unreadable_arguments_or_other_live_threads ... ok
+test guard::implementation::tests::an_expired_budget_cannot_turn_a_failed_inspection_into_a_skip ... ok
+test guard::implementation::tests::any_manager_change_or_failure_refuses ... ok
+test guard::implementation::tests::both_process_passes_keep_their_protected_paths ... ok
+test guard::implementation::tests::deadline_and_metadata_limits_refuse ... ok
+test guard::implementation::tests::disappearing_pinned_process_is_reported_and_never_follows_a_reused_pid ... ok
+test guard::implementation::tests::ending_a_process_does_not_remove_protection_already_discovered ... ok
+test guard::implementation::tests::every_voice_command_and_worker_role_on_the_voices_list_is_known ... ok
+test guard::implementation::tests::exits_in_a_scan_do_not_weaken_protection_for_a_live_file_holder ... ok
+test guard::implementation::tests::failed_service_still_protects_an_old_live_coordinator ... ok
+test guard::implementation::tests::fake_manager_success_failure_timeout_and_output_cap ... ok
+test guard::implementation::tests::incomplete_process_evidence_and_unknown_workers_refuse ... ok
+test guard::implementation::tests::main_executable_mismatch_refuses_even_with_the_right_binary_name ... ok
+test guard::implementation::tests::main_process_must_match_the_manager_and_be_present ... ok
+test guard::implementation::tests::manager_identity_and_invocation_are_strict ... ok
+test guard::implementation::tests::persistent_zero_thread_metadata_never_passes_process_inspection ... ok
+test guard::implementation::tests::pid_reuse_and_parenthesized_comm_do_not_confuse_identity ... ok
+test guard::implementation::tests::pid_reuse_or_changed_process_kind_cannot_be_reclassified_as_exit ... ok
+test guard::implementation::tests::pinned_proc_directory_does_not_switch_to_reused_name ... ok
+test guard::implementation::tests::process_exits_and_known_kernel_threads_are_reported_without_reading_hidden_arguments ... ok
+test guard::implementation::tests::relative_and_alias_outputs_are_resolved ... ok
+test guard::implementation::tests::renamed_manual_binary_uses_direct_root_evidence_without_voice_parsing ... ok
+test guard::implementation::tests::retained_invocation_is_protected_in_all_known_states ... ok
+test guard::implementation::tests::scan_keeps_current_old_survivor_manual_and_diagnostic_child ... ok
+test guard::implementation::tests::still_live_and_unreadable_after_every_look_refuses ... ok
+test guard::implementation::tests::the_second_voices_worker_is_known_and_its_files_still_checked ... ok
+test guard::implementation::tests::the_voices_end_of_turn_worker_is_known_and_its_files_still_checked ... ok
+test guard::implementation::tests::the_voices_schedule_consumer_is_known_and_its_files_still_checked ... ok
+test guard::implementation::tests::unit_argument_cannot_be_a_pattern_or_option ... ok
+test guard::implementation::tests::unknown_same_cgroup_process_refuses ... ok
+test guard::implementation::tests::unreadable_at_first_and_gone_a_zombie_or_exiting_on_a_later_look_is_skipped ... ok
+test guard::implementation::tests::unreadable_at_first_and_readable_on_a_later_look_is_inspected_as_live ... ok
+test guard::implementation::tests::unrelated_serve_commands_do_not_use_the_voice_argument_layout ... ok
+test guard::implementation::tests::zero_threads_require_one_followup_that_positively_establishes_exit ... ok
+test guard::platform_tests::unsupported_platform_never_claims_an_empty_live_set ... ok
+test json_file::tests::a_newer_builds_mode_at_this_schema_is_set_aside_whole_on_read_and_write ... ok
+test json_file::tests::archive_collision_or_source_replacement_never_moves_or_overwrites_either_file ... ok
+test json_file::tests::atomic_result_replaces_only_known_file_and_cache_detects_change ... ok
+test json_file::tests::current_report_ignores_added_fields_and_keeps_the_stamp_cache ... ok
+test json_file::tests::final_writer_rechecks_and_preserves_a_newer_report_before_replacing_it ... ok
+test json_file::tests::newer_report_is_kept_whole_once_without_creating_cleanup_evidence ... ok
+test json_file::tests::newer_report_still_requires_trusted_private_storage_and_the_file_byte_bound ... ok
+test json_file::tests::one_private_reserved_temporary_is_recovered_after_an_interrupted_write ... ok
+test json_file::tests::result_symlink_and_hardlink_are_refused_without_touching_target ... ok
+test json_file::tests::unrecognized_or_unknown_supported_values_are_preserved_on_read_and_write ... ok
+test plan::tests::age_is_strict_and_independent_from_size ... ok
+test plan::tests::clock_reversal_preserves_future_records_and_reports_pressure ... ok
+test plan::tests::duplicates_bad_names_and_overflow_are_errors_not_empty_success ... ok
+test plan::tests::live_session_is_kept_even_if_alone_older_and_larger_than_both_limits ... ok
+test plan::tests::recent_quarantine_is_resumed_but_never_while_protected ... ok
+test plan::tests::size_removes_oldest_whole_sessions_until_within_bound ... ok
+test plan::tests::tied_times_use_stable_names_and_both_bounds_apply ... ok
+test report::clock_tests::declaration_samples_the_clock_before_the_separate_real_header_start ... ok
+test report::clock_tests::rejected_roots_and_failed_declarations_do_not_sample_the_cadence_clock ... ok
+test report::clock_tests::the_records_constructor_installs_the_original_scan_and_presence_cadence ... ok
+test report::tests::a_disabled_flag_does_not_hide_a_failure_or_impossible_removal ... ok
+test report::tests::disabled_cleanup_is_visible_without_claiming_a_disk_scan ... ok
+test report::tests::dry_run_never_claims_enforced_retention_or_removals ... ok
+test report::tests::exact_disk_boundaries_do_not_round_a_warning_away ... ok
+test report::tests::healthy_report_identifies_snapshot_age_and_aggregates_without_record_ids ... ok
+test report::tests::invalid_in_memory_reports_never_become_ok_or_publish_unvalidated_counters ... ok
+test report::tests::large_counts_and_private_strings_do_not_overflow_or_expand_the_message ... ok
+test report::tests::missing_zero_or_impossible_disk_values_are_errors ... ok
+test report::tests::no_report_and_an_enabled_empty_report_are_errors ... ok
+test report::tests::refusals_byte_overruns_and_root_failures_remain_visible ... ok
+test report::tests::repeated_reports_do_not_refresh_the_cleanup_timestamp ... ok
+test report::tests::reporter_refuses_a_relative_bus_without_creating_a_directory ... ok
+test report::tests::stale_warning_or_error_is_not_downgraded ... ok
+test report::tests::the_worst_root_disk_is_not_hidden_by_averaging_or_double_counting ... ok
+test report::tests::two_cleanups_in_a_row_refused_for_an_unknown_worker_name_it ... ok
+test report::tests::two_hour_boundary_is_exact_and_large_clock_jumps_do_not_wrap ... ok
+test report::tests::unsupported_schema_invalid_mode_and_clock_rollback_are_errors ... ok
+test run::tests::disabled_apply_does_not_even_open_a_configured_root ... ok
+test run::tests::dry_run_plans_but_never_mutates_and_protects_old_live_session ... ok
+test run::tests::expired_budget_cannot_reach_protection_or_deletion ... ok
+test run::tests::full_disk_is_not_permission_to_bypass_safe_mutation_failures ... ok
+test run::tests::partial_unlinks_are_accounted_without_claiming_complete_session_removal ... ok
+test run::tests::unknown_protection_refuses_entire_root_but_reports_full_disk ... ok
+test store::tests::a_mutated_record_invalidates_the_whole_candidate_before_any_unlink ... ok
+test store::tests::accounting_rejects_overflow_and_snapshots_include_ctime_but_not_atime ... ok
+test store::tests::changed_file_inode_even_with_same_size_and_mtime_is_refused ... ok
+test store::tests::cleaner_lock_is_nonblocking_and_does_not_create_a_file ... ok
+test store::tests::combined_live_and_quarantine_entry_budget_is_enforced_and_clears_prior_authority ... ok
+test store::tests::conflicting_quarantine_id_never_overwrites_and_duplicate_inventory_refuses_both ... ok
+test store::tests::each_kept_session_folder_is_taken_as_a_session ... ok
+test store::tests::fsync_failures_keep_truthful_counts_and_a_recognizable_remainder ... ok
+test store::tests::full_disk_before_mutation_never_falls_back_to_in_place_deletion ... ok
+test store::tests::interrupted_unlinks_report_actual_progress_and_every_remainder_recovers ... ok
+test store::tests::invalid_quarantine_shares_the_total_entry_budget_and_clears_prior_authority ... ok
+test store::tests::inventory_is_read_only_and_uses_allocated_bytes_and_newest_mtime ... ok
+test store::tests::links_specials_unknown_layouts_and_permissions_are_refused_without_reads ... ok
+test store::tests::moved_or_replaced_root_is_detected_before_mutation ... ok
+test store::tests::partial_start_with_empty_metadata_is_known_but_empty_live_session_is_not ... ok
+test store::tests::public_constructor_accepts_a_private_tree_below_root_owned_sticky_temp ... ok
+test store::tests::public_constructor_rejects_writable_nonsticky_ancestors_open_root_and_symlinks ... ok
+test store::tests::refusal_limit_is_utf8_bytes_including_escaped_name_and_prefix ... ok
+test store::tests::removes_only_inventoried_sessions_and_requires_fresh_inventory_for_retry ... ok
+test store::tests::replaced_session_and_metadata_directory_keep_both_trees_intact ... ok
+test store::tests::session_read_group_roles_pin_gid_and_keep_health_and_quarantine_private ... ok
+test store::tests::session_read_group_unsupported_acl_verification_fails_closed ... ok
+test store::tests::sparse_file_allocation_is_not_confused_with_logical_length ... ok
+test store::tests::sticky_exception_requires_root_ownership_and_never_relaxes_final_root ... ok
+test store::tests::traversal_ids_invalid_roots_and_bounded_enumeration_fail_closed ... ok
+test store::tests::unknown_or_linked_quarantine_is_preserved ... ok
+test store::tests::vanished_candidate_is_not_recreated_or_confused_with_a_replacement ... ok
+test tests::added_fields_do_not_hide_unknown_enum_values_or_missing_required_fields ... ok
+test tests::fingerprint_is_required_and_exactly_lowercase_sha256_hex ... ok
+test tests::newer_schema_requires_the_bounded_report_envelope_but_does_not_decode_its_roots ... ok
+test tests::next_release_fields_are_ignored_at_every_persisted_level_and_not_written ... ok
+test tests::overflow_stops_before_reading_or_allocating_the_extra_value_or_tail ... ok
+test tests::paths_units_and_error_strings_have_byte_limits ... ok
+test tests::process_examples_are_bounded_and_remain_in_a_failed_root_report ... ok
+test tests::process_observations_are_optional_for_old_receipts_and_empty_output_is_unchanged ... ok
+test tests::process_report_counts_examples_and_unknown_reasons_fail_closed ... ok
+test tests::record_strings_are_bounded_by_decoded_utf8_bytes ... ok
+test tests::root_and_all_record_arrays_have_exact_count_bounds_even_for_empty_strings ... ok
+test tests::schema_mode_and_numeric_types_fail_closed ... ok
+test tests::valid_report_round_trips_without_imposing_counter_relationships ... ok
+test tests::values_built_in_memory_follow_the_same_resource_limits ... ok
+
+test result: ok. 138 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.42s
+
+     Running unittests src/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_records-fbe1507fe9866ba9)
+
+running 23 tests
+test application_schedule_tests::a_held_factory_cannot_reach_the_wait_or_fabricate_a_bus_message ... ok
+test application_schedule_tests::a_newer_schema_is_reported_as_the_cleanup_paused_until_this_builds_is_back ... ok
+test application_schedule_tests::a_real_publish_error_is_retained_after_successful_construction ... ok
+test application_schedule_tests::actual_bus_root_reload_recreates_the_selected_factory ... ok
+test application_schedule_tests::cadence_reads_preserve_work_residual_and_reuse_the_actual_publisher ... ok
+test application_schedule_tests::failed_construction_is_observed_after_real_work_and_retried_only_next_cycle ... ok
+test application_schedule_tests::initial_config_errors_precede_clock_factory_and_wait ... ok
+test application_schedule_tests::report_command_passes_the_original_arguments_once_and_check_does_not_select_it ... ok
+test application_schedule_tests::system_schedule_samples_host_time_and_keeps_a_zero_wait_successful ... ok
+test application_schedule_tests::zero_residual_is_preserved_and_logical_time_does_not_exhaust_the_host_lifetime ... ok
+test fixture_schedule_tests::a_stale_round_backwards_time_or_future_jump_after_settling_is_terminal ... ok
+test fixture_schedule_tests::actual_first_and_due_factories_must_finish_before_checked_or_event ... ok
+test fixture_schedule_tests::invalid_initial_identity_round_or_time_never_advances_and_latches_failure ... ok
+test fixture_schedule_tests::reads_and_pre_due_steps_are_pure_and_due_reply_waits_for_the_next_cycle ... ok
+test fixture_schedule_tests::real_construction_failure_can_only_recover_on_the_original_next_due ... ok
+test fixture_schedule_tests::zero_wait_and_changed_host_lifetime_cannot_acknowledge_a_cycle ... ok
+test tests::check_defaults_to_dry_and_never_accepts_a_live_override ... ok
+test tests::cleanup_on_sets_aside_a_newer_report_and_still_removes_an_expired_session ... {"schema_version":1,"config_fingerprint":"2045e11b63144f3c2e23786c9283a362fa8cd4b725e5ba8f452fd5372b4cbf86","at_unix_s":1792846313,"mode":"apply","enabled":true,"roots":[{"root":"/private/var/folders/4c/lq3h60sn5l53hs3s21nzpqzw0000gn/T/lamp-records-newer-cleanup-93219/sessions","unit":"lamp-voice.service","before_bytes":8192,"planned_bytes":8192,"removed_bytes":8192,"remaining_bytes":0,"limit_bytes":500000000,"active":[],"planned":["00000000000000000000000000000001"],"removed":["00000000000000000000000000000001"],"refused":[],"disk":{"total_bytes":994662584320,"available_bytes":117427826688},"error":null}],"error":null}
+ok
+test tests::failure_receipt_cannot_overwrite_an_unknown_supported_value ... ok
+test tests::old_result_does_not_match_a_changed_age_policy_or_enable_switch ... ok
+test tests::output_cannot_overwrite_config_or_an_unrelated_file ... ok
+test tests::oversized_result_leaves_readable_failure_and_next_cleanup_can_replace_it ... {"schema_version":1,"config_fingerprint":"9da4e81a001e0412d2acc5aa8c273ddd175ccb5a20999d1807133040b056b99d","at_unix_s":1792846313,"mode":"apply","enabled":false,"roots":[],"error":null}
+ok
+test tests::reporter_has_explicit_bounded_test_lifetime ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+     Running tests/records.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/records-c34aa4de6776d171)
+
+running 8 tests
+test a_report_from_a_later_build_is_read ... ok
+test diagnostic_is_delivered_over_the_real_local_bus_without_record_contents ... ok
+test public_tree_pipeline_dry_then_apply_keeps_live_memory_and_outside_link ... ok
+test real_cli_apply_with_unknown_service_cannot_delete_any_fixture_record ... ok
+test real_cli_runs_on_a_newer_builds_config_one_release_ahead ... ok
+test real_cli_sets_aside_a_newer_report_and_refuses_unknown_values_before_cleanup ... ok
+test real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt ... ok
+test records_cost ... ignored, finite release timing of disposable records; report machine separately
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.23s
+
+     Running tests/records_control.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/records_control-5066c2b3d56e0504)
+
+running 14 tests
+test a_complete_checked_queued_before_peer_close_is_consumed_and_committed ... ok
+test actual_child_returns_three_distinct_events_at_full_due_intervals ... ok
+test actual_control_close_requires_actual_error_exit_and_reap ... lamp-records: records fixture frame ended before LF
+ok
+test blocked_control_keeps_the_real_one_second_lifetime_and_exits_with_error_64 ... lamp-records: records fixture host deadline
+ok
+test every_initial_response_identity_and_cycle_field_is_validated ... ok
+test filled_real_pipe_write_uses_the_single_absolute_host_deadline ... ok
+test fragmented_real_pipe_frames_work_and_oversized_reads_fail_at_the_byte_bound ... ok
+test framing_rejects_truncation_unknown_fields_and_malformed_json ... ok
+test invalid_bootstrap_is_an_actual_child_error_before_any_reporting_event ... lamp-records: invalid records fixture bootstrap
+lamp-records: invalid records fixture bootstrap
+ok
+test malformed_due_receipt_after_peer_advance_latches_without_parent_time_commit ... ok
+test parent_rejects_future_steps_and_one_window_retains_full_periods_and_end ... ok
+test partial_setup_and_parent_unwind_both_reap_the_owned_child ... ok
+test returned_ok_without_a_subscriber_is_not_a_delivered_event ... ok
+test same_time_and_pre_due_replies_cannot_fabricate_new_work_or_change_outcome ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s
+
+     Running tests/release_pair_systemd.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair_systemd-170c09bf1ff72a07)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lamp_records
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

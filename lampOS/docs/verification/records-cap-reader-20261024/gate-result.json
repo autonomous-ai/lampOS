@@ -1,0 +1,95 @@
+{
+  "stages": [
+    {
+      "tag": "fmt",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 5.557
+    },
+    {
+      "tag": "clean-selected",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-bus",
+        "-p",
+        "lamp-msgs",
+        "-p",
+        "lamp-records",
+        "-p",
+        "lamp-voice-processes"
+      ],
+      "exit": 0,
+      "seconds": 0.313
+    },
+    {
+      "tag": "clippy",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-records",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 5.086
+    },
+    {
+      "tag": "test-compile",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-records",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 4.938
+    },
+    {
+      "tag": "test",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-records",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 8.423
+    }
+  ],
+  "unix_bind": "passed",
+  "cleaned_workspace_packages": [
+    "lamp-bus",
+    "lamp-msgs",
+    "lamp-records",
+    "lamp-voice-processes"
+  ],
+  "source_unchanged": true
+}
