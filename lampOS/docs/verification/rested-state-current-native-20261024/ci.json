@@ -1,0 +1,138 @@
+{
+  "head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+  "base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "tested_merge_from_checkout_logs": "9ca22aff7e09b3ca4937e9a23a5b9dceea1aabb6",
+  "status": "native pair, ordinary ARM64, strict Linux Clippy passed at this exact head",
+  "runs": {
+    "pair": {
+      "id": 40057211166,
+      "conclusion": "success",
+      "tests": {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0,
+        "seconds": 8.93
+      },
+      "raw_log_sha256": "4efb366c8e66c195302d624e328b7bc7692fcb5f8d291370980d8dec962b4ce9"
+    },
+    "arm": {
+      "id": 40057211171,
+      "conclusion": "success",
+      "head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+      "nextest": {
+        "passed": 11164,
+        "clean_pass_rows": 11163,
+        "leaky_passes": 1,
+        "failed": 0,
+        "skipped": 77,
+        "seconds": 199.891,
+        "summary": "Summary [ 199.891s] 11164 tests run: 11164 passed (1 leaky), 77 skipped",
+        "numbered_rows": {
+          "PASS": 11163,
+          "LEAK": 1
+        },
+        "leak_marked_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "skipped_names": "Not emitted by this run."
+      },
+      "doctests_passed": 4,
+      "separate_process_harness": {
+        "passed": 12,
+        "failed": 0
+      },
+      "relay_check": "Separate relay command completed in successful CI step; no count inferred.",
+      "publisher_artifact_cli_suites": [
+        35,
+        12,
+        7
+      ],
+      "packaged": {
+        "current_binaries": 47,
+        "selected_examples": 2,
+        "ordinary_payload_downloaded": false
+      },
+      "raw_log_sha256": "75b0956ce0fb7e8c4f4a0020f237f1e91c18ada1e58c5292944bbb53072fc193"
+    },
+    "clippy": {
+      "id": 40057211165,
+      "conclusion": "success",
+      "head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+      "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+      "rust_warning_error_diagnostics": 0,
+      "raw_log_sha256": "24fa0a9ddc6b6aae3dfbdb22853e7b20377e2ee42648d1a8d50550958aa2f409"
+    }
+  },
+  "source_binding": {
+    "authored_head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+    "file_count": 6974,
+    "unique_blob_count": 5863,
+    "source_before_sha256": "9470dbd00b9d627ac2b24222b865dbafe4a5725f3a19ed2eb9f01160998f14fc",
+    "source_after_sha256": "9470dbd00b9d627ac2b24222b865dbafe4a5725f3a19ed2eb9f01160998f14fc",
+    "authored_manifest_sha256": "9470dbd00b9d627ac2b24222b865dbafe4a5725f3a19ed2eb9f01160998f14fc",
+    "all_paths_and_hashes_match": true,
+    "missing": [],
+    "extra": [],
+    "changed": [],
+    "method": "Read every authored lampOS Git blob through one offline git cat-file --batch process; compare each full SHA-256 and complete path sets against both native source manifests."
+  },
+  "local_gates": {
+    "suite_summaries": [
+      [
+        157,
+        0,
+        0
+      ],
+      [
+        20,
+        0,
+        0
+      ],
+      [
+        306,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        6
+      ],
+      [
+        31,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ],
+    "passed": 514,
+    "failed": 0,
+    "ignored": 7,
+    "gate_exit": "0",
+    "scope": "Mac scoped Skills gate; ignored native cases are not counted as execution."
+  },
+  "archive": {
+    "file": "lampos-routine-state-pair-evidence.tar.gz",
+    "sha256": "cee2a4cea534ed404a31c26b3095b09014c63bff53f8b586449018fb56934993",
+    "note": "Digest of downloaded retained tar; artifact API ZIP metadata not separately requested."
+  },
+  "retention": {
+    "mapped_files": 289,
+    "excluded_case_files": 102,
+    "ordinary_and_clippy_logs": "Full raw logs audited outside this publication; hashes and derived results retained, no identity-bearing API objects copied."
+  },
+  "warnings": [
+    "One nextest leak-marked pass is included in the pass total.",
+    "Node action deprecation, certificate rehash notice, and Cargo example filename-collision warnings remain in CI."
+  ],
+  "scope_limits": [
+    "No physical lamp, actuator, speech, provider, or actual Expression owner.",
+    "Synthetic Body Over demonstrates test sequencing only, not motion completion.",
+    "Fixed offset mapping is not an elapsed night, timezone migration, or clock synchronization.",
+    "Acknowledged-boundary cuts do not prove mid-write or power-loss durability.",
+    "No global process inventory: retained receipts establish six owned rested-process reaps."
+  ]
+}

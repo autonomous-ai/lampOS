@@ -1,0 +1,27 @@
+    Checking lamp-bus v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/bus)
+    Checking lamp-ipc v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/ipc)
+    Checking lamp-turn-owner v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/turn-owner)
+    Checking lamp-local-time v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/camera)
+    Checking sonora v0.2.0 (/private/tmp/second-package-release-pair-20261024/lampOS/third_party/sonora)
+    Checking lamp-gemini v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/gemini)
+    Checking lamp-msgs v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/msgs)
+    Checking lamp-audio v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/audio)
+    Checking lamp-ring v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/ring)
+    Checking lamp-turn-end-wire v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/turn-end-wire)
+    Checking lamp-near-call v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/near-call)
+    Checking lamp-voice-processes v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/voice-processes)
+    Checking lamp-lean v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/lean)
+    Checking lamp-keeper v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/keeper)
+    Checking lamp-health v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/health)
+    Checking lamp-schedule v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/schedule)
+    Checking lamp-controls v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/controls)
+    Checking lamp-body v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/body)
+    Checking lamp-update v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/update)
+    Checking lamp-expression v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/expression)
+    Checking lamp-voice v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/voice)
+    Checking lamp-skills v0.1.0 (/private/tmp/second-package-release-pair-20261024/lampOS/crates/skills)
+    Finished `dev` profile [unoptimized] target(s) in 21.05s
+real 21.12
+user 28.63
+sys 3.39

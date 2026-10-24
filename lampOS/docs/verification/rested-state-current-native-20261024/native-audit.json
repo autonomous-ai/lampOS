@@ -1,0 +1,195 @@
+{
+  "run_id": 40057211166,
+  "authored_head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+  "native_platform": "Linux aarch64",
+  "test_exit": "0",
+  "suite": "6 passed, 0 failed, 0 ignored",
+  "rested_cases": [
+    {
+      "case": "kn-BqcCIv",
+      "direction": [
+        6408,
+        6498,
+        6408
+      ],
+      "pid_reaps": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10114,
+          "signal": 9,
+          "stage": "a"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10120,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10125,
+          "signal": 9,
+          "stage": "a-return"
+        }
+      ],
+      "negative_admissions": 2,
+      "same_episode_renewal_delta_us": 1001652,
+      "no_requests_from_replacement_or_return": true,
+      "state_preserved_on_reads": true,
+      "manifest_hashes": {
+        "SKILL.md": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+        "skill.toml": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27"
+      },
+      "daily_claims": {
+        "after-a": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ]
+        },
+        "after-b": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        },
+        "after-a-return": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        }
+      },
+      "spent_morning_refused": true,
+      "private_stretches": 1,
+      "synthetic_over_after_datagram_before_done": true,
+      "stale_fresh_owner_probes": [
+        false,
+        true
+      ],
+      "artifact_copies_rechecked": true
+    },
+    {
+      "case": "kn-MNJXD1",
+      "direction": [
+        6498,
+        6408,
+        6498
+      ],
+      "pid_reaps": [
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10068,
+          "signal": 9,
+          "stage": "a"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10074,
+          "signal": 9,
+          "stage": "b"
+        },
+        {
+          "code": null,
+          "event": "reaped",
+          "pid": 10079,
+          "signal": 9,
+          "stage": "a-return"
+        }
+      ],
+      "negative_admissions": 2,
+      "same_episode_renewal_delta_us": 1002781,
+      "no_requests_from_replacement_or_return": true,
+      "state_preserved_on_reads": true,
+      "manifest_hashes": {
+        "SKILL.md": "c7fba59a65e44c3ef01e57d637ea0a209c50532553c95c0cc736b4810128b58f",
+        "skill.toml": "6aa43551259cb9b5c545bd0a7e174e1fb7eb9a15762c36592870a17881527f27"
+      },
+      "daily_claims": {
+        "after-a": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ]
+        },
+        "after-b": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        },
+        "after-a-return": {
+          "night_stale": [
+            20749
+          ],
+          "night_unmatched": [
+            20749
+          ],
+          "night": [
+            20749
+          ],
+          "morning": [
+            20750
+          ]
+        }
+      },
+      "spent_morning_refused": true,
+      "private_stretches": 1,
+      "synthetic_over_after_datagram_before_done": true,
+      "stale_fresh_owner_probes": [
+        false,
+        true
+      ],
+      "artifact_copies_rechecked": true
+    }
+  ],
+  "source_binding": "source-binding.json: all 6974 files match authored Git tree and both native manifests",
+  "qualification": "Actual pinned Skills 6408/6498 A-to-B-to-A daily/on/off/rested persistence with synthetic Expression/Body, controlled consecutive-day offsets and acknowledged-boundary SIGKILL/reap.",
+  "limits": [
+    "No physical lamp, actuator, speech, provider, or actual Expression owner.",
+    "Synthetic Body Over demonstrates test sequencing only, not motion completion.",
+    "Fixed offset mapping is not an elapsed night, timezone migration, or clock synchronization.",
+    "Acknowledged-boundary cuts do not prove mid-write or power-loss durability.",
+    "Ordinary ARM64 workflow is separate; this audit does not claim its status.",
+    "No global process inventory: retained receipts establish six owned rested-process reaps."
+  ]
+}

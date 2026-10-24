@@ -1,0 +1,254 @@
+[
+  {
+    "source": "clippy.command",
+    "published": "clippy.command",
+    "source_sha256": "746c6089bdffd11da59db38055c4705a2645bdbb3e6d126d83e360d0c64148dc",
+    "published_sha256": "1a48426b815b4b0693aef7c523b2635df6f6c6b3b28d39355dc09f22427ffe5a",
+    "bytes_original": 105,
+    "bytes_published": 110,
+    "redaction": "private home directory replaced"
+  },
+  {
+    "source": "clippy.exit",
+    "published": "clippy.exit",
+    "source_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "bytes_original": 2,
+    "bytes_published": 2,
+    "redaction": null
+  },
+  {
+    "source": "clippy.log",
+    "published": "clippy.txt",
+    "source_sha256": "1f524027843f717e622bbbd4cb81f2d47f969bd5c40aa4457a3fb938ee39470c",
+    "published_sha256": "1f524027843f717e622bbbd4cb81f2d47f969bd5c40aa4457a3fb938ee39470c",
+    "bytes_original": 2545,
+    "bytes_published": 2545,
+    "redaction": null
+  },
+  {
+    "source": "fmt.command",
+    "published": "fmt.command",
+    "source_sha256": "fe2dfe312aece1e3d6e766583a15ae4d9b05f4c63a99f91645b6a1a40e1a0ce6",
+    "published_sha256": "96e9d79a41b26eb1039351397fee549d0aabf0f19adc22aaeac018988da1161c",
+    "bytes_original": 53,
+    "bytes_published": 58,
+    "redaction": "private home directory replaced"
+  },
+  {
+    "source": "fmt.exit",
+    "published": "fmt.exit",
+    "source_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "bytes_original": 2,
+    "bytes_published": 2,
+    "redaction": null
+  },
+  {
+    "source": "fmt.log",
+    "published": "fmt.txt",
+    "source_sha256": "b23f35e9150e5b78bab990952beae6d6e6fa5f42ee178e5951d8ec6bd4daec9d",
+    "published_sha256": "b23f35e9150e5b78bab990952beae6d6e6fa5f42ee178e5951d8ec6bd4daec9d",
+    "bytes_original": 29,
+    "bytes_published": 29,
+    "redaction": null
+  },
+  {
+    "source": "gate.exit",
+    "published": "gate.exit",
+    "source_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "bytes_original": 2,
+    "bytes_published": 2,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-cleanup-owner.stderr",
+    "published": "linux-format/linux-fmt-current-cleanup-owner.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-cleanup-owner.stdout",
+    "published": "linux-format/linux-fmt-current-cleanup-owner.stdout",
+    "source_sha256": "74d5474d1eff476e53be330065ac276e89a60df079da8543c57e19c67fa0c701",
+    "published_sha256": "74d5474d1eff476e53be330065ac276e89a60df079da8543c57e19c67fa0c701",
+    "bytes_original": 37,
+    "bytes_published": 37,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-cleanup-remaining.stderr",
+    "published": "linux-format/linux-fmt-current-cleanup-remaining.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-cleanup-remaining.stdout",
+    "published": "linux-format/linux-fmt-current-cleanup-remaining.stdout",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-cleanup-remove.stderr",
+    "published": "linux-format/linux-fmt-current-cleanup-remove.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-cleanup-remove.stdout",
+    "published": "linux-format/linux-fmt-current-cleanup-remove.stdout",
+    "source_sha256": "74d5474d1eff476e53be330065ac276e89a60df079da8543c57e19c67fa0c701",
+    "published_sha256": "74d5474d1eff476e53be330065ac276e89a60df079da8543c57e19c67fa0c701",
+    "bytes_original": 37,
+    "bytes_published": 37,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-cleanup.json",
+    "published": "linux-format/linux-fmt-current-cleanup.json",
+    "source_sha256": "1ac06016a4f50da8ccb77b68d34cea62241c709541092846b022a73fbfe90820",
+    "published_sha256": "1ac06016a4f50da8ccb77b68d34cea62241c709541092846b022a73fbfe90820",
+    "bytes_original": 260,
+    "bytes_published": 260,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-configuration.stderr",
+    "published": "linux-format/linux-fmt-current-configuration.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-configuration.stdout",
+    "published": "linux-format/linux-fmt-current-configuration.stdout",
+    "source_sha256": "6daa294e8735be65144ea15488e6868600cd93b869ae80282a8883e1a59fd3f9",
+    "published_sha256": "6daa294e8735be65144ea15488e6868600cd93b869ae80282a8883e1a59fd3f9",
+    "bytes_original": 6939,
+    "bytes_published": 6939,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-create.stderr",
+    "published": "linux-format/linux-fmt-current-create.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-create.stdout",
+    "published": "linux-format/linux-fmt-current-create.stdout",
+    "source_sha256": "1c83954c2e18fa4d85ce8543c6d30cdbf7c55ca27fc7db0cb76d3d5944f1d5c4",
+    "published_sha256": "1c83954c2e18fa4d85ce8543c6d30cdbf7c55ca27fc7db0cb76d3d5944f1d5c4",
+    "bytes_original": 65,
+    "bytes_published": 65,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-image.stderr",
+    "published": "linux-format/linux-fmt-current-image.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-image.stdout",
+    "published": "linux-format/linux-fmt-current-image.stdout",
+    "source_sha256": "8a68f8ddeae91fa77f009ea0134a8059c7d90f90557fe8e6fe1e2aedfeb9e68a",
+    "published_sha256": "8a68f8ddeae91fa77f009ea0134a8059c7d90f90557fe8e6fe1e2aedfeb9e68a",
+    "bytes_original": 84,
+    "bytes_published": 84,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-start.stderr",
+    "published": "linux-format/linux-fmt-current-start.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-state.stderr",
+    "published": "linux-format/linux-fmt-current-state.stderr",
+    "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_original": 0,
+    "bytes_published": 0,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current-state.stdout",
+    "published": "linux-format/linux-fmt-current-state.stdout",
+    "source_sha256": "09a55232136a1b9b5b12ccff348e8d4c85ca18f146b737fa405af81fbaccdab6",
+    "published_sha256": "09a55232136a1b9b5b12ccff348e8d4c85ca18f146b737fa405af81fbaccdab6",
+    "bytes_original": 224,
+    "bytes_published": 224,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current.json",
+    "published": "linux-format/linux-fmt-current.json",
+    "source_sha256": "c496234eb1aed7dc7a0f9738973490a483e54915ed85e970385c23303b222e22",
+    "published_sha256": "c496234eb1aed7dc7a0f9738973490a483e54915ed85e970385c23303b222e22",
+    "bytes_original": 6930,
+    "bytes_published": 6930,
+    "redaction": null
+  },
+  {
+    "source": "linux-format/linux-fmt-current.txt",
+    "published": "linux-format/linux-fmt-current.txt",
+    "source_sha256": "b33718016bbe5cc2a73d5e4704a9839015012804917334fc563e5dc76a3b4d54",
+    "published_sha256": "b33718016bbe5cc2a73d5e4704a9839015012804917334fc563e5dc76a3b4d54",
+    "bytes_original": 277,
+    "bytes_published": 277,
+    "redaction": null
+  },
+  {
+    "source": "tests.command",
+    "published": "tests.command",
+    "source_sha256": "fe7984ca09e2d7396cfedb0dd8a669ff184803308ddcc994def7594341fa0682",
+    "published_sha256": "3878572d339a1613b4f48341e3677b198c2c8b16280817c67aa47396eb6c365c",
+    "bytes_original": 74,
+    "bytes_published": 79,
+    "redaction": "private home directory replaced"
+  },
+  {
+    "source": "tests.exit",
+    "published": "tests.exit",
+    "source_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "bytes_original": 2,
+    "bytes_published": 2,
+    "redaction": null
+  },
+  {
+    "source": "tests.log",
+    "published": "tests.txt",
+    "source_sha256": "43884149a8f44461578d0808025ea3c91897e4fc48aee7b886db34ee22a264b6",
+    "published_sha256": "4cb533ead14bd484f57238387849bdbe8d432b7e1ab44ef7a85d5625bff9caa0",
+    "bytes_original": 97024,
+    "bytes_published": 97049,
+    "redaction": "private home directory replaced"
+  }
+]
