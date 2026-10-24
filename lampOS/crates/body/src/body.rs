@@ -4469,6 +4469,12 @@ fn run_on<P: PortIo, R: Runtime>(
     // hand has it each second, `gave_at` follows the hand, and a hand that
     // keeps a joint off its rest, pressing under its bound, is still one.
     let mut gave_first = [0u16; 3];
+    // Whether a joint went over its full load bound in this hold, kept while
+    // it is held: a hand pressing at 300 on a head bound 240 did; lamp-06c1's
+    // head, at 130 at its rest with one read of 192, did not. The hold bound
+    // (below) eases only for one that did and still presses over its own
+    // rest load.
+    let mut over_full = [false; 3];
     let mut kept = [0.0f32; 3];
     let mut stalls = [Stall::default(); 5];
     let contact_floor = [
@@ -6095,7 +6101,14 @@ fn run_on<P: PortIo, R: Runtime>(
             if !held[index] && !felt[index] && is.load <= strained {
                 rest_load[index] = is.load;
             }
+            over_full[index] = held[index] && (over_full[index] || is.load > strained);
             let moved = is.position.abs_diff(gave_first[index]) > HAND_MOVED;
+            // Pressure over its own rest load: over half the bound and a
+            // quarter of it over its own weight. A press at 300 easing to
+            // 130 on a pitch bound 240 that read 25 is; one that read 130
+            // before and reads 130 again is its weight.
+            let pressing =
+                is.load > strained / 2 && is.load > rest_load[index].saturating_add(strained / 4);
             felt[index] = held[index]
                 && (moved
                     || is.load > strained
@@ -6104,14 +6117,8 @@ fn run_on<P: PortIo, R: Runtime>(
                     // allows it more: a pitch pressed at 675 in a glance,
                     // its bound 700.
                     || (limping && is.load > contact_floor[index])
-                    // Once a hand, still one while it presses at over half
-                    // the bound and a quarter of it over its own weight: a
-                    // press at 300 easing to 130 on a pitch bound 240 that
-                    // read 25 is the same hand; one that read 130 before
-                    // and reads 130 again is its weight.
-                    || (felt[index]
-                        && is.load > strained / 2
-                        && is.load > rest_load[index].saturating_add(strained / 4)));
+                    // Once a hand, still one while `pressing`.
+                    || (felt[index] && pressing));
             off_track[index] = if written[index].abs_diff(is.position) > astray {
                 off_track[index].saturating_add(1)
             } else {
@@ -6206,9 +6213,16 @@ fn run_on<P: PortIo, R: Runtime>(
                 // the head's 240, and a head told to stay came back. Still
                 // where its hold began, only its full bound: lamp-06c1's
                 // head pitch reads 124 to 136 at its own rest (23 Oct), and
-                // judged by 100 it was held for good.
+                // judged by 100 it was held for good. One that went over the
+                // full bound in this hold (`over_full`) and still presses
+                // over its own rest load (`pressing`, load alone: not how
+                // far it stands from where it first gave) keeps the lower
+                // bound: a still press at 300 easing to 130 on that bound
+                // 240, from a rest of 25, is the same hand and its hold
+                // renews; 06c1's head pushed at 300 from its rest of 130
+                // reads its weight again.
                 let still = is.position.abs_diff(held_from[index]) <= HAND_MOVED;
-                let bound = if still {
+                let bound = if still && !(over_full[index] && pressing) {
                     strained
                 } else {
                     strained.min(STALL_LOAD)
@@ -6298,6 +6312,7 @@ fn run_on<P: PortIo, R: Runtime>(
                         is.position
                     };
                     gave_first[index] = gave_at[index];
+                    over_full[index] = is.load > strained;
                     in_hand[index] = 0;
                     over_load[index] = 0;
                     contact[index] = 0;
