@@ -1533,6 +1533,7 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
+        crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
         crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
@@ -1622,6 +1623,7 @@ mod tests {
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
             crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
             crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
+            crate::second_provider::TWO_FACES_HELD_ENVIRONMENT,
             crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
@@ -2227,6 +2229,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
                     || name == crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT
+                    || name == crate::second_provider::TWO_FACES_HELD_ENVIRONMENT
                     || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
@@ -2391,6 +2394,7 @@ mod tests {
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
                     "LAMP_TURNED_FACE_SPEAKS=on",
                     "LAMP_TURNED_SPEAKING=on",
+                    "LAMP_TWO_FACES_HELD=on",
                 ],
             ),
             (

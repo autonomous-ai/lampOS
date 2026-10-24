@@ -2889,6 +2889,14 @@ pub fn serve(
             if let Ok(mut room) = crate::room_told::room().lock() {
                 room.count_held_talk(true);
             }
+            if std::env::var(crate::second_provider::TWO_FACES_HELD_ENVIRONMENT)
+                .is_ok_and(|value| value == "on")
+            {
+                eprintln!(
+                    "lamp-voice second: two faces make the room busy only when the newest look and {TWO_FACES_LOOKS} or more of the eyes' looks in the last {FACES_KEPT_MS} ms saw two, spanning {TWO_FACES_FOR_MS} ms or more, not on one look (LAMP_TWO_FACES_HELD)"
+                );
+                heeding.holding_two_faces(files.bus_root.as_deref());
+            }
         }
         // Someone else's answer left alone (`LAMP_OTHERS_ANSWER=on`,
         // #2136): the rule learns which line began over the lamp's answer.
@@ -4011,6 +4019,121 @@ pub(crate) fn health_fact(
         .map_or(String::new(), |line| format!("\n\n{line}"))
 }
 
+/// How long [`FacesHeld`] keeps the eyes' looks. The eyes look every
+/// 250 ms with a face to follow (`LOOK_EVERY` in `lamp-eyes`), 500 ms with
+/// one face sat still and 600 ms with nobody, so this holds 4 to 10 looks.
+const FACES_KEPT_MS: u64 = 2_500;
+/// And at most this many, whatever the eyes' pace.
+const FACES_LOOKS_KEPT: usize = 16;
+/// A look over this old when taken is refused; a gap between two looks
+/// over this, a look dated before the one kept last or ahead of now, or a
+/// verdict this long after the newest look, is a break: what was kept is
+/// dropped (reviewer-two's HOLDs on #3355). The eyes' slowest pace is
+/// 600 ms.
+const LOOK_GAP_MS: u64 = 1_000;
+/// How many kept looks must see two faces or more for the room to be busy.
+const TWO_FACES_LOOKS: usize = 3;
+/// How long, from the first such look to the last, two faces must stay.
+const TWO_FACES_FOR_MS: u64 = 1_500;
+
+/// One look the eyes published, as [`FacesHeld`] keeps it.
+#[derive(Clone, Copy)]
+struct FacesLook {
+    /// When the eyes looked (`header.at_us`): their `lamp_ipc::monotonic_us`,
+    /// the system-wide clock the voice reads too (reviewer-two on #3355), so
+    /// every age, expiry and span is on one clock no wall step can move.
+    at_us: u64,
+    faces: usize,
+    /// The header's `expires_ms`, from when the eyes looked.
+    expires_ms: Option<u64>,
+}
+
+/// Every look the eyes published (`humans/faces/tracked`), read on a
+/// thread of its own as they come (`LAMP_TWO_FACES_HELD=on`): two faces
+/// make the room busy only when the newest fresh look sees two and at
+/// least [`TWO_FACES_LOOKS`] of those in the last [`FACES_KEPT_MS`] did,
+/// spanning [`TWO_FACES_FOR_MS`] or more, so a face passing by, a misread
+/// or a photo frame seen once does not. Sampling once per line instead
+/// made it 3 lines of 4 (the coordinator's finding on #3355). A privacy
+/// change drops what was kept and refuses every look dated at or before
+/// it, and every look the reader took across it (`epoch`), so looks
+/// queued before it never come back.
+#[derive(Default)]
+struct FacesHeld {
+    looks: std::collections::VecDeque<FacesLook>,
+    epoch: u64,
+    cutoff_us: Option<u64>,
+}
+
+impl FacesHeld {
+    /// Keep a look the reader took at `now_us`, `epoch` read before it
+    /// began to wait for it.
+    fn look(&mut self, look: FacesLook, epoch: u64, now_us: u64) {
+        if epoch != self.epoch || self.cutoff_us.is_some_and(|cutoff| look.at_us <= cutoff) {
+            return;
+        }
+        let ahead = look.at_us > now_us + lamp_bus::EXPIRY_GRACE_MS * 1_000;
+        if ahead
+            || self.looks.back().is_some_and(|last| {
+                look.at_us < last.at_us || look.at_us - last.at_us > LOOK_GAP_MS * 1_000
+            })
+        {
+            self.looks.clear();
+        }
+        if ahead || Self::stale(&look, now_us) {
+            return;
+        }
+        if self.looks.len() == FACES_LOOKS_KEPT {
+            self.looks.pop_front();
+        }
+        self.looks.push_back(look);
+    }
+
+    /// Whether a look is over [`LOOK_GAP_MS`] old at `now_us`, or expired
+    /// as [`lamp_bus::Header::expired_at`] has it.
+    fn stale(look: &FacesLook, now_us: u64) -> bool {
+        let age_ms = now_us.saturating_sub(look.at_us) / 1_000;
+        age_ms > LOOK_GAP_MS
+            || look
+                .expires_ms
+                .is_some_and(|lasts| age_ms > lasts + lamp_bus::EXPIRY_GRACE_MS)
+    }
+
+    /// Privacy closed or reopened at `now_us`: nothing before it counts.
+    fn privacy_changed(&mut self, now_us: u64) {
+        self.looks.clear();
+        self.epoch += 1;
+        self.cutoff_us = Some(self.cutoff_us.map_or(now_us, |cutoff| cutoff.max(now_us)));
+    }
+
+    /// Whether two faces have stayed at `now_us`. A missing or expired
+    /// newest look ends what was kept.
+    fn two_stayed(&mut self, now_us: u64) -> bool {
+        while self
+            .looks
+            .front()
+            .is_some_and(|look| now_us.saturating_sub(look.at_us) > FACES_KEPT_MS * 1_000)
+        {
+            self.looks.pop_front();
+        }
+        let Some(newest) = self.looks.back().copied() else {
+            return false;
+        };
+        if Self::stale(&newest, now_us) {
+            self.looks.clear();
+            return false;
+        }
+        if newest.faces < 2 {
+            return false;
+        }
+        let mut two = self.looks.iter().filter(|look| look.faces >= 2);
+        let count = two.clone().count();
+        let first = two.next().map_or(0, |look| look.at_us);
+        let last = two.next_back().map_or(first, |look| look.at_us);
+        count >= TWO_FACES_LOOKS && last.saturating_sub(first) >= TWO_FACES_FOR_MS * 1_000
+    }
+}
+
 /// The Live route's rule for whom it answers (`crate::attention`, given
 /// with `--attention`), run on this route's spoken turns with what this
 /// route can give it: how the room is as Gemini's worker publishes it
@@ -4182,6 +4305,9 @@ pub(crate) struct Heeding {
     face_not_speaking: Option<u64>,
     /// `LAMP_NAME_OR_FOLLOW_UP=on` ([`Self::needing_name_or_follow_up`]).
     name_or_follow_up: bool,
+    /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
+    /// last looks, so two faces make the room busy only when they stay.
+    faces_held: Option<Arc<Mutex<FacesHeld>>>,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
@@ -4883,6 +5009,7 @@ impl Heeding {
             turned_face_speaks: false,
             face_not_speaking: None,
             name_or_follow_up: false,
+            faces_held: None,
             spoke: std::collections::VecDeque::new(),
             near: None,
             turned_near_speaks: false,
@@ -4966,6 +5093,66 @@ impl Heeding {
     pub(crate) fn needing_name_or_follow_up(&mut self) {
         self.name_or_follow_up = true;
         self.attention.need_name_or_follow_up(true);
+    }
+
+    /// With [`Self::needing_name_or_follow_up`], two faces make the room
+    /// busy only when they stay ([`FacesHeld`], `LAMP_TWO_FACES_HELD=on`),
+    /// not on one look.
+    pub(crate) fn holding_two_faces(&mut self, root: Option<&Path>) {
+        let held: Arc<Mutex<FacesHeld>> = Arc::default();
+        // Weak: the thread ends once this `Heeding` is gone.
+        let kept = Arc::downgrade(&held);
+        let faces = root.and_then(|root| {
+            lamp_bus::Bus::new(root)
+                .and_then(|bus| {
+                    bus.subscribe_typed(
+                        lamp_msgs::Faces::TOPIC,
+                        "second_faces",
+                        lamp_msgs::Faces::TYPE,
+                    )
+                })
+                .inspect_err(|why| {
+                    eprintln!(
+                        "lamp-voice second: the eyes' looks cannot be taken from the bus, so two faces make no room busy: {why} (LAMP_TWO_FACES_HELD)"
+                    );
+                })
+                .ok()
+        });
+        if let Some(mut faces) = faces {
+            let _ = std::thread::Builder::new()
+                .name("second-faces".into())
+                .spawn(move || {
+                    loop {
+                        // Read before waiting: a look taken across a privacy
+                        // change is refused.
+                        let Some(epoch) = kept
+                            .upgrade()
+                            .and_then(|held| held.lock().ok().map(|held| held.epoch))
+                        else {
+                            return;
+                        };
+                        let message = faces.recv(Duration::from_secs(1));
+                        let Some(held) = kept.upgrade() else { return };
+                        match message {
+                            Ok(Some(message)) => {
+                                if let Ok(seen) = message.parse::<lamp_msgs::Faces>()
+                                    && let Ok(mut held) = held.lock()
+                                {
+                                    let look = FacesLook {
+                                        at_us: message.header.at_us,
+                                        faces: seen.faces.len(),
+                                        expires_ms: message.header.expires_ms,
+                                    };
+                                    held.look(look, epoch, monotonic_us());
+                                }
+                            }
+                            Ok(None) => {}
+                            Err(_) => std::thread::sleep(Duration::from_secs(1)),
+                        }
+                    }
+                });
+        }
+        self.faces_held = Some(held);
     }
 
     /// With [`Self::needing_name_or_follow_up`], whether the line in hand,
@@ -5695,6 +5882,12 @@ impl Heeding {
         if let Some((eyes, _)) = &self.eyes {
             eyes.forget();
         }
+        // The looks before it count for nothing after it (`LAMP_TWO_FACES_HELD`).
+        if let Some(held) = &self.faces_held
+            && let Ok(mut held) = held.lock()
+        {
+            held.privacy_changed(monotonic_us());
+        }
     }
 
     /// `LAMP_SAME_SPEAKER_CARRIES`: whether the line `request`, begun while
@@ -6396,7 +6589,14 @@ impl Heeding {
         if self.rooms.is_some() {
             self.in_view = Some((request, in_view));
         }
-        if self.name_or_follow_up && in_view.is_some_and(|faces| faces >= 2) {
+        // With `LAMP_TWO_FACES_HELD`, only two faces that stay.
+        let two_faces = match &self.faces_held {
+            Some(held) => held
+                .lock()
+                .is_ok_and(|mut held| held.two_stayed(monotonic_us())),
+            None => in_view.is_some_and(|faces| faces >= 2),
+        };
+        if self.name_or_follow_up && two_faces {
             if self.keeps_room
                 && let Ok(mut room) = crate::room_told::room().lock()
                 && room.two_people(monotonic_us())
@@ -9836,6 +10036,244 @@ mod tests {
         );
         assert_eq!(judged(true, vec![face("a", true)]), (Room::Unknown, None));
         assert_eq!(judged(false, two()), (Room::Unknown, None));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// `LAMP_TWO_FACES_HELD`: two faces make the room busy only when the
+    /// newest look and 3 of the last 2.5 s's looks saw two, spanning 1.5 s.
+    /// One look is not enough, nor a second face that has left, nor looks
+    /// too close together, nor an expired or old newest look.
+    #[test]
+    fn with_two_faces_held_two_faces_must_stay() {
+        // In these the times are ms on the shared monotonic clock, and each
+        // look is taken as it is published.
+        let look = |at_ms: u64, faces: usize| FacesLook {
+            at_us: at_ms * 1_000,
+            faces,
+            expires_ms: Some(2_000),
+        };
+        let held = |looks: &[(u64, usize)], now_ms: u64| {
+            let mut held = FacesHeld::default();
+            for &(at, faces) in looks {
+                held.look(look(at, faces), 0, at * 1_000);
+            }
+            held.two_stayed(now_ms * 1_000)
+        };
+        // One look with two faces.
+        assert!(!held(&[(10_000, 2)], 10_000));
+        // The eyes' 250 ms pace, two faces over 1.5 s: 7 looks.
+        let pace = |faces: &[usize]| -> Vec<(u64, usize)> {
+            (0..)
+                .zip(faces)
+                .map(|(k, &f)| (10_000 + k * 250, f))
+                .collect()
+        };
+        assert!(held(&pace(&[2; 7]), 11_500));
+        // A stray look among one face.
+        assert!(!held(&pace(&[1, 1, 1, 2, 1, 1, 1]), 11_500));
+        // Two faces over 1.25 s only.
+        assert!(!held(&pace(&[1, 1, 2, 2, 2, 2, 2, 2]), 11_750));
+        // The second face has left in the newest look.
+        assert!(!held(&pace(&[2, 2, 2, 2, 2, 2, 2, 1]), 11_750));
+        // The 600 ms pace with nobody to follow: 4 looks over 1.8 s.
+        assert!(held(
+            &[(10_000, 2), (10_600, 2), (11_200, 1), (11_800, 2)],
+            11_800
+        ));
+        // The looks all older than the 2.5 s kept, or the newest missing:
+        // the verdict over 1 s after it.
+        assert!(!held(&pace(&[2; 7]), 11_500 + FACES_KEPT_MS + 1));
+        assert!(!held(&pace(&[2; 7]), 11_500 + LOOK_GAP_MS + 1));
+        // An expired newest look, its own 500 ms run out.
+        let mut short = FacesHeld::default();
+        for (at, _) in pace(&[2; 7]) {
+            let look = FacesLook {
+                expires_ms: Some(500),
+                ..look(at, 2)
+            };
+            short.look(look, 0, at * 1_000);
+        }
+        assert!(short.two_stayed((11_500 + 500) * 1_000));
+        assert!(!short.two_stayed((11_500 + 500 + lamp_bus::EXPIRY_GRACE_MS + 1) * 1_000));
+        // After a long gap, a lone face, or two faces seen once again.
+        let gap = [(1_000, 2), (1_800, 2), (2_600, 2)];
+        assert!(!held(&[&gap[..], &[(602_600, 1)]].concat(), 602_600));
+        assert!(!held(&[&gap[..], &[(602_600, 2)]].concat(), 602_600));
+        // A look dated before the last one kept is a break too.
+        assert!(!held(
+            &[(10_000, 2), (10_800, 2), (11_600, 2), (9_000, 2)],
+            11_600
+        ));
+        // And the valid run still holds after such a break, once it stays.
+        assert!(held(
+            &[(9_000, 1), (12_000, 2), (12_800, 2), (13_600, 2)],
+            13_600
+        ));
+        // A look dated ahead of now, past the grace, is a break, and not kept.
+        let mut ahead = FacesHeld::default();
+        for at in [100_000, 100_750] {
+            ahead.look(look(at, 2), 0, at * 1_000);
+        }
+        ahead.look(look(101_500, 2), 0, 101_000 * 1_000);
+        assert!(!ahead.two_stayed(101_500 * 1_000));
+        assert!(ahead.looks.is_empty());
+    }
+
+    /// reviewer-two's, the reviewer-lead's and the second builder's HOLDs on
+    /// #3355, on the shared monotonic clock FacesHeld alone reads: looks
+    /// queued before a privacy change, or taken across it, never make the
+    /// room busy; looks delivered late get no time back; and a wall clock
+    /// stepped back or forward changes nothing, since no wall time is read.
+    #[test]
+    fn with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room() {
+        let look = |at_ms: u64| FacesLook {
+            at_us: at_ms * 1_000,
+            faces: 2,
+            expires_ms: Some(2_000),
+        };
+        // Queued: the eyes looked at 100 000, 100 750 and 101 500; privacy
+        // closed and reopened at 101 550; the reader takes the first across
+        // the change and the others after it, from 101 600.
+        let mut held = FacesHeld::default();
+        let before = held.epoch;
+        held.privacy_changed(101_550_000);
+        held.privacy_changed(101_550_000);
+        held.look(look(100_000), before, 101_600_000);
+        for (at, taken) in [(100_750, 101_610), (101_500, 101_620)] {
+            held.look(look(at), held.epoch, taken * 1_000);
+        }
+        assert!(held.looks.is_empty());
+        assert!(!held.two_stayed(101_650_000));
+        // Fresh looks after it count, once they have stayed.
+        for at in [101_700, 102_450, 103_200] {
+            held.look(look(at), held.epoch, at * 1_000);
+        }
+        assert!(held.two_stayed(103_250_000));
+        // Delivered late: looked at 100 000, 100 750 and 101 500, taken at
+        // 101 900, 102 000 and 103 400, each already over 1 s old: none
+        // kept, and at 104 300 no busy room.
+        let mut late = FacesHeld::default();
+        for (at, taken) in [(100_000, 101_900), (100_750, 102_000), (101_500, 103_400)] {
+            late.look(look(at), 0, taken * 1_000);
+        }
+        assert!(late.looks.is_empty());
+        assert!(!late.two_stayed(104_300_000));
+        // Taken 400 ms late each: kept, fresh from when the eyes looked, so
+        // busy at 102 000 and stale by 102 600.
+        let mut slow = FacesHeld::default();
+        for at in [100_000, 100_750, 101_500] {
+            slow.look(look(at), 0, (at + 400) * 1_000);
+        }
+        assert!(slow.two_stayed(102_000_000));
+        assert!(!slow.two_stayed(102_600_000));
+        // The wall clock set back 60 s with no new look: the looks kept go
+        // stale 1 s after the newest, as always.
+        let mut kept = FacesHeld::default();
+        for at in [100_000, 100_750, 101_500] {
+            kept.look(look(at), 0, at * 1_000);
+        }
+        assert!(kept.two_stayed(101_600_000));
+        assert!(!kept.two_stayed((101_500 + LOOK_GAP_MS + 1) * 1_000));
+        // The wall clock stepped 500 ms forward through 1 s of real looks
+        // (the second builder's trace): still 1 s, not busy.
+        let mut stepped = FacesHeld::default();
+        for at in [100_000, 100_250, 100_500, 100_750, 101_000] {
+            stepped.look(look(at), 0, at * 1_000);
+        }
+        assert!(!stepped.two_stayed(101_000_000));
+    }
+
+    /// `LAMP_TWO_FACES_HELD` on this route with `LAMP_NAME_OR_FOLLOW_UP`,
+    /// on the real clock: the eyes' looks published between lines are all
+    /// read, so two faces held 2.1 s make the first line's room busy, and
+    /// the face turned to the lamp lets nothing out alone; one stray look
+    /// with two faces, or two faces whose newest look sees one, leave the
+    /// room as it was, and so do looks before a privacy close and reopen.
+    /// Without the switch one look is enough, as today.
+    #[test]
+    fn with_two_faces_held_looks_between_lines_make_the_first_line_busy() {
+        // One test at a time on the process's thread and room (the reviewer's P2 on #2283).
+        let _one = crate::provider_worker::tests::one_thread();
+        use crate::room_told::Room;
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/ltf-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(
+                lamp_msgs::Faces::TOPIC,
+                &lamp_msgs::Faces::declaration(),
+                "eyes",
+            )
+            .unwrap();
+        eyes.expires_after(Some(Duration::from_secs(2)));
+        let face = |id: &str, facing: bool| lamp_msgs::Face {
+            id: id.into(),
+            xmin: 0.4,
+            ymin: 0.0,
+            xmax: 0.7,
+            ymax: 0.3,
+            confidence: 0.9,
+            yaw: None,
+            facing: Some(facing),
+            speaking: None,
+        };
+        let busy = (Room::Busy, Some(crate::attention::BUSY_TURNED_ALONE));
+        // Each case: the switch, the looks' face counts, 300 ms apart, and
+        // whether privacy closes and reopens after them, with one more look
+        // with two faces after the reopening.
+        for (held_on, looks, privacy, expected) in [
+            (true, vec![2; 8], false, busy),
+            (true, vec![1, 1, 1, 2], false, (Room::Unknown, None)),
+            (
+                true,
+                vec![2, 2, 2, 2, 2, 2, 1],
+                false,
+                (Room::Unknown, None),
+            ),
+            (true, vec![2; 8], true, (Room::Unknown, None)),
+            (false, vec![2], false, busy),
+        ] {
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                *room = crate::room_told::RoomTold::new();
+                room.count_only_talk(true);
+                room.count_held_talk(true);
+            }
+            let mut heeding = Heeding::new(true, true, Some(&root), None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.needing_name_or_follow_up();
+            if held_on {
+                heeding.holding_two_faces(Some(&root));
+                // The reader subscribes before the first look.
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            for (k, &count) in looks.iter().enumerate() {
+                if k > 0 {
+                    std::thread::sleep(Duration::from_millis(300));
+                }
+                let faces = [face("a", true), face("b", false)][..count].to_vec();
+                eyes.publish_json(lamp_ipc::monotonic_us(), &lamp_msgs::Faces { faces })
+                    .unwrap();
+            }
+            std::thread::sleep(Duration::from_millis(100));
+            if privacy {
+                // Closed, then reopened.
+                heeding.privacy_changed();
+                heeding.privacy_changed();
+                let faces = vec![face("a", true), face("b", false)];
+                eyes.publish_json(lamp_ipc::monotonic_us(), &lamp_msgs::Faces { faces })
+                    .unwrap();
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            let now_us = monotonic_us();
+            let held = heeding.heed(1, (now_us, now_us + 1_000_000), "Okay yeah sure.", None);
+            let room = crate::room_told::room().lock().unwrap().at(now_us);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            assert_eq!((room, held), expected, "{held_on} {looks:?} {privacy}");
+        }
         let _ = std::fs::remove_dir_all(&root);
     }
 
