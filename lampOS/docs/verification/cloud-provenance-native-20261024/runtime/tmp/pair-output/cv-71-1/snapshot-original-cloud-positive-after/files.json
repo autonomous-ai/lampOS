@@ -1,0 +1,74 @@
+[
+  {
+    "bytes": null,
+    "device": 65,
+    "inode": 19,
+    "mode": 448,
+    "mtime": [
+      1792823796,
+      221732663
+    ],
+    "path": ".",
+    "sha256": null
+  },
+  {
+    "bytes": null,
+    "device": 65,
+    "inode": 29,
+    "mode": 493,
+    "mtime": [
+      1792823796,
+      221732663
+    ],
+    "path": "provenance-kit",
+    "sha256": null
+  },
+  {
+    "bytes": 650,
+    "device": 65,
+    "inode": 33,
+    "mode": 420,
+    "mtime": [
+      1792823796,
+      221732663
+    ],
+    "path": "provenance-kit/.package.json",
+    "sha256": "48341fd2e15688543f52ca177a3f1c51b1122015593970afdaf688e70ae902c9"
+  },
+  {
+    "bytes": 103,
+    "device": 65,
+    "inode": 30,
+    "mode": 420,
+    "mtime": [
+      1792823796,
+      221732663
+    ],
+    "path": "provenance-kit/SKILL.md",
+    "sha256": "5e2df6f73df904c2d34f1eb76e375a0e02e0549be74e082ab54472e035f040d1"
+  },
+  {
+    "bytes": 23,
+    "device": 65,
+    "inode": 31,
+    "mode": 420,
+    "mtime": [
+      1792823796,
+      221732663
+    ],
+    "path": "provenance-kit/notes.txt",
+    "sha256": "4d307dc9e7cae0e6c9d680d1c128c48ad7dd122999411d27cda37e5a69c0702f"
+  },
+  {
+    "bytes": 160,
+    "device": 65,
+    "inode": 32,
+    "mode": 420,
+    "mtime": [
+      1792823796,
+      221732663
+    ],
+    "path": "provenance-kit/skill.toml",
+    "sha256": "40f72b569f0ac431bd4056e905303a7d4d65533225cbdf2c32662af8abb6c9ed"
+  }
+]
