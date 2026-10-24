@@ -1,0 +1,13 @@
+{
+  "authored_head": "8bc821736be09d62bd27f635f054350fca85a1d0",
+  "file_count": 6974,
+  "unique_blob_count": 5863,
+  "source_before_sha256": "9470dbd00b9d627ac2b24222b865dbafe4a5725f3a19ed2eb9f01160998f14fc",
+  "source_after_sha256": "9470dbd00b9d627ac2b24222b865dbafe4a5725f3a19ed2eb9f01160998f14fc",
+  "authored_manifest_sha256": "9470dbd00b9d627ac2b24222b865dbafe4a5725f3a19ed2eb9f01160998f14fc",
+  "all_paths_and_hashes_match": true,
+  "missing": [],
+  "extra": [],
+  "changed": [],
+  "method": "Read every authored lampOS Git blob through one offline git cat-file --batch process; compare each full SHA-256 and complete path sets against both native source manifests."
+}

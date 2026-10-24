@@ -1,0 +1,614 @@
+[
+  {
+    "source": "kn-BqcCIv/b/body/gesture/declaration",
+    "bytes": 60,
+    "sha256": "904fa7a6f90a6ba28366ae5ea94f0cdb590c4cff02fd8728972aa484be528937",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/rest_request/declaration",
+    "bytes": 105,
+    "sha256": "a06db4005cc42bcf66522bf3578b09b7ba76d0836423b31507c051115db3b092",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/rest_request/pubs/skills.10114.4f07410649dc4dff",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/rest_request/pubs/skills.10120.d5f9f2570c4b0570",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/rest_request/pubs/skills.10125.0967c882f76f11f1",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/rest_state/declaration",
+    "bytes": 103,
+    "sha256": "46a13877a073de0d7a1abefdc421866fc9d393a8a0e4692374ba45fc92444adb",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/rest_state/latest",
+    "bytes": 626,
+    "sha256": "642bc79ad8702e31129b6ff7a4cd856f2133dbb34be5ef92d0a6e61cc227d88d",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/sleep_claim/declaration",
+    "bytes": 109,
+    "sha256": "7ec63aa580d50dcbb2d49bca4442c082c9d7d0737c97530d07dfd94ef93e1487",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/sleep_claim/pubs/skills.10114.70ada1080bb77b80",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/sleep_claim/pubs/skills.10120.0af204b3028a564f",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/sleep_claim/pubs/skills.10125.4d4b5c02f7aa18ae",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/state/declaration",
+    "bytes": 99,
+    "sha256": "fb73497f80bf79d09ff807e85a71b2cd071d2fbbd71d3a0e51f76868779283c1",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/expression/state/latest",
+    "bytes": 380,
+    "sha256": "5d7b7162c466c4428a07f7aac6984b1c1d5052c5665f0f0e738f4dc135326909",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/fixture/pair/latest",
+    "bytes": 192,
+    "sha256": "a100c0b2975a8a8e2e510e5620a9f2e2f9eea159b8bec6eae5235c078871fa2f",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/skills/events/pubs/skills.10114.d2142dd92663e40b",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/skills/events/pubs/skills.10120.2974ea83de6d5020",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/skills/events/pubs/skills.10125.4e5c3c2985469b49",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/voice/state/declaration",
+    "bytes": 77,
+    "sha256": "1aab91ce50a07987103987103e7ef10261aa0a9c237620e14e41de55bf4ea519",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-BqcCIv/b/voice/state/latest",
+    "bytes": 200,
+    "sha256": "bd3ed87f46d54fe73336a13b40ec5fd0242af210f8293f037a67fbb363e8fb31",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/body/gesture/declaration",
+    "bytes": 60,
+    "sha256": "904fa7a6f90a6ba28366ae5ea94f0cdb590c4cff02fd8728972aa484be528937",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/rest_request/declaration",
+    "bytes": 105,
+    "sha256": "a06db4005cc42bcf66522bf3578b09b7ba76d0836423b31507c051115db3b092",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/rest_request/pubs/skills.10068.b8f17e6e548f1be3",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/rest_request/pubs/skills.10074.f41cd98477ae363a",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/rest_request/pubs/skills.10079.0c4730ca56f6e7bc",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/rest_state/declaration",
+    "bytes": 103,
+    "sha256": "46a13877a073de0d7a1abefdc421866fc9d393a8a0e4692374ba45fc92444adb",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/rest_state/latest",
+    "bytes": 626,
+    "sha256": "b1ee5760cd503dfe64300c04bd77b58788714488e3e2a906342532c80a0e4128",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/sleep_claim/declaration",
+    "bytes": 109,
+    "sha256": "7ec63aa580d50dcbb2d49bca4442c082c9d7d0737c97530d07dfd94ef93e1487",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/sleep_claim/pubs/skills.10068.9e85a6959a156b22",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/sleep_claim/pubs/skills.10074.44ede376cc1c9dfd",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/sleep_claim/pubs/skills.10079.fce8a87c882c64a8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/state/declaration",
+    "bytes": 99,
+    "sha256": "fb73497f80bf79d09ff807e85a71b2cd071d2fbbd71d3a0e51f76868779283c1",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/expression/state/latest",
+    "bytes": 380,
+    "sha256": "241f912ee861d5d39f8808529711116e0f0c2f9d1603dbb636f8cc3c6df1733f",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/fixture/pair/latest",
+    "bytes": 192,
+    "sha256": "dda603b4340759f57d2a0327e45a8f7f80dd042d67f79845ab9a3da606fefdcb",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/skills/events/pubs/skills.10068.efd999673034573f",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/skills/events/pubs/skills.10074.eda54db00b94becd",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/skills/events/pubs/skills.10079.692a29b8d936870c",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/voice/state/declaration",
+    "bytes": 77,
+    "sha256": "1aab91ce50a07987103987103e7ef10261aa0a9c237620e14e41de55bf4ea519",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kn-MNJXD1/b/voice/state/latest",
+    "bytes": 200,
+    "sha256": "d0490ea9efbec0fdcd04417307d9cbe75eb30ec8aa0c96c93c253b9bd7c802b9",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/a/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/a/b/fixture/pair/latest",
+    "bytes": 192,
+    "sha256": "43d1308ae8dc8bdc9aceeabc9b3634a43349c750813194b8debc53a28092d35c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/a/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/a/b/skills/ask/pubs/skills.10039.8b984434491d48de",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/a/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/a/b/skills/events/pubs/skills.10039.8ccdd9eb8ed6da8a",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/b/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/b/b/fixture/pair/latest",
+    "bytes": 193,
+    "sha256": "4fe061b46e35707bca32023b6cf9dbdf8d6eef69bcc66e7149759bb7c031e8f5",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/b/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/b/b/skills/ask/pubs/skills.10042.f532bd31a5e04afe",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/b/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/b/b/skills/events/pubs/skills.10042.ffee51ed6e752802",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/c/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/c/b/fixture/pair/latest",
+    "bytes": 192,
+    "sha256": "62b7c8b8b1696c21744bdedb6e808724af7a879706f274c911686ca86f4a2ff7",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/c/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/c/b/skills/ask/pubs/skills.10045.50baa065bf6fb140",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/c/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ILVq3t/c/b/skills/events/pubs/skills.10045.6f90f4668daca18e",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/b/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/b/b/fixture/pair/latest",
+    "bytes": 194,
+    "sha256": "6073d66fac6af1f3b04e4c79454abc8f46e53a932f2bb1d3ff45b3f23ad629e5",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/b/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/b/b/skills/ask/pubs/skills.10099.0c8ce26b2ce8ff5d",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/b/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/b/b/skills/events/pubs/skills.10099.f152ef47d9b858c5",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/c/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/c/b/fixture/pair/latest",
+    "bytes": 193,
+    "sha256": "f7001987fda8c0393cd72d86b03e79c725c5c60c55482e3d8bea6f420e11cd46",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/c/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/c/b/skills/ask/pubs/skills.10106.06594b8db26048f9",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/c/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-ZIBg9T/c/b/skills/events/pubs/skills.10106.e05312af39a077e8",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/b/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/b/b/fixture/pair/latest",
+    "bytes": 194,
+    "sha256": "66b1cc5656cc66c7ae133f112800f89076e9dc830f6061a682db655274b9dca4",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/b/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/b/b/skills/ask/pubs/skills.10053.29b96d363dec2136",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/b/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/b/b/skills/events/pubs/skills.10053.463d736a5be67caa",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/c/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/c/b/fixture/pair/latest",
+    "bytes": 193,
+    "sha256": "553fbd0a909743ee5c45ca56b834c73042333d83331c43809622cea5256088c0",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/c/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/c/b/skills/ask/pubs/skills.10060.9886995c272a04da",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/c/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-nEbZju/c/b/skills/events/pubs/skills.10060.3b4e4ee67ce2dc6a",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/a/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/a/b/fixture/pair/latest",
+    "bytes": 192,
+    "sha256": "b1d130d5d5f431e54396b9da205f903f93a0a7df370700799cc9e529ed89a2d6",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/a/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/a/b/skills/ask/pubs/skills.10085.9c7d76ec75223621",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/a/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/a/b/skills/events/pubs/skills.10085.1859456ddf22272f",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/b/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/b/b/fixture/pair/latest",
+    "bytes": 193,
+    "sha256": "d6646877a929361280c4d5e04d536a7ddcb5be37cc08df38bf6c536d48ca69d7",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/b/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/b/b/skills/ask/pubs/skills.10088.26d0f0433da9dd60",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/b/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/b/b/skills/events/pubs/skills.10088.4b34fbdf22961171",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/c/b/fixture/pair/declaration",
+    "bytes": 53,
+    "sha256": "1c75aa18d7b1dd956736124da8bcd4fffce3219872efbfe27164f06bfa625e2b",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/c/b/fixture/pair/latest",
+    "bytes": 192,
+    "sha256": "0e44546254246a326452c1aa09e6c890788c9202f2fff5e1da8ae8bd2a3b5818",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/c/b/skills/ask/declaration",
+    "bytes": 57,
+    "sha256": "b2c8b9c301a816ef959ff893af4cc88210d67840598030211ffb9251a276e56c",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/c/b/skills/ask/pubs/skills.10091.bfa8443ae2af076f",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/c/b/skills/events/declaration",
+    "bytes": 59,
+    "sha256": "13b37798468259203df32821726047fd603181afd87cb61214d2e65745bf47bf",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  },
+  {
+    "source": "kr-qzhjeE/c/b/skills/events/pubs/skills.10091.0d607a4ca7b06612",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Bus transport storage omitted; synthetic inputs/receipts remain in full transcript."
+  }
+]

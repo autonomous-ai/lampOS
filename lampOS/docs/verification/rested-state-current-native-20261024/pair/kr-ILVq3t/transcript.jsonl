@@ -1,0 +1,72 @@
+{"event":"environment","stage":"a","values":{"LAMP_SKILLS_ASK":"policy","LAMP_SKILLS_DAILY_FILE":"state/daily.json"}}
+{"argv":["--dir","skills","--state-dir","state","--trust-clock","--utc-offset-minutes","526","--bus-root","/tmp/pair-output/kr-ILVq3t/a/b","--clock-control","a/clock","--gaze-socket","a/gaze","--mood-socket","a/mood","--actions-socket","a/actions","--say-socket","a/say"],"event":"spawn","executable_sha256":"87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984","pid":10039,"release":6498,"stage":"a"}
+{"answer":{"now_us":272994583},"event":"drained_before_clock_barrier","stage":"a"}
+{"answer":{"now_us":272994706},"event":"drained_before_clock_barrier","stage":"a"}
+{"event":"input","phase":"first","sequence":1,"stage":"a"}
+{"answer":{"now_us":272995946},"event":"drained_before_clock_barrier","stage":"a"}
+{"event":"skills_event","message":{"skill":"daily-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"a"}
+{"event":"skills_event","message":{"skill":"daily-check","stage":"asked","why":"policy nudge"},"stage":"a"}
+{"event":"skills_event","message":{"allowed":false,"skill":"daily-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"a"}
+{"answer":{"now_us":272996263},"event":"drained_before_clock_barrier","stage":"a"}
+{"code":null,"event":"reaped","pid":10039,"signal":9,"stage":"a"}
+{"event":"snapshot","files":[{"bytes":7383,"file":"daily.json","mode":384,"sha256":"c522c301dd24249b288a2ba34909c9ffdd0ee949bf80376c1217884dc8ed3fe8"},{"absent":true,"file":"on"},{"absent":true,"file":"off"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":645,"file":"manifests/daily-check.toml","sha256":"c2f0fd97ee5d27154218d7aa54f3bcad4160014a0e5c38dafd053d640df29c08"}],"name":"after-a"}
+{"event":"environment","stage":"b","values":{"LAMP_SKILLS_ASK":"policy","LAMP_SKILLS_DAILY_FILE":"state/daily.json"}}
+{"argv":["--dir","skills","--state-dir","state","--trust-clock","--utc-offset-minutes","526","--bus-root","/tmp/pair-output/kr-ILVq3t/b/b","--clock-control","b/clock","--gaze-socket","b/gaze","--mood-socket","b/mood","--actions-socket","b/actions","--say-socket","b/say"],"event":"spawn","executable_sha256":"2c6bc8f34c9fd4a56784a54fa2d03b1e76be9d1833ccf37db905f88dba67d3d5","pid":10042,"release":6408,"stage":"b"}
+{"answer":{"now_us":273050537},"event":"drained_before_clock_barrier","stage":"b"}
+{"answer":{"now_us":273050666},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"input","phase":"first","sequence":1,"stage":"b"}
+{"answer":{"now_us":273050900},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"persisted_state_refused_trigger","phase":"first","reason":"daily-check not run: its day already claimed","stage":"b"}
+{"answer":{"now_us":273051057},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"input","phase":"neutral","sequence":2,"stage":"b"}
+{"answer":{"now_us":273051330},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"skills_event","message":{"allowed":false,"skill":"daily-check","stage":"answered","why":"first watch reset after 0 s: stopped holding: fixture/pair phase no longer first"},"stage":"b"}
+{"answer":{"now_us":273051517},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"input","phase":"control","sequence":3,"stage":"b"}
+{"answer":{"now_us":273051915},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"b"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"asked","why":"policy nudge"},"stage":"b"}
+{"event":"skills_event","message":{"allowed":false,"skill":"control-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"b"}
+{"answer":{"now_us":273052139},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"input","phase":"second","sequence":4,"stage":"b"}
+{"answer":{"now_us":273053076},"event":"drained_before_clock_barrier","stage":"b"}
+{"event":"skills_event","message":{"skill":"daily-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"b"}
+{"event":"skills_event","message":{"skill":"daily-check","stage":"asked","why":"policy nudge"},"stage":"b"}
+{"event":"skills_event","message":{"allowed":false,"skill":"daily-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"b"}
+{"answer":{"now_us":273053304},"event":"drained_before_clock_barrier","stage":"b"}
+{"code":null,"event":"reaped","pid":10042,"signal":9,"stage":"b"}
+{"event":"snapshot","files":[{"bytes":14742,"file":"daily.json","mode":384,"sha256":"9a2d4b417a4a16ed1066a3372a51cb7b71a08b0aa329627794fb440daa612e6d"},{"absent":true,"file":"on"},{"absent":true,"file":"off"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":645,"file":"manifests/daily-check.toml","sha256":"c2f0fd97ee5d27154218d7aa54f3bcad4160014a0e5c38dafd053d640df29c08"}],"name":"after-b"}
+{"event":"environment","stage":"c","values":{"LAMP_SKILLS_ASK":"policy","LAMP_SKILLS_DAILY_FILE":"state/daily.json"}}
+{"argv":["--dir","skills","--state-dir","state","--trust-clock","--utc-offset-minutes","526","--bus-root","/tmp/pair-output/kr-ILVq3t/c/b","--clock-control","c/clock","--gaze-socket","c/gaze","--mood-socket","c/mood","--actions-socket","c/actions","--say-socket","c/say"],"event":"spawn","executable_sha256":"87e500127793db88df8bcd7af793879faeee95f36a8e0d2ef8483c59fef26984","pid":10045,"release":6498,"stage":"c"}
+{"answer":{"now_us":273105528},"event":"drained_before_clock_barrier","stage":"c"}
+{"answer":{"now_us":273105656},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"first","sequence":1,"stage":"c"}
+{"answer":{"now_us":273105886},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"persisted_state_refused_trigger","phase":"first","reason":"daily-check not run: its day already claimed","stage":"c"}
+{"answer":{"now_us":273106015},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"neutral","sequence":2,"stage":"c"}
+{"answer":{"now_us":273106293},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"skills_event","message":{"allowed":false,"skill":"daily-check","stage":"answered","why":"first watch reset after 0 s: stopped holding: fixture/pair phase no longer first"},"stage":"c"}
+{"answer":{"now_us":273106478},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"second","sequence":3,"stage":"c"}
+{"answer":{"now_us":273106821},"event":"drained_before_clock_barrier","stage":"c"}
+{"answer":{"now_us":273106911},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"neutral","sequence":4,"stage":"c"}
+{"answer":{"now_us":273107288},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"skills_event","message":{"allowed":false,"skill":"daily-check","stage":"answered","why":"second watch reset after 0 s: stopped holding: fixture/pair phase no longer second"},"stage":"c"}
+{"answer":{"now_us":273107451},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"control","sequence":5,"stage":"c"}
+{"answer":{"now_us":273107749},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"c"}
+{"event":"skills_event","message":{"skill":"control-check","stage":"asked","why":"policy nudge"},"stage":"c"}
+{"event":"skills_event","message":{"allowed":false,"skill":"control-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"c"}
+{"answer":{"now_us":273107951},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"input","phase":"third","sequence":6,"stage":"c"}
+{"answer":{"now_us":273108891},"event":"drained_before_clock_barrier","stage":"c"}
+{"event":"skills_event","message":{"skill":"daily-check","stage":"triggered","why":"fixture/pair has held for 0 s"},"stage":"c"}
+{"event":"skills_event","message":{"skill":"daily-check","stage":"asked","why":"policy nudge"},"stage":"c"}
+{"event":"skills_event","message":{"allowed":false,"skill":"daily-check","stage":"answered","why":"not asked: nobody is subscribed to skills/ask (lamp-policy --gate)"},"stage":"c"}
+{"answer":{"now_us":273109133},"event":"drained_before_clock_barrier","stage":"c"}
+{"code":null,"event":"reaped","pid":10045,"signal":9,"stage":"c"}
+{"event":"snapshot","files":[{"bytes":22100,"file":"daily.json","mode":384,"sha256":"fda34c7c0458c56f5e2d58802d14e7a8aad9801f300fad1efa71d68958cc5d37"},{"absent":true,"file":"on"},{"absent":true,"file":"off"},{"bytes":263,"file":"manifests/control-check.toml","sha256":"8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"},{"bytes":645,"file":"manifests/daily-check.toml","sha256":"c2f0fd97ee5d27154218d7aa54f3bcad4160014a0e5c38dafd053d640df29c08"}],"name":"after-return"}
+{"artifacts_unchanged":true,"event":"case_complete"}
