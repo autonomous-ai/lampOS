@@ -1,3 +1,22 @@
+## Current checkpoint: 2026-10-24 18:21 +07, formatter collision resolved
+
+Third claimed the Linux fmt workflow two seconds before Second; #3373 is
+the one proceeding. Duplicate #3374 is closed and only Second's exact-head
+runs are being cancelled; branch/source retained, no competing merge.
+[Requested #3369 Linux format proof](verification/controls-cleanup-linux-format-reader-20261024/README.md)
+is complete on `714c30820`: **7,020 unchanged files**, actual Linux fmt
+exit0 and owned container removed. No local ARM build/test or broad source
+read implied. Next: independent #3373 workflow read and original #3355
+clock-span HOLD disposition on corrected `031990a89`.
+
+#3361 is landed through train85 with complete tested-tree equality, all
+original failures/repairs retained. Real-lamp/key/isolated-route inputs for
+#2809/#1812 still wait with First/Migrate/Fifth; integrity and static audits
+are published, no device or release mutation. Source/evidence HOLD on the
+product-hearing third setup remains with #3371's assigned readers.
+
+---
+
 ## Current checkpoint: 2026-10-24 18:04 +07, Surround landed; new hearing HOLD
 
 #3361 is landed through train85 at `6902cf8e2`. [Exact train proof](verification/surround-release-pair-20261024/train85/landing-audit.json)
