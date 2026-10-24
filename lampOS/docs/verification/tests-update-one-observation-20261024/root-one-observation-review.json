@@ -1,0 +1,11 @@
+{
+  "actual_case_passed": 1,
+  "actual_case_failed": 0,
+  "observation_count": 1,
+  "retry_count": 0,
+  "stdout_sha256": "bb37a3bff8b2937825b668e5b3c39a7a7347b6564008931459e43aa227959880",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "probe_used": false,
+  "cause_finding": null,
+  "historical_2_of_3_hold_waived": false
+}

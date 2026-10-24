@@ -1,0 +1,59 @@
+{
+  "command": {
+    "command": [
+      "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+      "--exact",
+      "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-diagnostic/lampOS/crates/update",
+    "started_at": "2026-10-24T14:27:10.194314+00:00",
+    "timeout_seconds": 120,
+    "stdout": "exact.stdout.txt",
+    "stderr": "exact.stderr.txt",
+    "timeout_cleanup": [],
+    "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+    "owned_pid": 41604,
+    "owned_process_group": 41604,
+    "timed_out": false,
+    "exit_code": 0,
+    "unexpected_residual_group_after_normal_exit": false,
+    "direct_status_before_cleanup": 0,
+    "owned_group_present_before_cleanup": false,
+    "direct_wait_status": 0,
+    "owned_group_absent_after_cleanup": true,
+    "wall_seconds": 25.021961,
+    "finished_at": "2026-10-24T14:27:35.215846+00:00",
+    "stdout_sha256": "bb37a3bff8b2937825b668e5b3c39a7a7347b6564008931459e43aa227959880",
+    "stdout_bytes": 209,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "summary": {
+    "source": "actual test result lines only, including any harness-compatible summaries",
+    "command_exit_code": 0,
+    "command_timed_out": false,
+    "rows": [
+      {
+        "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 24.97s",
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 156
+      }
+    ],
+    "totals": {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 156
+    },
+    "qualification": "Nonzero or timeout is still a failed/incomplete gate regardless of parsed counts; compiled inventory is not execution."
+  },
+  "passed": true,
+  "meaning": "Normal pass/probe unused gives NO cause finding and NO retry. Timeout failure stays failed; component controls require separate root grant before interpreting mechanism. Distinguish check3 OLD-back before intended cut from check4 NEW-current after cut.",
+  "original_case_observations": 1,
+  "extra_controls_executed": 0
+}

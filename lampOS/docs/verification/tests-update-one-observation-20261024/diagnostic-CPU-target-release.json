@@ -1,0 +1,25 @@
+{
+  "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+  "diagnostic_source_sha256": "1edc7f1c6de393a672aa4e42e90a9305ca045216970f64db4606cc580cd6521b",
+  "CPU_and_target_released": true,
+  "no_owned_jobs_outstanding": true,
+  "native_handles_terminal": {
+    "78284": 0,
+    "67360": 0,
+    "57489": 0,
+    "9968": 0
+  },
+  "owned_command_groups_absent": 178,
+  "direct_children_waited": 178,
+  "scope": "One metadata query,48-ID supported clean,exact11 no-run compilation,174file/list/ignored commands,andEXACTLYONE original named case. No component controls or other test.",
+  "group_proof_basis": "Completed unchangedf40 per-command terminal receipts, not signaling/reprobing recycled PIDs.",
+  "source_and_generated_artifacts_final_guard": "Approved controller observe phase returned normally after fullDT+Phone bytes/kind/fullmode/mtime_ns guard and unchanged sealed local artifacts/executables.",
+  "one_original_case_result": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 156
+  },
+  "interpretation": "Probeunused; NOCAUSEFINDING,no retry,old2/3HOLDnotwaived.",
+  "further_execution_grant": false
+}

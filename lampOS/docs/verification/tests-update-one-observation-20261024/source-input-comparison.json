@@ -1,0 +1,14 @@
+{
+  "head": "e63a86d0d470d95cceb8c6dea75015838207953a",
+  "matching_index_entries": true,
+  "tracked_paths": 10313,
+  "unchanged_bytes_kind_full_modes_except_probe": true,
+  "only_changed_path": "lampOS/crates/update/tests/round/self_cuts.rs",
+  "probe_sha256": "1edc7f1c6de393a672aa4e42e90a9305ca045216970f64db4606cc580cd6521b",
+  "original_sha256": "9fe9f465ac38a803353538faed959b541ad913f8abf1f37b05741a33a146c013",
+  "original_inputs_source": "Actual clean Phonee63 all tracked files/index, not just Update package",
+  "helper_hashes": {
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+  }
+}

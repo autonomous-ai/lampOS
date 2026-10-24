@@ -1,0 +1,131 @@
+{
+  "files": [
+    {
+      "path": "all178-command-receipts.json",
+      "bytes": 290314,
+      "sha256": "76d6c9726a6f4ffe7b1fe5ccf141e6b130eb6987891ad1edd82e2c83fbe8a9c2"
+    },
+    {
+      "path": "clean-compile/bound-artifacts.json",
+      "bytes": 149976,
+      "sha256": "5e70748f239e3ee7bd140f71c10a27085d3587338e6c54cd0b62f56ffbd649a7"
+    },
+    {
+      "path": "clean-compile/compilation-outcome.json",
+      "bytes": 162,
+      "sha256": "43e4f3b44177796d3aea8c1fe90fee6d83480bb7dd5eb50e0a8edd1c36cf13d4"
+    },
+    {
+      "path": "clean-compile/compiler-unit-identity-comparison.json",
+      "bytes": 200468,
+      "sha256": "a876e827b91fd8c04ec24002810858c1bc5e6577e4fb02aa9a338eb4e0f02d97"
+    },
+    {
+      "path": "clean-compile/local-provenance.json",
+      "bytes": 339333,
+      "sha256": "ae01c07e8a25e034890bc96b1b24383f3b9e7ca67e75bb4ad25881a9fb4df327"
+    },
+    {
+      "path": "clean-compile-final-receipt.json",
+      "bytes": 19746,
+      "sha256": "1e97f33c2dacc7133f350746407a9138468a1dcf6651ffd5c8488921a6f80c98"
+    },
+    {
+      "path": "diagnostic-CPU-target-release.json",
+      "bytes": 1136,
+      "sha256": "1d66dff4ca812114ac2c7a6ce185507fc5c1fd12f7fac1d3a61715d6cca5a17b"
+    },
+    {
+      "path": "execution-plan.json",
+      "bytes": 20662,
+      "sha256": "996bc6e6240ca89a52ccb206cead2b29187b205a9b80ac5d1c48f27fb6bb6ec8"
+    },
+    {
+      "path": "list/compiled-census.json",
+      "bytes": 327356,
+      "sha256": "a8cf4c5d1cd4a7970dd618faae839bdb060c8007b76374aa0a893534bb2e068b"
+    },
+    {
+      "path": "list-final-receipt.json",
+      "bytes": 16595,
+      "sha256": "f686046da2a9a8f88031b092e3f3e04223a30fcc1bfe315a8c784d086cc4be6c"
+    },
+    {
+      "path": "local-clean-receipt.json",
+      "bytes": 18503,
+      "sha256": "4e07be2b627665d56b78968faa9ad0f4019ff2de65f4692858e8210171ffcb40"
+    },
+    {
+      "path": "local-dependency-context.json",
+      "bytes": 740999,
+      "sha256": "9dce5f221ed5933181739d2637becb9537ed888d67e995216a4136c0f8b1a724"
+    },
+    {
+      "path": "local-path-package-ids.json",
+      "bytes": 127812,
+      "sha256": "671afe41242e4b14114d16e2bc10c61b79efc86b6acdc74d4a1133b23c228a17"
+    },
+    {
+      "path": "metadata-source-guard-result.json",
+      "bytes": 296,
+      "sha256": "c1a7601c6260f5ec01ea12b84e69bfcaa6c7e793f5b485daed62c7a2808caaea"
+    },
+    {
+      "path": "native-streams.json",
+      "bytes": 3119104,
+      "sha256": "8054c4267196c6f8c5e9b1ac2c00fb080a44e60374bcb8a1cc42e0e2fe16d91f"
+    },
+    {
+      "path": "one-observation/executed-summaries.json",
+      "bytes": 672,
+      "sha256": "1251f96c7f3e01c862f1a9d45c08197787dd5038ec5526e9b40ad9461fa15b41"
+    },
+    {
+      "path": "one-observation-consumed.json",
+      "bytes": 15773,
+      "sha256": "65bc4160c56033b7fe012e9557af8b5d6fbdbc38cbd387027a3735a5603c1dc4"
+    },
+    {
+      "path": "one-observation-final-receipt.json",
+      "bytes": 3251,
+      "sha256": "5373551c7d26f9fc2c758e48fc8f23cc54c02e0e25dbfc232058753a02989780"
+    },
+    {
+      "path": "one-observation-interpretation.json",
+      "bytes": 2498,
+      "sha256": "b0c51c6f8c89c59f5272d9b002bcc174b5cea5bfafe1b6f96956395259b4840d"
+    },
+    {
+      "path": "proposed-clean-command.json",
+      "bytes": 9316,
+      "sha256": "cda40625bc434f3d4c29424f95b1210f9087cd8d69f85f0e0249102772c9467f"
+    },
+    {
+      "path": "reference-compiled-census.json",
+      "bytes": 326660,
+      "sha256": "d73ac72e9c6f6fc1dd8060e78368d855cfa263d050e367aa5810b0a1f0c9d6c1"
+    },
+    {
+      "path": "round-binding.json",
+      "bytes": 15167,
+      "sha256": "85a8da58f1c081ad2126ae03f9b3fc4d1653d50c06a6b2c6ea7a9b42cf6e731f"
+    },
+    {
+      "path": "source-input-comparison.json",
+      "bytes": 718,
+      "sha256": "d9bfb1c8b74f175a9e3028757a100dfe9519d391168b4ea27ac50aab87074c3e"
+    },
+    {
+      "path": "source-mode-mtime-before-metadata.json",
+      "bytes": 6076403,
+      "sha256": "3aa9cfdc16ae95d6d6fac67c18d820385f6b8399e55f4ec6756434af5e349f9e"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 2608,
+      "sha256": "08918ab0efd84c0b795b79f660ddb6ced84b2efe55a0e4515bc24394e0907917"
+    }
+  ],
+  "contents": "JSON only, including exact UTF8 raw streams; no Python/binaries",
+  "historical_failures_not_relabelled": true
+}

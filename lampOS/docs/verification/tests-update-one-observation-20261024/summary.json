@@ -1,0 +1,63 @@
+{
+  "original_case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+  "observations": 1,
+  "actual_outcome": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 156,
+    "seconds": 24.97
+  },
+  "diagnostic_source_sha256": "1edc7f1c6de393a672aa4e42e90a9305ca045216970f64db4606cc580cd6521b",
+  "timeout_probe_unused": true,
+  "no_cause_finding": true,
+  "historical_old_2of3_HOLD_not_waived": true,
+  "original_failed_phases_distinct": [
+    "Fullcheck3 OLD fallback during prepared, before intended cut",
+    "Standalone01-1check4 NEW current after intended cut"
+  ],
+  "compiler": {
+    "original_actual_messages": [
+      425,
+      425
+    ],
+    "original_actual_unique_units": [
+      419,
+      419
+    ],
+    "message_multiplicities_equal": true,
+    "local_artifact_messages": 117,
+    "all_local_artifacts_fresh_false_current_source": true,
+    "local_lib_proc_macro_messages": 45,
+    "local_compiled_packages": 34,
+    "all_local_ids_cleaned": 48,
+    "cleaned_but_unused_local_packages": 14,
+    "buildscript_executions": 1,
+    "provenance_limit": "Actual CargoJSON current-source/fresh:false, metadata edges and sealed outputs; no per-consumer rustc--extern argv claim."
+  },
+  "census": {
+    "original_actual_targets": 58,
+    "compiled_cases": 3294,
+    "ignored": 19,
+    "all_case_ignored_sets_equal": true,
+    "round_cases": 157,
+    "round_ignored": 0
+  },
+  "guard": "10313 tracked input byte/kind/fullmode/mtime_ns records for DT and originalPhone; only approved probe differs, independent mtimes preserved, pre/post checks each command and final sealed artifact check.",
+  "cleanup": {
+    "owned_groups_absent": 178,
+    "direct_children_waited": 178,
+    "owned_jobs_remaining": 0,
+    "CPU_target_released": true
+  },
+  "actual_clean_qualifier_limit": {
+    "supported_command": "cargo clean --offline --locked -p EACHactual48localID",
+    "actual_warning": "Cargo ignored URL/version qualifiers, cleaning all cached versions of each selected package NAME. Full stderr preserved.",
+    "nonlocal_registry_git_name_collisions_in_complete_metadata": [],
+    "not_proved": "Historical same-name generated cache outputs outside current resolved metadata were not inventoried; do not claim they were preserved. Registry/git source caches were not selected or edited."
+  },
+  "no_extra_diagnostic_execution": true,
+  "component_controls_executed": 0,
+  "event_candidate_or_counterfactual_results": "None; separate source-only work remains unexecuted.",
+  "private_controller_execution_results_bound_not_code_published": true
+}

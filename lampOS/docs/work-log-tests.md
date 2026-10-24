@@ -4240,3 +4240,9 @@ Pushed `42cf24d5a` with an exact lease after all 33 prescribed observations pass
 Ready for lamp-voice: yes (#3190), landed as `22b753df5` through train 91.
 
 Current READ-OK and all Linux checks passed. Fresh primary-log verification finds PR ARM 7,371 PASS + 1 LEAK / 53 skipped and direct-head whole-workspace ARM 11,204 PASS + 1 LEAK / 100 skipped, zero failed/unrun. All indices and identities are complete and unique. The older matched 11,163 PASS + 1 LEAK before/after remains separate from current coverage; no speed claim. Original Mac failures and 33 exact observations remain retained. [Native receipts](verification/tests-native-42cf24d5a-20261024/). Third owns replacement Expression #3386; Second owns phone #3382. The isolated Update diagnostic has cleaned only its 48 local packages and is compiling the original context before any single observation.
+
+## 24 October, 21:38 — One Update observation passed without a probe
+
+Ready for lamp-voice: no
+
+Exactly one original-case observation passed, with the unchanged two-second helper and timeout-only probe unused. No cause finding or historical 2/3 waiver; no retry or component control. Original package/profile/features and all 58 case/ignored inventories match; 117 local compiler messages are fresh, 425/419 unit context counts match, source/full modes/mtimes stay fixed and all 178 owned groups close. Supported-clean qualifier limits remain explicit. [Complete diagnostic](verification/tests-update-one-observation-20261024/). The test-only event-helper candidate is now carried onto landed22 and being formatted; it is not yet tested or offered. The separate SleepingService control remains an unapplied proposal.
