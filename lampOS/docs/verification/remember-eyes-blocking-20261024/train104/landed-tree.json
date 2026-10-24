@@ -1,0 +1,12 @@
+{
+  "train_authored_tested_landed_trees": {
+    "861480341b5a9a6a29bb7879b3c6c0210b2ca94c": "20695fa3e7ff2dc8f39c212dc1de1650dee6ee5d",
+    "9899094364783353739f1d96a150f72915b36dc6": "20695fa3e7ff2dc8f39c212dc1de1650dee6ee5d",
+    "fc31e012334cda59eb3c489560454c515fb86386": "20695fa3e7ff2dc8f39c212dc1de1650dee6ee5d"
+  },
+  "all_equal": true,
+  "authored_fixture_run_tree": "0a0d8f284e955370d286a603ab4b450fb23eb8d1",
+  "authored_fixture_run_is_different_whole_tree": true,
+  "readiness_bypass_report": 6389780744,
+  "state": "Second author-ready/HOLD was not restored before the train merged; no retrospective approval."
+}

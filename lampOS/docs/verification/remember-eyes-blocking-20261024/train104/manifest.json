@@ -1,0 +1,34 @@
+{
+  "arm64-official.json": {
+    "original_sha256": "956577babaa7e79334397de6bf8abbef0e26eb9b9f4e7868b94a6e057e837f84",
+    "published_sha256": "956577babaa7e79334397de6bf8abbef0e26eb9b9f4e7868b94a6e057e837f84"
+  },
+  "linux-official.json": {
+    "original_sha256": "7008cf697abdfb0c58fc30fcf0adceb0211ea9977fce6ecf09c8315019a43612",
+    "published_sha256": "7008cf697abdfb0c58fc30fcf0adceb0211ea9977fce6ecf09c8315019a43612"
+  },
+  "arm64-final-jobs.json": {
+    "original_sha256": "7f4ef6ed2685afcc1e301a4f95120ff4bb39fd675692a40abbc914e31c75d195",
+    "published_sha256": "7f4ef6ed2685afcc1e301a4f95120ff4bb39fd675692a40abbc914e31c75d195"
+  },
+  "linux-final-jobs.json": {
+    "original_sha256": "b8897b4cff6edc582fdac43020f16604e8c6afb46bbc0bfd80cc940c847268bd",
+    "published_sha256": "b8897b4cff6edc582fdac43020f16604e8c6afb46bbc0bfd80cc940c847268bd"
+  },
+  "receipt.json": {
+    "original_sha256": "a946ccc9a9e7c4825307fd5cbf11eef6f2eb2919076dc68b75d38b37bc653721",
+    "published_sha256": "a946ccc9a9e7c4825307fd5cbf11eef6f2eb2919076dc68b75d38b37bc653721"
+  },
+  "all-terminal-rows.json": {
+    "original_sha256": "1654c31be50701d7aa3db61ace1eebf056eeb4dfd0b3f03fb292f7b263da3dd2",
+    "published_sha256": "1654c31be50701d7aa3db61ace1eebf056eeb4dfd0b3f03fb292f7b263da3dd2"
+  },
+  "arm64-selected.txt": {
+    "original_sha256": "fe97c9e76b7f07bd54c5b5e4d22a8f304c0a63d2d4d497cf14217aca4e208918",
+    "published_sha256": "fe97c9e76b7f07bd54c5b5e4d22a8f304c0a63d2d4d497cf14217aca4e208918"
+  },
+  "linux-selected.txt": {
+    "original_sha256": "9806eeb15b48ab7b541f0adb9d36deecf724d7f4e8aa11ba7170cae276764946",
+    "published_sha256": "9806eeb15b48ab7b541f0adb9d36deecf724d7f4e8aa11ba7170cae276764946"
+  }
+}
