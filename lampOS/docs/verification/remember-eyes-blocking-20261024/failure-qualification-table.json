@@ -1,0 +1,57 @@
+{
+  "executed_head": "1f78ef3b8a62c69c0affff3f4bd89870d5ea5339",
+  "executed_source_reference": "second/remember-eyes-mac-20261024",
+  "current_head": "fa82c279e7b056ff45dd1af3fd77d3a3ea7adaa3",
+  "whole_tree": "8d8c615acf16f1dd865f64e957012220b0bb13c8",
+  "original_full_library": {
+    "passed": 3742,
+    "failed": 1,
+    "ignored": 15,
+    "state": "FAILED",
+    "case": "second_provider::net::chat::tests::a_kept_client_lets_an_idle_connection_go_and_the_default_reuses_it",
+    "observed_connections": 2,
+    "expected_connections": 1
+  },
+  "isolated_observations": [
+    {
+      "ordinal": 1,
+      "passed": 1,
+      "failed": 0,
+      "source": "qualification/isolated-1.txt"
+    },
+    {
+      "ordinal": 2,
+      "passed": 1,
+      "failed": 0,
+      "source": "qualification/isolated-2.txt"
+    },
+    {
+      "ordinal": 3,
+      "passed": 1,
+      "failed": 0,
+      "source": "qualification/isolated-3.txt"
+    }
+  ],
+  "separate_remaining_targets": {
+    "passed": 289,
+    "failed": 0,
+    "ignored": 6
+  },
+  "distinct_target_total": {
+    "passed": 4031,
+    "failed": 1,
+    "ignored": 21
+  },
+  "reader_disposition": {
+    "comment": "https://github.com/autonomous-ai/lampOS/pull/3412#issuecomment-6389410236",
+    "accepted_route": "three-alone at published source-content/launcher scope",
+    "no_further_retry_requested": true,
+    "original_full_run_remains_failed": true
+  },
+  "scope_limits": [
+    "Post-run executable hashes are not per-launch byte observations.",
+    "Original and rebased source trees are identical; execution identities stay separate.",
+    "Host socket probe is not a historical cause diagnosis.",
+    "Current native and latest-base readiness remain separate."
+  ]
+}
