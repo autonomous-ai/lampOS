@@ -1164,24 +1164,27 @@ on #3126).
   - It reaches at most 500 ms (`SOFT_START_BLOCKS`) before the usual start.
     Talk across a room that runs straight into a line adds half a second at
     most.
-  - It never reaches past a block heard while the lamp was sounding, or kept
-    quiet for a busy answer. The coordinator gives the detector a block's
-    score before the floor only while the lamp is silent: its sound not
-    reaching the microphone by the echo evidence, and nothing of a reply to
-    yield as the duplex mask hears the block (`reply_sounding`: audio still
-    to hand over, or the lamp's sound accepted, queued or within its tail)
-    (`unfloored_score`). So a start never reaches into the lamp's own voice,
-    nor into the 300 ms after it. The reply's playback token is not the
-    test: it is held from a reply's start until its audio is retired, and
-    on 25 October it kept every line begun after an answer, or after a bare
-    "Lamp." whose answer waited, from a soft start.
-  - It never begins later than the usual start. A line begun while a reply's
-    playback is still held but its sound has gone quiet has every block
-    marked so, its onset's among them, and starts as without the switch
-    (the reviewer's P2: it had started with no audio, which admission
-    refuses and which ended the conversation).
-  - A pause of 100 ms or more ends the run, and neither lead crosses it: a
-    name said before the pause isn't taken with the question.
+  - Additional lead never crosses a block marked unavailable by
+    `unfloored_score`. The coordinator records a score only when the echo
+    evidence does not say the lamp is sounding, no busy answer is kept, and
+    `reply_sounding` is false: no reply audio still to hand over, accepted,
+    queued or within the playback mask's tail. With echo evidence, the
+    sounding guard requires 30 quiet 10 ms blocks (300 ms). Without it,
+    the mask's existing fallback tail is 100 ms (`TAIL_US`), not 300 ms.
+    These are software evidence bounds, not a measured acoustic tail.
+    The reply's playback token alone is not the test: it remains held until
+    audio is retired, even after that audio is handed over and quiet.
+  - It never begins later than the usual start. If pending reply PCM still
+    makes the onset's score unavailable, it keeps the ordinary prefix rather
+    than returning empty audio (the reviewer's P2 on #3392). Once the PCM is
+    handed over and the mask and echo guards are clear, a retained playback
+    token does not prevent the extra lead. The ordinary 300 ms prefix is
+    never shortened by these guards, so it can still contain samples that
+    would block additional lead.
+  - A pause of 100 ms or more ends the speech-like run. The additional lead
+    starts after the preceding speech, so it does not add a name from before
+    that pause. This does not remove speech already inside the unchanged
+    ordinary prefix.
 - `input_candidate`'s `first_read_at_us` shows where each line's sound began.
   With `mic2/audio` recorded off the bus, which is on the voice's clock, the
   line's onset can be set against it.
