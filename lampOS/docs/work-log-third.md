@@ -5,6 +5,22 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 03:12 — held-colleague constraints claimed
+
+Ready for lamp-voice: no (design and regression preparation only).
+
+- Claimed the newest-held-print P3 after checking new Queue comments and
+  both open and merged PRs. [Scope and candidate](verification/held-colleague-constraints-20261025/README.md).
+- First negative control: two distinct visitors alternate with the owner,
+  then the older visitor returns off camera. Existing newest-only print
+  must not erase that visitor's constraint.
+- Candidate remains bounded, in memory, with no new inference/wait or
+  threshold/activation change. Missing evidence/overflow require a face;
+  lifecycle resets and old callbacks need explicit controls.
+- No implementation yet. The current #3408 fix stays frozen through its
+  full current-base gate and push. Sixth retains personal scope; Second
+  is checking the separate macOS fixture ownership. No lamp action.
+
 ## 2026-10-25 03:05 — delayed-verdict reader finding in progress
 
 Ready for lamp-voice: no (#3408 remains draft).
