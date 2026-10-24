@@ -1,0 +1,62 @@
+{
+  "activation_claim": false,
+  "base_head": "8aed9d14acadbbf66fd5e309c880dead0225643d",
+  "cause_assigned": false,
+  "combined_top_level_test_count_per_host": 1,
+  "counts_by_host": {
+    "linux": {
+      "census": {
+        "failed": 0,
+        "filtered": 12,
+        "ignored": 0,
+        "passed": 1
+      },
+      "cleanup_proved": true,
+      "fresh_local_members": 46,
+      "gate_exit": 0,
+      "once_passed_controls": 6,
+      "required_controls": 6,
+      "source_stable": true,
+      "stage_count": 5,
+      "voice": {
+        "failed": 0,
+        "ignored": 24,
+        "passed": 4187
+      }
+    },
+    "mac": {
+      "census": {
+        "failed": 0,
+        "filtered": 12,
+        "ignored": 0,
+        "passed": 1
+      },
+      "cleanup_proved": true,
+      "fresh_local_members": 46,
+      "gate_exit": 0,
+      "once_passed_controls": 6,
+      "required_controls": 6,
+      "source_stable": true,
+      "stage_count": 5,
+      "voice": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4126
+      }
+    }
+  },
+  "final_head_bound": false,
+  "formal_read_ok_issued": false,
+  "format": "callback-R5-count-sourcehash-bool-review/1",
+  "old_timeout_reclassified": false,
+  "owned_test_file_count": 2,
+  "physical_qualified": false,
+  "previous_R3_failure_waived": false,
+  "previous_R4_format_failure_waived": false,
+  "public_raw_upload_authorized": false,
+  "semantic_index_sha256": "ebbad0ed517d638e35434bf4ee9376681eddf1386bbaf81075816eb9b21251b1",
+  "source_file_count": 10454,
+  "source_internal_row_count": 4,
+  "source_map_sha256": "7d52c8a725b43c6a9da3759c21c7282fbd1fdebc61e96447558fccd50b27d22d",
+  "tested_staged_tree": "30eabf6bc5365006a44ebaf17ba617abcb6784d6"
+}

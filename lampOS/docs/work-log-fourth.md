@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 01:24: callback correction pushed and parent qualification active
+
+- Amended and lease-pushed #3391 `26102b834`, one test-only commit on e9d. [Selected two-host receipt and final-head binding](verification/callback-r5-selected-20261025/README.md): both five-stage gates/six controls/fresh 46 pass; Mac Voice 4126/0/21, Linux 4187/0/24, exact census 1/0/0/12 filtered each. Only result README differs from tested 30eab; direct final-tree verification completed after the sandbox-denied write-tree check. Earlier failures remain retained.
+- Rebased Common locally to f5d on 427, preserving all 36 authored deltas and both reuse records. Its new eight-stage gates are active: Mac fmt/strict Clippy pass/build active; Linux fmt pass/strict Clippy active. No new parent qualification or push claimed yet.
+- Callback has no current native workflow run yet and waits on parent composition/restack plus current read; draft/privacy/freeze/physical holds remain. Photo Linux 8ad5 is qualified separately; Photo Mac follows the parent qualification. Raw stays private; no lamp action.
+
 ## 2026-10-25 00:47: Photo Linux qualified and failed callback epoch retained
 
 - [Photo Linux selected receipt](verification/photo-current-linux-selected-20261025/README.md): source `8ad5` passed seven stages and 210 controls, fresh 46, Voice 4215/0/24, Cloud 209/0/4, Update 389/0/4 and Eyes 360/0/5. Mac Photo not run; final/native/physical/original-capture/strict-interval holds remain.

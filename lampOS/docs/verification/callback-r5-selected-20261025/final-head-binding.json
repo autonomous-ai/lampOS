@@ -1,0 +1,34 @@
+{
+  "head": "26102b834632ebd964565f9eba94760a969dc1c0",
+  "parent": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+  "final_tree": "b4d0689ea1d2ffe55d55ea97c5fae88a0ab3eb76",
+  "tested_tree": "30eabf6bc5365006a44ebaf17ba617abcb6784d6",
+  "one_commit": true,
+  "observed_post_test_changed_paths": [
+    "lampOS/docs/verification/private-callback-http-20261024/README.md"
+  ],
+  "all_other_blobs_modes_tested_exact": true,
+  "direct_tree_comparison_exit": 0,
+  "verification_boundary": "Direct immutable final/tested Git tree comparison after push; earlier write-tree observation was denied by sandbox metadata restriction.",
+  "required_host_stages": 5,
+  "required_controls_each_host": 6,
+  "mac_voice": {
+    "passed": 4126,
+    "failed": 0,
+    "ignored": 21
+  },
+  "linux_voice": {
+    "passed": 4187,
+    "failed": 0,
+    "ignored": 24
+  },
+  "census_each_host": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 12
+  },
+  "native_current_head_qualified": false,
+  "parent_current_rebase_qualified": false,
+  "raw_publication_authorized": false
+}
