@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837)
+
+running 1 test
+test attention::tests::the_real_name_call_keeps_positions_without_recognizer_stand_ins ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3739 filtered out; finished in 0.00s
+

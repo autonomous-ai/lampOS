@@ -1,0 +1,50 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837)
+
+running 43 tests
+test attention::tests::a_name_heard_close_to_the_lamp_is_a_call_in_a_busy_room ... ok
+test attention::tests::a_request_that_continues_an_early_ended_one_keeps_its_name_in_a_busy_room ... ok
+test attention::tests::in_a_busy_room_a_name_heard_plainly_is_a_call_without_a_face ... ok
+test attention::tests::in_its_busy_form_a_busy_room_needs_a_sign_on_every_request ... ok
+test attention::tests::only_a_new_sessions_first_requests_in_a_busy_room_are_held_and_every_doubt_plays ... ok
+test attention::tests::the_lamp_spoken_of_in_a_busy_room_is_held_only_with_the_switch ... ok
+test attention::tests::two_people_talking_soon_after_the_news_in_a_busy_room_are_held ... ok
+test attention::tests::with_both_switches_scene_three_after_a_pause_is_still_judged_in_a_busy_room ... ok
+test attention::tests::with_name_or_follow_up_a_face_turned_to_the_lamp_lets_nothing_out_alone_in_a_busy_room ... ok
+test attention::tests::with_remarks_a_remark_outside_a_busy_room_or_named_plays ... ok
+test attention::tests::with_the_days_bars_in_a_busy_room_by_day_the_name_alone_counts_only_heard_surely ... ok
+test attention::tests::with_the_switch_a_line_going_on_in_a_busy_room_is_the_lamps_only_as_the_policy_says ... ok
+test called::tests::in_a_busy_room_the_note_waits_for_someone_turned_to_the_lamp ... ok
+test coordinator::tests::duplex::talk_over_the_lamps_own_line_in_a_busy_room_leaves_no_playback_gap ... ok
+test coordinator::tests::second_route::in_a_busy_room_a_sound_after_a_line_that_ends_before_its_name_is_held_as_before ... ok
+test coordinator::tests::second_route::talk_over_a_say_in_a_busy_room_is_let_go_with_the_switch ... ok
+test coordinator::tests::second_route::talk_over_a_say_in_a_busy_room_waits_for_the_name_then_is_let_go_under_duplex ... ok
+test coordinator::tests::turn_taking::a_name_said_late_in_talk_over_the_lamps_own_line_in_a_busy_room_still_stops_it ... ok
+test coordinator::tests::turn_taking::talk_over_the_lamps_own_line_in_a_busy_room_is_let_go ... ok
+test provider_worker::tests::a_new_sessions_first_answers_to_talk_in_a_busy_room_are_held_and_later_ones_are_the_models ... ok
+test provider_worker::tests::going_on_asks::with_the_switch_a_line_going_on_in_a_busy_room_is_played_only_as_the_policy_says ... ok
+test provider_worker::tests::going_on_asks::with_the_switch_talk_in_a_busy_room_sets_no_timer_unless_it_names_one ... ok
+test provider_worker::tests::kept_start::the_lamp_spoken_of_is_a_call_in_a_busy_room_without_the_switch ... ok
+test provider_worker::tests::kept_start::the_lamp_spoken_of_is_held_in_a_busy_room_with_the_switch ... ok
+test provider_worker::tests::kept_start::the_rest_after_a_cut_is_held_in_a_busy_room_without_the_switch ... ok
+test provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by ... ok
+test room_told::tests::sounds_and_talk_spread_over_an_afternoon_are_not_a_busy_room ... ok
+test room_told::tests::with_the_switch_a_busy_room_ends_a_minute_after_the_lamps_first_answer_since_its_talk ... ok
+test room_told::tests::with_the_switch_a_split_cut_in_is_kept_out_whole_and_keeps_a_busy_room_busy ... ok
+test room_told::tests::with_the_switch_lines_held_only_as_a_busy_rooms_are_talk ... ok
+test second_provider::tests::a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room ... ok
+test second_provider::worker::tests::a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face ... ok
+test second_provider::worker::tests::a_busy_room_never_holds_a_line_that_calls_the_lamp ... ok
+test second_provider::worker::tests::a_busy_rooms_conversation_goes_on_fifteen_seconds ... ok
+test second_provider::worker::tests::a_busy_rooms_fifteen_seconds_count_from_the_end_of_the_lamps_words ... ok
+test second_provider::worker::tests::a_line_judged_in_a_busy_room_is_known_as_judged_busy ... ok
+test second_provider::worker::tests::as_the_only_voice_an_answer_ends_a_busy_room_a_minute_later_with_the_switch ... ok
+test second_provider::worker::tests::in_a_busy_room_a_line_going_on_waits_for_the_policy_and_goes_as_it_says ... ok
+test second_provider::worker::tests::the_same_speaker_goes_on_five_turns_in_a_busy_room_only_with_the_switch ... ok
+test second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room ... ok
+test second_provider::worker::tests::with_busy_called_strict_office_lines_are_no_call_in_a_busy_room ... ok
+test second_provider::worker::tests::with_name_or_follow_up_a_face_alone_lets_no_line_out_in_a_busy_room_on_this_route ... ok
+test second_provider::worker::tests::with_named_always_a_line_begun_with_the_name_to_a_face_is_answered_in_a_busy_room ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 3697 filtered out; finished in 7.50s
+

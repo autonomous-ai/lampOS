@@ -1,0 +1,18 @@
+
+running 1 test
+test cgroup_tests::oversized_evidence_refuses_cleanup ... FAILED
+
+failures:
+
+---- cgroup_tests::oversized_evidence_refuses_cleanup stdout ----
+
+thread 'cgroup_tests::oversized_evidence_refuses_cleanup' (82921494) panicked at /private/tmp/second-review-3381-gates-20261024/cap-guard-removed.rs:199:13:
+assertion failed: group_text(&path, limit as u64).is_none()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cgroup_tests::oversized_evidence_refuses_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.01s
+

@@ -1,0 +1,1 @@
+Original runner exited 1 at the final empty-TMPDIR assertion. Only xcrun_db, a compiler-created regular file, remained (1470 bytes). All four subprocess exit assertions passed before this check. Six real fixture directories were already removed. No control was rerun. Finalization removed only the inspected owned cache file; the owned TMPDIR is now empty.

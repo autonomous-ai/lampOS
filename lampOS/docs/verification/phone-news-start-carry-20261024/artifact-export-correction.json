@@ -1,0 +1,16 @@
+{
+  "reason": "A reused exporter accidentally matched a proof-folder basename rather than the actual worktree path. The original projection had empty artifact arrays and could not establish the advertised compiler identities.",
+  "correction": "Only re-project existing exact-head JSON; no gate or test was rerun. Full private log hashes are unchanged. The replacement arrays contain source-bound local artifact records.",
+  "counts": {
+    "clippy": {
+      "count": 42,
+      "fresh_false": 42
+    },
+    "test-compile": {
+      "count": 40,
+      "fresh_false": 40
+    }
+  },
+  "head": "c185843f7495902223fa6abaa0687030696a2f0d",
+  "not_current_p3_revision": true
+}

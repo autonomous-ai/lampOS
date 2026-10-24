@@ -1,3 +1,28 @@
+## Current checkpoint: 2026-10-24 20:07 +07, current findings and independent Records read
+
+#3380 is at `9fe62cd69`, exactly one comment correcting three words (not
+four). [Current focused proof](verification/busy-room-real-call-20261024/wording-9fe62cd69/README.md)
+has fmt/strictVoiceClippy,3/0 controls and exact Linux fmt pass; prior full
+and native results remain on b33ade247. New official checks are separate.
+
+[Independent #3381 Records read](verification/records-cap-reader-20261024/README.md)
+finds no P1/P2 on0d057ef4b: scoped Mac182/0/1; portable exact controls6/0
+and expected guard-removal failure. Ordinary ARM1448/0/16 and dedicated
+three-case evidence bind this head. The extraction runner's compiler-cache
+cleanup assertion failure is retained; no case rerun. No local ARM/device.
+
+#3382 c185's exported artifact arrays were empty due to a reused wrong-path
+filter. Re-projecting the same logs gives42Clippy/40test-compile local
+records, all fresh=false; original raw hashes unchanged, no rerun. The
+correction is explicit in its proof. Both inherited fixture P3s are now
+being fixed in messages.rs: direct cancellation witness and owned
+worker/root cleanup. Fresh scoped Voice gate is active, no terminal claim.
+Historical Update triplet8/1 remains held by rule6370483473; Tests retains
+#1569 diagnostic and Reviewer-two the disposition. No full workspace retry.
+#2809/#1812 lamp/key/isolated-route blockers remain with their holders.
+
+---
+
 ## Current checkpoint: 2026-10-24 19:42 +07, carry CI green and next fixture gated
 
 #3380 `b33ade247` has [official ARM64 and Linux receipts](verification/busy-room-real-call-20261024/official-ci/README.md):

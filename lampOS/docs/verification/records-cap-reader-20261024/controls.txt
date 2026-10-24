@@ -1,0 +1,11 @@
+
+running 6 tests
+test cgroup_tests::absent_group_without_unified_v2_proof_refuses_cleanup ... ok
+test cgroup_tests::empty_parent_with_live_descendant_refuses_cleanup ... ok
+test cgroup_tests::genuine_empty_subtree_and_absent_exact_group_allow_cleanup ... ok
+test cgroup_tests::missing_or_invalid_events_and_live_parent_refuse_cleanup ... ok
+test cgroup_tests::oversized_evidence_refuses_cleanup ... ok
+test cgroup_tests::symlinks_and_unexpected_group_paths_refuse_cleanup ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

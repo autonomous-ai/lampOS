@@ -15,14 +15,14 @@
     "home_path_redacted": false
   },
   "clippy-summary.json": {
-    "private_sha256": "95ac567d54c230b45d20fba0d5d001f360122f88d85b679150b0f1c88dfad28d",
-    "published_sha256": "95ac567d54c230b45d20fba0d5d001f360122f88d85b679150b0f1c88dfad28d",
-    "home_path_redacted": false
+    "private_sha256": "0aadb651ba78388c02c9fed7444925552d9b5b0efbf0f4a845b435ed3ae024c0",
+    "published_sha256": "39c02743266e712dfa91c7c5c6f75eb803e4b74840aa1ce5646519f620f6ed84",
+    "home_path_redacted": true
   },
   "test-compile-summary.json": {
-    "private_sha256": "ac2bbb8d85b5b56d022e0c9572d4b0159484562e52589ced348de16cfb619229",
-    "published_sha256": "ac2bbb8d85b5b56d022e0c9572d4b0159484562e52589ced348de16cfb619229",
-    "home_path_redacted": false
+    "private_sha256": "33e076bd0e511813958df64a56fb8473361cf928ddfc2d736f56d4d996bb0afa",
+    "published_sha256": "00dc4b285daea99c220fba1fa56a7edeaafbb9da4fe8f6bf64580347d28315f3",
+    "home_path_redacted": true
   },
   "test.txt": {
     "private_sha256": "be5a2907d885c7f5fe9b8ef1f4c83fdd680ec8b69c2893d8eed27ea0fed5489b",

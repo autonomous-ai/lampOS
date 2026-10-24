@@ -1,0 +1,29 @@
+{
+  "head": "0d057ef4be25107e203d8ccdef246360b2357ab0",
+  "source_sha256": "33fedeb4650bf4a0549277b81bd760a7d22a74065be368f96925ca12a8057f30",
+  "extraction_sha256": "fd82a0d8568c326046d612c659d51d280175dbb999b1ac9d1b1f90df4f6e204e",
+  "mutant_sha256": "98354729669357d9252bb9a7900b0e3340513d6247e07a8466518b69813e14ad",
+  "validated_subprocess_exits_before_runner_failure": {
+    "controls-compile": 0,
+    "controls": 0,
+    "mutant-compile": 0,
+    "mutant": 101
+  },
+  "normal_controls": {
+    "passed": 6,
+    "failed": 0
+  },
+  "guard_removed_control": {
+    "passed": 0,
+    "expected_failed": 1
+  },
+  "original_runner_exit": 1,
+  "runner_failure": "Final empty-TMPDIR assertion also counted the compiler-created xcrun_db cache; all four subprocess exit assertions had passed. No case was repeated. Only that owned regular cache file was removed after inspection.",
+  "compiler_cache_cleanup": {
+    "name": "xcrun_db",
+    "bytes": 1470,
+    "sha256": "181ff7f96d56bb5d689eab27d050f37d140a9e9462674f39750fba701715715a"
+  },
+  "all_owned_fixtures_removed": true,
+  "limits": "Exact portable helper/control extraction on Mac, no real cgroup, Linux/ARM, systemd or published-artifact execution."
+}
