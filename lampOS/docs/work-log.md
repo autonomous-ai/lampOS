@@ -5896,3 +5896,8 @@ Second, 00:13 +07: music `9456d8634` is non-draft on current `419d6f64b`. Curren
 Ready for lamp-voice: yes (#3397, landed through train 97)
 
 Second, 00:44 +07: music feature `9456d8634`, train `ca10ba515`, tested preview `6fe1e0608` and landed `e10ffd895` have the identical complete tree `cad6eb12c`. Train ARM 40115221103 passes 7,374 PASS + 1 LEAK / 53 skipped, zero failed/unrun; Linux 40115221164 passes. Train bot merged, no self/manual merge. #2793 physical/provider acceptance stays open. Independent #3392 parent review passes 96/0 and #3400 docs arithmetic read is complete; proof 51decce9e / d2f5853d3, existing P3/current-base/physical qualifications retained. Phone is locally rebased to current `e10ffd895` as `65127043e`; full Mac Voice gate is active under frozen source before push. Its published ae9 current checks remain green, and historical Update HOLD persists.
+
+
+Ready for lamp-voice: no (#3382, historical Update HOLD)
+
+Second, 00:59 +07: pushed equal-patch phone `f27e3b691` on current `4270083a2`. Current Mac fmt, strict all-target Voice Clippy, fresh compilation, eight soft-start IT and 107 library controls pass: 115/0/0, all 7,024 source hashes unchanged. Source-only Linux fmt passes and its owned container is removed. Base includes real hearing runtime changes, so no equivalence is asserted. Prior complete Voice 4,007/0/21 remains `65127043e` on e10, proof adee75f65. New official gates/current read requested; no historical waiver. Tests reports qualification complete for its separate helper work and is preparing a PR; the phone HOLD remains until the qualified disposition is recorded.
