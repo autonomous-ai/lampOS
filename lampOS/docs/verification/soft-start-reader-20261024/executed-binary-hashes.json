@@ -1,0 +1,12 @@
+[
+  {
+    "target": "it",
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c75c87452d24a363",
+    "sha256": "2c5bde9c4098e3ca9524ed75dad2b8490d7d8b19fae50ef75b8e216f3f165c64"
+  },
+  {
+    "target": "lamp_voice",
+    "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+    "sha256": "bb27e717948520ea1b52a58f5bf1289170fce1a3640fadaaa19fb509e0889d63"
+  }
+]
