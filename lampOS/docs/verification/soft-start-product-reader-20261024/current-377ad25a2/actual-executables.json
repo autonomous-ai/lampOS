@@ -1,0 +1,29 @@
+{
+  "scope": "Compiler JSON/freshness applies only to captured Clippy and combined no-run stages. Standalone Update and Eval invocations recompile19 and4 crates in plain logs; their actual per-target compiler profile/freshness JSON was not captured. Executable hashes are post-terminal, not per-launch bytes. Voice runner matches captured no-run path.",
+  "bindings": [
+    {
+      "actual_invocation_log": "unit-contracts.txt",
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-2fc2e5180de6bc32",
+      "matches_captured_combined_no_run": false,
+      "plain_compiling_line_count": 19,
+      "post_terminal_sha256": "3b19c6c47ee5c43d29d85161f2a7ff60e8b016eb27f0199d1903b5f6b9f41207",
+      "bytes": 14050576
+    },
+    {
+      "actual_invocation_log": "voice-census.txt",
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+      "matches_captured_combined_no_run": true,
+      "plain_compiling_line_count": 0,
+      "post_terminal_sha256": "894a960bf6df6dd7267b55f0d17303ece30650a8a255956388079225e028acf4",
+      "bytes": 141207496
+    },
+    {
+      "actual_invocation_log": "test.txt",
+      "path": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-08ef6062460c547c",
+      "matches_captured_combined_no_run": false,
+      "plain_compiling_line_count": 4,
+      "post_terminal_sha256": "696a1619a22406e077317cb107a4121d3b91b073b5cadc124114e6cb62c63194",
+      "bytes": 20127792
+    }
+  ]
+}

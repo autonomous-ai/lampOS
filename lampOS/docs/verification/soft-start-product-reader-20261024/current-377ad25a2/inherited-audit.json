@@ -1,0 +1,8 @@
+{
+  "prior_proof": "172b690783ed9172320e0d3cefff741c27521280",
+  "prior_head": "4143055641e45da8a06fe2f2f992945f2739b785",
+  "current_head": "377ad25a20fd153917ff11e9d66c50543944b783",
+  "preserved_owned_inputs": 17,
+  "changed_owned_input": "docs/verification/soft-start-product-20261025/README.md",
+  "scope": "Static unit/numeric calculations reuse byte-identical inputs; current Cargo observations are new and scoped separately."
+}

@@ -1,0 +1,13 @@
+   Compiling lamp-gemini v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/gemini)
+   Compiling lamp-voice v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice)
+   Compiling lamp-voice-eval v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval)
+   Compiling lamp-skills v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/skills)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.48s
+     Running tests/it/main.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-08ef6062460c547c)
+
+running 2 tests
+test switches::every_switch_says_how_it_is_counted ... ok
+test switches::the_counts_by_table_and_in_all ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 236 filtered out; finished in 0.01s
+

@@ -1,0 +1,1516 @@
+{
+  "artifacts": [
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-processes/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_processes",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-processes/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice_processes-1cdefd6834eb873b.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice_processes-1cdefd6834eb873b.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-owner/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_owner",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-owner/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_owner-d05defb6d3783701.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_owner-d05defb6d3783701.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/near-call#lamp-near-call@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/near-call/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_near_call",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/near-call/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_near_call-306a9a5cdcf7cc1b.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_near_call-306a9a5cdcf7cc1b.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/camera#lamp-camera@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/camera/Cargo.toml",
+      "target": {
+        "kind": [
+          "custom-build"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "build-script-build",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/camera/build.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/build/lamp-camera-27471807e4b0dd68/build-script-build"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/local-time/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_local_time",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/local-time/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_local_time-ac6ec29f6adb92c3.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_local_time-ac6ec29f6adb92c3.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/ipc/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ipc",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/ipc/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ipc-f7a4b6ad6b8c38d0.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ipc-f7a4b6ad6b8c38d0.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/ring#lamp-ring@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/ring/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ring",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/ring/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ring-9805915824b14748.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ring-9805915824b14748.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-end-wire/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_end_wire",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-end-wire/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_end_wire-f449146cf7e13668.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_end_wire-f449146cf7e13668.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/third_party/sonora#0.2.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/third_party/sonora/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "sonora",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/third_party/sonora/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libsonora-67bb02897d22e1a1.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libsonora-67bb02897d22e1a1.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/same-voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_same_voice",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/same-voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_same_voice-3433a5c2dce7f0eb.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_same_voice-3433a5c2dce7f0eb.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/bus#lamp-bus@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/bus/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_bus",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/bus/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_bus-3727d683a5678bb5.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_bus-3727d683a5678bb5.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/sound-fixtures#lamp-sound-fixtures@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/sound-fixtures/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_sound_fixtures",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/sound-fixtures/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_sound_fixtures-d9675931c21b7498.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_sound_fixtures-d9675931c21b7498.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/camera#lamp-camera@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/camera/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_camera",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/camera/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_camera-d39a7b0d5a2fa1f5.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_camera-d39a7b0d5a2fa1f5.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-end#lamp-turn-end@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-end/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_end",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-end/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_end-b595e4572a8893bb.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_end-b595e4572a8893bb.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/audio#lamp-audio@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/audio/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_audio",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/audio/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_audio-0f7706b93d870d47.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_audio-0f7706b93d870d47.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/gemini#lamp-gemini@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/gemini/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_gemini",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/gemini/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_gemini-9e122b5e143a369e.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_gemini-9e122b5e143a369e.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/lean#lamp-lean@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/lean/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_lean",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/lean/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_lean-d65694d64fd91eaf.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_lean-d65694d64fd91eaf.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/ears#lamp-ears@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/ears/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ears",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/ears/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ears-28a42c4bef2c1190.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ears-28a42c4bef2c1190.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/keeper/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_keeper",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/keeper/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_keeper-1ed5c5cd42291440.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_keeper-1ed5c5cd42291440.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/msgs/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_msgs",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/msgs/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_msgs-3fd9b9c6b3e8fd33.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_msgs-3fd9b9c6b3e8fd33.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/health#lamp-health@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/health/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_health",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/health/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_health-b09ddca8346a8207.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_health-b09ddca8346a8207.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/observer#lamp-observer@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/observer/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_observer",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/observer/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_observer-bc73389f8fc83d2f.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_observer-bc73389f8fc83d2f.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/actions#lamp-actions@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/actions/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_actions",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/actions/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_actions-6224151521e4c49d.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_actions-6224151521e4c49d.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/schedule#lamp-schedule@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/schedule/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_schedule",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/schedule/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_schedule-0880c046effaa62b.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_schedule-0880c046effaa62b.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/controls#lamp-controls@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/controls/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_controls",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/controls/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_controls-b4080b80d297a206.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_controls-b4080b80d297a206.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/memory#lamp-memory@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/memory/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_memory",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/memory/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_memory-2caed45609455547.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_memory-2caed45609455547.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_body-680795bd2880d9e9.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_body-680795bd2880d9e9.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/tasks/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_tasks",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/tasks/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_tasks-14d4c6f3ed1bbed7.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_tasks-14d4c6f3ed1bbed7.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/policy#lamp-policy@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/policy/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_policy",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/policy/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_policy-6e5defea3d09df04.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_policy-6e5defea3d09df04.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_update-b63def2e2ad893e4.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_update-b63def2e2ad893e4.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/expression/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_expression-0d4f9b5ddaa920b9.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_expression-0d4f9b5ddaa920b9.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-update",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-update"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_skills-755f47061381753d.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_skills-755f47061381753d.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_eval",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice_eval-3e7e152aa827fb57.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice_eval-3e7e152aa827fb57.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": null,
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-c00ddfe05c8f80a2.rlib",
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-c00ddfe05c8f80a2.rmeta"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "self-process-cuts",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/tests/self_process_cuts.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/self_process_cuts-6537b978908bec2a",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/self_process_cuts-6537b978908bec2a"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/render_line_second-64bf83bb8828a9bd",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/render_line_second-64bf83bb8828a9bd"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "head_qualification_operator",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/head_qualification_operator.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/head_qualification_operator",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/head_qualification_operator"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-dfc948d249f13939",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-dfc948d249f13939"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "reference_pace",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/reference_pace.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/reference_pace",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/reference_pace"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "probe_handover",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/probe_handover.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/probe_handover",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/probe_handover"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "self-cli-exec",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/tests/self_cli_exec.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/self_cli_exec-4fdd8bb2d87a43b7",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/self_cli_exec-4fdd8bb2d87a43b7"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "ring_process_probe",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/ring_process_probe.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/ring_process_probe",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/ring_process_probe"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-2ed81a17fa5871f5",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-2ed81a17fa5871f5"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "turn_end_replay",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/examples/turn_end_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/turn_end_replay",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/turn_end_replay"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-92b41c10fde060fb",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/release_pair-92b41c10fde060fb"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "hearing_replay",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/hearing_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/hearing_replay",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/hearing_replay"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-27fc5fa83987591b",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-27fc5fa83987591b"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice-eval",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice_eval-cebcb248ba977514",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice_eval-cebcb248ba977514"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "admission_latency",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/admission_latency.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/admission_latency",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/admission_latency"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "install",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/tests/install.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/install-4d35d294f28e7724",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/install-4d35d294f28e7724"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "duplex_lab",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/duplex_lab.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/duplex_lab",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/duplex_lab"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-3ab8ef644bb4cec9",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-3ab8ef644bb4cec9"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/stop_words_stt_replay-b4b5bc69dcd2f200",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/stop_words_stt_replay-b4b5bc69dcd2f200"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice-eval",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-voice-eval",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-voice-eval"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "functions",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/tests/functions.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/functions-80383dfd29821dc0",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/functions-80383dfd29821dc0"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "same_voice_pairs",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/examples/same_voice_pairs.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/same_voice_pairs",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/same_voice_pairs"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "round",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/tests/round.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/round-f87ef5f27b5a1901",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/round-f87ef5f27b5a1901"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-voice",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-voice"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/update/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-b576ea14987ba2c6",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-b576ea14987ba2c6"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-fb116a30568fcdd0",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-fb116a30568fcdd0"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c75c87452d24a363",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c75c87452d24a363"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_eval",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice-eval/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice_eval-f14403cb192f5166",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice_eval-f14403cb192f5166"
+      ]
+    },
+    {
+      "package_id": "path+file:///private/tmp/second-review-soft-product-20261024/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837",
+      "filenames": [
+        "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837"
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "reason": "build-finished",
+      "success": true
+    }
+  ],
+  "full_private_log_sha256": "5992cf44669c5fbaccf04ec6f765e396aca082303b8b6c98773a9a20d497b099"
+}

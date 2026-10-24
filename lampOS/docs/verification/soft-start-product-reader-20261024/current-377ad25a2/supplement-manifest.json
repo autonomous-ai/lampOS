@@ -1,0 +1,26 @@
+{
+  "head.json": {
+    "original_sha256": "4fa81cdbedc493e082d7d283edefd07501c68e7968ce704dce0c4f79030e049f",
+    "published_sha256": "4fa81cdbedc493e082d7d283edefd07501c68e7968ce704dce0c4f79030e049f"
+  },
+  "unit-contracts.txt": {
+    "original_sha256": "8080fb4b3f7824e4962032dbbb3df73c8ac41682b98ef2d6f05ca7b638668a25",
+    "published_sha256": "6def3edd2e5fa7cc2a3b392dc52741bff758ab084417ae7279524de96d89799d"
+  },
+  "voice-census.txt": {
+    "original_sha256": "cefdd796f275009e28bf27186729e92a9396445997571ba622e499143d1ff7f3",
+    "published_sha256": "b55908331416dc4aaffab79ccac2d1d753dc3e8250fdc0982a428fcecab7f4f9"
+  },
+  "clippy.txt": {
+    "original_sha256": "b1e28fbf084affa724663b26f2581f854e9d6b449e2ff62d4dffa7f2a4497f2b",
+    "published_sha256": "17f957591800b733cc3346ff16da20a4b7925a67c2f05a47fdad44c0a388e355"
+  },
+  "test-compile.txt": {
+    "original_sha256": "5992cf44669c5fbaccf04ec6f765e396aca082303b8b6c98773a9a20d497b099",
+    "published_sha256": "77e92969ec77b01f22a7adc2f3dd647aa8995f817523ecbd0e05222a55809415"
+  },
+  "workspace-metadata.json": {
+    "original_sha256": "7ce191fdd31c716f139bef203f620e4e75b4e47d88dde4aac299901909ce8dae",
+    "published_sha256": "7ce191fdd31c716f139bef203f620e4e75b4e47d88dde4aac299901909ce8dae"
+  }
+}

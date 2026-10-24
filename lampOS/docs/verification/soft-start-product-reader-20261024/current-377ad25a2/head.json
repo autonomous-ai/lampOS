@@ -1,0 +1,10 @@
+{
+  "head": "377ad25a20fd153917ff11e9d66c50543944b783",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "scope": "Independent corrected current unit review; fmt/strict three-crate Clippy/fresh compile and targeted Unit/Voice/Eval census tests. No full workspace/full crate or physical claim.",
+  "unchanged_owned_inputs": 17,
+  "changed_owned_input": [
+    "lampOS/docs/verification/soft-start-product-20261025/README.md"
+  ],
+  "old_static_read_scope": "414 held packet remains immutable; static unit/numeric row inputs unchanged."
+}

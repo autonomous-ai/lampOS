@@ -1,0 +1,35 @@
+   Compiling lamp-bus v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/turn-owner)
+   Compiling lamp-near-call v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/near-call)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/gemini)
+   Compiling lamp-audio v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/audio)
+   Compiling lamp-ring v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/ring)
+   Compiling lamp-camera v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/camera)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/msgs)
+   Compiling lamp-lean v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/lean)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/keeper)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/schedule)
+   Compiling lamp-health v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/health)
+   Compiling lamp-controls v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/controls)
+   Compiling lamp-update v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/update)
+   Compiling lamp-body v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/body)
+   Compiling lamp-actions v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/actions)
+   Compiling lamp-expression v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/expression)
+   Compiling lamp-voice v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/voice)
+   Compiling lamp-skills v0.1.0 (/private/tmp/second-review-soft-product-20261024/lampOS/crates/skills)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 26.40s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_update-2fc2e5180de6bc32)
+
+running 9 tests
+test unit::tests::a_new_build_is_written_everywhere_the_folder_is_named ... ok
+test unit::tests::comments_do_not_make_a_unit_another ... ok
+test unit::tests::lamp_4aces_own_units_are_read ... ok
+test unit::tests::only_a_part_installed_by_build_is_a_program ... ok
+test unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does ... ok
+test unit::tests::the_generic_voice_answers_whom_the_product_does ... ok
+test unit::tests::the_generic_voice_has_the_product_clock_and_session_context ... ok
+test unit::tests::the_generic_voice_runs_the_ring_as_the_product_does ... ok
+test unit::tests::the_generic_voice_says_its_failures_as_the_product_does ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.02s
+

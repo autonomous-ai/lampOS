@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_voice-2fadf74cec888837)
+
+running 7 tests
+test process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types ... ok
+test process::switch_census_tests::a_helper_left_out_loses_its_switches ... ok
+test process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not ... ok
+test process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments ... ok
+test process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker ... ok
+test process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches ... ok
+test process::switch_census_tests::the_coordinators_functions_are_still_in_their_files ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3751 filtered out; finished in 7.82s
+
