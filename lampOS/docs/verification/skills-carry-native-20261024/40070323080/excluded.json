@@ -1,0 +1,90 @@
+[
+  {
+    "path": "kp-EqkkXv/negative/digest.tar",
+    "sha256": "d93728dd32c57f6e7649a0081bc46168160a9ee5ddda7748629d7ff20d70475e"
+  },
+  {
+    "path": "kp-EqkkXv/negative/field.tar",
+    "sha256": "44a4dd4583823023546247e332a48568388b914a8f43e71034779434ab8eb7e8"
+  },
+  {
+    "path": "kp-EqkkXv/negative/format.tar",
+    "sha256": "2551df1f84d91f45622943da32bb1e68305c6d7cada10fae6ac1479d30c36d14"
+  },
+  {
+    "path": "kp-EqkkXv/negative/kind.tar",
+    "sha256": "f2828d86091d7366b94680fffae379bf443d228a51c0a1371e80920c4c0a890c"
+  },
+  {
+    "path": "kp-EqkkXv/negative/permission.tar",
+    "sha256": "1e0d84b4ad977e9114bcc1400a0498e117bbf51cf28c811744d0d73725208db0"
+  },
+  {
+    "path": "kp-EqkkXv/negative/provenance.tar",
+    "sha256": "2023c4a5e37d5f54a61519f63b94dea2fb0c82fa6a7df315dabddef0dd7d7719"
+  },
+  {
+    "path": "kp-EqkkXv/packages/pack-a/pair-kit-1.0.0.tar",
+    "sha256": "e59443cdc4947e9d328d1b80ad127dfa6e014fa4af976d492bf51d3c75382281"
+  },
+  {
+    "path": "kp-EqkkXv/packages/pack-b/pair-kit-1.1.0.tar",
+    "sha256": "12b21b29ead92562605f01403b24b31594915ffc7db40657a196491f3499126b"
+  },
+  {
+    "path": "kp-EqkkXv/packages/pack-duplicate/duplicate-kit-1.0.0.tar",
+    "sha256": "cf1eefc758f9d55aac99d9c3f69a3e4c47fbdc62a048a40ef3f1f2db7bc02ce3"
+  },
+  {
+    "path": "kp-EqkkXv/packages/pack-hidden/sleeping-kit-1.0.0.tar",
+    "sha256": "61c23a05a00d33a11b869bc8b1eb5d5e239ffc85790167788b69a72e9250def2"
+  },
+  {
+    "path": "kp-wiCTpx/negative/digest.tar",
+    "sha256": "d93728dd32c57f6e7649a0081bc46168160a9ee5ddda7748629d7ff20d70475e"
+  },
+  {
+    "path": "kp-wiCTpx/negative/field.tar",
+    "sha256": "44a4dd4583823023546247e332a48568388b914a8f43e71034779434ab8eb7e8"
+  },
+  {
+    "path": "kp-wiCTpx/negative/format.tar",
+    "sha256": "2551df1f84d91f45622943da32bb1e68305c6d7cada10fae6ac1479d30c36d14"
+  },
+  {
+    "path": "kp-wiCTpx/negative/kind.tar",
+    "sha256": "f2828d86091d7366b94680fffae379bf443d228a51c0a1371e80920c4c0a890c"
+  },
+  {
+    "path": "kp-wiCTpx/negative/permission.tar",
+    "sha256": "1e0d84b4ad977e9114bcc1400a0498e117bbf51cf28c811744d0d73725208db0"
+  },
+  {
+    "path": "kp-wiCTpx/negative/provenance.tar",
+    "sha256": "2023c4a5e37d5f54a61519f63b94dea2fb0c82fa6a7df315dabddef0dd7d7719"
+  },
+  {
+    "path": "kp-wiCTpx/packages/pack-a/pair-kit-1.0.0.tar",
+    "sha256": "e59443cdc4947e9d328d1b80ad127dfa6e014fa4af976d492bf51d3c75382281"
+  },
+  {
+    "path": "kp-wiCTpx/packages/pack-b/pair-kit-1.1.0.tar",
+    "sha256": "12b21b29ead92562605f01403b24b31594915ffc7db40657a196491f3499126b"
+  },
+  {
+    "path": "kp-wiCTpx/packages/pack-duplicate/duplicate-kit-1.0.0.tar",
+    "sha256": "cf1eefc758f9d55aac99d9c3f69a3e4c47fbdc62a048a40ef3f1f2db7bc02ce3"
+  },
+  {
+    "path": "kp-wiCTpx/packages/pack-hidden/sleeping-kit-1.0.0.tar",
+    "sha256": "61c23a05a00d33a11b869bc8b1eb5d5e239ffc85790167788b69a72e9250def2"
+  },
+  {
+    "path": "source-after.sha256",
+    "sha256": "6e09c2e4f94653e19a4f9ec13f8669d7b5f12345523242eb3289ff70b8660108"
+  },
+  {
+    "path": "source-before.sha256",
+    "sha256": "6e09c2e4f94653e19a4f9ec13f8669d7b5f12345523242eb3289ff70b8660108"
+  }
+]

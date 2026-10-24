@@ -1,0 +1,1 @@
+Synthetic inert asset for duplicate-kit 1.0.0.

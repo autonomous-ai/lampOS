@@ -1,0 +1,1 @@
+Synthetic inert asset for sleeping-kit 1.0.0.

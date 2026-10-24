@@ -1,0 +1,6 @@
+lamp-skills: not installed: pair-kit does not load: skill.toml: TOML parse error at line 1, column 1
+  |
+1 | future_option = true
+  | ^^^^^^^^^^^^^
+unknown field `future_option`, expected one of `enabled`, `needs`, `kind`, `version`, `permissions`, `trigger`, `while`, `ask`, `tool`, `choice`, `flag`, `again`, `still`, `unplug`, `history`, `news`, `reminder`, `onboarding`, `startle`, `quiet`, `most_a_day`, `active`, `budget`, `rest`, `search`, `stop`, `watch`, `limits`, `do`
+
