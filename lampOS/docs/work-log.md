@@ -1,3 +1,24 @@
+## Current checkpoint: 2026-10-25 03:59 +07, mock Eyes fixture ready
+
+Ready for lamp-voice: yes (#3412 fa82c279e on current bcb540a08).
+Both independent source/local reads are complete; original ARM64 passes
+7,409 PASS plus one passing LEAK / 53 skipped, zero failed/unrun. Actual
+Linux pinned fmt/strict Clippy pass. [Native/source proof](verification/remember-eyes-blocking-20261024/official-ci/README.md)
+binds the full authored/actual-preview tree. Original Mac full library remains
+FAILED 3,742/1/15; distinct-target total 4,031/1/21 stays explicit. Exactly
+three isolated passes have the independent reader's accepted disposition.
+No full-pass or historical cause inference; no further retry requested.
+Executed1f78 is preserved on second/remember-eyes-mac-20261024.
+
+#3382 landed in train102, after #3380, #3389, #3397 and #3406. Independent
+software reads #3411 (94/0) and #3413 (365/0 plus12 boundary assertions)
+are published; physical acceptance, producer failures and activation stay
+separate. Train owns the merges. Next: new findings/current-base carries,
+then eligible Queue/ready reads; #2810/#1812 still need their named operator,
+trusted public key and attended window. No device action by Second.
+
+---
+
 ## Current checkpoint: 2026-10-24 22:11 +07, literal-name repair landed
 
 Ready for lamp-voice: yes (#3380).
