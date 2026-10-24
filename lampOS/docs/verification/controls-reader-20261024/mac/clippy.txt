@@ -1,0 +1,9 @@
+   Compiling serde_json v1.0.151
+   Compiling serde_core v1.0.229
+   Compiling signal-hook v0.4.4
+    Checking serde v1.0.229
+    Checking lamp-ipc v0.1.0 (/private/tmp/second-review-3346-20261024/lampOS/crates/ipc)
+    Checking lamp-bus v0.1.0 (/private/tmp/second-review-3346-20261024/lampOS/crates/bus)
+    Checking lamp-msgs v0.1.0 (/private/tmp/second-review-3346-20261024/lampOS/crates/msgs)
+    Checking lamp-controls v0.1.0 (/private/tmp/second-review-3346-20261024/lampOS/crates/controls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.50s

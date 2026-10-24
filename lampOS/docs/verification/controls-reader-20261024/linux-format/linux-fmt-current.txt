@@ -1,0 +1,7 @@
+files_before=6994
+6a5867a781167e69296fcab9e08a2512117cfef039f5ba5729f85e84cbb63bb9  /tmp/before.sha256
+gate_started=cargo fmt --all --check
+files_after=6994
+6a5867a781167e69296fcab9e08a2512117cfef039f5ba5729f85e84cbb63bb9  /tmp/after.sha256
+fmt_exit=0
+source_comparison_exit=0
