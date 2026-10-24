@@ -5,6 +5,19 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 08:55 — post-merge speaking-outlier finding
+
+- Independent #3313 read reproduced a P2 after it merged: removing one
+  look reconnects a 500 ms gap as one step, promoting subthreshold mesh
+  and corner movement from No to Yes. The six added review controls are
+  **4 passed / 2 failed**; original exact-head Eyes **311/0/5 ignored**,
+  fmt and strict Clippy pass. [Reproduction](verification/speaking-outlier-review-20261024/README.md).
+- Recommend retaining original adjacency or elapsed time and keeping the
+  outlier switch off pending repair/qualification. This is synthetic, not
+  a measured wrong-person event. First/Sixth own disposition and repair.
+- Enrollment's full Voice gate continues; its current-base carry and Eyes
+  gate follow. No production changes or lamp actions in this review.
+
 ## 2026-10-24 08:52 — native Body gate complete; final Voice suite running
 
 - #3308 `a4a4d9e42` ARM64 is green: **7,316 passed (two Voice LEAK),

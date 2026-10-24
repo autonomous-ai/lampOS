@@ -1,0 +1,8 @@
+{
+  "head": "21e03f28e0fc017296186123390025f3336ff808",
+  "original_sha256": "c3984789651380d7b65a39245de425b823507cea1128b5bc2276108105169126",
+  "original_bytes": 34077,
+  "prefix_unchanged": true,
+  "only_appended_test_module": true,
+  "fixture_sha256": "9ba173b31ee29d5ddd40d71a8726f2fbcb44addfd679163bf2cf0f39cc460138"
+}

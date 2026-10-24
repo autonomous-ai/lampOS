@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-q",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-eyes",
+    "--lib",
+    "third_review_outlier",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "exit": 101,
+  "seconds": 12.56
+}
