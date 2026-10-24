@@ -1,0 +1,7 @@
+{
+  "code": 0,
+  "event": "reaped",
+  "pid": 10043,
+  "signal": null,
+  "stage": "pack-duplicate"
+}

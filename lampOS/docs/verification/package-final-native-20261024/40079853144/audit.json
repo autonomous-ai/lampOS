@@ -1,0 +1,133 @@
+{
+  "run": 40079853144,
+  "head": "6cba8153250ad07f71db36ca66f49099a1f4d7e8",
+  "archive_sha256": "ab4bf8edadee05ac0b8072bbb0e648bc241423b42d083216c4a9e03db557130d",
+  "members": 734,
+  "source_files": 7008,
+  "source_matches_git": true,
+  "tested_merge": "35e2834c227ecb0130b0bdc5f6aa8adc150f27e8",
+  "authored_head_parent_verified": true,
+  "case_counts": "8/0/0 ignored",
+  "filtered_ordinary_controls": 2,
+  "cases": [
+    {
+      "folder": "kn-P6eoJ7",
+      "kind": "rested-night",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kn-VTKt5c",
+      "kind": "rested-night",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kp-ghhr6r",
+      "kind": "local-package-loader",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 30,
+      "reaps": 30,
+      "exit_codes": {
+        "0": 16,
+        "1": 14
+      },
+      "signals": {
+        "None": 30
+      }
+    },
+    {
+      "folder": "kp-oNL46j",
+      "kind": "local-package-loader",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 30,
+      "reaps": 30,
+      "exit_codes": {
+        "0": 16,
+        "1": 14
+      },
+      "signals": {
+        "None": 30
+      }
+    },
+    {
+      "folder": "kr-3gXh49",
+      "kind": "on-off",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 8,
+      "reaps": 8,
+      "exit_codes": {
+        "0": 6,
+        "None": 2
+      },
+      "signals": {
+        "None": 6,
+        "9": 2
+      }
+    },
+    {
+      "folder": "kr-PyVrrT",
+      "kind": "daily",
+      "writer": 6408,
+      "reader": 6498,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    },
+    {
+      "folder": "kr-bvHkFT",
+      "kind": "on-off",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 8,
+      "reaps": 8,
+      "exit_codes": {
+        "0": 6,
+        "None": 2
+      },
+      "signals": {
+        "None": 6,
+        "9": 2
+      }
+    },
+    {
+      "folder": "kr-zg1iZW",
+      "kind": "daily",
+      "writer": 6498,
+      "reader": 6408,
+      "spawns": 3,
+      "reaps": 3,
+      "exit_codes": {
+        "None": 3
+      },
+      "signals": {
+        "9": 3
+      }
+    }
+  ],
+  "scope": "raw case inventory, source blob equality and matched direct-child exits; not independent replay of every domain assertion"
+}

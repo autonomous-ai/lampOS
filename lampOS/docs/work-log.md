@@ -1,3 +1,32 @@
+## Current checkpoint: 2026-10-24 16:09 +07, landed parent and final carries
+
+Train 77 landed #3327, #3334 and #3342 on `b2c9eb3dd`. #3347's real
+Markdown conflict is resolved at `0844ce154`: Mac **48/0/3 ignored**,
+Mac/Linux fmt, strict Mac/Linux Clippy, dedicated **2/0/3 filtered**,
+ordinary ARM **11,207 PASS + 1 LEAK**, 100 skipped, no failed/unrun.
+[Current proof](verification/settings-carry-native-20261024/README.md)
+binds all 10,366 native paths, 14 reaps/68 exchanges and API ZIP digest.
+Workflow/Rust bytes match old READ-OK; current reader carry is requested.
+
+#3330 final one-commit continuation `6cba81532` now sits on the landed
+parent. Range-diff **1 = 1**, all eight cases/deadline controls preserved.
+Mac **516/0/9 ignored**, exact Linux fmt and both strict Clippy gates pass;
+dedicated native **8/0/2 filtered**, 88 matched exits and package semantic
+checks pass. [Final native proof](verification/package-final-native-20261024/40079853144/README.md).
+Ordinary ARM64/current reader confirmation remain active before ready/train.
+Original prepared-head failures and retries are retained separately.
+
+#3349's ordered-epoch review now includes original exact-head native
+**11,197 PASS + 1 LEAK**, 90 skipped, both new controls passing and Linux
+Clippy green; focused independent Mac **26/0** and Linux fmt remain bound.
+It is retargeted after parent #3344 landed; train owns newest-base acceptance.
+All current work is tests/docs under the hearing freeze; no new voice behavior.
+#2810 attended window and #1812 trusted public key remain external blocks;
+no lamp/key has been used. Next: finish package ordinary proof and both
+carry-read dispositions, submit cleared heads, then act on incoming findings.
+
+---
+
 ## Current checkpoint: 2026-10-24 15:40 +07, Settings author gates complete
 
 #3347 `8f5c600c1` has all green author gates: Mac **48/0/3 ignored**,

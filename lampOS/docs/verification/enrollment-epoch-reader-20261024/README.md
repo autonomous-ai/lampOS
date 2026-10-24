@@ -20,3 +20,11 @@ It does not execute the asynchronous known-file read, concurrent filesystem
 stall, real camera/slide or physical output, and does not prove activation.
 The branch is stacked on #3344; native result and final base qualification
 remain separate. No new runtime privacy defect is claimed or repaired here.
+
+Original authored-branch dispatch **40077846199** is now independently
+checked terminal green: **11,197 PASS plus one LEAK**, zero failed/unrun,
+90 skipped; both new ordered controls pass. Strict Linux Clippy **40077847930**
+is green. Exact checkout SHA, event, summary and primary log hashes are in
+native-audit.json. These execute authored `6213596a3`; no newest-base/whole-tree
+equivalence is claimed. Parent #3344 has since landed and the PR is retargeted
+to lamp-voice; train integration remains separate.

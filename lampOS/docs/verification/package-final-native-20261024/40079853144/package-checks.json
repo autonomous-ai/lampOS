@@ -1,0 +1,36 @@
+[
+  {
+    "directory": "kp-ghhr6r",
+    "writer": 6408,
+    "reader": 6498,
+    "reaped_commands": 30,
+    "successful_exits": 16,
+    "intentional_refusals": 14,
+    "install_inputs_unchanged": 20,
+    "positive_packages_checked": 4,
+    "installed_snapshots": 5,
+    "snapshot_file_hashes_checked": 40,
+    "exact_inventory_checks": 6,
+    "sources_unchanged": true,
+    "transcript_sha256": "6ac8a285506e2fc45c59a34c70474bf81c5b6305f533714d269753898e213e7a",
+    "identity": "Direct private executable paths and before/after byte hashes; no live /proc claim.",
+    "provenance_limit": "Installer output bytes checked; Cloud provenance reader not executed."
+  },
+  {
+    "directory": "kp-oNL46j",
+    "writer": 6498,
+    "reader": 6408,
+    "reaped_commands": 30,
+    "successful_exits": 16,
+    "intentional_refusals": 14,
+    "install_inputs_unchanged": 20,
+    "positive_packages_checked": 4,
+    "installed_snapshots": 5,
+    "snapshot_file_hashes_checked": 40,
+    "exact_inventory_checks": 6,
+    "sources_unchanged": true,
+    "transcript_sha256": "534095456da9a7e27bdc275dac0154bc75bef89b6428584a89cd44bc710f8734",
+    "identity": "Direct private executable paths and before/after byte hashes; no live /proc claim.",
+    "provenance_limit": "Installer output bytes checked; Cloud provenance reader not executed."
+  }
+]
