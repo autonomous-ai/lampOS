@@ -73,6 +73,7 @@ Environment=LAMP_ROOM_FACTS=on
 # about its own work and its name heard with no face are played: without it a busy room holds every line nobody calls it in, and a held line
 # starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
 Environment=LAMP_SPOKEN_TO=on
+Environment=LAMP_BUSY_ENDS_SOONER=on
 # "The lamp" said about it, not to it, is no call in a busy room (#829, #864).
 Environment=LAMP_NAME_IN_PASSING=ignored
 # The model is told its name was heard as a request began, and in a busy room only with a face
