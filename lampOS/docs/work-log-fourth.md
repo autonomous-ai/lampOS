@@ -8523,3 +8523,7 @@ Claimed the source-local distinct-frame gap on #3064 and Queue before code. [Exa
 ## 2026-10-24 18:20 +07: explicit formatting CI PR pushed
 
 Claimed Queue6383482422 after open/merged ownership searches; pushed #3375 head e36f065eb, four files on base6902cf8e2. Both ordinary jobs now enforce the pinned whole-workspace formatting check, with EN/VI notes. [Local evidence](verification/linux-format-ci-20261024/README.md): YAML2/2, shell4/4, normalized structure exact outside the change, Mac exact pinned fmt0 and Linux verified direct1.96 fmt0; the image's unavailable Rustup-selector failure101 is retained separately. Actual CI remains required, so PR is draft and awaits one reader. Corrected Common665d full Mac/Linux gates continue, with both format/strictClippy stages passed; no activation or voice-freeze waiver.
+
+## 2026-10-24 18:25 +07: duplicate workflow lane yielded
+
+Latest Queue read established Third claimed the formatting workflow first and owns #3373. Closed own duplicate #3375, preserved the branch/evidence, and requested cancellation only for still-running exact-head ARM40089324326; no competing merge. Returning to Common665d qualification: Mac/Linux format, strict workspace Clippy and workspace build pass, compiler fresh:false binding covers46/46 local members on each; Eyes357/0/5 Mac and360/0/5 Linux pass. Both full Voice stages are active with all three new dedup controls required. Privacy/physical and voice-freeze holds remain.

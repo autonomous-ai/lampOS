@@ -1,5 +1,7 @@
 # Explicit Linux formatting CI gate
 
+**Disposition:** duplicate #3375 was closed in favor of Third’s earlier claim and #3373. The own branch and all local evidence remain; no competing merge is requested. Cancellation was requested only for its still-running exact-head ARM job. These receipts retain the validation performed before that ownership correction.
+
 PR #3375, source head `e36f065eb242ad904c21a30243ec3024f16b2fdc`, base `6902cf8e203d165f63e73059d2747a9ec7002642`. Two ordinary workflows now run mandatory `cargo +1.96.0 fmt --all --check` from `lampOS/` after Rust setup. The x86 installer adds rustfmt. English and Vietnamese notes are in the PR.
 
 Local validation: **2 YAML parses**, **4 extracted shell bodies pass bash -n**, both new steps are unconditional without an error override, and removing only those steps plus the x86 rustfmt component restores every base YAML field. `git diff --check` passes. `receipt.json` records the structural checks; its preparation flags describe the time before commit. `final-head.json` separately binds all four validated source-file digests to the pushed commit.
