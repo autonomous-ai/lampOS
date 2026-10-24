@@ -3183,9 +3183,11 @@ after a take-over, but now for every turn:
   `LAMP_NAME_OR_FOLLOW_UP`. The 22 Oct rule that a lone voice with nobody in
   view never makes the room busy stands: here a face is in view and its
   mouth reads still while the voice talks. With no mouths read
-  (`LAMP_EYES_SPEAKING` off, or never read through the line) the face is a
-  sign as before: fail open, so a person alone at a lamp whose eyes can't
-  read mouths is still answered. A line carried by `LAMP_SAME_SPEAKER_CARRIES`
+  (`LAMP_EYES_SPEAKING` off, or any face turned to the lamp never read
+  through the line, judged per face) the face is a sign as before: fail
+  open, so a person alone at a lamp whose eyes can't read mouths is still
+  answered, and a still face beside it does not speak for an unread one.
+  With `LAMP_TURNED_SPEAKING` on too, this rule decides alone. A line carried by `LAMP_SAME_SPEAKER_CARRIES`
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
   still through the whole line, needs its name or a follow-up.
