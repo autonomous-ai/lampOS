@@ -1,7 +1,15 @@
 [
   {
     "file": "README.md",
-    "sha256": "b88c0bd8329f2a706cf0f6c86cde43031323cfcf6bedece39f44e5a3efecb763"
+    "sha256": "591670161f737ecd33cefcebf2d7176f208a7a9f41bafeb0a19e61535b2a2885"
+  },
+  {
+    "file": "compile.stderr.txt",
+    "sha256": "4f92cec2cf49da5660818d829c1a5b36e08e9f64292375e20b664da75995da8a"
+  },
+  {
+    "file": "compile.stdout.txt",
+    "sha256": "322f679ad7c9be8814af46a60e253b541aff091949154808304309c07c6e4636"
   },
   {
     "file": "diagnostic-only.patch",
