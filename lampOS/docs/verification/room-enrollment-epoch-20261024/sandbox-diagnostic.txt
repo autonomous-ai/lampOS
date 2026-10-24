@@ -1,0 +1,111 @@
+
+running 26 tests
+... 3/26
+remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation --- FAILED
+remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire --- FAILED
+remember_speaker::tests::remember_speaker_own_name_accepts_direct_names_and_exact_spelling --- FAILED
+remember_speaker::tests::remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming --- FAILED
+remember_speaker::tests::remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement --- FAILED
+remember_speaker::tests::remember_speaker_own_name_off_keeps_other_names_and_replacement_response --- FAILED
+remember_speaker::tests::remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments --- FAILED
+remember_speaker::tests::remember_speaker_own_name_refuses_other_people_before_connect --- FAILED
+remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines --- FAILED
+remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating --- FAILED
+remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect --- FAILED
+remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence --- FAILED
+remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket --- FAILED
+remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry --- FAILED
+.........
+failures:
+
+---- remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation' (242795721) panicked at crates/voice/src/remember_speaker.rs:618:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire' (242795722) panicked at crates/voice/src/remember_speaker.rs:785:36:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- remember_speaker::tests::remember_speaker_own_name_accepts_direct_names_and_exact_spelling stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_accepts_direct_names_and_exact_spelling' (242795723) panicked at crates/voice/src/remember_speaker.rs:199:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remember_speaker::tests::remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming' (242795724) panicked at crates/voice/src/remember_speaker.rs:199:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remember_speaker::tests::remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement' (242795725) panicked at crates/voice/src/remember_speaker.rs:199:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remember_speaker::tests::remember_speaker_own_name_off_keeps_other_names_and_replacement_response stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_off_keeps_other_names_and_replacement_response' (242795726) panicked at crates/voice/src/remember_speaker.rs:199:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remember_speaker::tests::remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments' (242795727) panicked at crates/voice/src/remember_speaker.rs:199:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remember_speaker::tests::remember_speaker_own_name_refuses_other_people_before_connect stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_refuses_other_people_before_connect' (242795728) panicked at crates/voice/src/remember_speaker.rs:199:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines' (242795729) panicked at crates/voice/src/remember_speaker.rs:199:52:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+
+---- remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating' (242795730) panicked at crates/voice/src/remember_speaker.rs:759:36:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect' (242795731) panicked at crates/voice/src/remember_speaker.rs:553:36:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence' (242795732) panicked at crates/voice/src/remember_speaker.rs:739:36:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket' (242795733) panicked at crates/voice/src/remember_speaker.rs:702:36:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry stdout ----
+
+thread 'remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry' (242795734) panicked at crates/voice/src/remember_speaker.rs:510:36:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+
+failures:
+    remember_speaker::tests::remember_speaker_never_borrows_an_earlier_name_or_replacement_confirmation
+    remember_speaker::tests::remember_speaker_off_keeps_the_legacy_wire
+    remember_speaker::tests::remember_speaker_own_name_accepts_direct_names_and_exact_spelling
+    remember_speaker::tests::remember_speaker_own_name_caps_raw_candidate_bytes_before_trimming
+    remember_speaker::tests::remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement
+    remember_speaker::tests::remember_speaker_own_name_off_keeps_other_names_and_replacement_response
+    remember_speaker::tests::remember_speaker_own_name_refuses_folded_delimiters_and_sentence_arguments
+    remember_speaker::tests::remember_speaker_own_name_refuses_other_people_before_connect
+    remember_speaker::tests::remember_speaker_own_name_refuses_reported_quoted_negated_or_ambiguous_lines
+    remember_speaker::tests::remember_speaker_proof_caps_count_bytes_and_refuse_instead_of_truncating
+    remember_speaker::tests::remember_speaker_requires_its_own_current_proof_names_and_lease_before_connect
+    remember_speaker::tests::remember_speaker_revoked_before_publication_never_inserts_evidence
+    remember_speaker::tests::remember_speaker_stop_and_forget_close_the_live_socket
+    remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry
+
+test result: FAILED. 12 passed; 14 failed; 0 ignored; 0 measured; 3703 filtered out; finished in 0.38s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

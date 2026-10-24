@@ -5,6 +5,18 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 15:24 — epoch follow-up pushed; Memory correction arrived
+
+- #3349 `6213596a3` pushed, stacked on #3344 to keep its cleared head:
+  focused **26/0**, full Voice **3,995/0/21**, fmt/Clippy/workspace pass.
+  [Receipts](verification/room-enrollment-epoch-20261024/README.md).
+- Official ARM64 40077846199 and Linux Clippy 40077847930 dispatched on
+  the branch; one test-only read requested. No runtime/product/lamp action.
+- #3346 gets reviewer-two’s additional current-head READ-OK, all green;
+  its required reader was already satisfied. #3344 remains cleared.
+- Fourth now published #3333 `0882cb904` with fresh 41-RPC raw evidence;
+  taking the full-record P2 disposition next, rather than using lost runs.
+
 ## 2026-10-24 15:10 — Controls current head cleared
 
 - #3346 `d3a291bf8` fresh native pair **2/0**, 36 matched starts/reaps;
