@@ -1,0 +1,127 @@
+name: lampOS published state compatibility
+
+# These opt-in fixtures execute released readers and writers, not newly built
+# substitutes. The ordinary ARM64 and Clippy gates remain separate requirements.
+on:
+  pull_request:
+    branches: ['lamp-voice']
+    paths:
+      - 'lampOS/crates/schedule/tests/release_pair*'
+      - 'lampOS/crates/schedule/tests/release_pair/**'
+      - 'lampOS/crates/tasks/tests/release_pair*'
+      - 'lampOS/crates/tasks/tests/release_pair/**'
+      - 'lampOS/crates/voice/tests/release_pair*'
+      - 'lampOS/crates/voice/tests/release_pair/**'
+      - '.github/workflows/lampos-state-pair.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lampos-state-pair-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  published-pair:
+    name: published 6408 and 6498 state readers on ARM64
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 35
+    # A fresh /run has no host timesync marker. No device, provider, signing key,
+    # systemd service or physical reboot participates in these tests.
+    container: rust:1.96.0-bookworm
+    env:
+      CARGO_HOME: /github/home/.cargo
+      PAIR_PR_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: fixture build dependencies
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl pkg-config clang libclang-dev libasound2-dev
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            /github/home/.cargo/registry
+            /github/home/.cargo/git
+            lampOS/target
+          key: lampos-state-pair-${{ github.sha }}
+          restore-keys: |
+            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+            lampos-arm64-u2204-
+      - name: fetch the exact published artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test ! -e /run/systemd/timesync/synchronized
+          mkdir -p /tmp/pair-output /tmp/pair-artifacts/{6408,6498}
+          git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD 'HEAD^{tree}' > /tmp/pair-output/source-revision
+          printf '%s\n' "run_id=$GITHUB_RUN_ID" "run_attempt=$GITHUB_RUN_ATTEMPT" \
+            "pr_head=$PAIR_PR_HEAD" "event=$GITHUB_EVENT_NAME" \
+            > /tmp/pair-output/run-provenance.txt
+          rustc --version --verbose > /tmp/pair-output/rustc-version
+          uname -sm > /tmp/pair-output/platform
+          for release in 6408 6498; do
+            for part in schedule tasks voice; do
+              curl --fail --location --proto '=https' --proto-redir '=https' \
+                --retry 3 --connect-timeout 20 --max-time 180 \
+                "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-$release/lamp-$part" \
+                --output "/tmp/pair-artifacts/$release/lamp-$part"
+            done
+          done
+          # Each fixture also checks its hardcoded SHA-256/size/ELF before exec.
+          find /tmp/pair-artifacts -type f -print0 | sort -z | xargs -0 sha256sum \
+            > /tmp/pair-output/downloaded.sha256
+      - name: execute the published writers and opposite readers
+        working-directory: lampOS
+        shell: bash
+        env:
+          LAMP_COMPAT_OUTPUT: /tmp/pair-output
+          LAMP_COMPAT_SCHEDULE_6408: /tmp/pair-artifacts/6408/lamp-schedule
+          LAMP_COMPAT_SCHEDULE_6498: /tmp/pair-artifacts/6498/lamp-schedule
+          LAMP_COMPAT_TASKS_6408: /tmp/pair-artifacts/6408/lamp-tasks
+          LAMP_COMPAT_TASKS_6498: /tmp/pair-artifacts/6498/lamp-tasks
+          LAMP_COMPAT_VOICE_6408: /tmp/pair-artifacts/6408/lamp-voice
+          LAMP_COMPAT_VOICE_6498: /tmp/pair-artifacts/6498/lamp-voice
+        run: |
+          set -euo pipefail
+          git -c safe.directory="$GITHUB_WORKSPACE" ls-files -z | sort -z | xargs -0 sha256sum > /tmp/pair-output/source-before.sha256
+          result=0
+          for part in schedule tasks voice; do
+            set +e
+            cargo test --locked --release -p "lamp-$part" --test release_pair \
+              -- --ignored --nocapture --test-threads=1 \
+              2>&1 | tee "/tmp/pair-output/$part-tests.log"
+            part_result=${PIPESTATUS[0]}
+            set -e
+            printf '%s\n' "$part_result" > "/tmp/pair-output/$part-exit"
+            if [ "$part_result" -ne 0 ]; then result=1; fi
+          done
+          printf '%s\n' "$result" > /tmp/pair-output/test-exit
+          git -c safe.directory="$GITHUB_WORKSPACE" ls-files -z | sort -z | xargs -0 sha256sum > /tmp/pair-output/source-after.sha256
+          cmp /tmp/pair-output/source-before.sha256 /tmp/pair-output/source-after.sha256
+          exit "$result"
+      - name: collect regular evidence without sockets or FIFOs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/pair-output
+          # Retain stopped databases and logs, but never open a leftover FIFO
+          # or socket. Public executables are identified by hashes, not uploaded.
+          find . -type f \
+            ! -name lamp-schedule-6408 ! -name lamp-schedule-6498 \
+            ! -name lamp-tasks-6408 ! -name lamp-tasks-6498 \
+            ! -name voice-6408 ! -name voice-6498 -print0 \
+            | sort -z | tar --null -T - -czf /tmp/lampos-state-pair-evidence.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lampos-state-pair-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/lampos-state-pair-evidence.tar.gz
+          if-no-files-found: error
+          retention-days: 7
