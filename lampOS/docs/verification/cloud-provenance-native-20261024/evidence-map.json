@@ -284,14 +284,6 @@
     "sha256": "01aa53b47295ef74ec7ed279d1e3c2551c87d3fd50e9828b02f878e1e03f5684"
   },
   {
-    "path": "runtime/tmp/pair-output/cv-71-0/packages/a/provenance-kit-1.0.0.tar",
-    "sha256": "3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406"
-  },
-  {
-    "path": "runtime/tmp/pair-output/cv-71-0/packages/b/provenance-kit-1.1.0.tar",
-    "sha256": "49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05"
-  },
-  {
     "path": "runtime/tmp/pair-output/cv-71-0/result.json",
     "sha256": "2f73991a490fb7249b782559c4cac0e32f1c89dc24984431d2c43edf8b840a5d"
   },
@@ -822,14 +814,6 @@
   {
     "path": "runtime/tmp/pair-output/cv-71-1/pack-b.stdout",
     "sha256": "01aa53b47295ef74ec7ed279d1e3c2551c87d3fd50e9828b02f878e1e03f5684"
-  },
-  {
-    "path": "runtime/tmp/pair-output/cv-71-1/packages/a/provenance-kit-1.0.0.tar",
-    "sha256": "3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406"
-  },
-  {
-    "path": "runtime/tmp/pair-output/cv-71-1/packages/b/provenance-kit-1.1.0.tar",
-    "sha256": "49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05"
   },
   {
     "path": "runtime/tmp/pair-output/cv-71-1/result.json",

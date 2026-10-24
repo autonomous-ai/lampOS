@@ -18,5 +18,29 @@
     "namespace": "host",
     "path": "lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/source-before.sha256",
     "sha256": "ed1d26facd730ffab6af25a5b62bf7ee44f6e9b1b4d2f9fe02e59d6e8b0360ea"
+  },
+  {
+    "published_path_removed": "runtime/tmp/pair-output/cv-71-1/packages/a/provenance-kit-1.0.0.tar",
+    "sha256": "3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406",
+    "bytes": 5120,
+    "reason": "binary archive mistakenly classified as UTF-8 text; private original retained"
+  },
+  {
+    "published_path_removed": "runtime/tmp/pair-output/cv-71-1/packages/b/provenance-kit-1.1.0.tar",
+    "sha256": "49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05",
+    "bytes": 5120,
+    "reason": "binary archive mistakenly classified as UTF-8 text; private original retained"
+  },
+  {
+    "published_path_removed": "runtime/tmp/pair-output/cv-71-0/packages/a/provenance-kit-1.0.0.tar",
+    "sha256": "3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406",
+    "bytes": 5120,
+    "reason": "binary archive mistakenly classified as UTF-8 text; private original retained"
+  },
+  {
+    "published_path_removed": "runtime/tmp/pair-output/cv-71-0/packages/b/provenance-kit-1.1.0.tar",
+    "sha256": "49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05",
+    "bytes": 5120,
+    "reason": "binary archive mistakenly classified as UTF-8 text; private original retained"
   }
 ]

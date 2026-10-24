@@ -1,7 +1,7 @@
-85cfe9da45859b926e2f783a60458326edb1599c5d17180be018acdc1ed90a78  README.md
+753b6aa1759b739275cb825dd0104fb97a04ff2d05503fc881a05bafcfda4088  README.md
 389f465707810b2e652a9007f2141653f2bf0eede52b918ad46c98e9e205e24f  audit.json
-af33c638493297e9a3f155d9030f9b3f9b6fff9f6a390bb0c0e218ff22812c9e  evidence-map.json
-271ed78bd7439821a2c471fe7a87cf217b3c6a9acd8659ea4bbc42d72d79a0dc  excluded.json
+0f900fa8d456391c85946cf9c6e5d24a16dc2fe99d5d71138f037d05af74ffbe  evidence-map.json
+4d3e860a28a5863f171c173ca316c089dbbe46ad7b9ec39f857d1fe7958a551c  excluded.json
 598c9b6ca855edaec8acd827f09012893d6a096e6cf32a517b34a8a4df581583  host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/base-image.json
 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/build-exit.txt
 b4ca1057827b8c221a83b84c66e2ff0b44e004bb4b27a08ae7ef2f2275a86517  host/lampos-cloud-provenance-pair-2ad786f91e43bbefbb6d7edab3176a4b3510f040/build.stderr
@@ -73,8 +73,6 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  runtime/tmp/pa
 1673680609fa567d075d07ef6b209a099778210a78ad152b8fd1fab061c5535f  runtime/tmp/pair-output/cv-71-0/pack-a.stdout
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  runtime/tmp/pair-output/cv-71-0/pack-b.stderr
 01aa53b47295ef74ec7ed279d1e3c2551c87d3fd50e9828b02f878e1e03f5684  runtime/tmp/pair-output/cv-71-0/pack-b.stdout
-3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406  runtime/tmp/pair-output/cv-71-0/packages/a/provenance-kit-1.0.0.tar
-49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05  runtime/tmp/pair-output/cv-71-0/packages/b/provenance-kit-1.1.0.tar
 2f73991a490fb7249b782559c4cac0e32f1c89dc24984431d2c43edf8b840a5d  runtime/tmp/pair-output/cv-71-0/result.json
 ad133ab676355acae84f063e4df40f6de991fa4b7bfaf6376d9ecfbab7488d48  runtime/tmp/pair-output/cv-71-0/return-cloud-positive-reply.json
 6d7ee7a120785e9b022f63ab5021a23be88dc730bdba58a6bce970076cb623f3  runtime/tmp/pair-output/cv-71-0/return-cloud.stderr
@@ -208,8 +206,6 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  runtime/tmp/pa
 1673680609fa567d075d07ef6b209a099778210a78ad152b8fd1fab061c5535f  runtime/tmp/pair-output/cv-71-1/pack-a.stdout
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  runtime/tmp/pair-output/cv-71-1/pack-b.stderr
 01aa53b47295ef74ec7ed279d1e3c2551c87d3fd50e9828b02f878e1e03f5684  runtime/tmp/pair-output/cv-71-1/pack-b.stdout
-3c2799a1113f51aa554b6f88498c94adbbd995c0929f316e82aa879817948406  runtime/tmp/pair-output/cv-71-1/packages/a/provenance-kit-1.0.0.tar
-49d9285f2f7aa3631acf5cb20f94878a27ba70a121cb9bef86daabb3447a4f05  runtime/tmp/pair-output/cv-71-1/packages/b/provenance-kit-1.1.0.tar
 46276d77d99c79d15c45f5331a3544bd2c3b78cb6104fd38ba7e5727f9fd3b9f  runtime/tmp/pair-output/cv-71-1/result.json
 3ab9b051ca771f909de147101f6786105994bf5949b3886ca169b2538ce53666  runtime/tmp/pair-output/cv-71-1/return-cloud-positive-reply.json
 97daf5396cb553e6b2a177b33677fa594667431371afac548045755e637d75f4  runtime/tmp/pair-output/cv-71-1/return-cloud.stderr
