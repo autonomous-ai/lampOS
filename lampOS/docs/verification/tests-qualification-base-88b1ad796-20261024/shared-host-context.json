@@ -1,0 +1,8 @@
+{
+  "source": "Parent builder report during execution",
+  "base_reader_interval_utc": "2026-10-24 approximately 01:32–01:35",
+  "event": "An isolated source-only worktree checkout on the shared host became unexpectedly slow. Its exact process was stopped with TERM, terminal exit 143; parent verified no group descendants or worktree registration remained.",
+  "parallel_build_or_test": false,
+  "disk_free_reported_gib": 12,
+  "interpretation": "Recorded shared-host preparation I/O. Full-run commands, environment and package scope remain matched. Neither idle-machine conditions nor equal instantaneous host load is claimed. No failure cause is inferred."
+}

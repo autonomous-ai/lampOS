@@ -1,0 +1,55 @@
+{
+  "status": "passed",
+  "checks": {
+    "json": [
+      "affected-cases.json",
+      "artifact-bindings.json",
+      "authored.patch.json",
+      "census-and-outcomes.json",
+      "command-results.json",
+      "dependency-closure.json",
+      "external-raw-index.json",
+      "failures.json",
+      "gate-plan.json",
+      "light-call-boundary.json",
+      "native-streams.json",
+      "range-diff.json",
+      "source-and-environment.json",
+      "source-self-review.json",
+      "superseded-unexecuted-candidate.json",
+      "shared-host-context.json",
+      "source-delta-readers.json"
+    ],
+    "links": [
+      "census-and-outcomes.json",
+      "affected-cases.json",
+      "failures.json",
+      "light-call-boundary.json",
+      "command-results.json",
+      "gate-plan.json",
+      "source-and-environment.json",
+      "source-self-review.json",
+      "range-diff.json",
+      "authored.patch.json",
+      "native-streams.json",
+      "artifact-bindings.json",
+      "external-raw-index.json",
+      "source-delta-readers.json",
+      "superseded-unexecuted-candidate.json",
+      "shared-host-context.json"
+    ],
+    "exact_wrappers": 85,
+    "projections": 6
+  },
+  "combined_actual_counts": {
+    "passed": 7227,
+    "failed": 9,
+    "ignored": 34,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_binding": true,
+  "new_test_execution_during_sealing": false,
+  "source_or_target_reads_during_sealing": "None; captured immutable external evidence only.",
+  "superseded_source_status": "Old base retained; old candidate never executed; new full pair required"
+}

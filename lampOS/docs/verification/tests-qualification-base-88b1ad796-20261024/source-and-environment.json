@@ -1,0 +1,93 @@
+{
+  "identity": {
+    "worktree": "/private/tmp/tests-3190-qualification-base-20261024",
+    "head": "88b1ad796e5045490ad678eb240eea2dab010c81",
+    "base_tree": "f61333ce1bdcc1e2577f39bb5d78a3918105c010",
+    "qualification_base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+    "branch": "",
+    "tracked_paths": 10309,
+    "lampos_paths": 6963,
+    "source_aggregate_sha256": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+    "owned_paths": [],
+    "combined_authored_paths": [],
+    "source_map_sha256": "6b590907280df428c93bbf8ab8bb19672818a3479b2e070644c04ddbfe3e3431",
+    "clean_committed_source": true
+  },
+  "candidate_commit_at_execution": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "source_unchanged": true,
+  "source_before_sha256": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+  "source_after_sha256": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+  "freshness": {
+    "mtime_ns": 1792804414647082000,
+    "paths": 10309,
+    "before_sha256": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+    "after_sha256": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+    "bytes_modes_symlinks_identical": true
+  },
+  "per_step_source_aggregates": [
+    {
+      "step": "fmt",
+      "before": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+      "after": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56"
+    },
+    {
+      "step": "clippy",
+      "before": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+      "after": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56"
+    },
+    {
+      "step": "voice-default-parallel",
+      "before": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+      "after": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56"
+    },
+    {
+      "step": "readers-default-parallel",
+      "before": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+      "after": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56"
+    },
+    {
+      "step": "workspace-build",
+      "before": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+      "after": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56"
+    },
+    {
+      "step": "diff-check",
+      "before": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56",
+      "after": "f0f95c6d317432597653b6f3ac086f3be4a769a0c16a0170634eece8f4b27a56"
+    }
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/tests-codex-1569-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TERM_COLOR": "never",
+    "RUSTUP_TOOLCHAIN": "1.96.0-x86_64-apple-darwin",
+    "RUST_BACKTRACE": "1",
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "socket_preflight": "AF_UNIX datagram and IPv4 loopback succeeded before Cargo",
+  "launch_permissions": "Explicitly authorized require_escalated for local fixture sockets.",
+  "architecture": "Rust host x86_64-apple-darwin and captured Mach-O x86_64 artifacts; physical hardware ISA not independently measured.",
+  "source_map": {
+    "external_file": "/private/tmp/tests-3190-qualification-20261024/base/source-map.json",
+    "bytes": 2837141,
+    "sha256": "6b590907280df428c93bbf8ab8bb19672818a3479b2e070644c04ddbfe3e3431"
+  },
+  "original_results_json": {
+    "external_file": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/results.json",
+    "bytes": 44455,
+    "sha256": "f0dc787598807215888c761a6a23e2e7d5d169b49ef400fde8e985e7c992be23"
+  },
+  "limit": "All tracked repository inputs/modes/symlink values were guarded on a clean committed source. Bulk source map remains external."
+}

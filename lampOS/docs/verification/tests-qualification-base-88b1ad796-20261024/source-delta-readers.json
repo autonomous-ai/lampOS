@@ -1,0 +1,14 @@
+{
+  "old_base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "new_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "changed_paths": [
+    "lampOS/crates/eyes/src/main.rs",
+    "lampOS/crates/eyes/src/speaking.rs",
+    "lampOS/docs/eyes.md",
+    "lampOS/docs/switches.md"
+  ],
+  "compiled_selected_reader": "lampOS/crates/voice-eval/tests/it/switches.rs:8 uses include_str!(\"../../../../docs/switches.md\")",
+  "decision": "Preserve this completed old-base observation; do not treat it as a full current-base gate. Old candidate5f87 was never executed. Fresh matched full base/candidate pair is required on the confirmed new base.",
+  "latest_base_rule": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6378427230",
+  "runtime_cause_claim": false
+}

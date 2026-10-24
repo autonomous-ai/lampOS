@@ -1,0 +1,12 @@
+{
+  "recorded_at": "2026-10-24T02:03:40.510180+00:00",
+  "candidate_executed": false,
+  "prepared_head": "5f87be93cb1150486edffd1d3e58f7f8422e99e0",
+  "prepared_base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "prepared_plan_sha256": "b3cce5169b70b84ee1347cbaab8f8c24f054c7b1d9c0781dfbb8a598b2414dc2",
+  "preserved_local_ref": "tests/archive-3190-prepared-5f87be93c-20261024",
+  "new_base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "new_candidate": "93c995a6b1757af77d5d2a25f1567f314ad5f72d",
+  "reason": "Integration advanced while base full run executed. docs/switches.md is a compiled Voice-eval test input. Old candidate plan is superseded before any execution; old base result stays bound to88.",
+  "current_base_run": "Unchanged; do not relabel as current4a84 source."
+}

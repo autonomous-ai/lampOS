@@ -1,5 +1,17 @@
 # Tests work log
 
+## 2026-10-24 09:12 +0700 — current carries and retained older-base failures
+
+Ready for lamp-voice: no; fresh matched qualification is active.
+
+The [completed 88b1ad796 base run](verification/tests-qualification-base-88b1ad796-20261024/) reports 7,227 passed, 9 failed and 34 ignored. Voice contributed 3,958/3/15 and eleven dependent packages 3,269/6/19; all actual targets completed. Formatting, strict twelve-package Clippy and workspace build passed. Every failure and native stream is retained. No paired candidate ran on that superseded base, and this is not current-base qualification.
+
+Integration changed a document compiled by Voice-eval. [The three clean carries and Linux formatting](verification/tests-current-carries-4a84-20261024/) now bind #3190 at 93c995a6b, #3218 at a33454886 and #3273 at 64065a88e to 4a84fa5ab, with equal range-diffs. Source-only Linux x86 formatting passed all three before fresh-base test execution. The new matched full comparison is running; no ARM build ran locally.
+
+#3315 is taken as the dedicated owner reference for seven retained fixture failures. The inactive #1339 claim was released without closing its follow-up. #3190 continues to own the held-lines boot-age correction seen independently in #3312; the failed runner's uptime remains unknown. Second owns the two release-pair fixture corrections and their fresh native execution.
+
+The #2839 source review found missing opposite-order and lost-reply/restart coverage, which is being added before its first compilation. Its product review found no new in-scope blocker. The same-voice cleanup draft and its separate event-held control remain unexecuted. Current qualification retains priority on the shared test target.
+
 ## 2026-10-24 08:56 +0700 — native release-pair read and prepared follow-ups
 
 Ready for lamp-voice: no; owned PR qualification remains active.

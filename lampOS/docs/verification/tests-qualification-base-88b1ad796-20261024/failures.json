@@ -1,0 +1,162 @@
+{
+  "head": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "comparison_base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "count": 9,
+  "failures": [
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 657170,
+        "original_stream_sha256": "a6b1add9d1622c0033828b315a4ab8ba16a6e34841cedf97ae758af60f208390",
+        "byte_offset": 626022,
+        "bytes": 908,
+        "sha256": "b07e58f475c82cc44eb38eb4551358de0a0b0acde759037ed2ec85b0b8b3d57a",
+        "utf8": "---- coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said stdout ----\nlamp-voice schedule-consumer: reminder id 1 delivery 1: withdrawn: its due notice aged while the ledger was written\n\nthread 'coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said' (717112655) panicked at crates/voice/src/reminders/consumer/roundtrip_tests.rs:371:13:\nfresh durable offer\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: lamp_voice::reminders::consumer::roundtrip_tests::RoundtripFixture::offer\n   3: lamp_voice::coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said\n   4: lamp_voice::coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:lib:lamp_voice",
+      "name": "provider_worker::tests::held_consent::an_unheld_reports_stop_is_done_and_answered_as_before",
+      "actual_status": "FAILED",
+      "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 657170,
+        "original_stream_sha256": "a6b1add9d1622c0033828b315a4ab8ba16a6e34841cedf97ae758af60f208390",
+        "byte_offset": 626930,
+        "bytes": 2879,
+        "sha256": "75b1dc0bcac7d243311af1b0a692a3674eb02743220f013f426f9425ac0fa0a0",
+        "utf8": "---- provider_worker::tests::held_consent::an_unheld_reports_stop_is_done_and_answered_as_before stdout ----\nlamp-voice provider: request 1: its answer is played: the room is not known to be busy\nlamp-voice provider: request 1 asked for reports_stop; the reports answered in 29 ms; the answer was sent\n\nthread 'provider_worker::tests::held_consent::an_unheld_reports_stop_is_done_and_answered_as_before' (717143424) panicked at crates/voice/src/provider_worker/tests/held_consent.rs:285:5:\nassertion `left == right` failed\n  left: Object {\"toolResponse\": Object {\"functionResponses\": Array [Object {\"id\": String(\"hcs4-c9\"), \"name\": String(\"reports_stop\"), \"response\": Object {\"ok\": Bool(true), \"say\": String(\"I'm not sending any reports.\")}}]}}\n right: Object {\"toolResponse\": Object {\"functionResponses\": Array [Object {\"id\": String(\"hcs4-c9\"), \"name\": String(\"reports_stop\"), \"response\": Object {\"ok\": Bool(true), \"say\": String(\"I've stopped sending reports.\")}}]}}\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: lamp_voice::provider_worker::tests::held_consent::an_unheld_reports_stop_is_done_and_answered_as_before::{{closure}}\n   5: <core::pin::Pin<P> as core::future::future::Future>::poll\n   6: <core::pin::Pin<P> as core::future::future::Future>::poll\n   7: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}::{{closure}}\n   8: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}::{{closure}}\n   9: tokio::runtime::scheduler::current_thread::Context::enter\n  10: tokio::runtime::scheduler::current_thread::CoreGuard::block_on::{{closure}}\n  11: tokio::runtime::scheduler::current_thread::CoreGuard::enter::{{closure}}\n  12: tokio::runtime::context::scoped::Scoped<T>::set\n  13: tokio::runtime::context::set_scheduler::{{closure}}\n  14: std::thread::local::LocalKey<T>::try_with\n  15: std::thread::local::LocalKey<T>::with\n  16: tokio::runtime::context::set_scheduler\n  17: tokio::runtime::scheduler::current_thread::CoreGuard::enter\n  18: tokio::runtime::scheduler::current_thread::CoreGuard::block_on\n  19: tokio::runtime::scheduler::current_thread::CurrentThread::block_on::{{closure}}\n  20: tokio::runtime::context::runtime::enter_runtime\n  21: tokio::runtime::scheduler::current_thread::CurrentThread::block_on\n  22: tokio::runtime::runtime::Runtime::block_on_inner\n  23: tokio::runtime::runtime::Runtime::block_on\n  24: lamp_voice::provider_worker::tests::held_consent::an_unheld_reports_stop_is_done_and_answered_as_before\n  25: lamp_voice::provider_worker::tests::held_consent::an_unheld_reports_stop_is_done_and_answered_as_before::{{closure}}\n  26: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "voice-default-parallel",
+      "target": "lamp-voice:test:it",
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "actual_status": "FAILED",
+      "binary_sha256": "366ac00c3d3546f83f5c713ba31f5934b606456791209f7780ebd65b4f3ed470",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+        "original_stream_bytes": 657170,
+        "original_stream_sha256": "a6b1add9d1622c0033828b315a4ab8ba16a6e34841cedf97ae758af60f208390",
+        "byte_offset": 654773,
+        "bytes": 1211,
+        "sha256": "b2ea57296407a2f7cf94e4c53d92a0a842e4e1387554519ae2253c9c8bf7b99b",
+        "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [837.889µs, 2.728302ms, 3.234334ms, 3.355915ms, 4.323911ms, 5.31815ms, 36.076689ms, 38.169909ms, 39.163242ms, 40.055586ms, 58.425955ms, 58.886288ms, 71.885436ms, 74.986092ms, 77.71869ms, 81.807068ms, 91.942598ms, 95.505645ms, 97.455916ms, 136.64801ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (717167793) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[837.889µs, 2.728302ms, 3.234334ms, 3.355915ms, 4.323911ms, 5.31815ms, 36.076689ms, 38.169909ms, 39.163242ms, 40.055586ms, 58.425955ms, 58.886288ms, 71.885436ms, 74.986092ms, 77.71869ms, 81.807068ms, 91.942598ms, 95.505645ms, 97.455916ms, 136.64801ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-memory:test:it",
+      "name": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+      "actual_status": "FAILED",
+      "binary_sha256": "cf8a340bc7882113f364b3dff5e6f75a6ee4ed8dec604e4c2d7cae029d84a3cc",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 671460,
+        "original_stream_sha256": "fc3b31817b9250e08241fa05543b65aa80ec95fa88959cfe3ab6202c106a75b8",
+        "byte_offset": 492230,
+        "bytes": 1628,
+        "sha256": "5985ae4863603d47c34878fe5bb9584129ab806713084a2d1e23bf94c2e39c5e",
+        "utf8": "---- voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation stdout ----\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: Days memory is answering\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: memory journal stopped until a fresh worker: why=forgotten\nlamp-memory: conversation_end named 2 source(s) it no longer has; ended with the rest\nlamp-voice provider: memory conversation end was not acknowledged; no retry\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: Days memory is answering\nlamp-voice provider: a bare forget after a follow-up forgets entry 2\n\nthread 'voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation' (717234509) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::voice::forget_that_after\n   3: it::voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation\n   4: it::voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation::{{closure}}\n   5: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\nlamp-voice provider: memory conversation end was not acknowledged; no retry\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-skills:test:it",
+      "name": "skills::the_asking_lines_late_words_do_not_end_its_search",
+      "actual_status": "FAILED",
+      "binary_sha256": "1995e0e22cc19bf80891587f6963368e9b5a15f6149ab565850f1b5a0e9cbfdf",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 671460,
+        "original_stream_sha256": "fc3b31817b9250e08241fa05543b65aa80ec95fa88959cfe3ab6202c106a75b8",
+        "byte_offset": 553140,
+        "bytes": 716,
+        "sha256": "747824f9e7bb69da9c3e3f0441730f868c000cc8c71ae8e7d4f1b9b3459fd8e7",
+        "utf8": "---- skills::the_asking_lines_late_words_do_not_end_its_search stdout ----\n\nthread 'skills::the_asking_lines_late_words_do_not_end_its_search' (717285636) panicked at crates/skills/tests/it/skills.rs:7340:5:\nassertion `left == right` failed\n  left: []\n right: [\"blue\"]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::assert_failed_inner\n   3: core::panicking::assert_failed\n   4: it::skills::the_asking_lines_late_words_do_not_end_its_search\n   5: it::skills::the_asking_lines_late_words_do_not_end_its_search::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-update:test:round",
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "actual_status": "FAILED",
+      "binary_sha256": "ca133b37ed087a8a91fe5d8c5a934c4874ed2f06d7374f158811568159010b3a",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 671460,
+        "original_stream_sha256": "fc3b31817b9250e08241fa05543b65aa80ec95fa88959cfe3ab6202c106a75b8",
+        "byte_offset": 600850,
+        "bytes": 1190,
+        "sha256": "dbd3078a31eed192bea0835489879fdaa4273763e0ad0bbb6061cbd2b842b3b6",
+        "utf8": "---- self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart stdout ----\n\nthread 'self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart' (717512437) panicked at crates/update/tests/round/self_cuts.rs:336:20:\nupdater fixture did not exit: check=1 caller=crates/update/tests/round/self_cuts.rs:336:20 path=/var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmpWXA5oE/opt/lampOS/update/current/lamp-update expected=old sha256=464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7; pid=87678 elapsed=2.004242158s polls=341 last_poll=2.004238809s..2.004241037s final_status=Ok(None) (diagnostic only; timeout still fails)\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::executable\n   3: round::self_cuts::boundary\n   4: round::self_cuts::prepared\n   5: round::self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart\n   6: round::self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-update:test:round",
+      "name": "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+      "actual_status": "FAILED",
+      "binary_sha256": "ca133b37ed087a8a91fe5d8c5a934c4874ed2f06d7374f158811568159010b3a",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 671460,
+        "original_stream_sha256": "fc3b31817b9250e08241fa05543b65aa80ec95fa88959cfe3ab6202c106a75b8",
+        "byte_offset": 602040,
+        "bytes": 1226,
+        "sha256": "840b869eaaa8e6ed3dfdb5524783a48b1cc134c14e2ae9ab3c981aa7ddd202b1",
+        "utf8": "---- self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round stdout ----\n\nthread 'self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round' (717512794) panicked at crates/update/tests/round/self_cuts.rs:278:20:\nupdater fixture did not exit: check=3 caller=crates/update/tests/round/self_cuts.rs:278:20 path=/var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmpUXlhQk/usr/local/lib/lampos/lamp-update-back expected=old sha256=464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7; pid=92235 elapsed=2.001571143s polls=351 last_poll=2.001567042s..2.001570072s final_status=Ok(None) (diagnostic only; timeout still fails)\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::executable\n   3: round::self_cuts::boundary\n   4: round::self_cuts::prepared\n   5: round::self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round\n   6: round::self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-update:test:round",
+      "name": "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+      "actual_status": "FAILED",
+      "binary_sha256": "ca133b37ed087a8a91fe5d8c5a934c4874ed2f06d7374f158811568159010b3a",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 671460,
+        "original_stream_sha256": "fc3b31817b9250e08241fa05543b65aa80ec95fa88959cfe3ab6202c106a75b8",
+        "byte_offset": 603266,
+        "bytes": 1199,
+        "sha256": "03b27d77f52a3ddca9b0cda880224a4f3d757b406cce8219e4d6de71a4b913fb",
+        "utf8": "---- self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate stdout ----\n\nthread 'self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate' (717512308) panicked at crates/update/tests/round/self_cuts.rs:247:20:\nupdater fixture did not exit: check=3 caller=crates/update/tests/round/self_cuts.rs:247:20 path=/var/folders/qg/lhfdx6q166z5cj705q22mh480000gn/T/.tmpsE7IDx/usr/local/lib/lampos/lamp-update-back expected=old sha256=464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7; pid=92379 elapsed=2.004234376s polls=345 last_poll=2.004229981s..2.004233137s final_status=Ok(None) (diagnostic only; timeout still fails)\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: round::self_cuts::executable\n   3: round::self_cuts::boundary\n   4: round::self_cuts::prepared\n   5: round::self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate\n   6: round::self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate::{{closure}}\n   7: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    },
+    {
+      "phase": "readers-default-parallel",
+      "target": "lamp-voice-eval:test:it",
+      "name": "serve_session::serve_readiness_comes_only_from_the_fresh_cue_never_from_stdout",
+      "actual_status": "FAILED",
+      "binary_sha256": "0300a57b871aee8d6500b64a119a76a6fee6ee88e4b690081c9260c08ffdffd9",
+      "diagnostic": {
+        "external_source": "/private/tmp/tests-3190-qualification-20261024/base/run-2026-10-24T011334.500869Z/readers-default-parallel/readers-default-parallel.stdout.txt",
+        "original_stream_bytes": 671460,
+        "original_stream_sha256": "fc3b31817b9250e08241fa05543b65aa80ec95fa88959cfe3ab6202c106a75b8",
+        "byte_offset": 669243,
+        "bytes": 777,
+        "sha256": "49d4f4e8273f75f718752c2c02ad90f4b60a5dc9431a4ec213ae545643a60a4f",
+        "utf8": "---- serve_session::serve_readiness_comes_only_from_the_fresh_cue_never_from_stdout stdout ----\n\nthread 'serve_session::serve_readiness_comes_only_from_the_fresh_cue_never_from_stdout' (717639597) panicked at crates/voice-eval/tests/it/serve_session.rs:850:10:\ncalled `Option::unwrap()` on a `None` value\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic\n   3: core::option::unwrap_failed\n   4: it::serve_session::serve_readiness_comes_only_from_the_fresh_cue_never_from_stdout\n   5: it::serve_session::serve_readiness_comes_only_from_the_fresh_cue_never_from_stdout::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+      },
+      "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+    }
+  ],
+  "paired_baseline_run_in_this_plan": true,
+  "failed_candidate_runs_repeated": false
+}

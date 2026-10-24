@@ -1,0 +1,56 @@
+{
+  "actual_failures": [
+    {
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "samples_raw": "837.889µs, 2.728302ms, 3.234334ms, 3.355915ms, 4.323911ms, 5.31815ms, 36.076689ms, 38.169909ms, 39.163242ms, 40.055586ms, 58.425955ms, 58.886288ms, 71.885436ms, 74.986092ms, 77.71869ms, 81.807068ms, 91.942598ms, 95.505645ms, 97.455916ms, 136.64801ms",
+      "milliseconds": [
+        0.837889,
+        2.728302,
+        3.234334,
+        3.355915,
+        4.323911,
+        5.31815,
+        36.076689,
+        38.169909,
+        39.163242,
+        40.055586,
+        58.425955,
+        58.886288,
+        71.885436,
+        74.986092,
+        77.71869,
+        81.807068,
+        91.942598,
+        95.505645,
+        97.455916,
+        136.64801
+      ],
+      "checked_index": 10,
+      "checked_upper_median_ms": 58.425955,
+      "strict_bound_ms": 25,
+      "maximum_ms_descriptive_only": 136.64801,
+      "all_20_Outcome_Done_assertions_preceded_this_assertion": true,
+      "source_predicate": "middle < Duration::from_millis(25); middle = took[took.len() / 2]",
+      "limit": "This is a retained timing failure on the named source, not an inherited-cause classification or waiver."
+    }
+  ],
+  "source": {
+    "base": "810e05109bced3beca88a5b602930cfed5fba4e5",
+    "path": "lampOS/crates/voice/tests/it/light_call.rs",
+    "full_source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+    "same_as_tested_source_map": true,
+    "line_81_through_91": "    stop.store(true, Ordering::Release);\n    ring.join().unwrap();\n    std::fs::remove_dir_all(&root).unwrap();\n    took.sort();\n    eprintln!(\"light calls, fastest to slowest: {took:?}\");\n    // A few of the ring's passes, not a 50 ms look and a 15 ms read: the\n    // middle call took about 55 ms before #1806 on the Intel Mac, and 3 ms\n    // after.\n    let middle = took[took.len() / 2];\n    assert!(middle < Duration::from_millis(25), \"{took:?}\");\n}\n",
+    "predicate": "middle < Duration::from_millis(25)",
+    "definition": "let middle = took[took.len() / 2];",
+    "all_20_done_assertions_and_cleanup_precede_this_assertion": true,
+    "causality_limit": "Source and assertion boundary only; no historical-cause classification."
+  },
+  "current_tested_source_binding": {
+    "path": "lampOS/crates/voice/tests/it/light_call.rs",
+    "git_mode": "100644",
+    "base_blob": "2827452b9b6336d505c82219f036424858626ee5",
+    "bytes": 3214,
+    "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8"
+  },
+  "historical_source_record_byte_equal_to_current": true
+}
