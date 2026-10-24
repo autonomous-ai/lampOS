@@ -1,0 +1,23 @@
+
+running 6 tests
+test controls::delayed_delivery_keeps_original_age ... ok
+test controls::forward_wall_step_does_not_invent_half_second_of_persistence ... FAILED
+test controls::normal_persistence ... ok
+test controls::ordinary_short_span_is_not_busy ... ok
+test controls::queued_before_privacy_is_refused ... ok
+test controls::rollback_without_stream_expires ... ok
+
+failures:
+
+---- controls::forward_wall_step_does_not_invent_half_second_of_persistence stdout ----
+
+thread 'controls::forward_wall_step_does_not_invent_half_second_of_persistence' (81761316) panicked at /private/tmp/second-review-3355-source-controls-20261024/controls.rs:149:3:
+two faces have stayed 1.0 s, below the required 1.5 s; wall time must not manufacture persistence
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    controls::forward_wall_step_does_not_invent_half_second_of_persistence
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
