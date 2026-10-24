@@ -1,0 +1,112 @@
+
+running 3695 tests
+....................................................................................... 87/3695
+....................................................................................... 174/3695
+....................................................................................... 261/3695
+....................................................................................... 348/3695
+....................................................................................... 435/3695
+....................................................................................... 522/3695
+....................................................................................i.. 609/3695
+.................................................................i.i................... 696/3695
+....................................................................................... 783/3695
+....................................................................................... 870/3695
+....................................................................................... 957/3695
+....................................................................................... 1044/3695
+....................................................................................... 1131/3695
+.........i............................................................................. 1218/3695
+....................................................................................... 1305/3695
+....................................................................................... 1392/3695
+....................................................................................... 1479/3695
+....................................................................................... 1566/3695
+....................................................................................... 1653/3695
+....................................................................................... 1740/3695
+....................................................................................... 1827/3695
+.........i...............................................i............................. 1914/3695
+...........i.....................i..................................................... 2001/3695
+....................................................................................... 2088/3695
+.............i......................................................................... 2175/3695
+.....................................i.................i............................... 2262/3695
+....................................................................................... 2349/3695
+....................................................................................... 2436/3695
+....................................................................................... 2523/3695
+....................................................................................... 2610/3695
+....................................................................................... 2697/3695
+....................................................................................... 2784/3695
+....................................................................................... 2871/3695
+....................................................................................... 2958/3695
+...................................................................i................... 3045/3695
+....................................................................................... 3132/3695
+....................................................................................... 3219/3695
+....................................................................................... 3306/3695
+....................................................................................... 3393/3695
+....................................................................................... 3480/3695
+.........i....................................i........................................ 3567/3695
+.............i......................................................................... 3654/3695
+.........................................
+test result: ok. 3680 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 531.34s
+
+
+running 1 test
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 270 tests
+....................................................................................... 87/270
+....................................................................................... 174/270
+....................................................................................... 261/270
+.........
+test result: ok. 270 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.22s
+
+
+running 6 tests
+iiiiii
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+......
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+error[E0463]: can't find crate for `lamp_body`
+ --> crates/voice/src/ring_unplug.rs:3:5
+  |
+3 | use lamp_body::unplug::{Phase, Request, State};
+  |     ^^^^^^^^^ can't find crate
+
+error[E0463]: can't find crate for `lamp_ring`
+ --> crates/voice/src/ring_unplug.rs:5:5
+  |
+5 | use lamp_ring::{PIXEL_COUNT, Rgb};
+  |     ^^^^^^^^^ can't find crate
+
+error[E0463]: can't find crate for `lamp_audio`
+ --> crates/voice/src/activity.rs:5:5
+  |
+5 | use lamp_audio::{CAPTURE_RATE, CAPTURE_SAMPLES, CaptureBlock, duplex, evidence::EchoEvidence};
+  |     ^^^^^^^^^^ can't find crate
+
+error[E0463]: can't find crate for `lamp_controls`
+  --> crates/voice/src/hand_controls.rs:16:5
+   |
+16 | use lamp_controls::{
+   |     ^^^^^^^^^^^^^ can't find crate
+
+error[E0463]: can't find crate for `lamp_schedule`
+ --> crates/voice/src/reminders.rs:4:5
+  |
+4 | use lamp_schedule::delivery::{PreparedToken, QualifiedCompletion, QualifiedRetirement};
+  |     ^^^^^^^^^^^^^ can't find crate
+
+error: aborting due to 5 previous errors
+
+For more information about this error, try `rustc --explain E0463`.
+error: doctest failed, to rerun pass `-p lamp-voice --doc`
+
+Caused by:
+  process didn't exit successfully: `/Users/ab/.rustup/toolchains/1.96.0-aarch64-apple-darwin/bin/rustdoc --edition=2024 --crate-type lib --color auto --crate-name lamp_voice --test crates/voice/src/lib.rs --test-run-directory /private/tmp/second-reminder-task-release-pair-20261024/lampOS/crates/voice -L native=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/build/libsqlite3-sys-5ddd9325dcabd29d/out -L native=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/build/ring-702b0306efb0a032/out -L native=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/build/tract-linalg-65c30d275a6a3c73/out --test-args --test-threads=1 --test-args --quiet --deny=unsafe_code '--warn=clippy::all' --extern base64=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libbase64-e4532c73ad546e3b.rlib --extern futures_util=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libfutures_util-24f9ce1e1b968722.rlib --extern hound=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libhound-5bb299652476ec8c.rlib --extern hyper_util=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libhyper_util-5aae2014bfcb7b06.rlib --extern lamp_actions=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_actions-6224151521e4c49d.rlib --extern lamp_audio=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_audio-0f7706b93d870d47.rlib --extern lamp_body=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_body-680795bd2880d9e9.rlib --extern lamp_bus=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_bus-3727d683a5678bb5.rlib --extern lamp_camera=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_camera-d39a7b0d5a2fa1f5.rlib --extern lamp_controls=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_controls-b4080b80d297a206.rlib --extern lamp_ears=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ears-28a42c4bef2c1190.rlib --extern lamp_expression=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_expression-0d4f9b5ddaa920b9.rlib --extern lamp_gemini=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_gemini-9e122b5e143a369e.rlib --extern lamp_health=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_health-b09ddca8346a8207.rlib --extern lamp_ipc=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ipc-f7a4b6ad6b8c38d0.rlib --extern lamp_local_time=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_local_time-ac6ec29f6adb92c3.rlib --extern lamp_msgs=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_msgs-3fd9b9c6b3e8fd33.rlib --extern lamp_near_call=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_near_call-306a9a5cdcf7cc1b.rlib --extern lamp_policy=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_policy-6e5defea3d09df04.rlib --extern lamp_ring=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_ring-9805915824b14748.rlib --extern lamp_schedule=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_schedule-0880c046effaa62b.rlib --extern lamp_tasks=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_tasks-14d4c6f3ed1bbed7.rlib --extern lamp_turn_end_wire=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_end_wire-f449146cf7e13668.rlib --extern lamp_turn_owner=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_turn_owner-d05defb6d3783701.rlib --extern lamp_voice=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice-c00ddfe05c8f80a2.rlib --extern lamp_voice_processes=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/liblamp_voice_processes-1cdefd6834eb873b.rlib --extern reqwest=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libreqwest-6c12bf96ca1b22df.rlib --extern rtrb=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/librtrb-0006e56cdb43ff63.rlib --extern rustix=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/librustix-7424dd734b3552f1.rlib --extern rustls=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/librustls-c818709ac0d7813d.rlib --extern serde=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libserde-0e16a51fbff80246.rlib --extern serde_json=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libserde_json-31ff0f8af25acc33.rlib --extern sha2=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libsha2-c84cbb1156bf4c08.rlib --extern signal_hook=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libsignal_hook-8fbca0ccef090ee1.rlib --extern sonora_agc2=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libsonora_agc2-fd29f7b8ebc45dbc.rlib --extern sonora_simd=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libsonora_simd-f72ae80467f1bbd0.rlib --extern tokio=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libtokio-194251aed6c813e2.rlib --extern tokio_tungstenite=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libtokio_tungstenite-c9f29cb17f5bce5f.rlib --extern toml=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libtoml-8f637fa1738a0d6d.rlib --extern unicode_normalization=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libunicode_normalization-3f59bd30ee53b059.rlib --extern webpki_roots=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps/libwebpki_roots-a2c404b71ef32bb0.rlib -L dependency=/Users/ab/Library/Caches/second-music-mac-20261021-3/target/debug/deps -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' --error-format human` (exit status: 1)
