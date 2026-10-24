@@ -1520,6 +1520,11 @@ introduction. Both the heard line and raw requested name are limited to
 4 KiB. Existing spelling and letter-count checks still apply. A word name
 that collides with the refusal vocabulary needs a spelling-only response.
 Earlier exchanges and model-supplied face identifiers are not evidence.
+With `LAMP_MEMORY_ROOM_SPEAKER` also on, its background attribution keeps
+this same request's enrollment proof through the live scope check. It does
+not replace the proof with visibility or a room speaker. A cancelled,
+expired or mismatched request cannot publish a late proof. The off path
+continues to publish room attribution without enrollment evidence.
 With no eyes, missing or stale evidence,
 or an unsupported route, nothing is saved. Guarded `replace=true` is refused:
 the earlier confirmation is not yet bound to the same speaker. Ordinary

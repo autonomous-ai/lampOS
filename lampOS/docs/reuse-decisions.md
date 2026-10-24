@@ -1636,3 +1636,15 @@ GID. Private, finite, lookup-failure and verified-rollback traces retain their
 original contents. The serialization/enqueue host target is under 1 ms per
 record; asynchronous filesystem stalls remain outside that target. The authored
 controls still require their Mac/Linux gates; no lamp result is claimed here.
+
+### Room attribution preserves the current enrollment proof (24 October 2026)
+
+Reuse `speaking_faces::saw_line_scoped` for the background room-speaker
+publish, as the forget path already does. The original path replaced the
+same request's line with `enrollment: None`; a deterministic regression
+reproduced loss of an existing microphone-bound proof. Carry only that
+proof and its lease, retaining cancellation under the existing cache lock.
+No new I/O, inference, polling, topic, switch or protocol field is added.
+The known-file read remains background work; the immediate publish target
+is under 1 ms without added I/O, with no device latency claim. The combined
+switches still need the physical two-person/cancellation enrollment trial.

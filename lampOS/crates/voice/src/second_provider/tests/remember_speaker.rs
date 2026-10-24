@@ -6,6 +6,7 @@ async fn run(
     count_only: bool,
     scoped: bool,
     privacy_change: bool,
+    room_publish: bool,
 ) -> (
     Engine,
     u64,
@@ -13,8 +14,11 @@ async fn run(
     u64,
     Option<crate::speaking_faces::LineSeen>,
 ) {
-    let request =
-        3_298_701 + u64::from(count_only) + 2 * u64::from(!scoped) + 4 * u64::from(privacy_change);
+    let request = 3_298_701
+        + u64::from(count_only)
+        + 2 * u64::from(!scoped)
+        + 4 * u64::from(privacy_change)
+        + 8 * u64::from(room_publish);
     let words = "My name is Kesh, remember my face";
     let gate = privacy_change.then(|| Arc::new(FinishGate::default()));
     let script = Arc::new(Script {
@@ -128,7 +132,7 @@ async fn run(
 
 #[tokio::test]
 async fn remember_speaker_records_an_ordinary_request_from_its_microphone_clock() {
-    let (mut engine, request, began_us, ended_us, line) = run(false, true, false).await;
+    let (mut engine, request, began_us, ended_us, line) = run(false, true, false, false).await;
     let line = line.expect("the enrollment call read its line");
     let proof = line
         .enrollment
@@ -149,20 +153,20 @@ async fn remember_speaker_records_an_ordinary_request_from_its_microphone_clock(
 
 #[tokio::test]
 async fn remember_speaker_count_only_never_records_enrollment_words_or_identity() {
-    let (_, request, _, _, line) = run(true, true, false).await;
+    let (_, request, _, _, line) = run(true, true, false, false).await;
     assert!(line.is_none(), "onboarding must not run an enrollment tool");
     assert!(crate::speaking_faces::line_seen(request).is_none());
 }
 
 #[tokio::test]
 async fn remember_speaker_without_a_live_request_scope_never_records_evidence() {
-    let (_, request, _, _, _) = run(false, false, false).await;
+    let (_, request, _, _, _) = run(false, false, false, false).await;
     assert!(crate::speaking_faces::line_seen(request).is_none());
 }
 
 #[tokio::test]
 async fn remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enrollment() {
-    let (engine, request, _, _, line) = run(false, true, true).await;
+    let (engine, request, _, _, line) = run(false, true, true, false).await;
     let line = line.expect("the tool looked for its own line");
     assert!(line.enrollment.is_none());
     let lease = engine
@@ -195,4 +199,59 @@ async fn remember_speaker_privacy_close_and_reopen_during_stt_cannot_revive_enro
         Some(&lease),
     );
     assert_eq!(answer, json!({"error":crate::remember_speaker::NOT_SEEN}));
+}
+
+#[tokio::test]
+async fn remember_speaker_room_publish_keeps_only_its_live_request_proof() {
+    let (mut engine, request, _, _, line) = run(false, true, false, true).await;
+    let original = line.unwrap();
+    let proof = original.enrollment.as_ref().unwrap();
+    let lease = engine
+        .turn
+        .as_ref()
+        .unwrap()
+        .memory_scope
+        .as_ref()
+        .unwrap()
+        .lease();
+    let mut room = original.clone();
+    room.speakers.clear();
+    room.known = None;
+    publish_room_line(room.clone(), true, Some(&lease));
+    let after = crate::speaking_faces::line_seen(request).unwrap();
+    assert_eq!(
+        after
+            .enrollment
+            .as_ref()
+            .map(|p| (&p.face, &p.heard, p.began_us, p.ended_us)),
+        Some((&proof.face, &proof.heard, proof.began_us, proof.ended_us))
+    );
+    assert!(after.speakers.is_empty() && after.known.is_none());
+    let mut other = room.clone();
+    other.request += 100;
+    publish_room_line(other.clone(), true, Some(&lease));
+    assert!(
+        crate::speaking_faces::line_seen(other.request).is_none(),
+        "another request's lease cannot publish this proof"
+    );
+    publish_room_line(other.clone(), true, None);
+    assert!(
+        crate::speaking_faces::line_seen(other.request).is_none(),
+        "missing scope cannot publish enrollment"
+    );
+    publish_room_line(other.clone(), false, None);
+    let off = crate::speaking_faces::line_seen(other.request).unwrap();
+    assert!(
+        off.enrollment.is_none(),
+        "off publishes only room attribution"
+    );
+    engine.stop_through(request);
+    publish_room_line(room, true, Some(&lease));
+    assert!(
+        crate::speaking_faces::line_seen(request)
+            .unwrap()
+            .enrollment
+            .is_none(),
+        "late room publication cannot revive a cancelled enrollment"
+    );
 }
