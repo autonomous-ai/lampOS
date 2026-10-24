@@ -1,5 +1,46 @@
 # Tests work log
 
+## 2026-10-24 08:56 +0700 — native release-pair read and prepared follow-ups
+
+Ready for lamp-voice: no; owned PR qualification remains active.
+
+The requested #3312 source read found its first dedicated ARM64 job failed
+before execution on Git ownership validation. The corrected head ba7031f58
+changes only the three Git calls and scopes trust to the checkout. Its
+[native run 40051251652](https://github.com/autonomous-ai/lampOS/actions/runs/40051251652/job/120744211229)
+executed all twelve cases: Schedule 4 passed, Tasks 2 failed, Voice 4 passed
+and 2 failed, zero ignored/filtered. Both Tasks directions exit before
+readiness; both unfinished Voice directions disagree between Ack guard
+request suffix .1 and the completion attempt .2. Those are failed fixture
+observations, not established product compatibility defects. The
+[HOLD](https://github.com/autonomous-ai/lampOS/pull/3312#issuecomment-6378444634)
+remains with Second to repair and qualify. Twelve exact-head source
+snapshots were verified against Git; the six release pins match API
+metadata, without an independent binary/signature acceptance claim.
+
+#2839's eight-file draft has its dependency closure checked: thirteen
+packages, with all current workspace manifests unchanged. The new
+compatibility matrices now own their mock listeners and join them; the
+separate provider process retains failure output and is killed/reaped on
+unwind. The unrun validation plan includes a deliberate legacy-polling
+control and the original delivery-count assertions, then focused/full and
+native gates. No source draft has been compiled or called ready.
+
+The same-voice follow-up has a separate two-file source draft on
+tests/1569-same-voice-teardown. Only its three process fixtures opt into
+joining their actual worker, after their original assertions and on panic.
+A separate unapplied event-held cleanup control is prepared. Product
+worker/child bodies and deadlines are unchanged; non-test token identity
+is not claimed. Its five-second watchdog does not hard-bound an OS join.
+No control, local test or native result is claimed yet.
+
+The #3190 base full gate is still active, followed by its candidate and
+fixed standalone observations, then #3218/#3273. Direct standalone runs
+will use the exact full-run artifacts and fixed plan environment; Cargo's
+uncaptured injected loader variables are not called identical. Source
+inspection found no runtime Cargo-variable dependency in the original
+case families, and the compiled census already loads these executables.
+
 ## 2026-10-24 08:39 +0700 — base Voice result and source preparation
 
 Ready for lamp-voice: no; matched qualification and fresh native CI remain.
