@@ -1,0 +1,377 @@
+{
+  "files": [
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "20beb4f2747cb69b61c335f3c9e459b018fde2b8fca91753547dfc7e353a60fe",
+      "source": "cp-D59VrG/caps/schedule.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/a-after-kill.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/a-committed.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "20beb4f2747cb69b61c335f3c9e459b018fde2b8fca91753547dfc7e353a60fe",
+      "source": "cp-D59VrG/snapshots/a-final-after-kill.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "20beb4f2747cb69b61c335f3c9e459b018fde2b8fca91753547dfc7e353a60fe",
+      "source": "cp-D59VrG/snapshots/a-final.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "943d516083e79a6f48c48dda9c1fab1e8e497a4518f7fa714fa024882d1b0ff9",
+      "source": "cp-D59VrG/snapshots/a-fresh-replacement.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-live-retry-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-live-retry-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-new-cancel-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-new-cancel-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-old-cancel-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-old-cancel-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "943d516083e79a6f48c48dda9c1fab1e8e497a4518f7fa714fa024882d1b0ff9",
+      "source": "cp-D59VrG/snapshots/a-replaced-token-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "943d516083e79a6f48c48dda9c1fab1e8e497a4518f7fa714fa024882d1b0ff9",
+      "source": "cp-D59VrG/snapshots/a-replaced-token-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-returned.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-wrong-remove-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/a-wrong-remove-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/b-after-kill.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-cancelled-retry-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-cancelled-retry-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-changed-token-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-changed-token-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "bf1ebfe9abf4eb19fa405d7780433001c10b9a3c4889bc51ac793c96fd51d86a",
+      "source": "cp-D59VrG/snapshots/b-committed.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-extra-field-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-extra-field-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-reopened.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-stale-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-stale-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-wrong-remove-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "e68f2c7e427b2c1413bf5f31dd8ea0b059e47f6ac21162371ddfa663bbfe93c1",
+      "source": "cp-D59VrG/snapshots/b-wrong-remove-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "99a582ccbab57f652eba46d2c7da6e97e531bf61a83daeb1527cd8d7a1f2589a",
+      "source": "cp-gCUaeY/caps/schedule.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/a-after-kill.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/a-committed.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "99a582ccbab57f652eba46d2c7da6e97e531bf61a83daeb1527cd8d7a1f2589a",
+      "source": "cp-gCUaeY/snapshots/a-final-after-kill.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "99a582ccbab57f652eba46d2c7da6e97e531bf61a83daeb1527cd8d7a1f2589a",
+      "source": "cp-gCUaeY/snapshots/a-final.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "181f7cf6ff06ba9b0223589f971f3a011930671a6b58ef1debee87db1535687b",
+      "source": "cp-gCUaeY/snapshots/a-fresh-replacement.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-live-retry-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-live-retry-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-new-cancel-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-new-cancel-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-old-cancel-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-old-cancel-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "181f7cf6ff06ba9b0223589f971f3a011930671a6b58ef1debee87db1535687b",
+      "source": "cp-gCUaeY/snapshots/a-replaced-token-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "181f7cf6ff06ba9b0223589f971f3a011930671a6b58ef1debee87db1535687b",
+      "source": "cp-gCUaeY/snapshots/a-replaced-token-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-returned.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-wrong-remove-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/a-wrong-remove-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/b-after-kill.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-cancelled-retry-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-cancelled-retry-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-changed-token-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-changed-token-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "9e469b29a091bacc682f7acc8f721aa637e399d4a11500012cf173849da09d67",
+      "source": "cp-gCUaeY/snapshots/b-committed.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-extra-field-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-extra-field-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-reopened.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-stale-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-stale-before.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-wrong-remove-after.sqlite3"
+    },
+    {
+      "bytes": 8192,
+      "reason": "Binary SQLite file; audited privately, exact JSON BLOB and digest retained in text evidence.",
+      "sha256": "b8a62ac1a4772649add33c36c1285273353ac198e71c7ad35fb6fc9afdc2d05d",
+      "source": "cp-gCUaeY/snapshots/b-wrong-remove-before.sqlite3"
+    },
+    {
+      "bytes": 913673,
+      "reason": "Complete source map retained privately; compact all-file comparison and both full-map digests are in ci.json.",
+      "sha256": "3278e4b0970229916e0d0ba7e7943a4ec7b9a21da9fd9d62e2977fcaba6bf44a",
+      "source": "source-after.sha256"
+    },
+    {
+      "bytes": 913673,
+      "reason": "Complete source map retained privately; compact all-file comparison and both full-map digests are in ci.json.",
+      "sha256": "3278e4b0970229916e0d0ba7e7943a4ec7b9a21da9fd9d62e2977fcaba6bf44a",
+      "source": "source-before.sha256"
+    }
+  ],
+  "other_private_material": "Raw workflow logs, identity-bearing API responses, complete source maps, downloaded archive and audit scripts are not published. No executable was included in the CI evidence archive."
+}
