@@ -1,0 +1,21 @@
+{
+  "earlier_gate": "library 3718 passed / 7 failed / 15 ignored; Cargo skipped later targets",
+  "failures": "seven exact old confirmation-note comparisons, fixed as expected model context",
+  "changed_after_that_gate": [
+    "lampOS/crates/voice/src/provider_worker.rs",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs",
+    "lampOS/crates/voice/src/second_provider/tests.rs",
+    "lampOS/crates/voice/src/second_provider/tests/music_current.rs",
+    "lampOS/crates/voice/src/second_provider/tests/music_scope.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs"
+  ],
+  "source_boundary_checks": {
+    "lampOS/crates/voice/src/provider_worker.rs": "all source before test module is byte-identical to base",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "test module file only",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "test module file only",
+    "lampOS/crates/voice/src/second_provider/tests/music_current.rs": "test module file only",
+    "lampOS/crates/voice/src/second_provider/tests/music_scope.rs": "test module file only",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "all source before test module is byte-identical to base"
+  },
+  "limits": "Earlier failure retained; no historical or provider-compliance cause claim; final full gate separate"
+}
