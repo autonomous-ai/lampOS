@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 02:08: Photo skill removal decision and explicit acceptance holds
+
+- Refreshed already-claimed #2949 while Common qualification runs; [source decision](verification/photo-skill-removal-plan-20261025/README.md) reuses durable off intent and the tools-file handoff after #2856, with no extra model function or generic grant change. Removal must remain effective across updates; no renewed permission question.
+- Old Voice with an old on unit ignores policy, and current app helper success has no runtime cancellation receipt. Old-unit rollback and effective-removal acknowledgement stay explicit HOLD. TTL starts before reads and final leases self-expire; all bounds/latency/regressions remain proposed and unmeasured. No extraction code before precursor landing or activation.
+- Common f5d Linux Voice 4200/0/24 and Update 388/0/4 pass; Skills active. Mac Voice remains active and recent log progress was confirmed. Both hosts already passed fmt/strict Clippy/build/Eyes. No complete eight-stage result yet; callback 261 READ-OK and selected b6a6 receipt remain separately bound. Raw stays private; no lamp action.
+
 ## 2026-10-25 01:24: callback correction pushed and parent qualification active
 
 - Amended and lease-pushed #3391 `26102b834`, one test-only commit on e9d. [Selected two-host receipt and final-head binding](verification/callback-r5-selected-20261025/README.md): both five-stage gates/six controls/fresh 46 pass; Mac Voice 4126/0/21, Linux 4187/0/24, exact census 1/0/0/12 filtered each. Only result README differs from tested 30eab; direct final-tree verification completed after the sandbox-denied write-tree check. Earlier failures remain retained.
