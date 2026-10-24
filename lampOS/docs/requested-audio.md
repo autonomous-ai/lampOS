@@ -211,8 +211,9 @@ is left for its own change, since the product's voice is the second route.
 A recording accepted and then ended early says why, once, in the journal.
 `request N: requested audio cancelled: <why>` comes from the recording's
 own checks: the service stopped, it wasn't ready, the speaker's state was
-being read, was stale, changed or unknown, its Skills lease lapsed, it was
-past its time, Skills refused its start or a renewal, or its recording
+being read past the clash spin, the speaker was muted, silent or its state
+unknown, its state changed, was stale, or was read after the check's own
+time, its Skills lease lapsed, it was past its time, Skills refused its start or a renewal, or its recording
 couldn't be read or wasn't the one offered. `request N: requested audio
 revoked: <why>` comes from the coordinator, when the turn is revoked.
 
@@ -398,9 +399,15 @@ No file or socket work is added to that final check.
 Admission reserves the one active slot before reading the speaker cache, so
 a second offer refused for capacity cannot contend with the current item's
 permission check. A failed cache lookup returns that reservation immediately.
-The permission check remains nonblocking: cache contention, stale data, or
-an observation newer than the caller's sampled time cancels the item. A later
-fresh observation cannot revive it or extend its original deadlines.
+The permission check remains nonblocking: a clash for the cache is tried
+again, spinning and never sleeping, for at most 200 µs, and a cache still held
+after that, stale data, or an observation newer than the caller's sampled
+time cancels the item. A later fresh observation cannot revive it or extend
+its original deadlines. The spin is there because the monitor writes the
+cache every 20 ms and the worker reads it every 20 ms, so the two meet
+often: on lamp-4ace on 24 Oct (#2793) a recording accepted at 13:18:46.68
+was cancelled 0.66 s later by one such clash, which a single `try_lock`
+treated as a loss of permission.
 
 Stop, interruption/new owner, microphone privacy closure, capture gap, speaker mute,
 invalid speaker state, definition revocation, daemon loss and deadline expiry
