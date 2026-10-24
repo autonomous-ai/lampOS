@@ -5,6 +5,18 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 09:36 — current enrollment native gate and own-name follow-up
+
+- #3318 `8b42bb15f` ARM64 **11,161 passed (one reported Voice journal
+  LEAK), 71 skipped**, process **12/0**; strict Linux Clippy passes.
+  Current carried reads are posted. Exact-current Linux fmt is requested.
+- Train 68 closed over another carried PR’s HOLD; this head stays as read.
+- Taken at 09:25: name-ownership P2 and guarded rename-prompt P3 on
+  `third/remember-own-name`. Tests-first implementation is active; the
+  requested name must be the speaker’s own, not a mentioned friend’s name.
+  Default-off behavior remains separate; physical qualification remains open.
+- [Evidence](verification/remember-speaking-face-20261024/README.md).
+
 ## 2026-10-24 09:20 — enrollment cadence follow-up and current-base push
 
 - #3318 is now `8b42bb15f` on `59c4ac795`; implementation range-diff is

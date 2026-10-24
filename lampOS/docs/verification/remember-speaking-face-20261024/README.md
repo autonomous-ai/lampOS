@@ -79,3 +79,20 @@ historical passes, not carried-head acceptance. Fresh carried-head ARM64
 reads remain pending. Third posted the addressed P3s and current head on
 [the PR](https://github.com/autonomous-ai/lampOS/pull/3318#issuecomment-6378682327)
 and Queue #3126. Physical qualification remains unexecuted by Third.
+
+## Current carry native result and name-ownership follow-up
+
+Head `8b42bb15f` passes ARM64 run 40053707125: **11,161 passed (one
+reported Voice journal LEAK), 71 skipped**, process checks **12/0**.
+Linux strict Clippy run 40053707118 passed. The preview tree equals the
+authored tree; see `cadence-carry-native.json`. No lamp result is claimed.
+
+Reviewer-three’s separate Mac whole-library run at the original head
+reported 3,693 passes and four failures, each passing twice in isolation.
+Those outcomes remain recorded on #3318; isolated success does not prove
+a failure’s cause. Third’s earlier full two-thread gate passed.
+
+At 09:25 Third claimed the guarded name-ownership P2 and unusable rename
+prompt P3 on `third/remember-own-name`. This follow-up preserves #3318 as
+read, rejects third-person name mentions, and keeps the switch off pending
+those corrections and physical qualification.
