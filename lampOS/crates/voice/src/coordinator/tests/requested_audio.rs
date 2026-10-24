@@ -1007,6 +1007,58 @@ fn offers_require_the_current_worker_session_request_and_privacy_identity() {
         .finished(&current, RequestedAudioOutcome::Cancelled);
 }
 
+/// #2793: on lamp-4ace a first "play me something to relax" was refused
+/// with nothing to say why. A refused offer now names the first condition
+/// that refused it, and one that would be taken names none.
+#[test]
+fn a_refused_offer_names_the_condition_that_refused_it() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let good = test.offer(1);
+    let why = |test: &Test, offer: &RequestedAudioOffer| {
+        test.reply
+            .as_ref()
+            .unwrap()
+            .requested_audio_refusal(test.worker, test.snapshot, offer)
+    };
+    for (field, said) in [
+        ("worker", "the offer is from another worker boot"),
+        ("session", "the offer is for another provider session"),
+        ("request", "the offer is for another request"),
+        ("privacy", "the offer is from another privacy generation"),
+        ("digest", "the offer does not check"),
+    ] {
+        let mut bad = good.clone();
+        match field {
+            "worker" => bad.context.worker_boot = "another-worker".into(),
+            "session" => bad.context.provider_session += 1,
+            "request" => bad.context.request += 1,
+            "privacy" => bad.context.privacy_generation += 1,
+            "digest" => bad.sha256 = "invalid".into(),
+            _ => unreachable!(),
+        }
+        assert_eq!(why(&test, &bad), Some(said), "{field}");
+    }
+    let mut foreign = Controller::new(new_boot().unwrap(), now());
+    let foreign_snapshot = foreign.snapshot(now()).unwrap();
+    assert_eq!(
+        test.reply
+            .as_ref()
+            .unwrap()
+            .requested_audio_refusal(test.worker, foreign_snapshot, &good),
+        Some("the speaker belongs to another owner")
+    );
+    assert_eq!(why(&test, &good), None);
+    assert!(test.accept_offer(good.clone()));
+    assert_eq!(
+        why(&test, &good),
+        Some("this turn already had its one offer")
+    );
+    let written = Test::new(Route::Written, REQUESTED_AUDIO_LEASE_US, false);
+    let offer = written.offer(1);
+    assert_eq!(why(&written, &offer), Some("not a spoken turn"));
+}
+
 #[test]
 fn written_reminder_say_and_offline_turns_never_authorize_requested_recordings() {
     let _clock = fixture_clock();

@@ -7171,25 +7171,39 @@ fn conversation_with_gate_inner(
                     session,
                     offer,
                 } => {
-                    let accepted = requested_audio.as_ref().is_some_and(|service| {
-                        reply
-                            .as_mut()
-                            .filter(|current| {
-                                current.owner.turn() == request && current.cloud.session == session
-                            })
-                            .is_some_and(|current| {
-                                current.accept_requested_audio(
+                    // Why a refused offer was refused, in the trace and once
+                    // in the journal (#2793: a refusal said nothing).
+                    let current = reply.as_mut().filter(|current| {
+                        current.owner.turn() == request && current.cloud.session == session
+                    });
+                    let refused = match (requested_audio.as_ref(), current) {
+                        (None, _) => Some("requested audio is off or unavailable"),
+                        (_, None) => Some("not the turn in hand"),
+                        (Some(service), Some(current)) => {
+                            match current.requested_audio_refusal(
+                                rig.provider.boot,
+                                snapshot,
+                                &offer,
+                            ) {
+                                Some(why) => Some(why),
+                                None => (!current.accept_requested_audio(
                                     service,
                                     rig.provider.boot,
                                     snapshot,
                                     offer,
-                                )
-                            })
-                    });
+                                ))
+                                .then_some("its recording could not be prepared"),
+                            }
+                        }
+                    };
+                    let accepted = refused.is_none();
+                    if let Some(why) = refused {
+                        eprintln!("lamp-voice: request {request}: requested audio refused: {why}");
+                    }
                     record(
                         trace,
                         json!({"kind":"requested_audio_offered",
-                        "turn":request,"provider_session":session,"accepted":accepted,
+                        "turn":request,"provider_session":session,"accepted":accepted,"refused":refused,
                         "at_us":monotonic_us(),"boundary":"queued preparation; no playback authority"}),
                     )?;
                 }

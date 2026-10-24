@@ -34,6 +34,63 @@ impl Reply {
             .is_some_and(|ticket| ticket.wait_ready(timeout))
     }
 
+    /// Why this turn would refuse `offer`, the first of its conditions that
+    /// fails, or `None` when it would take it: what the trace and the
+    /// journal say for a refused offer. On lamp-4ace on 24 Oct a first
+    /// "play me something to relax" was refused with nothing to say which
+    /// (#2793).
+    pub(super) fn requested_audio_refusal(
+        &self,
+        worker: BootId,
+        snapshot: Snapshot,
+        offer: &RequestedAudioOffer,
+    ) -> Option<&'static str> {
+        let refusals = [
+            (!self.media.spoken, "not a spoken turn"),
+            (self.media.offered, "this turn already had its one offer"),
+            (
+                !self.cloud.started,
+                "the turn's provider speech has not started",
+            ),
+            (self.provider_idle, "the provider is idle"),
+            (
+                self.notice.origin() != SpeechOrigin::Provider,
+                "the turn's speech is not the provider's",
+            ),
+            (self.local_only.is_some(), "a local-only turn"),
+            (self.reminder.is_some(), "a reminder turn"),
+            (self.say.is_some(), "a Say cue holds the speaker"),
+            (
+                snapshot.owner() != Some(self.owner),
+                "the speaker belongs to another owner",
+            ),
+            (
+                snapshot.microphone_permission() != Permission::Allowed,
+                "the microphone is not allowed",
+            ),
+            (offer.check().is_err(), "the offer does not check"),
+            (
+                offer.context.worker_boot != boot_text(worker),
+                "the offer is from another worker boot",
+            ),
+            (
+                offer.context.request != self.owner.turn(),
+                "the offer is for another request",
+            ),
+            (
+                offer.context.provider_session != self.cloud.session,
+                "the offer is for another provider session",
+            ),
+            (
+                offer.context.privacy_generation != snapshot.microphone_generation(),
+                "the offer is from another privacy generation",
+            ),
+        ];
+        refusals
+            .into_iter()
+            .find_map(|(refused, why)| refused.then_some(why))
+    }
+
     pub(super) fn accept_requested_audio(
         &mut self,
         service: &crate::requested_audio::Service,
@@ -41,21 +98,9 @@ impl Reply {
         snapshot: Snapshot,
         offer: RequestedAudioOffer,
     ) -> bool {
-        if !self.media.spoken
-            || self.media.offered
-            || !self.cloud.started
-            || self.provider_idle
-            || self.notice.origin() != SpeechOrigin::Provider
-            || self.local_only.is_some()
-            || self.reminder.is_some()
-            || self.say.is_some()
-            || snapshot.owner() != Some(self.owner)
-            || snapshot.microphone_permission() != Permission::Allowed
-            || offer.check().is_err()
-            || offer.context.worker_boot != boot_text(worker)
-            || offer.context.request != self.owner.turn()
-            || offer.context.provider_session != self.cloud.session
-            || offer.context.privacy_generation != snapshot.microphone_generation()
+        if self
+            .requested_audio_refusal(worker, snapshot, &offer)
+            .is_some()
         {
             return false;
         }
