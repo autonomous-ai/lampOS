@@ -1,0 +1,42 @@
+{
+  "head": "d3cb29ea9885222bc30f4adc6b5befb97861af74",
+  "base": "d7b85b1dd5f67e5d862e4970e1ec60c6eef30c22",
+  "crates": [
+    "lamp-skills"
+  ],
+  "steps": [
+    {
+      "stage": "fmt",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 6.16
+    },
+    {
+      "stage": "clippy",
+      "argv": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 21.845
+    }
+  ],
+  "source_count": 6974,
+  "source_unchanged": true,
+  "result": "failed"
+}

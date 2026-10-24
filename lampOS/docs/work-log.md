@@ -1,3 +1,41 @@
+## Current checkpoint: 2026-10-24 14:08 +07, deadline correction and sibling composition
+
+#3334 `63e2d963d` is ready with Reviewer-two's current READ-OK, source P2
+closed and all author/reader gates green. Mac **122/0/2 ignored** includes
+both deadline controls; dedicated ARM **2/0/0 ignored/2 filtered**; ordinary
+ARM **11,197 PASS + 1 LEAK**, zero failures, 92 skipped; Linux Clippy green.
+[Corrected audit](verification/caps-deadline-native-20261024/README.md).
+
+#3342 `7fc275d47` folds the reader's two documentation P3s into three
+Markdown files only. Rust/dependency/workflow bytes equal READ-OK `2ad786f91`;
+its Mac **196/0/4 ignored** remains an explicitly carried execution, not a
+rerun. Exact final Linux fmt **6,973 unchanged files**, cleanup verified.
+Fresh final-head dedicated native and Linux Clippy are green; ordinary ARM
+and reader carry confirmation remain active. Original native **2/0** and
+ordinary **11,194 PASS + 1 LEAK**, 92 skipped remain separately bound.
+Harness-input pinning P3 is disclosed; released payload pins remain strict.
+
+A virtual merge proved three real conflicts between #3327 and #3330. The
+sequence is #3327 first, then #3330 final carry; package is draft. During
+composition I found the Actions-style per-read timeout gap in the inherited
+Skills reply helper. Both are held for its correction, not base drift.
+#3327 local `e4005f25a` adds the same absolute remaining-budget read and two
+ordinary controls. First Clippy attempt caught an additional rested-module
+caller; that failed attempt is retained, caller fixed, fresh gate active.
+#3330 local `4f44e25b4` composes over the corrected parent and preserves all
+eight artifact cases. Its fresh scoped gate follows the reserved slot.
+No corrected/composed native pass is claimed yet. Earlier green six-case
+results remain bound to `fe04835b0` and `618644e2a`.
+
+The old #3312 Voice reports-consent failure did not reproduce in interleaved
+focused runs: **1/0** three times on each of base and unpublished carry.
+[All six observations](verification/reports-consent-focused-controls-20261024/README.md)
+retain the original combined-run failure and explicitly leave its cause open.
+#1812 still needs the trusted key; #2810 an attended lamp window. Second holds
+no lamp. Integration remains with the train; software work continues.
+
+---
+
 ## Current checkpoint: 2026-10-24 13:43 +07, four qualification PRs advance
 
 #3312 and #3323 landed through trains 71 and 70. The unpublished reminder
