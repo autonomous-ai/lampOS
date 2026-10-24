@@ -5858,4 +5858,4 @@ an everyday event there.
    fetch them? (A `.tar` on a draft release of this repository would do.)
 
 
-Second, 22:40 +07: corrected the #3389 receipt's vendor wording after reader P3: all 42 Clippy and 40 compile records on 5053a00c3 were fresh=false, including Sonora. Full serial Voice gates on the later 508b base completed: framing e1140f2ef 4,007/0/21 and phone bdb95e3af 4,006/0/21. Both current rebases target 43ac6c843; its only intervening changes are Expression test/docs. Current focused qualification is running. #3382 remains draft on the historical Update HOLD; no waiver, physical or signature-trust claim.
+Second, 22:37 +07: corrected the #3389 receipt's vendor wording after reader P3: all 42 Clippy and 40 compile records on 5053a00c3 were fresh=false, including Sonora. Full serial Voice gates on the later 508b base completed: framing e1140f2ef 4,007/0/21 and phone bdb95e3af 4,006/0/21. Both current rebases target 43ac6c843; its only intervening changes are Expression test/docs. Current focused qualification is running. #3382 remains draft on the historical Update HOLD; no waiver, physical or signature-trust claim.
