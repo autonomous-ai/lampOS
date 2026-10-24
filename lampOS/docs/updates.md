@@ -1685,6 +1685,18 @@ Private synthetic peers supply the triggers and helper requests. The
 separates these four cases from ordinary-suite skips and from the still-open
 rested-night, full-loader, installation and physical power-cut boundaries.
 
+**Rested-night continuation** (#2809): two additional Skills cases keep one
+unchanged synthetic skill through 6408 → 6498 → 6408 and the reverse. They
+require the actual released writer's matched rest admission and persisted
+night, the replacement reader's single morning stretch at a private fake
+Body socket, and the original reader's suppression of the spent morning.
+Fresh owner probes distinguish persisted history from resumed active rest.
+Fixed local offsets map consecutive dates; no physical night is elapsed and
+no timezone migration is qualified. The separate
+[rested-state plan and gate record](verification/rested-state-release-pair-20261024/README.md)
+records the passing Mac source gate and the still-pending native execution;
+ordinary-suite skips establish no released-process result.
+
 What follows is the audit for #1680 at `647f1ee63`, read from the code
 (paths relative to `lampOS/`). The tasks, schedule, eyes and cloud rows
 were also checked with temporary tests, since removed. "Unread" marks what
