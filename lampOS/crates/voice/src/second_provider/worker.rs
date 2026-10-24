@@ -2883,7 +2883,7 @@ pub fn serve(
         {
             heeding.going_on_only_for_the_same_one();
         }
-        if let Some(hook) = hearing_hook(&heeding, hears, files.others_answer) {
+        if let Some(hook) = hearing_hook(&heeding, hears, files.others_answer || declines) {
             engine = engine.hearing(hook);
         }
         // The name note, as the Live route gives it (`LAMP_NAME_NOTE=on`).
@@ -4639,13 +4639,15 @@ const MEMORY_WORDS: [&str; 2] = ["remember", "forget"];
 
 /// The rule's hook for each spoken line's sound ([`Engine::hearing`]), when
 /// it needs one: for the same-voice check (`voice_judged`), or to know which
-/// line began over the lamp's answer (`others_answer`, #2136). Neither, none.
+/// line began over the lamp's answer (`over_the_lamp`: `LAMP_OTHERS_ANSWER`,
+/// #2136, and the conversation's note, [`Heeding::conversation_note_for`]).
+/// Neither, none.
 fn hearing_hook(
     heeding: &Arc<Mutex<Heeding>>,
     voice_judged: bool,
-    others_answer: bool,
+    over_the_lamp: bool,
 ) -> Option<crate::second_provider::Hearing> {
-    (voice_judged || others_answer).then(|| {
+    (voice_judged || over_the_lamp).then(|| {
         let heeding = heeding.clone();
         let hook: crate::second_provider::Hearing = Arc::new(move |request, heard| {
             if let Ok(mut heeding) = heeding.lock() {
@@ -6781,7 +6783,9 @@ impl Heeding {
             Some(crate::attention::Verdict::Hold(why)) => Some(why),
             // Said, as each hold is by the route (#829, 17:21).
             Some(crate::attention::Verdict::Play(why)) => {
-                let alone = if self.alone.is_some() {
+                let alone = if self.began_over == Some(request) && self.alone.is_some() {
+                    ", only as the conversation going on, begun over the lamp's answer: the model is not told it may be people's talk"
+                } else if self.alone.is_some() {
                     ", only as the conversation going on: the model is told so"
                 } else {
                     ""
@@ -6868,8 +6872,17 @@ impl Heeding {
     /// said to the lamp. On lamp-4ace on 20 Oct, told the note, "Remember
     /// that my favourite colour is green." got `not_for_me` and nothing was
     /// kept (the first builder at 04:54 and their yes at 05:01).
+    ///
+    /// Nor for a line begun over the lamp's own answer ([`Self::began_over`]):
+    /// a cut-in over its voice is said to it, and is told what any line
+    /// without its name is ([`DECLINE_NOTE`]). On lamp-52e6 on 24 Oct, told
+    /// the note, "Sorry, can you say that last part again?", said over the
+    /// lamp's story, got `not_for_me` and silence.
     pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
-        (self.alone == Some(request) && !self.asks_its_work(request)).then_some(CONVERSATION_ALONE)
+        (self.alone == Some(request)
+            && self.began_over != Some(request)
+            && !self.asks_its_work(request))
+        .then_some(CONVERSATION_ALONE)
     }
 
     /// Whether `request` was judged in a busy room: a line that may follow
@@ -17345,6 +17358,55 @@ mod tests {
             heeding.conversation_note_for(13),
             Some(super::CONVERSATION_ALONE)
         );
+    }
+
+    /// lamp-52e6, 24 Oct 15:33: over the lamp's story, "Sorry, can you say
+    /// that last part again?" was let out only as the conversation going on,
+    /// told it may be people's talk, and got `not_for_me`. A line begun over
+    /// the lamp's own answer is said to it: no such note. Begun with the lamp
+    /// quiet, or over the wait sound, the same line still earns it.
+    #[test]
+    fn a_line_begun_over_the_lamps_answer_is_not_told_it_may_be_peoples_talk() {
+        use crate::second_provider::Heard;
+        let signs = super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let noted = |heard: Option<Heard<'static>>| {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if let Some(heard) = heard {
+                heeding.hear(9, heard);
+            }
+            let held = heeding.judge(
+                9,
+                line,
+                "Sorry, can you say that last part again?",
+                signs.clone(),
+            );
+            (held, heeding.conversation_note_for(9))
+        };
+        let over = |over_the_lamps_voice| Heard::Began {
+            over_the_lamps_voice,
+        };
+        assert_eq!(noted(Some(over(true))), (None, None), "over the lamp");
+        for (heard, why) in [
+            (Some(over(false)), "the lamp quiet"),
+            (None, "not heard"),
+            (Some(Heard::BeganOverTheWaitSound), "over the wait sound"),
+        ] {
+            assert_eq!(
+                noted(heard),
+                (None, Some(super::CONVERSATION_ALONE)),
+                "{why}"
+            );
+        }
     }
 
     /// #2136 (the first builder at 11:29 and 11:37): A asked for a story by
