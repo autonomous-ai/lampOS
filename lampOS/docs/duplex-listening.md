@@ -1141,7 +1141,8 @@ A start found after the 1.6 s is still late.
 
 Off unless `LAMP_SOFT_START=on`, and nothing without `LAMP_FIRST_WORDS=kept`
 (the first builder, 24 October 2026, for the lost first word after a pause
-on #3126).
+on #3126). The product and lamp-4ace units set it since 25 October, after
+lamp-4ace's third A/B (#3411).
 
 - **The fault:** "Lamp, what time is it in London?", said with a pause after
   the name, was heard as "Time is it in London?". The owner's own lines lost

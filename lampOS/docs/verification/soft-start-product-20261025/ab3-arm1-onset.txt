@@ -1,0 +1,34 @@
+   4.080 candidate: kept from   4.080, trigger   4.668, speech onset   4.571: lead-in  +491 ms, trigger 97 ms after onset; first 100 ms dBFS -39 -28 -19 -16 -15 -13 -11 -10 -11 -13 -13
+   8.947     heard (request 1): 'Lamp. How are you today?'
+  39.543 candidate: kept from  39.543, trigger  40.132, speech onset  40.046: lead-in  +503 ms, trigger 86 ms after onset; first 100 ms dBFS -32 -23 -19 -18 -16 -13 -11 -13 -16 -18
+  41.227     heard (request 2): 'Lamp.'
+  41.564 candidate: kept from  41.564, trigger  42.154, speech onset  42.076: lead-in  +511 ms, trigger 78 ms after onset; first 100 ms dBFS -38 -22 -18 -17 -18 -18 -18 -15 -13 -12
+  44.412     heard (request 3): 'How are you today?'
+  74.629 candidate: kept from  74.629, trigger  75.220, speech onset  75.015: lead-in  +385 ms, trigger 205 ms after onset; first 100 ms dBFS -46 -38 -29 -22 -18 -17 -23 -23 -19 -20 -21
+  76.211     heard (request 4): 'Lamp.'
+  76.621 candidate: kept from  76.621, trigger  77.211, speech onset  76.863: lead-in  +242 ms, trigger 348 ms after onset; first 100 ms dBFS -50 -51 -56 -53 -49 -47 -44 -43 -42 -30
+  78.701     heard (request 5): 'What did I just ask you?'
+ 109.016 candidate: kept from 109.016, trigger 109.606, speech onset 109.530: lead-in  +514 ms, trigger 76 ms after onset; first 100 ms dBFS -41 -30 -22 -18 -16 -15 -14 -16 -17 -17 -24
+ 113.240     heard (request 6): 'Lamp. What did I just ask you?'
+ 143.322 candidate: kept from 143.322, trigger 143.913, speech onset 143.746: lead-in  +424 ms, trigger 167 ms after onset; first 100 ms dBFS -47 -38 -26 -21 -16 -14 -12 -14 -17 -16 -14
+ 144.856     heard (request 7): 'Lamp.'
+ 145.184 candidate: kept from 145.184, trigger 145.773, speech onset 145.596: lead-in  +413 ms, trigger 176 ms after onset; first 100 ms dBFS -46 -44 -41 -41 -40 -40 -39 -39 -38 -38 -38
+ 148.185     heard (request 8): 'What time is it in London?'
+ 181.749 candidate: kept from 181.749, trigger 182.340, speech onset 182.264: lead-in  +515 ms, trigger 77 ms after onset; first 100 ms dBFS -42 -24 -17 -17 -16 -14 -13 -15 -16 -14 -16
+ 183.383     heard (request 9): 'Lamp.'
+ 184.030 candidate: kept from 184.030, trigger 184.622, speech onset 184.273: lead-in  +243 ms, trigger 348 ms after onset; first 100 ms dBFS -37 -30 -22 -16 -12 -14 -13 -17 -18 -20
+ 187.586     heard (request 10): 'What time is it in London?'
+ 217.837 candidate: kept from 217.837, trigger 218.426, speech onset 218.323: lead-in  +486 ms, trigger 103 ms after onset; first 100 ms dBFS -39 -29 -21 -21 -24 -18 -17 -16 -15 -15 -17
+ 219.459     heard (request 11): 'Lamp.'
+ 219.508 candidate: kept from 219.508, trigger 220.098, speech onset 219.990: lead-in  +482 ms, trigger 108 ms after onset; first 100 ms dBFS -47 -48 -50 -41 -29 -20 -16 -15 -14 -19
+ 222.781     heard (request 12): 'Tell me a joke.'
+ 254.913 candidate: kept from 254.913, trigger 255.504, speech onset 255.428: lead-in  +515 ms, trigger 76 ms after onset; first 100 ms dBFS -36 -24 -19 -17 -16 -16 -16 -15 -17 -18 -19
+ 256.605 candidate: kept from 256.605, trigger 257.194, speech onset 257.098: lead-in  +493 ms, trigger 96 ms after onset; first 100 ms dBFS -48 -49 -48 -40 -25 -17 -13 -12 -11 -13 -17
+ 256.618     heard (request 13): 'Lamp.'
+ 258.550     heard (request 14): 'Tell me a joke.'
+ 290.890 candidate: kept from 290.890, trigger 291.481, speech onset 291.416: lead-in  +526 ms, trigger 65 ms after onset; first 100 ms dBFS -47 -26 -16 -14 -14 -14 -14 -14 -15 -16 -16
+ 293.329     heard (request 15): 'Do I need an umbrella today?'
+ 334.838 candidate: kept from 334.838, trigger 335.429, speech onset 335.346: lead-in  +507 ms, trigger 83 ms after onset; first 100 ms dBFS -33 -21 -16 -11 -10 -11 -11 -15 -15 -14 -14
+ 337.248     heard (request 16): 'Do I need an umbrella today?'
+ 340.621 candidate: kept from 340.621, trigger 340.910, speech onset 340.752: lead-in  +131 ms, trigger 158 ms after onset; first 100 ms dBFS -45 -35 -29 -28 -28 -27 -27 -28 -26 -28
+ 341.663 candidate rejected "policy"
