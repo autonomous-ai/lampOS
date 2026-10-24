@@ -714,13 +714,10 @@ fn run() -> Result<()> {
                 channels = channels.taking_late_input();
             }
             channels.connect(Path::new(dir), role, true)?;
-            // The worker's own boot, never the parent's: it stamps each
-            // requested-audio offer, which the coordinator takes only from the
-            // worker it spawned (`rig.provider.boot`). With the parent's, every
-            // offer on the second route was refused as "from another worker
-            // boot" (lamp-4ace, 24 Oct, #2793). Its memory scope's key is the
-            // worker's own too; nothing outside this worker compares it.
-            lamp_voice::second_provider::worker::serve(channels, worker, Path::new(provider_config), Path::new(second_config), files, route)?;
+            // Both boots, named: the coordinator's for the authority it sends,
+            // the worker's own for the offers it stamps (#2793, #3319).
+            let boots = lamp_voice::second_provider::worker::WorkerBoots { coordinator: parent, own: worker };
+            lamp_voice::second_provider::worker::serve(channels, boots, Path::new(provider_config), Path::new(second_config), files, route)?;
         }
         // probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS]
         [command, provider_config, second_config, rest @ ..] if command == "probe-cache" => {
