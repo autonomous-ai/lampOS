@@ -1137,6 +1137,43 @@ sound. It reaches back over whatever the detector scores as speech, and
 the canceller takes out much of a person's speech under the lamp's voice.
 A start found after the 1.6 s is still late.
 
+### A line's sound begins before its first word (24 Oct)
+
+Off unless `LAMP_SOFT_START=on`, and nothing without `LAMP_FIRST_WORDS=kept`
+(the first builder, 24 October 2026, for the lost first word after a pause
+on #3126).
+
+- **The fault:** "Lamp, what time is it in London?", said with a pause after
+  the name, was heard as "Time is it in London?". The owner's own lines lost
+  their first word the same way. A line starts on six blocks scored 0.8 or
+  more over the faint floor and keeps the 300 ms before that. The detector
+  can take longer than that to be sure of a word. q03's "what", at -11 dBFS
+  within 50 ms of its onset, started its line 278 ms in. So the line's sound
+  began 12 ms before the word, and speech to text dropped it ("Did I just
+  ask you?", four times of four that evening). With 171 ms of quiet before
+  the "what", the same kind of line was heard whole.
+- **With the switch,** an ordinary start (not a yield's, nor a line begun as
+  the lamp's sound ends) keeps 200 ms more than the usual 300 ms
+  (`SOFT_START_LEAD_BLOCKS`). If the speech-like run it starts on began
+  earlier, it begins 200 ms (`REACH_LEAD_BLOCKS`) before the run. The run is
+  judged by each block's score before the faint floor, at 0.35 or more
+  (`SILENCE_PROBABILITY`), through gaps under 100 ms
+  (`SOFT_START_GAP_BLOCKS`). That keeps a soft first word that is still
+  under the floor (`TurnDetector::soft_begin`).
+- **Bounds:**
+  - It reaches at most 500 ms (`SOFT_START_BLOCKS`) before the usual start.
+    Talk across a room that runs straight into a line adds half a second at
+    most.
+  - It never reaches past a block heard while the lamp was sounding, or kept
+    quiet for a busy answer. The coordinator gives the detector a block's
+    score before the floor only while the lamp is silent, so a start never
+    reaches into the lamp's own voice.
+  - A pause of 100 ms or more ends the run. A name said before the pause
+    isn't taken with the question.
+- `input_candidate`'s `first_read_at_us` shows where each line's sound began.
+  With `mic2/audio` recorded off the bus, which is on the voice's clock, the
+  line's onset can be set against it.
+
 ## Listening gaps (#828)
 
 Off unless `LAMP_LISTEN_GAPS=on` in the voice's environment, and nothing
