@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 03:49: current bcb carries and interrupted older Linux epoch
+
+- [Selected interrupted Linux receipt](verification/common-f978-interrupted-selected-20261025/README.md):08ed formatting0, Clippy KeyboardInterrupt125, two of eight observed, six UNRUN, no compiler/test/fresh46 credit. Exact-owned bounded cleanup and source/target release verify. Current-base direction requires bcb; old source and failed epochs remain preserved.
+- Common9df is one local commit on bcb,36owned paths;35non-README blobs/deltas exact08ed, only result status qualifier differs. Namef517 is on9df with unit/test exactf7d, no conditional3371 comment edit. Callback current copy and fresh pending gate packets continue; no source-only carry has inherited gates/READ-OK or been pushed.
+- Mac clean427 full Voice comparison remains active after fmt/Clippy/build pass. Its separate fixed-observation runner remains ungranted pending actual boundary review. Source-only fresh-call/off-camera availability case handed to Third's already-owned held-print task; no new private-read bypass found in bounded source audit. Raw stays private; no lamp action.
+
 ## 2026-10-25 03:27: provisional Name Linux receipt and current parent preparation
 
 - [Selected Name Linux receipt](verification/name-rebased-linux-selected-20261025/README.md): local 853 on f5d passes five stages/six controls/fresh 46, Voice 4200/0/24 and Update 388/0/4. Independent source/compiler/raw-output verification confirms counts; three omitted should-panic labels affect only the recorded named inventory, not aggregates or controls. Raw stays private, Mac unrun and final parent binding open.

@@ -1,0 +1,26 @@
+{
+  "cleanup_proved": true,
+  "compiler_pass": false,
+  "formal_read_ok_or_readiness_claim": false,
+  "format": "interrupted-count-sourcehash-bool-review/1",
+  "fresh46_compiler_proof": false,
+  "full_gate_pass": false,
+  "head": "08edb2e0879aee737d738f7c14954444a1f30f95",
+  "intentional_stop_reason_preserved": true,
+  "observed_stage_count": 2,
+  "public_raw_upload_authorized": false,
+  "required_stage_count": 8,
+  "scope_base": "f9780cb2a117f5c5d2c0960cd28cfbee866bd59b",
+  "source_map_sha256": "1b907596ea0d835f6558197c453db696e673c4a613b730b9e33d0e8ef127b623",
+  "source_stable": true,
+  "stage_exits": [
+    0,
+    125
+  ],
+  "state": "INTERRUPTED_INFRASTRUCTURE125",
+  "terminal_exit": 125,
+  "test_controls_executed": 0,
+  "test_pass": false,
+  "tree": "3e0ddb69bd92b2b7bb87786b43903eedd1b3f75c",
+  "unrun_stage_count": 6
+}
