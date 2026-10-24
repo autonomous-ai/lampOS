@@ -1,0 +1,119 @@
+diff --git a/lampOS/crates/expression/tests/runtime.rs b/lampOS/crates/expression/tests/runtime.rs
+index 0d05d426ae..075070a53a 100644
+--- a/lampOS/crates/expression/tests/runtime.rs
++++ b/lampOS/crates/expression/tests/runtime.rs
+@@ -495,6 +495,98 @@ mod sleep_name {
+         }
+     }
+ 
++    // This diagnostic is activated only by the exact clock-set test below.
++    // Holding the channel is a scheduling intervention, never completion evidence.
++    thread_local! {
++        static INPUT_PAUSE: std::cell::RefCell<Option<InputPauseHook>> = const {
++            std::cell::RefCell::new(None)
++        };
++    }
++    static INPUT_PAUSED_ONCE: std::sync::atomic::AtomicBool =
++        std::sync::atomic::AtomicBool::new(false);
++
++    enum InputPauseCommand {
++        Reached,
++        Cancel,
++    }
++    struct InputPauseHook {
++        command: std::sync::mpsc::Sender<InputPauseCommand>,
++        release: std::sync::mpsc::Receiver<Option<std::time::Duration>>,
++    }
++    struct ControlledInputPause {
++        command: std::sync::mpsc::Sender<InputPauseCommand>,
++        controller: Option<std::thread::JoinHandle<()>>,
++    }
++    impl ControlledInputPause {
++        fn for_observation() -> Option<Self> {
++            const MODE: &str = "LAMP_TEST_SLEEP_INPUT_PAUSE";
++            match std::env::var(MODE).as_deref() {
++                Err(std::env::VarError::NotPresent) | Ok("control") => return None,
++                Ok("after-first-joints-1100ms") => {}
++                other => panic!("invalid controlled input pause mode: {other:?}"),
++            }
++            assert!(!INPUT_PAUSED_ONCE.swap(true, std::sync::atomic::Ordering::SeqCst));
++            let (command, commands) = std::sync::mpsc::channel();
++            let (release, released) = std::sync::mpsc::channel();
++            let controller = std::thread::spawn(move || {
++                match commands.recv_timeout(std::time::Duration::from_secs(30)) {
++                    Ok(InputPauseCommand::Reached) => {}
++                    Ok(InputPauseCommand::Cancel) => return,
++                    Err(error) => panic!("input pause never reached: {error}"),
++                }
++                let began = std::time::Instant::now();
++                match commands.recv_timeout(std::time::Duration::from_millis(1_100)) {
++                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
++                        let held = began.elapsed();
++                        assert!(held >= std::time::Duration::from_millis(1_100));
++                        release.send(Some(held)).expect("pause waiter remains owned");
++                    }
++                    Ok(InputPauseCommand::Cancel)
++                    | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
++                        let _ = release.send(None);
++                    }
++                    Ok(InputPauseCommand::Reached) => panic!("input pause reached twice"),
++                }
++            });
++            INPUT_PAUSE.with(|slot| {
++                assert!(slot.borrow_mut().replace(InputPauseHook {
++                    command: command.clone(),
++                    release: released,
++                }).is_none());
++            });
++            Some(Self { command, controller: Some(controller) })
++        }
++    }
++    impl Drop for ControlledInputPause {
++        fn drop(&mut self) {
++            INPUT_PAUSE.with(|slot| { slot.borrow_mut().take(); });
++            let _ = self.command.send(InputPauseCommand::Cancel);
++            let joined = self.controller.take().expect("owned pause controller").join();
++            eprintln!("sleep-input-pause controller joined: {}", joined.is_ok());
++            if !std::thread::panicking() {
++                joined.expect("pause controller completed");
++            }
++        }
++    }
++    fn pause_after_first_joints() {
++        let hook = INPUT_PAUSE.with(|slot| slot.borrow_mut().take());
++        if let Some(hook) = hook {
++            let before_wall = runtime::unix_ms();
++            let began = std::time::Instant::now();
++            eprintln!("sleep-input-pause reached after joints: wall_ms={before_wall}");
++            hook.command.send(InputPauseCommand::Reached).unwrap();
++            let held = hook.release.recv_timeout(std::time::Duration::from_secs(5))
++                .expect("owned pause released before outer bound")
++                .expect("pause was not cancelled");
++            let elapsed = began.elapsed();
++            assert!(elapsed >= std::time::Duration::from_millis(1_100));
++            eprintln!(
++                "sleep-input-pause released: held_us={} elapsed_us={} before_wall_ms={} after_wall_ms={}",
++                held.as_micros(), elapsed.as_micros(), before_wall, runtime::unix_ms()
++            );
++        }
++    }
++
+     struct SleepingService {
+         service: runtime::Service,
+         voice: Publisher,
+@@ -753,6 +845,7 @@ mod sleep_name {
+                     },
+                 )
+                 .unwrap();
++            pause_after_first_joints();
+             // The wall clock just after publishing, as `populate` gives it.
+             let wall = runtime::unix_ms();
+             // The service places each bus input at `now` less its wall age.
+@@ -882,6 +975,7 @@ mod sleep_name {
+ 
+     #[test]
+     fn a_clock_not_set_gives_no_night_and_a_set_one_does() {
++        let _controlled_pause = ControlledInputPause::for_observation();
+         // The same night-time hour: asleep with a set clock, never without.
+         SleepingService::with(|service| service.with_clock_check(|| Some(true))).sleep();
+         let unset = [

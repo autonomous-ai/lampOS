@@ -4282,3 +4282,9 @@ Read the completed #3382 runs directly: 7,373 PASS plus one LEAK, all 7,374 sele
 Ready for lamp-voice: no
 
 Corrected Update fmt/strict twelve-package Clippy pass. Full Voice is 4,000/4/21 ignored, with complete binding and all seven originally requested cases passed. Four failures remain failed and under phase review; 99 matched executable witnesses are preserved before later build replacement. Readers continue. Canonical NoPause now runs on its own target, with explicit shared CPU context (Update four compile jobs plus NoPause two). The resource amendment and timestamp clarification prevent an isolated-load claim. [Actual failures, seven-case rows and concurrency receipts](verification/tests-current-gates-20261024/). No new test retries or product changes.
+
+## 25 October, 00:10 — Controlled post-publication gap reproduced once
+
+Ready for lamp-voice: no
+
+One 1.107-second owned pause after joint publication reaches the unchanged SleepingService two-versus-zero refusal assertion, with stale joints at 1,108 ms. This is an expected negative, not a green suite or historical cause. Fresh compile/inventory/source and all command closures verify; no retry or product change. The newly reported ARM privacy-closed tap failure is linked to this shared precondition, without claiming privacy output. [Raw controlled evidence and limits](verification/tests-sleep-publication-negative-20261024/). Existing authorization covers the narrower subscriber fixture pattern; an unapplied shared-clock scope proposal is being prepared before any API implementation.

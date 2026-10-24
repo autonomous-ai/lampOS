@@ -1,0 +1,34 @@
+[
+  {
+    "file": "README.md",
+    "sha256": "b88c0bd8329f2a706cf0f6c86cde43031323cfcf6bedece39f44e5a3efecb763"
+  },
+  {
+    "file": "diagnostic-only.patch",
+    "sha256": "98c7c7f7b670c1e4d2da64fb23513cd6cc80ecdfce67dba8d1f57775d1dc1a82"
+  },
+  {
+    "file": "frozen-executable.json",
+    "sha256": "2bb191d6681adb9aec00fd3a1f8fe051b9deef7e345f6f640d60ad7bc6adb874"
+  },
+  {
+    "file": "inventory.json",
+    "sha256": "231e59221e85c0bea71aab087ea9891fd70b55b9b41329b5ba6d7037ea2095f3"
+  },
+  {
+    "file": "local-library-lineage.json",
+    "sha256": "44ada25a00d4278fd6722bb6f88ac04497c18f8acb5c3bb66b51aa4a74ac0060"
+  },
+  {
+    "file": "plan.json",
+    "sha256": "f176b21bd3f6c629f00e87307cacb77e54bd825d26ab8265e37b025e23e8a0a1"
+  },
+  {
+    "file": "raw-controlled-streams.json",
+    "sha256": "318360ebe54be17949efec5fe81881c5cede85011b6c2ae964abfd69dbb5ad23"
+  },
+  {
+    "file": "result.json",
+    "sha256": "64fb9516b5abc71aa0f8fc32ed36bb75a074df2e9b56f6598a39e823d667b6a0"
+  }
+]

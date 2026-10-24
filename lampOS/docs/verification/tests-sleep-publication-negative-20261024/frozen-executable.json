@@ -1,0 +1,50 @@
+{
+  "original": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/runtime-4128ad189403a8f0",
+    "sha256": "c5b0b9e9fa4a08ef0d78d1f5a5e5f3e99ced1941e5e3b9e5b740e134e1daaf49",
+    "mode": "0o755",
+    "bytes": 8243264
+  },
+  "saved": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleeping-service-source-design/reproduction-prep/applied-43ac6c843/shared-target-control/run-2026-10-24T165028.908453+0000/frozen-runtime-executable",
+    "sha256": "c5b0b9e9fa4a08ef0d78d1f5a5e5f3e99ced1941e5e3b9e5b740e134e1daaf49",
+    "mode": "0o555",
+    "bytes": 8243264
+  },
+  "compiler_artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "runtime",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/tests/runtime.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/runtime-4128ad189403a8f0"
+    ],
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/runtime-4128ad189403a8f0",
+    "fresh": false
+  },
+  "source_guards": {
+    "sleep": "f93d73204faf1b78643818ef4ca5c5a027185d61a5bee105d2a4dc9e54c40470"
+  },
+  "child_scope": "Selected sleep clock-set case invokes SleepingService fixtures and injected functionpointer clock checks only. Hook spawns one ownedstdthread, cancels/releases/joins on unwind. No JournalChild test or othercase executed; no external subprocess child."
+}

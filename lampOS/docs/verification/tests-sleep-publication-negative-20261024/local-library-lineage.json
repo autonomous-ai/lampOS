@@ -1,0 +1,527 @@
+[
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/bus#lamp-bus@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/bus/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_bus",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/bus/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_bus-8d0165f0ddd9c2ba.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_bus-8d0165f0ddd9c2ba.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_bus-8d0165f0ddd9c2ba.rlib",
+        "sha256": "3e2072fc7fdfed0acc50ec2bb91933f7376889976fd8326ec6ea3760ae2b91c9",
+        "mode": "0o644",
+        "bytes": 6533368
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_bus-8d0165f0ddd9c2ba.rmeta",
+        "sha256": "c38067bd46ff26c86c6c5e96670e1c7b7b6e69d0ff67ba38a934a5ec842735b6",
+        "mode": "0o644",
+        "bytes": 563356
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/msgs/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_msgs",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/msgs/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_msgs-80f53b9c6d09cd9a.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_msgs-80f53b9c6d09cd9a.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_msgs-80f53b9c6d09cd9a.rlib",
+        "sha256": "5f7ef69bda8eb6fbb7217c04e332c501cd6a643eb412a8a02c1d14ebf07ac179",
+        "mode": "0o644",
+        "bytes": 15011024
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_msgs-80f53b9c6d09cd9a.rmeta",
+        "sha256": "debae22569b04ee06085e91cffca01ec029f7f1f1b03f3742ea91ecea865410a",
+        "mode": "0o644",
+        "bytes": 6169838
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/lean#lamp-lean@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/lean/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_lean",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/lean/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_lean-52670de8f912077b.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_lean-52670de8f912077b.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_lean-52670de8f912077b.rlib",
+        "sha256": "350d87fbc4dcc5ac003bae4de54e9441024f20e5c419b305c847bd6c2fccb4a4",
+        "mode": "0o644",
+        "bytes": 1904624
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_lean-52670de8f912077b.rmeta",
+        "sha256": "a5f42a07d6730255900ac122db9ca83326440c262feab438cfe2be90543f9a94",
+        "mode": "0o644",
+        "bytes": 294373
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/keeper/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_keeper",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/keeper/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_keeper-cf1fa984ac52b82c.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_keeper-cf1fa984ac52b82c.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_keeper-cf1fa984ac52b82c.rlib",
+        "sha256": "c19a933ce0d1f29d43dd6d54fc58f993874ed0910d0d3d4794896923265a0937",
+        "mode": "0o644",
+        "bytes": 4511912
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_keeper-cf1fa984ac52b82c.rmeta",
+        "sha256": "20ca9fe2c47d7ddc42503024634de64c258068fdb277b0c3587efa9f1211a1be",
+        "mode": "0o644",
+        "bytes": 239680
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/ipc/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_ipc",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/ipc/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_ipc-35169ada1be49630.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_ipc-35169ada1be49630.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_ipc-35169ada1be49630.rlib",
+        "sha256": "827c1edae668f101872310a4f9dddaadd9dc9917864e82ef9fac47f44e05f7f3",
+        "mode": "0o644",
+        "bytes": 1440048
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_ipc-35169ada1be49630.rmeta",
+        "sha256": "c34d6d110416374a1a8a2544db2d714eb90b0a68be082db281a692f84460d22e",
+        "mode": "0o644",
+        "bytes": 74359
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/turn-owner/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_turn_owner",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/turn-owner/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_turn_owner-4e8192b982ce99ba.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_turn_owner-4e8192b982ce99ba.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_turn_owner-4e8192b982ce99ba.rlib",
+        "sha256": "254d565ec95a65751fc32bd23f0a59854850254ebd2bfb3262a6786cafd9f6aa",
+        "mode": "0o644",
+        "bytes": 958384
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_turn_owner-4e8192b982ce99ba.rmeta",
+        "sha256": "bdfb470404b08dec2791fea9c28d8c5d1569899b3314d34522313a26a474fbd9",
+        "mode": "0o644",
+        "bytes": 514276
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/local-time/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_local_time",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/local-time/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_local_time-65a349301943f6bf.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_local_time-65a349301943f6bf.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_local_time-65a349301943f6bf.rlib",
+        "sha256": "48210905f3fc32ec8addcd7fa9ba66cd3423fd0765ad32be9fe4dd520f937eac",
+        "mode": "0o644",
+        "bytes": 1526168
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_local_time-65a349301943f6bf.rmeta",
+        "sha256": "737f3900da0db2e70b055c61369d391326681580a17d90a7572a9da7176d9a4b",
+        "mode": "0o644",
+        "bytes": 37488
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_body-2aff5fd4b938293c.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_body-2aff5fd4b938293c.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_body-2aff5fd4b938293c.rlib",
+        "sha256": "39d2751186c7f8e6fd9ec97ccd782a7283afd60c889cda9bc6bf691f8e6bebdd",
+        "mode": "0o644",
+        "bytes": 12233032
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_body-2aff5fd4b938293c.rmeta",
+        "sha256": "19c003c40058a74a70166f06f5810de1fa908e5cd5789b797249674a4abf65b2",
+        "mode": "0o644",
+        "bytes": 3339969
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_expression-2913822613a5ac53.rlib",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_expression-2913822613a5ac53.rmeta"
+      ],
+      "executable": null,
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_expression-2913822613a5ac53.rlib",
+        "sha256": "2e42848b4258eeb2254640d0d748194c60882a5e4836b1918effc34be675d3fc",
+        "mode": "0o644",
+        "bytes": 19698336
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/liblamp_expression-2913822613a5ac53.rmeta",
+        "sha256": "911bf4b2b19136255e878380238329ef61d1c8affcaf0dcbeeb5055b488717f4",
+        "mode": "0o644",
+        "bytes": 1994001
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/lamp-expression"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/lamp-expression",
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/lamp-expression",
+        "sha256": "2b844e9c2aeda3b8229de997955f8b662df15cb67d3baa2ef7f06c1242ef0266",
+        "mode": "0o755",
+        "bytes": 10452672
+      }
+    ]
+  },
+  {
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/runtime-4128ad189403a8f0"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/runtime-4128ad189403a8f0",
+      "fresh": false
+    },
+    "output_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target/debug/deps/runtime-4128ad189403a8f0",
+        "sha256": "c5b0b9e9fa4a08ef0d78d1f5a5e5f3e99ced1941e5e3b9e5b740e134e1daaf49",
+        "mode": "0o755",
+        "bytes": 8243264
+      }
+    ]
+  }
+]

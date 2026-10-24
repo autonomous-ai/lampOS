@@ -1,0 +1,139 @@
+{
+  "identity": "sleeping-service-post-publication-negative-43ac-v2-shared",
+  "execution_authorized": false,
+  "source_only_preparation": true,
+  "recovery_root": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target",
+  "variants": [
+    {
+      "name": "sleep",
+      "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-admission-repro",
+      "branch": "tests/1569-sleep-admission-repro",
+      "head": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+      "owned_paths": [
+        "lampOS/crates/expression/tests/runtime.rs"
+      ],
+      "source_map": "sleep-source-map.json",
+      "source_map_sha256": "5ec4f8da138e96a7ae969a1ab44dc00dde71c4fc2880c7582f8f52eb3d475158",
+      "tracked_paths": 10442
+    }
+  ],
+  "packages_to_invalidate": [
+    "lamp-actions",
+    "lamp-audio",
+    "lamp-body",
+    "lamp-bus",
+    "lamp-camera",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-gemini",
+    "lamp-health",
+    "lamp-ipc",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-local-time",
+    "lamp-msgs",
+    "lamp-near-call",
+    "lamp-policy",
+    "lamp-ring",
+    "lamp-schedule",
+    "lamp-skills",
+    "lamp-tasks",
+    "lamp-turn-end-wire",
+    "lamp-turn-owner",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-processes",
+    "sonora",
+    "tough"
+  ],
+  "compile_argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-expression",
+    "--test",
+    "runtime",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "case": "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+  "mode_key": "LAMP_TEST_SLEEP_INPUT_PAUSE",
+  "mode": "after-first-joints-1100ms",
+  "expected": "fail-original-refused-assert-with-stale-joints",
+  "original_assertion": {
+    "file": "crates/expression/tests/runtime.rs",
+    "line": 857,
+    "source": "assert_eq!(self.service.counts.refused, 0);"
+  },
+  "diagnostics": [
+    "exactcase once, one result summary",
+    "one reached-after-joints marker",
+    "one held/elapsed_us>=1100000 release marker",
+    "one controller joined:true marker even when original assert unwinds",
+    "original refused-count assertion panic at frozen source line857",
+    "stale body/joint_states age>500ms; do not require exactly2refusals"
+  ],
+  "timeouts": {
+    "clean": 300,
+    "compile": 3600,
+    "list": 60,
+    "negative": 120
+  },
+  "minimum_free_bytes": 5368709120,
+  "root_grant_scope": "one-sleeping-service-compile-list-negative-observation",
+  "protocol": "ONE compile/inventory/negative case observation, plus explicit28localpackageclean; no control observation/warmup/repeat. Validunexpectedcaseoutcome retained; infrastructure/source/storage/census invalid stops. Expectednegative101 is diagnostic completion, not greenproduct/testsuite. No historicalcause claim.",
+  "metadata_proof": "Exact10442trackedbytes/symlinktargets/indexGitmode/executablebit; sourcefullPOSIXmodes/mtimes/ctime/ownership NOT claimed. Executablebytes/fullmode bound separately.",
+  "child_scope": "Selected sleep clock-set case invokes SleepingService fixtures and injected functionpointer clock checks only. Hook spawns one ownedstdthread, cancels/releases/joins on unwind. No JournalChild test or othercase executed; no external subprocess child.",
+  "permanent_consumption": "Rootgrant binds finalplan/controller/sourceguard/head/exclusivetargetCPUrelease. Permanent O_EXCL+fsync execution sentinel beforetarget/commands; permanent prelaunch negative receipt; never reset afterabort.",
+  "source_compatibility": "Entire sleep_name module is byte-identical22b\u219243ac before private9feeoverlay. Upstream3386 preserved, NoPause case remains original43ac. No Bus API/clock seam or canonical NoPause fix included.",
+  "root_grant_schema": {
+    "plan_identity": "sleeping-service-post-publication-negative-43ac-v2-shared",
+    "plan_sha256": "ACTUAL_FINAL_PLAN_SHA256",
+    "controller_sha256": "ACTUAL_FINAL_RUN_PY_SHA256",
+    "source_map_sha256": {
+      "sleep": "5ec4f8da138e96a7ae969a1ab44dc00dde71c4fc2880c7582f8f52eb3d475158"
+    },
+    "source_guards": "actual mapping from prepare-only",
+    "source_heads": {
+      "sleep": "43ac6c843ea91dfc051a9d25e165c9d93f895942"
+    },
+    "execution_authorized": true,
+    "grant_scope": "one-sleeping-service-compile-list-negative-observation",
+    "exclusive_target_grant": {
+      "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target",
+      "previous_owner_released": true,
+      "cpu_exclusive": false,
+      "target_exclusive": true
+    },
+    "grant_id": "UNIQUE_ROOT_GRANTED_NONEMPTY_ID",
+    "concurrency_context": {
+      "other_active_native_session": 98367,
+      "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+      "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target",
+      "other_compile_jobs": 2,
+      "this_compile_jobs": 2,
+      "bounded_combined_compile_jobs": 4,
+      "cpu_exclusive": false,
+      "targets_distinct_and_exclusive": true,
+      "isolated_load_or_timing_claim": false
+    }
+  },
+  "freshness": "Explicit28localpackage clean immediately before singlecompile; actual pathcompiler-artifacts must fresh=false and currentWTmanifest; compilerprofile/features/source/executable SHA/mode archived. No diagnosticNoPause binary reuse.",
+  "storage": "Reserve5GiB before clean/compile/list/negative, plus requiredfrozenexecutablebytes beforecopy. Save available/required receipt beforechecking; lowstorage invalidates, rawcompletedcommand/streams preserved.",
+  "concurrency_context": {
+    "other_active_native_session": 98367,
+    "other_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-diagnostic-target",
+    "other_compile_jobs": 2,
+    "this_compile_jobs": 2,
+    "bounded_combined_compile_jobs": 4,
+    "cpu_exclusive": false,
+    "targets_distinct_and_exclusive": true,
+    "isolated_load_or_timing_claim": false
+  }
+}
