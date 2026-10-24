@@ -172,6 +172,10 @@ struct Shared {
     ready: AtomicBool,
     lease_until_us: AtomicU64,
     samples: Mutex<Option<Vec<i16>>>,
+    /// Why the recording was cancelled, the first reason only, said once in
+    /// the journal (#2793: on lamp-4ace an accepted recording was revoked
+    /// with nothing to say why).
+    cancelled_for: std::sync::OnceLock<&'static str>,
     #[cfg(test)]
     changed: Condvar,
     #[cfg(test)]
@@ -179,6 +183,17 @@ struct Shared {
 }
 
 impl Shared {
+    /// [`Self::cancel`], naming why: the first reason is kept and said once.
+    fn cancel_for(&self, why: &'static str) {
+        if self.cancelled_for.set(why).is_ok() && self.terminal.load(Ordering::Acquire) == ACTIVE {
+            eprintln!(
+                "lamp-voice: request {}: requested audio cancelled: {why}",
+                self.offer.context.request
+            );
+        }
+        self.cancel();
+    }
+
     fn cancel(&self) {
         let _ =
             self.terminal
@@ -193,37 +208,52 @@ impl Shared {
     }
 
     fn limit(&self, now_us: u64, playback: bool) -> Option<u64> {
-        let check = || {
-            if self.terminal.load(Ordering::Acquire) != ACTIVE
-                || !self.running.live()
-                || now_us < self.offer.issued_us
-                || (playback && !self.ready.load(Ordering::Acquire))
-            {
-                return None;
+        let check = || -> Result<u64, &'static str> {
+            if self.terminal.load(Ordering::Acquire) != ACTIVE {
+                return Err("already ended");
+            }
+            if !self.running.live() {
+                return Err("the requested-audio service stopped");
+            }
+            if now_us < self.offer.issued_us {
+                return Err("checked before the offer was issued");
+            }
+            if playback && !self.ready.load(Ordering::Acquire) {
+                return Err("its recording was not ready");
             }
             let mut until = if self.started.load(Ordering::Acquire) {
                 self.offer.finish_before_us
             } else {
                 self.offer.start_before_us
             };
-            until = until.min(
-                self.speaker
-                    .cache
-                    .try_lock()
-                    .ok()?
-                    .deadline(&self.fence, now_us)?,
-            );
+            let Ok(cache) = self.speaker.cache.try_lock() else {
+                return Err("the speaker's state was being read");
+            };
+            let Some(speaker) = cache.deadline(&self.fence, now_us) else {
+                return Err("the speaker's state was stale, changed or unknown");
+            };
+            drop(cache);
+            until = until.min(speaker);
             let lease = self.lease_until_us.load(Ordering::Acquire);
             if playback || lease != 0 {
                 until = until.min(lease);
             }
-            (now_us < until).then_some(until)
+            if now_us >= until {
+                return Err(if until == lease {
+                    "its Skills lease lapsed"
+                } else {
+                    "past its time"
+                });
+            }
+            Ok(until)
         };
-        let permitted = check();
-        if permitted.is_none() {
-            self.cancel();
+        match check() {
+            Ok(until) => Some(until),
+            Err(why) => {
+                self.cancel_for(why);
+                None
+            }
         }
-        permitted
     }
 }
 
@@ -472,6 +502,7 @@ impl Service {
             ready: AtomicBool::new(false),
             lease_until_us: AtomicU64::new(0),
             samples: Mutex::new(None),
+            cancelled_for: std::sync::OnceLock::new(),
             #[cfg(test)]
             changed: Condvar::new(),
             #[cfg(test)]
@@ -836,16 +867,19 @@ fn authorize(
 
 fn prepare(socket: &Path, shared: &Shared, renew_at: &mut u64, time: &impl WorkerTime) -> bool {
     if !authorize(socket, shared, RequestedAudioPhase::Start, time) {
+        shared.cancel_for("Skills refused its start");
         return false;
     }
     *renew_at = time.now_us().saturating_add(RENEW_US);
     let Ok(sound) = super::read_sound(Path::new(&shared.offer.asset)) else {
+        shared.cancel_for("its recording could not be read");
         return false;
     };
-    if sound.sha256 != shared.offer.sha256
-        || sound.samples.len() != shared.offer.frames as usize
-        || shared.limit(time.now_us(), false).is_none()
-    {
+    if sound.sha256 != shared.offer.sha256 || sound.samples.len() != shared.offer.frames as usize {
+        shared.cancel_for("its recording is not the one offered");
+        return false;
+    }
+    if shared.limit(time.now_us(), false).is_none() {
         return false;
     }
     let Ok(mut samples) = shared.samples.lock() else {
@@ -881,7 +915,7 @@ fn work(
         while shared.limit(time.now_us(), false).is_some() {
             if time.now_us() >= renew_at {
                 if !authorize(socket, &shared, RequestedAudioPhase::Renew, time) {
-                    shared.cancel();
+                    shared.cancel_for("Skills refused a lease renewal");
                     break;
                 }
                 renew_at = time.now_us().saturating_add(RENEW_US);
@@ -988,6 +1022,7 @@ mod tests {
                 ready: AtomicBool::new(ready),
                 lease_until_us: AtomicU64::new(if ready { now_us + 500_000 } else { 0 }),
                 samples: Mutex::new(ready.then(|| vec![100; 480])),
+                cancelled_for: std::sync::OnceLock::new(),
                 changed: Condvar::new(),
                 fixture_time: None,
             }),
