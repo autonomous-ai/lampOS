@@ -136,6 +136,8 @@ pub struct Settings {
     /// A name is kept only if the person said it, and a face keeps one
     /// name (`LAMP_NAMES=checked`, [`crate::known_faces::said_by_them`]).
     pub names_checked: bool,
+    /// Save only the face seen speaking this exact request.
+    pub remember_speaker: bool,
     /// The person at the lamp may say yes or no to being named in Who was
     /// here (`LAMP_WHO_WAS_HERE_NAMES=on`, [`crate::known_faces::TELL`]).
     pub who_visits: bool,
@@ -184,6 +186,13 @@ pub fn arguments_from_environment() -> Vec<String> {
                 .ok()
                 .as_deref(),
         ));
+        if crate::remember_speaker::switched_on(
+            std::env::var(crate::remember_speaker::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ) {
+            flags.push(crate::remember_speaker::FLAG.to_owned());
+        }
         flags.extend(crate::known_faces::visits_arguments(
             std::env::var(crate::known_faces::VISITS_ENVIRONMENT)
                 .ok()
@@ -354,6 +363,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             && flag == crate::known_faces::NAMES_FLAG
         {
             settings.names_checked = true;
+            flags = rest;
+        }
+        if let [flag, rest @ ..] = flags
+            && flag == crate::remember_speaker::FLAG
+        {
+            settings.remember_speaker = true;
             flags = rest;
         }
         if let [flag, rest @ ..] = flags
@@ -886,6 +901,7 @@ pub const APP_CALLS: [&str; 2] = ["volume_level", "volume_to"];
 fn face_switches(settings: &Settings) -> crate::known_faces::FaceSwitches {
     crate::known_faces::FaceSwitches {
         checked: settings.names_checked,
+        remember_speaker: settings.remember_speaker,
         visits: settings.who_visits && settings.memory.is_some(),
     }
 }
@@ -1160,6 +1176,9 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
     }
     match route {
         Route::Memory(socket) => {
+            if crate::remember::is_forget(&call.name) {
+                crate::remember_speaker::forget();
+            }
             let began = std::time::Instant::now();
             // A text names no day the lamp heard: a `remember`'s `on` goes (#1693).
             let call = crate::remember::on::call_as_heard(call, None);
@@ -1409,6 +1428,9 @@ fn run_call_with_scope(
     let deadline = ASK_DEADLINE;
     let result = match route {
         Route::Memory(socket) => {
+            if crate::remember::is_forget(&call.name) {
+                crate::remember_speaker::forget();
+            }
             // A `forget` whose heard line names what to forget is that
             // thing's, of the asker's own scope, never the last kept thing's
             // (#3113), on every switch.
@@ -1527,13 +1549,25 @@ fn run_call_with_scope(
             // anyone (`LAMP_MEMORY_FOLLOWS_FACE`), whatever its outcome.
             if call.name == crate::known_faces::FORGET {
                 crate::follows_face::forgot();
+                if switches.remember_speaker {
+                    crate::remember_speaker::forget();
+                }
             }
             // Who the eyes saw saying this line: a room's "forget my face"
             // forgets only a face seen saying it (El's P2 on #3018).
-            let line = (call.name == crate::known_faces::FORGET && person.is_none())
+            let line = ((call.name == crate::known_faces::FORGET && person.is_none())
+                || (call.name == crate::known_faces::REMEMBER && switches.remember_speaker))
                 .then(|| crate::speaking_faces::line_seen(request))
                 .flatten();
-            let told = crate::known_faces::run_for(socket, call, *switches, person, line.as_ref());
+            let told = crate::known_faces::run_scoped(
+                socket,
+                call,
+                *switches,
+                person,
+                line.as_ref(),
+                request,
+                lease,
+            );
             // "Forget my face" by the known person whose line it is: their
             // memory goes with it (`LAMP_MEMORY_FORGET_ALL`, #2850).
             let told = match lease {
@@ -1916,6 +1950,7 @@ mod tests {
                 request,
                 speakers: vec![speaker.to_owned()],
                 known: crate::speaking_faces::known_with_face(&known),
+                enrollment: None,
             })
         };
         seen(request, "f2");
@@ -1984,6 +2019,7 @@ mod tests {
         let on = FaceSwitches {
             checked: false,
             visits: true,
+            remember_speaker: false,
         };
         let route = Route::Faces(socket.clone(), on);
         let call = |name: &str| ToolCall {
@@ -2204,6 +2240,7 @@ mod tests {
             who: Some("/run/lampos-eyes/request.sock".into()),
             // The checked `remember_my_face`, with `replace` (#1057).
             names_checked: true,
+            remember_speaker: true,
             who_visits: false,
             photo_faces: false,
             mark: Some("/var/lib/lampos-voice/session".into()),
@@ -2453,6 +2490,7 @@ mod tests {
                 schedule_speak: true,
                 who: Some("/run/lampos-eyes/who.sock".into()),
                 names_checked: false,
+                remember_speaker: false,
                 who_visits: false,
                 photo_faces: false,
                 mark: None,

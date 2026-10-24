@@ -95,6 +95,10 @@ const NOT_PASSED: &[(&str, &str)] = &[
     ),
     ("LAMP_NAMES", "the coordinator's, given as an argument"),
     (
+        "LAMP_REMEMBER_SPEAKER",
+        "the coordinator's, given as --remember-speaker",
+    ),
+    (
         "LAMP_WHO_WAS_HERE_NAMES",
         "the coordinator's, given as an argument",
     ),
@@ -673,6 +677,40 @@ fn session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker()
         !passed(setting),
         "the reader group belongs only to continuous coordinator startup"
     );
+}
+
+#[test]
+fn remember_speaker_arguments_survive_both_workers_cleared_environments() {
+    let boot = super::new_boot().unwrap();
+    let flags = [
+        "--who-socket",
+        "/tmp/eyes.sock",
+        "--names-checked",
+        crate::remember_speaker::FLAG,
+    ];
+    for role in ["provider", "second"] {
+        let command = super::worker_command(
+            Path::new("/bin/true"),
+            Path::new("/"),
+            role,
+            (boot, boot),
+            &flags,
+            |_| None,
+        );
+        let args: Vec<_> = command
+            .get_args()
+            .map(|arg| arg.to_str().unwrap().to_owned())
+            .collect();
+        let at = args.iter().position(|arg| arg == "--who-socket").unwrap();
+        let (settings, rest) = crate::tools::take(&args[at..]).unwrap();
+        assert!(settings.remember_speaker && settings.names_checked);
+        assert!(rest.is_empty());
+        assert!(
+            !command
+                .get_envs()
+                .any(|(key, _)| key == crate::remember_speaker::ENVIRONMENT)
+        );
+    }
 }
 
 #[test]

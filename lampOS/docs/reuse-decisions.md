@@ -1,5 +1,34 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Bind live face enrollment to its speaker (2026-10-24)
+
+Read V1's `hal/realtime/orchestrator.py` delegate description and
+`skills/face-enroll/reference/self-enroll-camera.md`. Keep the spoken-name
+check, refusal to borrow a stale current-user name, and confirmation only
+after enrollment actually succeeds. Change the assumption that the visible
+face belongs to the requester: V1's camera flow also permits a text request
+while assuming its sender is in front of the camera. The guarded Rust path
+requires evidence from the current microphone line and the face seen speaking
+it; no remote text or prior person's words supply that consent.
+
+Reuse Rust's speaking-face reader, bounded cancellable socket exchange,
+camera permission holds, original driver frame times, existing SFace prints
+and 0.363 matching threshold. A tracking ID is not identity: its IoU tracker
+can assign the same ID to a replacement in the same position. Keep one
+immutable speaking-frame print for comparison throughout capture; bound the
+temporary anchor history to 16 prints and 30 seconds. Reuse the existing
+People mutation path and its actual result, without a V1 runtime bridge,
+new inference dependency or automatic privacy opening. Guarded renaming
+waits for a future same-speaker confirmation design; it fails closed here.
+
+The distinct internal `remember_speaker` operation makes mixed-version
+Voice/Eyes pairs refuse unsupported proof instead of ignoring an added
+field and enrolling unguarded. The switch is off by default on both sides.
+The existing four-second capture and six-second tool deadline stay fixed;
+no extra background inference or capture delay is introduced. Host regressions
+do not establish physical enrollment accuracy, end-to-end latency, or V1
+parity. Those remain separate lamp checks.
+
 ## Face repair writer prerequisite (2026-10-23)
 
 Read V1's `system/server/device/delivery/mqtt/face_enroll_handler.go` and

@@ -40,6 +40,7 @@ pub mod mesh;
 pub mod permit;
 pub mod photo;
 pub mod picture;
+pub mod remember_speaker;
 pub mod reopen;
 pub mod repair_writer;
 pub mod seems;

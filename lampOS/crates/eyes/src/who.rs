@@ -1429,6 +1429,7 @@ fn repair_file(path: &Path) -> io::Result<(PathBuf, File)> {
 /// is nothing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
+    RememberSpeaker(crate::remember_speaker::Request),
     Remember(String),
     RememberOne {
         name: String,
@@ -1473,6 +1474,16 @@ pub enum Ask {
 }
 
 pub fn ask_of(line: &[u8]) -> Option<Ask> {
+    // A distinct operation makes older Eyes refuse the guarded request,
+    // rather than silently treating an unknown proof as an ordinary save.
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Speaker {
+        remember_speaker: crate::remember_speaker::Request,
+    }
+    if let Ok(Speaker { remember_speaker }) = serde_json::from_slice(line) {
+        return Some(Ask::RememberSpeaker(remember_speaker));
+    }
     // A face from a photo's consent (`--photo-dir`): one of these alone.
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -1780,6 +1791,9 @@ pub fn after_remembering(looked_for: &mut Option<Instant>, kept: bool) {
 #[derive(Debug)]
 pub struct Taking {
     pub name: String,
+    /// Present only for speaker-bound enrollment; checked before every
+    /// accepted print and once more at the final store boundary.
+    pub speaker: Option<crate::remember_speaker::Guard>,
     /// One name for one face, and whether to replace another name for it
     /// (`Ask::RememberOne`); `None`: as asked plainly.
     pub one_face: Option<bool>,
@@ -1839,6 +1853,7 @@ impl Taking {
     pub fn new(name: String, now_us: u64) -> Self {
         Self {
             name,
+            speaker: None,
             one_face: None,
             apart: false,
             prints: Vec::new(),
@@ -1865,6 +1880,32 @@ impl Taking {
             && self.prints.len() < MOST_PRINTS
         {
             self.prints.push(print);
+        }
+    }
+
+    /// The real camera path: the optional speaker guard sees every fresh
+    /// capture before the legacy sample collector can accept its print.
+    pub fn look_seen(
+        &mut self,
+        heights: &[f32],
+        print: Option<Vec<f32>>,
+        face: Option<&str>,
+        frame_us: u64,
+        now_us: u64,
+        hold: Option<u64>,
+    ) {
+        let accepts = self.speaker.as_mut().is_none_or(|guard| {
+            guard.looked(
+                face,
+                print.as_deref(),
+                heights.iter().filter(|h| **h >= NEAR_ENOUGH).count() == 1,
+                frame_us,
+                now_us,
+                hold,
+            )
+        });
+        if accepts {
+            self.look(heights, print);
         }
     }
 
