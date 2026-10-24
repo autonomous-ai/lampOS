@@ -8392,3 +8392,7 @@ Fourth still needs that concrete head for the assigned independent read.
 ## 2026-10-23: Skills early-refusal review
 
 Assigned #3277 read complete on 1806a691d, P1/P2 none. [Source/evidence review](verification/skills-refusal-review-1806a691d-20261023/README.md) verifies the narrow fixture change, preserved assertions and ordering, local census and current native result. No independent Cargo or lamp run. First owns the standalone merge; Common must then carry and qualify again. Photo/Name remain behind Common and their recorded contract/physical decisions.
+
+## 2026-10-24: current Common carry and next rollback row
+
+Resumed under the continuous-work order. #3277 is landed. Common is resolved on 1d915d44c with the crop/hold and newer Voice/Update behavior preserved; [source audits](verification/common-current-carry-audit-20261024/README.md) are complete. Both host gates are running on frozen tree7b5df82fd. Claimed #2809's SQLite rollback floor and cleanup/session reader pair; actual Memory binary tests are being authored independently. No lamp action or new qualified result yet.

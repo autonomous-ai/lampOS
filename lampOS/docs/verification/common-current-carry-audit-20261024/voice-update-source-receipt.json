@@ -1,0 +1,359 @@
+{
+  "created_utc": "2026-10-24T01:15:14.927265+00:00",
+  "worktree": "/private/tmp/fourth-common-current-20261024",
+  "head": "1d915d44c97fcdd980a8a5d9c9e4fecc9570d746",
+  "old_Common": "4d634474e740bd093430ac5ab62801fa9629f014",
+  "old_base": "be16c3327524ccef8a1908a3b8ebf40c16efba8a",
+  "current_main": "1d915d44c97fcdd980a8a5d9c9e4fecc9570d746",
+  "upstream_added_removed_sequences_exact": true,
+  "upstream_changed_paths": 29,
+  "Common_signed_line_multisets_exact": true,
+  "Common_changed_paths_in_scope": 22,
+  "hunk_alignment_only_sequence_differences": [
+    "lampOS/crates/voice/src/second_provider/worker.rs"
+  ],
+  "comparison_limit": "Worker diff alignment moves unchanged braces/deletion placement; signed-line multisets match and authority regions below are byte-exact. No execution claim.",
+  "unchanged_authority_files": [
+    "lampOS/crates/voice/src/memory_scope.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/second_provider/services.rs",
+    "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+    "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+    "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+    "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+    "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs"
+  ],
+  "unchanged_authority_segments": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "name": "private_speaker_permission",
+      "sha256": "ee106acfefd24aed4641ebdc3ba3a805f0f87cd5f966fd1c37f3f6469efe90e4",
+      "byte_exact_to_old_Common": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "name": "memory_context",
+      "sha256": "4c8194e210af28ab401946f24cce474d4c41ff68b434e686fc59a48efe5f1229",
+      "byte_exact_to_old_Common": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "name": "memory_disclosure",
+      "sha256": "3cdef899a5409a2b0e25a4b8d76dff7d3fe99867ec366aedaccee6a2b96dcc7f",
+      "byte_exact_to_old_Common": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "name": "memory_whose",
+      "sha256": "b8cdc6b0e9a4fce7bd2a18b331ac2b8a72bbb0af4d1bd7c4b14fff3c787eef2a",
+      "byte_exact_to_old_Common": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "name": "memory_read_permission",
+      "sha256": "01825c8c363fc574363511b0045b1fd8ae78df171acde70ccbbc75250f67096a",
+      "byte_exact_to_old_Common": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/speaking_faces.rs",
+      "from": "    pub(crate) fn positive_speaker(",
+      "through_before": "    /// Forget every look:",
+      "sha256": "e40d3ec8e2db4b456ac08bde137741a9aa47fcc925d776e7602aca99a1b3b90b",
+      "byte_exact_to_old_Common": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/speaking_faces.rs",
+      "from": "pub(crate) enum KnownSpeakerSource",
+      "through_before": "/// Whether a line admitted for `person`",
+      "sha256": "1089fd85dc94c50efbd1e4df1b6bb8c1093cae170a361b3f665fe9e58cb5fcd2",
+      "byte_exact_to_old_Common": true
+    }
+  ],
+  "source_files": {
+    "lampOS/crates/update/src/apply.rs": {
+      "index_blob": "c68150cc104c2b62bb37dc54470e7f995af211d6",
+      "sha256": "8b6c9d73865dcc61a211486b1bf566bbc61ff626751f1dc24a6e360f80d8a3b7",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/src/head_touch.rs": {
+      "index_blob": "f57efdd3da978fde93dd62a3b57db2b90b410933",
+      "sha256": "8a3096797778d5072eef0187f4d10ed3c7245bb8d83fcb4dd619279868be5bf0",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/src/install.rs": {
+      "index_blob": "0c1e4b36df285ec2d9f0a93286042ca4e354f8cb",
+      "sha256": "af713c6d89eaf59cb272ac7d82cdef529da553a1724efd8da675609ca3e3b47e",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/src/unit.rs": {
+      "index_blob": "1d50a9db4bb6cc21d13f9598c55cbaa29021ebc8",
+      "sha256": "cec708ff2c716e46f02736b6fcea2dec0c972e342430fbc2cbea70a5375bcc4f",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/tests/install.rs": {
+      "index_blob": "0cb5da2988e48ae60aae949afba0cd14eaab90aa",
+      "sha256": "48dc786269f9d3e8730e29a57dd72ce3c2e9903d0beea08b4a247165bdaf1202",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/tests/release_pair.rs": {
+      "index_blob": "ade76f20c5db1cc9467623b1a752d31de256a06b",
+      "sha256": "6ff8c240b6064654ab3640e6bee009ae0f9c5c13a8ef2d3569e17d79df7a1812",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/tests/release_pair/run.sh": {
+      "index_blob": "4a03e247dd696f72222ca2597a2e4422c6e524d3",
+      "sha256": "9ec752bf75d942ed16ee35372513db659a6bf20026ff4a70f7ece3ba737c582d",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/tests/release_pair/systemctl.sh": {
+      "index_blob": "af367ceec4ef5734ae0b1a37fce5ef40d83adb17",
+      "sha256": "8b2a06b747aa406caed9beb6ca475bf2e75a3c895a8298ce6dc1f81bc2d13e77",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/update/tests/round/head_touch.rs": {
+      "index_blob": "d1f845a4219909e4d8fad4994ddc8e4c41aaa3f5",
+      "sha256": "4edb9bbb1662f1b218d12eb287d879ff5679eb718a7235c81a275cbd4b4e0bb8",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/coordinator.rs": {
+      "index_blob": "523919d08d5ab1be596b51ceb5fffd3b937f980e",
+      "sha256": "c669a641b688987c66589d1cc94718f044b50ff3e1db47a9d6d42c7984346d8e",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/coordinator/notices.rs": {
+      "index_blob": "122f4691467a1e2022218a69b61ad6513a601b22",
+      "sha256": "f72aa7dd3a5e24a8ba48a443848203762885f821f431775f39a84a69bb0a2abb",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs": {
+      "index_blob": "866637a9c4bc704784be6525b8ab06021b3fbc1f",
+      "sha256": "1b4b491904ee7baf486c371f306d6677afcd645bba19e2f070e147dec8cd480e",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/head_cue.rs": {
+      "index_blob": "0df77d4a586fe3c67fedf538ebcb8021a90144be",
+      "sha256": "b0f7f98883b84173d8c6925db665f2571314ed60bdd0bf622b7cb1c816f5acc1",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/memory_scope.rs": {
+      "index_blob": "54501c44a9cad9fc7450b12822714473acb11978",
+      "sha256": "24574bcc7e0103a1d053eda7fd21ae1a814bd61803be27f01edd2487b1fac70a",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/process.rs": {
+      "index_blob": "ec6e7bfa683254946ffed8a3cb41ab682add083d",
+      "sha256": "5e9f9a0801ac87469b96236e1e7ecb49c90a5378ad92137412f2d9281dcda95e",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/remember.rs": {
+      "index_blob": "392c4bd1c5cc471b3efe6d388c4bd561e040288f",
+      "sha256": "6e8009e318344e0d5c9ceca9e8e9ad13ce9d2d04f64b17eedc2b4b4a7c528893",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/room_told.rs": {
+      "index_blob": "9848039c4dfd3ec03a2308e784297ce32e625797",
+      "sha256": "cdc957183f550c809afb6ae54cda0e7c79bea5be812a67614c30a4f2f30e0db3",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/same_voice.rs": {
+      "index_blob": "c0728652d4bae3042a5dfeb8ffc1676de5900e73",
+      "sha256": "7d68cc331f2e1818a224cebdd7c3bcd36389fae65e8c06e53307511bdf7a7301",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/say.rs": {
+      "index_blob": "08c7642414b757803eaeed1848f16ab1aaef166c",
+      "sha256": "52e66278fc7da702b73fd3e7d19c00754bf6e62804f12ccfdbc04a2cf7ad129e",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider.rs": {
+      "index_blob": "7452835a2694390be302b290576f0502075cad47",
+      "sha256": "6cdedb36058646f275b2727903724030870bf696b15db8eb8130475c678634c5",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/services.rs": {
+      "index_blob": "841444d7c3c2148cc6c8536cce5aeb57d3bedfb0",
+      "sha256": "1a99075bea104dc189ed4d1865a0e7ac0601b5997ebf60d0e494657b593e2180",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests.rs": {
+      "index_blob": "5a01fc60bb1cdffad5009416d65080875d577669",
+      "sha256": "e8beeb1378ee86a1c1cadacd276d4442a82fd2def7a9fb7650d005123a9b41ab",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests/music_scope.rs": {
+      "index_blob": "20ba0c2f0e8f8687bc85ec9e2925114fd103661f",
+      "sha256": "8cf3577bca32ed2e236cc6999b09ca0aea5caeabb96b2877b7b4f8158643f421",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests/private_context.rs": {
+      "index_blob": "607c9afd49883a865772ff233ae969248ac16a5d",
+      "sha256": "7627781314692f3f5c163fc0692bf23bd35ee747a4fb1abb567b8e07a7237114",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs": {
+      "index_blob": "cce8c85a399515a3b6aa1829e3a67e1c9cb4700c",
+      "sha256": "a705591e8b0aca48cc33df143288d803e50abb79a859e84b138e8770d6fdbeac",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs": {
+      "index_blob": "f1846afc9832b7d24b207fcda15f6ab44b12f09b",
+      "sha256": "32814a0a1961741a06dc1c6109bc9a6ab7cdfaa10a2c5120f9a34af473081f90",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/tests/unplayed_join.rs": {
+      "index_blob": "6610e8937a06f1655290151863e38a4bb1b2ef6d",
+      "sha256": "e1fee1740ce4f3336dd5c88945cbb69513f7240b28753e928aa53d4b7936234a",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker.rs": {
+      "index_blob": "acab75906b65d33a21a7e6e0df886ec9294ab1b6",
+      "sha256": "c83a4dfc5d9db9e71c8afbdd2668252db8b674a48691fff044c3e45ab012d31b",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs": {
+      "index_blob": "ef0cb308364de3a9a5391b642195f2aa7d59938e",
+      "sha256": "7e02d5fe851d31e08a24f5e6d86f007822b018825b3d9710758522266206b744",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs": {
+      "index_blob": "1a9245906df6eb104362098a590cbda2ae02ff76",
+      "sha256": "508c278d3b00aea82ecc2a3b0eac4671314bfb7a9d41afb00616e8f683bcc516",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs": {
+      "index_blob": "540c5456c4c9448f2c206480c85a9a5a2b0b1051",
+      "sha256": "b31c95f238cb836d1bcfc83f777f567e6a2e080187177c63038ee1efcc734102",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs": {
+      "index_blob": "fac7f14db6b01aec75c962168a9789574e641e9d",
+      "sha256": "24ea8d7465f64320f300dd6e1998ade833ae9b1f739cfd8b5a30d7680c1b5609",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker/pending_context.rs": {
+      "index_blob": "705208db1c563b044055e396deac998c3b67c822",
+      "sha256": "1c40451c38c03974a1ac5bf1d8f23b8f92f7c042ac49c53062e98b4a33776333",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/second_provider/worker/private_output_tests.rs": {
+      "index_blob": "47dd033566c56b15bd1f993d9283fe17ef34c9e2",
+      "sha256": "e35fb81a5cb44550d6b0046a4810a66b222b13e8e6e58dba10583c7d6a0ab552",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/speaking_faces.rs": {
+      "index_blob": "80d139798e26a4c77622b67932f2c880d6562b50",
+      "sha256": "524b7cabcf997e4c3a959f1d95cee8b29a3f76efb51bba6ff9f87191748ced40",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/stop_words.rs": {
+      "index_blob": "950edd121afc5decaa961db81f55e3e86b5824c3",
+      "sha256": "92d5f7e150de4cf6a9d7219af43d09054b6664922fa69ccb6ea6f6e5ae42c2d5",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/crates/voice/src/turn_taking.rs": {
+      "index_blob": "26be957071b72ef6ac6d1374f5fd1927e6b641d7",
+      "sha256": "e309a7a664c152770e26e2728c32c2d240ce410e76195dacae62131592f90a41",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/lamp-4ace/RUNBOOK.md": {
+      "index_blob": "9dc3893d5e47d583b9451127dd0ce261f41ab319",
+      "sha256": "a8a52b3562ad6a118f439af64cc0c391b3717b83195a2140507ce0a01c1f33ba",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/lamp-4ace/lamp-eyes.service": {
+      "index_blob": "f64fcb7d4e5a870c8b9b49fd84499446e7d5b520",
+      "sha256": "9699b06a7c4adbd6f85582b24177dc1b7e1d1ae82a06f4aed857c6b3fa1b4fdd",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/lamp-4ace/lamp-voice.service": {
+      "index_blob": "6597d5761868aa9b813b265b8a79c929febb9acf",
+      "sha256": "ee3633d590a0bda04a4c050eb870dde5079ae2810cf3fe417998f18031f09553",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/product/lamp-body.service": {
+      "index_blob": "6c6dedfe7dca7173c0d1cf16d35170fdeb81d75d",
+      "sha256": "ec1ccd4c9f5c63e7dd25880da09100d75d8c37687261d945e98fb08cc0808bfe",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/product/lamp-controls.service": {
+      "index_blob": "196984ba359731c19f9f9ddd378f47363862ac66",
+      "sha256": "1a01dd19b140621fa29079823eb66241bf9dcfcf528e295afb83d4c30455ecc9",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/product/lamp-expression.service": {
+      "index_blob": "c45ae70c1d9fa6341fc0750a34d1cf8457be9a66",
+      "sha256": "e7b74d8b2754a3fcdffceb6358849c73d12f3fe48e0d4fb0ede0f9cdc911de85",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/product/lamp-voice.service": {
+      "index_blob": "7029156e462ed20f2cd947a416da413747d31f62",
+      "sha256": "47bf48cda169d69c97536a3a569f1de44fdd7d7040b1543ca4e82480fb16983f",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/product/lampos.conf": {
+      "index_blob": "0547d16e60b71cfb24764f3ceb0f5a46092c57cd",
+      "sha256": "3d5ae5d6c2351dbebc0f5e142441f1637f405c8258b3a6beb30f6f848571bf24",
+      "mode": "100644",
+      "worktree_equals_index": true
+    },
+    "lampOS/deploy/product/settings/controls-pins.json": {
+      "index_blob": "f5274b7ef3c887de9a5e4715fd0ca135d7643300",
+      "sha256": "6e9bf8fc1b6d192df8b832d8202a7fc152befeab5c6f83e1ba5eef0cff64987a",
+      "mode": "100644",
+      "worktree_equals_index": true
+    }
+  },
+  "P1_P2_findings": [],
+  "limits": [
+    "Read-only source audit; no Cargo, target, source/index/ref/mtime mutation, external post or device access.",
+    "Eyes main/Cargo conflict resolution belongs to Root and is outside this audit.",
+    "No full candidate-tree identity claimed while Eyes resolution is in progress.",
+    "Source inventory counts are authored tests, not run/pass counts; Root owns full Voice/Eyes/Update gates on both hosts.",
+    "No acoustic, physical/privacy acceptance or external review signoff."
+  ]
+}

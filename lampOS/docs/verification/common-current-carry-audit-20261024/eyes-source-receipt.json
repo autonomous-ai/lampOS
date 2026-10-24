@@ -1,0 +1,8 @@
+{
+  "scope": "read-only semantic resolution audit; no edits, Cargo, targets or posts",
+  "source": {
+    "lampOS/crates/eyes/Cargo.toml": "c515c877b91ac81438e15641a2004a064a17fb0410f452564ebebf6c6535c174",
+    "lampOS/crates/eyes/src/main.rs": "6ff9ca8b208b282ed94ea4c710b28d7c59c9190e7ffb8fb8cdb52304228ec1eb",
+    "lampOS/crates/eyes/src/who.rs": "79e947dc686fab9ae2fce897342071cfb57fe2d20cb1c4fb0c5eb512898ccf5c"
+  }
+}

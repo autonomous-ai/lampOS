@@ -1,0 +1,23 @@
+# Eyes full-crop / typed source composition audit
+
+Read-only review of `/private/tmp/fourth-common-current-20261024`, Common carry `4d634474e` onto `1d915d44c`. No concrete P1/P2 found in the reviewed resolution. No compile/test/device execution was performed. Exact observed source hashes are in source-receipt.json; Root was concurrently formatting docs/source, so this is the observed source snapshot, not a final-gate receipt.
+
+## Findings
+
+- Full-resolution crop is retained: `main.rs` keeps `Picture::from_jpeg_full` when `who.held.on()` (2261), and recognition chooses `who::align_full` from that frame (2440) rather than the activity reader's smaller aligned crop. Cargo keeps global `lamp-camera` and Linux-only rustix fs/process.
+- The typed source and legacy visual hold are correctly separated. `candidate` runs after real detector/bus identity publication and before slow print work (2409); returning/new tracks force immediate recognition via `check_return` even inside the two-second cadence (2431). A successful `people.who` match supplies `seen` directly (2482–2495), before Photo/visit/store work and before `Held::keeps_print` may retain the old visual name (2510 onward). A failed match therefore revokes even if the 0.30 legacy likeness hold keeps `who.known` and its old known file. Positive other-person recognition advances generation through `KnownSpeakerPublisher::seen`; same-subject positive re-recognition may preserve epoch. No held name manufactures a fresh speaker identity.
+- No-print publication precedes **both** legacy Held branches (2463–2472). Only raw successful empty detection (`detect && faces.is_empty()` recorded before filtering, 2303), with current permit and open port, produces identity-free absence. A visible far/unaligned face, filter-removed face, recognizer failure, missing qualified identity or privacy closure clears source instead. The legacy `keeps_unprinted` branch may retain its visual name afterward (2570), but cannot overwrite that typed revocation. Skipped detector frames neither refresh nor revoke the typed source; real detection is forced at source-recognition cadence.
+- Taking starts with hard clear on both remember/replace paths (1730,1750), success completion clears again (1807), and no taking branch calls `seen`. A valid print during taking can leave Checking, but this grants no initial proof, and prior authority was already invalidated. No-print paths still publish only the qualified raw-empty status or clear before the taking branch. Camera/no-permit, forget/PhotoYes, startup/drop, decode/detector/mouth/print error paths retain explicit invalidation; an error then later same-iteration positive match has an advanced epoch, so it cannot restore an old admitted grant.
+
+## Remaining regression gap and smallest useful control
+
+Existing `who` tests cover full crop, printed/unprinted Held thresholds, returning Checking/epoch/cadence, and missing/error source fields separately. Main tests cover storage/startup/drop and forced real refresh. They do **not** execute the newly composed publication-before-legacy-Held decision as one control.
+
+Add a model-free regression in the existing `main.rs` tests through a narrowly factored recognition-result publication seam (same seam used by production, not copied if/else). Use actual `KnownSpeakerPublisher`, `People`, synthetic normalized prints and `Held`:
+
+1. Positively match A/f3, then same-ID near print with likeness between HOLD_LIKENESS and SAME_PERSON. Assert legacy Held/name stays A while typed source is revoked/generation advanced and never Seen(A).
+2. A/f3 then same-ID unprintable visible face: legacy unprinted hold may stay, typed source revokes. Repeat a genuinely raw-empty detector result: typed source becomes same-epoch Absent only when permit+port valid. Filtered-to-empty, skipped inference and model error must not impersonate raw-empty.
+3. Returning A/new f4 publishes Checking before a recognizer barrier and bypasses a fresh `looked_for`; completing a true A match preserves epoch. B/unmatched/failed alignment advances epoch even if visual Held could otherwise retain A.
+4. Active taking never produces Seen, including a valid known-person print; permit/port loss clears before any legacy hold.
+
+This tests the new composition, preserves upstream Held behavior and Common's stricter disclosure contract, and requires no camera/model/device dependency. Compile/host/Linux/native gates remain Root's responsibility. Geometric fN and legacy visual retention are not liveness authentication, and the audit does not broaden First's unmatched-return policy.

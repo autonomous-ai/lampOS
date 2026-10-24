@@ -1,0 +1,2331 @@
+{
+  "purpose": "Named coverage expectations inside full package gates; do not repeat selectors already covered merely to duplicate counts.",
+  "selectors": [
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "speaking_faces::tests::",
+      "source_test_count": 15,
+      "source_tests": [
+        {
+          "name": "explicit_known_speaker_is_atomic_bounded_fresh_and_never_guesses_a_boot",
+          "line": 847,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "atomic_publication_between_reader_entry_and_open_is_fresh_not_future",
+          "line": 906,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "positive_speaker_never_hides_a_minority_speaker_or_an_eyes_restart",
+          "line": 966,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "two_short_looks_require_the_same_single_positive_face",
+          "line": 989,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_face_speaking_turned_to_the_lamp_is_told_apart_from_the_room",
+          "line": 1067,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_turned_face_never_read_is_not_spoken_for_by_a_still_one",
+          "line": 1122,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "only_silent_faces_turned_to_the_lamp_are_told_apart",
+          "line": 1144,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_face_that_spoke_through_the_line_is_the_one_seen_speaking",
+          "line": 1183,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "only_the_lines_own_looks_count_and_old_ones_go",
+          "line": 1207,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "ids_keep_their_boot_and_a_privacy_change_forgets_them",
+          "line": 1230,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "each_of_the_eyes_frames_counts_once",
+          "line": 1257,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_line_is_someone_elses_when_any_other_face_spoke_it",
+          "line": 1286,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_known_face_is_read_with_the_name_and_only_as_an_id",
+          "line": 1306,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_known_face_takes_the_boot_it_was_written_under",
+          "line": 1331,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_known_face_was_in_view_at_a_lines_start_only_if_its_id_was_tracked_then",
+          "line": 1421,
+          "path": "lampOS/crates/voice/src/speaking_faces.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "speaking_faces::tests::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "memory_scope::tests::",
+      "source_test_count": 34,
+      "source_tests": [
+        {
+          "name": "original_admission_distinguishes_room_from_narrowed_private_and_revocation",
+          "line": 1015,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "cache_uses_latest_face_never_sticky_session_owner_and_expires",
+          "line": 1029,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "refreshed_observation_is_hashed_off_path_and_uses_its_original_expiry",
+          "line": 1053,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "contention_is_unknown_instead_of_waiting_or_reusing_an_old_person",
+          "line": 1069,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "invalidation_never_waits_for_a_refresh_lock_and_retires_inflight_reads",
+          "line": 1080,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_narrowed_lease_reads_the_room_at_every_later_boundary",
+          "line": 1119,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "owner_drop_revokes_every_task_lease_without_revoking_a_new_request",
+          "line": 1136,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "revocation_after_borrow_requires_a_fresh_boundary_check",
+          "line": 1153,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "looking_later_keeps_one_recorder_and_never_upgrades_room_disclosure",
+          "line": 1174,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "speaker_recorder_is_issued_once_and_seals_only_its_request",
+          "line": 1266,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "speaker_proof_rejects_wrong_worker_session_and_request_without_transfer",
+          "line": 1312,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "speaker_proof_requires_exactly_one_well_formed_boot_qualified_face",
+          "line": 1371,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "room_speaker_proof_keeps_old_and_new_boots_distinct_for_pending_photos",
+          "line": 1410,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "speaker_expiry_stays_anchored_to_audio_end_and_has_strict_bounds",
+          "line": 1436,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "held_narrowed_and_revoked_requests_never_expose_speaker_proof",
+          "line": 1471,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "dropping_the_request_owner_revokes_unsealed_and_sealed_speaker_proofs",
+          "line": 1522,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_known_face_lost_with_no_face_in_view_keeps_its_scope_through_the_gap",
+          "line": 1591,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "lamp_c0a4s_timeline_a_line_decided_4_to_6_s_after_the_answer_is_held",
+          "line": 1614,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "lamp_c0a4s_question_9_s_after_the_answer_is_held_past_a_sound_of_no_words",
+          "line": 1662,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_face_in_view_or_no_look_or_the_switch_off_holds_nothing",
+          "line": 1696,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_gap_is_held_only_for_someone_the_lamp_was_just_talking_with",
+          "line": 1731,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "an_unproved_private_read_check_does_not_poison_a_later_actual_proof",
+          "line": 1766,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_read_loss_is_shared_by_clones_and_cannot_be_reproved",
+          "line": 1777,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_new_request_has_fresh_private_read_state_after_the_previous_lost_it",
+          "line": 1790,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_read_loss_does_not_revoke_narrow_or_destroy_the_original_speaker",
+          "line": 1802,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "concurrent_true_and_false_after_private_proof_always_finish_lost",
+          "line": 1823,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "checking_can_only_pause_a_pinned_grant_and_never_wins_over_loss",
+          "line": 1852,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face",
+          "line": 1903,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_face_first_named_after_the_lines_end_and_the_wait_is_not_the_keeper",
+          "line": 1958,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet",
+          "line": 1993,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_late_look_is_armed_only_while_the_cache_is_cold",
+          "line": 2084,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_cache_gone_cold_during_the_line_arms_its_late_look_at_the_end",
+          "line": 2153,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_line_begun_cold_keeps_only_for_a_face_seen_or_named_at_its_start",
+          "line": 2291,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_change_in_the_eyes_known_file_makes_the_cache_cold",
+          "line": 2350,
+          "path": "lampOS/crates/voice/src/memory_scope.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "memory_scope::tests::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::tests::private_context::",
+      "source_test_count": 30,
+      "source_tests": [
+        {
+          "name": "expired_private_system_never_calls_chat_or_speech",
+          "line": 112,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_hits_are_guarded_even_with_neutral_system",
+          "line": 123,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_held_forget_policy_expiry_sends_no_chat_or_tool",
+          "line": 133,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_tool_completion_expiry_cannot_start_another_round",
+          "line": 167,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "expired_prepared_private_events_never_reach_speech",
+          "line": 202,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "positive_private_and_public_room_contexts_still_dispatch",
+          "line": 230,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "empty_packets_preserve_legacy_current_and_carried_read_bounds",
+          "line": 261,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "authority_lost_while_chat_waits_sends_no_private_speech",
+          "line": 341,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_authority_loss_completes_the_live_engine_turn_once",
+          "line": 364,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "lost_private_authority_cannot_complete_a_revoked_or_different_request",
+          "line": 432,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "cached_private_hit_cannot_be_downgraded_by_neutral_final_system",
+          "line": 454,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_output_rechecks_authority_after_queue_backpressure",
+          "line": 481,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_held_forget_tool_completion_expiry_sends_no_first_chat",
+          "line": 508,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "lost_private_authority_cannot_resume_on_a_later_positive_read",
+          "line": 540,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "buffered_private_output_expires_at_both_receiver_boundaries_without_blocking_public_output",
+          "line": 553,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_words_waiting_for_announcement_capacity_are_never_retained_or_sent_to_tts",
+          "line": 655,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_speech_rechecks_before_first_poll_with_positive_room_and_public_controls",
+          "line": 700,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_speech_packet_returning_after_expiry_is_not_enqueued",
+          "line": 751,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_speech_piece_initialisation_preserves_queue_call_order",
+          "line": 796,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_words_expiring_between_announcement_check_and_retained_words_lock_are_not_kept",
+          "line": 832,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "event_note_private_provenance_survives_neutral_told_and_async_expiry",
+          "line": 908,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "queued_private_event_callback_rechecks_proof_before_read",
+          "line": 968,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "lost_request_before_told_keeps_public_completion_without_private_services",
+          "line": 1051,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "short_done_after_a_private_tool_keeps_fresh_speaker_permission",
+          "line": 1192,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "returned_private_event_waits_without_rereading_then_resumes_or_ends",
+          "line": 1429,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "days_event_lock_pending_is_retried_without_replaying_its_decision",
+          "line": 1569,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "returned_private_event_pending_obeys_the_original_response_ceiling",
+          "line": 1935,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+          "line": 1942,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "carried_old_speech_requires_positive_evidence_on_the_actual_current_piece",
+          "line": 93,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context/carried_speaker.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_short_current_piece_requires_two_unambiguous_positive_frames",
+          "line": 40,
+          "path": "lampOS/crates/voice/src/second_provider/tests/private_context/short_line.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::tests::private_context::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::lookaway_authority_tests::",
+      "source_test_count": 19,
+      "source_tests": [
+        {
+          "name": "explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+          "line": 75,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "explicit_absence_never_heals_loss_or_downgrades_errors_and_legacy_sources",
+          "line": 113,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "repeated_explicit_absence_does_not_extend_the_original_audio_deadline",
+          "line": 220,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "actual_engine_sealed_microphone_request_finishes_through_explicit_lookaway",
+          "line": 285,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "actual_http_fallback_retains_only_explicit_same_epoch_lookaway",
+          "line": 464,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "explicit_lookaway_retains_credited_output_only_for_same_request_epoch",
+          "line": 571,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "explicit_source_envelopes_reject_malformed_or_mixed_continuation_tokens",
+          "line": 769,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+          "line": 873,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "returning_track_same_name_never_erases_changed_stable_identity",
+          "line": 921,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+          "line": 950,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "returning_track_completed_recognition_keeps_original_grant_at_credited_ipc",
+          "line": 1112,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "returning_track_unbound_and_legacy_requests_still_need_the_original_audio_face",
+          "line": 1320,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+          "line": 1359,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "returning_track_completed_recognition_never_extends_original_audio_deadline",
+          "line": 1392,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+          "line": 1436,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "checking_wait_never_hides_terminal_source_or_identity_loss",
+          "line": 1478,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "checking_wait_ends_at_the_original_audio_deadline",
+          "line": 1558,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "checking_return_holds_real_credited_ipc_until_completed_recognition",
+          "line": 1594,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "event_selection_keeps_checking_distinct_from_room_and_lost",
+          "line": 1825,
+          "path": "lampOS/crates/voice/src/second_provider/worker/lookaway_authority_tests.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::lookaway_authority_tests::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::pending_context::",
+      "source_test_count": 2,
+      "source_tests": [
+        {
+          "name": "pending_composition_rebuilds_cached_note_history_and_name_before_one_final_chat",
+          "line": 242,
+          "path": "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+          "ignored": false
+        },
+        {
+          "name": "pending_prepared_composition_never_freezes_reduced_messages",
+          "line": 252,
+          "path": "lampOS/crates/voice/src/second_provider/worker/pending_context.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::pending_context::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::kept_name_callback::privacy::",
+      "source_test_count": 9,
+      "source_tests": [
+        {
+          "name": "prepared_private_context_is_neutral_and_final_proof_discloses_both_layouts",
+          "line": 65,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "unproved_mismatched_expired_and_legacy_private_requests_never_read_memory_or_history",
+          "line": 121,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "genuine_room_context_keeps_room_notes_and_history_without_speaker_proof",
+          "line": 181,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "slow_note_read_rechecks_revocation_expiry_and_fresh_known_identity",
+          "line": 223,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "actual_hits_rpc_requires_positive_current_matching_proof_and_rechecks_its_reply",
+          "line": 294,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "identity_changed_during_history_composition_discards_the_private_told",
+          "line": 376,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "by_presence_context_never_adopts_a_different_sticky_person",
+          "line": 415,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "typed_setup_name_uses_final_speaker_proof_and_marks_disclosure",
+          "line": 507,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        },
+        {
+          "name": "missing_private_source_is_reported_once_without_granting_context",
+          "line": 647,
+          "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::kept_name_callback::privacy::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::the_same_speaker_goes_on_five_turns_in_a_busy_room_only_with_the_switch",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "the_same_speaker_goes_on_five_turns_in_a_busy_room_only_with_the_switch",
+          "line": 10588,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::the_same_speaker_goes_on_five_turns_in_a_busy_room_only_with_the_switch",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::a_colleagues_face_ends_the_carry_and_the_owner_comes_back_only_by_a_new_answer",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_colleagues_face_ends_the_carry_and_the_owner_comes_back_only_by_a_new_answer",
+          "line": 10620,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_colleagues_face_ends_the_carry_and_the_owner_comes_back_only_by_a_new_answer",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::a_line_with_no_sure_sign_is_held_and_ends_no_carry",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_line_with_no_sure_sign_is_held_and_ends_no_carry",
+          "line": 10658,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_line_with_no_sure_sign_is_held_and_ends_no_carry",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::the_owner_turned_to_a_colleague_is_held_and_goes_on_turned_back",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "the_owner_turned_to_a_colleague_is_held_and_goes_on_turned_back",
+          "line": 10698,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::the_owner_turned_to_a_colleague_is_held_and_goes_on_turned_back",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::the_carry_ends_twenty_seconds_after_the_lamps_words_by_the_lines_start",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "the_carry_ends_twenty_seconds_after_the_lamps_words_by_the_lines_start",
+          "line": 10721,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::the_carry_ends_twenty_seconds_after_the_lamps_words_by_the_lines_start",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::a_stop_a_privacy_change_or_a_forgetting_ends_the_carry",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_stop_a_privacy_change_or_a_forgetting_ends_the_carry",
+          "line": 10745,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_stop_a_privacy_change_or_a_forgetting_ends_the_carry",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::a_late_unsure_print_of_a_carried_line_ends_nothing",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_late_unsure_print_of_a_carried_line_ends_nothing",
+          "line": 10771,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_late_unsure_print_of_a_carried_line_ends_nothing",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::the_owners_line_seven_seconds_after_an_answer_with_a_short_print_is_carried",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "the_owners_line_seven_seconds_after_an_answer_with_a_short_print_is_carried",
+          "line": 10807,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::the_owners_line_seven_seconds_after_an_answer_with_a_short_print_is_carried",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::a_colleague_within_the_eight_seconds_ends_the_carry_until_a_fresh_call",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_colleague_within_the_eight_seconds_ends_the_carry_until_a_fresh_call",
+          "line": 10845,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_colleague_within_the_eight_seconds_ends_the_carry_until_a_fresh_call",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::an_unsure_print_with_no_face_decides_nothing_whenever_it_comes",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "an_unsure_print_with_no_face_decides_nothing_whenever_it_comes",
+          "line": 10889,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::an_unsure_print_with_no_face_decides_nothing_whenever_it_comes",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::an_unknown_voice_let_out_in_the_eight_seconds_is_no_identity_past_them",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "an_unknown_voice_let_out_in_the_eight_seconds_is_no_identity_past_them",
+          "line": 10930,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::an_unknown_voice_let_out_in_the_eight_seconds_is_no_identity_past_them",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::a_sure_other_voice_within_the_eight_seconds_is_held",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_sure_other_voice_within_the_eight_seconds_is_held",
+          "line": 10970,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::a_sure_other_voice_within_the_eight_seconds_is_held",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking",
+          "line": 16143,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::with_turned_face_speaks_desk_talk_past_a_still_face_is_held_and_makes_the_room_busy",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "with_turned_face_speaks_desk_talk_past_a_still_face_is_held_and_makes_the_room_busy",
+          "line": 16218,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::with_turned_face_speaks_desk_talk_past_a_still_face_is_held_and_makes_the_room_busy",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::with_turned_face_speaks_the_conversations_voice_still_counts_with_a_still_face",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "with_turned_face_speaks_the_conversations_voice_still_counts_with_a_still_face",
+          "line": 16297,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::with_turned_face_speaks_the_conversations_voice_still_counts_with_a_still_face",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::worker::tests::with_turned_face_speaks_the_same_speaker_still_goes_on_five_turns",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "with_turned_face_speaks_the_same_speaker_still_goes_on_five_turns",
+          "line": 16376,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::with_turned_face_speaks_the_same_speaker_still_goes_on_five_turns",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "second_provider::tests::the_first_line_after_a_stop_tells_the_rule_of_it",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "the_first_line_after_a_stop_tells_the_rule_of_it",
+          "line": 5369,
+          "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::tests::the_first_line_after_a_stop_tells_the_rule_of_it",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_late_print_from_too_little_speech_is_unsure",
+          "line": 1521,
+          "path": "lampOS/crates/voice/src/same_voice.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "an_unsure_print_let_out_is_not_the_conversations_voice",
+          "line": 1549,
+          "path": "lampOS/crates/voice/src/same_voice.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "room_told::tests::lines_held_past_a_still_face_turned_to_the_lamp_are_talk",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "lines_held_past_a_still_face_turned_to_the_lamp_are_talk",
+          "line": 2138,
+          "path": "lampOS/crates/voice/src/room_told.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "room_told::tests::lines_held_past_a_still_face_turned_to_the_lamp_are_talk",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-voice",
+      "target": [
+        "--lib"
+      ],
+      "filter": "room_told::tests::a_carried_line_left_unanswered_is_not_talk",
+      "exact": true,
+      "source_test_count": 1,
+      "source_tests": [
+        {
+          "name": "a_carried_line_left_unanswered_is_not_talk",
+          "line": 2227,
+          "path": "lampOS/crates/voice/src/room_told.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "room_told::tests::a_carried_line_left_unanswered_is_not_talk",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-update",
+      "target": [
+        "--lib"
+      ],
+      "filter": "unit::tests::",
+      "source_test_count": 10,
+      "source_tests": [
+        {
+          "name": "the_generic_voice_runs_the_ring_as_the_product_does",
+          "line": 211,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_generic_voice_says_its_failures_as_the_product_does",
+          "line": 237,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_generic_voice_has_the_product_clock_and_session_context",
+          "line": 297,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_generic_voice_answers_whom_the_product_does",
+          "line": 308,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_generic_package_sets_up_and_resets_as_the_product_does",
+          "line": 398,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "lamp_4aces_own_units_are_read",
+          "line": 484,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "lamp_4aces_private_memory_has_matching_authority_and_speaking_sources",
+          "line": 506,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_new_build_is_written_everywhere_the_folder_is_named",
+          "line": 567,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "only_a_part_installed_by_build_is_a_program",
+          "line": 583,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        },
+        {
+          "name": "comments_do_not_make_a_unit_another",
+          "line": 598,
+          "path": "lampOS/crates/update/src/unit.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "unit::tests::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-update",
+      "target": [
+        "--test",
+        "install"
+      ],
+      "filter": "",
+      "source_test_count": 90,
+      "source_tests": [
+        {
+          "name": "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+          "line": 360,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_closed_etc_lampos_is_said_and_left_as_it_is",
+          "line": 466,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "run_twice_it_changes_nothing",
+          "line": 488,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_exit_note_allowlist_is_exactly_clouds_product_services",
+          "line": 500,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+          "line": 533,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install",
+          "line": 599,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_file_that_does_not_match_installs_nothing_of_it",
+          "line": 633,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_build_without_a_part_is_refused_before_anything_is_written",
+          "line": 653,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_build_without_the_bodys_factory_tools_still_installs",
+          "line": 666,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+          "line": 687,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "every_part_of_the_brain_has_a_product_unit",
+          "line": 709,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+          "line": 770,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+          "line": 821,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_product_keeps_nothing_personal_while_nobody_is_known",
+          "line": 848,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_product_sees_who_speaks",
+          "line": 867,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+          "line": 900,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+          "line": 942,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+          "line": 1055,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+          "line": 1095,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+          "line": 1138,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "unreadable_records_stop_install_rather_than_being_written_over",
+          "line": 1210,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "every_skill_folder_is_in_the_product_or_says_why_not",
+          "line": 1256,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_product_skills_are_exactly_the_core_skills",
+          "line": 1282,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_blank_lamp_runs_every_product_skill_as_the_skill",
+          "line": 1313,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+          "line": 1398,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_disabled_core_skill_turned_on_stays_on_through_an_install",
+          "line": 1421,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+          "line": 1444,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+          "line": 1538,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "product_units_pass_only_options_an_older_binary_takes",
+          "line": 1652,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+          "line": 1708,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_tasks_part_closes_the_harness_a_told_task_started",
+          "line": 1733,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_tasks_part_waits_for_harness_rather_than_failing",
+          "line": 1753,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+          "line": 1804,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_pinned_models_are_the_ones_their_parts_check",
+          "line": 1960,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "music_sway_and_watch_you_leave_are_on_in_the_product",
+          "line": 2046,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+          "line": 2085,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+          "line": 2130,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_moved_lamp_is_given_the_product_voices_five_lines",
+          "line": 2226,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+          "line": 2249,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+          "line": 2329,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+          "line": 2446,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said",
+          "line": 2479,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_device_key_found_open_is_narrowed_and_never_said",
+          "line": 2543,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+          "line": 2578,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+          "line": 2621,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_records_the_tmpfiles_it_writes",
+          "line": 2655,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_newer_default_replaces_only_a_setting_nobody_changed",
+          "line": 2668,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+          "line": 2782,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_setting_in_the_way_stops_the_install_before_any_is_written",
+          "line": 2834,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "settings_written_before_one_that_fails_are_still_installs",
+          "line": 2858,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+          "line": 2906,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_setting_written_but_not_yet_recorded_is_still_installs",
+          "line": 2946,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+          "line": 2993,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_is_set_to_start_at_boot_once_when_it_is_there",
+          "line": 3070,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_off_after_a_first_install_leaves_no_linger",
+          "line": 3211,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+          "line": 3246,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+          "line": 3270,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+          "line": 3310,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "what_harness_service_status_still_has_is_read_from_its_json",
+          "line": 3344,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_device_key_is_provisioned_private_and_only_where_missing",
+          "line": 3387,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+          "line": 3413,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+          "line": 3429,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_reset_then_prepare_does_not_restore_the_old_key",
+          "line": 3472,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+          "line": 3512,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+          "line": 3589,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "prepare_then_reset_then_install_does_not_restore_the_old_key",
+          "line": 3657,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+          "line": 3684,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+          "line": 3723,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+          "line": 3795,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+          "line": 3849,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_on_keeps_a_harness_already_there",
+          "line": 3896,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+          "line": 3919,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_versions_are_read_as_harness_prints_them",
+          "line": 4013,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+          "line": 4032,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "harness_at_boot_gives_lamposs_manager_its_home_first",
+          "line": 4066,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+          "line": 4099,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "lamp_update_back_waits_for_its_binary_rather_than_failing",
+          "line": 4125,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+          "line": 4157,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_builds_plan_already_there_is_no_change_and_no_backup",
+          "line": 4188,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+          "line": 4207,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_plans_install_shipped_are_listed",
+          "line": 4229,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_product_full_look_is_on_in_both_units_with_one_file",
+          "line": 4256,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_review_head_pair_keeps_a_benign_drop_in",
+          "line": 4348,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+          "line": 4353,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+          "line": 4358,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+          "line": 4415,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+          "line": 4461,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "second_review_body_head_off_refuses_before_bundle_mutation",
+          "line": 4504,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_head_body_keeps_factory_calibration",
+          "line": 4536,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        },
+        {
+          "name": "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+          "line": 4558,
+          "path": "lampOS/crates/update/tests/install.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-update",
+      "target": [
+        "--test",
+        "round"
+      ],
+      "filter": "head_touch::",
+      "source_test_count": 34,
+      "source_tests": [
+        {
+          "name": "pr2948_settings_off_preserves_the_old_head_reader",
+          "line": 122,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "pr2948_settings_on_keeps_a_head_reader_available",
+          "line": 144,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+          "line": 258,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "mixed_head_readers_are_refused_before_settings_or_units_are_written",
+          "line": 275,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "paired_head_readers_without_controls_mute_are_refused_before_writes",
+          "line": 284,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "settings_off_refuses_paired_head_readers_with_legacy_pins",
+          "line": 291,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+          "line": 298,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "failed_head_reader_candidate_restores_exact_old_pins_and_units",
+          "line": 331,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+          "line": 366,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+          "line": 442,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "head_reader_mode_overrides_are_not_guessed_from_base_units",
+          "line": 525,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+          "line": 544,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "invalid_mute_path_and_unknown_reader_are_refused",
+          "line": 571,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "head_pins_cannot_change_without_restarting_their_controls_reader",
+          "line": 604,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "isolated_voice_controls_bus_is_refused_before_any_write",
+          "line": 645,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "expression_or_controls_bus_mismatch_is_refused_before_any_write",
+          "line": 658,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+          "line": 686,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "absent_unused_product_pins_do_not_block_active_build_pins_updates",
+          "line": 781,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "stale_unused_product_pins_do_not_block_active_build_pins_updates",
+          "line": 809,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+          "line": 846,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "environment_only_head_bus_mismatch_is_refused_before_any_write",
+          "line": 882,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "head_bus_root_dropins_are_not_guessed_from_base_units",
+          "line": 914,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+          "line": 934,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "third_review_paired_head_readers_on_different_buses_are_refused",
+          "line": 981,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "third_review_binary_update_checks_active_build_local_head_pins",
+          "line": 1019,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "semantic_head_reader_paths_cannot_expand_invocation_variables",
+          "line": 1105,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+          "line": 1169,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "malformed_environment_quotes_are_not_reader_evidence",
+          "line": 1214,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "body_head_requires_an_enabled_carried_or_installed_sleep_reader",
+          "line": 1229,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "body_head_mode_and_bus_dropins_are_refused_before_writes",
+          "line": 1251,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "body_head_on_an_isolated_bus_is_refused_before_writes",
+          "line": 1267,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "body_head_repeated_exec_start_is_refused_before_writes",
+          "line": 1280,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "body_head_calibration_cannot_override_the_sleep_reader",
+          "line": 1299,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        },
+        {
+          "name": "body_head_complete_bundle_preserves_literal_factory_calibration",
+          "line": 1317,
+          "path": "lampOS/crates/update/tests/round/head_touch.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "head_touch::",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "package": "lamp-update",
+      "target": [
+        "--test",
+        "it"
+      ],
+      "filter": "scratch_paths::",
+      "source_test_count": 2,
+      "source_tests": [
+        {
+          "name": "no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "line": 136,
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs",
+          "ignored": false
+        },
+        {
+          "name": "the_names_read_are_the_scratch_folders_only",
+          "line": 183,
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs",
+          "ignored": false
+        }
+      ],
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "it",
+        "scratch_paths::",
+        "--",
+        "--test-threads=1"
+      ]
+    }
+  ],
+  "release_pair_limit": "Two new tests in tests/release_pair.rs are explicitly ignored; require pinned old ARM64 artifacts and owned Docker context. Do not add --ignored to ordinary gates."
+}
