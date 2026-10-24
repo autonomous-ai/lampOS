@@ -4444,7 +4444,7 @@ pub(crate) const BUSY_TURNED: &str =
 /// came after it, was let out as the conversation going on too, and held
 /// here as a short line.
 fn busy_bar(why: &str, heard: &str, lamp_asked: bool) -> Option<&'static str> {
-    if crate::attention::called_by_name_on(heard, true) {
+    if crate::attention::called_by_real_name(heard) {
         return None;
     }
     let question = heard.trim_end().ends_with('?');
@@ -8830,16 +8830,32 @@ mod tests {
 
     /// lamp-4ace on 24 Oct, the owner alone: "Lamp." said, nothing after it,
     /// answered as a call, then held in a busy room as a short line of the
-    /// conversation going on. A line whose words call the lamp, or a word
-    /// written for its name where the name stands, is never held for being
-    /// short; one that only mentions it is.
+    /// conversation going on. A literal name call is never held for being
+    /// short; recognizer substitutes and a mere mention keep the old bar.
     #[test]
     fn a_busy_room_never_holds_a_line_that_calls_the_lamp() {
         use crate::attention::{GOING_ON, TURNED};
-        for called in ["Lamp.", "Lamp", "Hey Lamp.", "Plan.", "Man.", "Lynn."] {
+        for called in [
+            "Lamp.",
+            "Lamp",
+            "Hey Lamp.",
+            "Lamp tell me a joke.",
+            "Lamb, please.",
+            "Thanks, Lamp.",
+        ] {
             assert_eq!(super::busy_bar(GOING_ON, called, false), None, "{called}");
             assert_eq!(super::busy_bar(TURNED, called, false), None, "{called}");
         }
+        for alias in ["Plan.", "Man.", "Lynn."] {
+            assert_eq!(super::busy_bar(GOING_ON, alias, false), Some(BUSY_SHORT));
+            assert_eq!(super::busy_bar(TURNED, alias, false), Some(BUSY_TURNED));
+        }
+        assert_eq!(
+            super::busy_bar(TURNED, "Man, that's crazy.", false),
+            Some(BUSY_TURNED)
+        );
+        // Four words already satisfy the separate GOING_ON policy.
+        assert_eq!(super::busy_bar(GOING_ON, "Man, that's crazy.", false), None);
         assert_eq!(
             super::busy_bar(GOING_ON, "The lamp.", false),
             Some(BUSY_SHORT),
