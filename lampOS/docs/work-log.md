@@ -1,3 +1,27 @@
+## Current checkpoint: 2026-10-25 04:19 +07, fresh current fixture gate passed
+
+Ready for lamp-voice: no (#3412 current a039cc7fb on 3d1a13ae7).
+[Fresh current proof](verification/remember-eyes-blocking-20261024/current-3d1a13ae7/README.md):
+Mac fmt, strict Voice Clippy, fresh compilation, direct 16/0 and full
+Voice 4,029/0/21 pass; all 7,027 source hashes unchanged. Equal range-diff,
+owned blobs unchanged, six upstream differences explicit. Source-only Linux
+fmt passes with the owned container removed. Original current ARM64
+40133487641 and Linux 40133487864 run; current composition read requested.
+Draft stays until these qualify. Train 104 source-readiness HOLD remains;
+Second does not substitute for #3387's designated Lead disposition.
+
+Earlier fa/bcb green native/reads and accepted FAILED Mac row remain
+immutable at their own execution identities. No repeated old observations,
+new historical cause, local Linux ARM build/test or device action.
+Independent current Cloud read is published at b50bcbe97 (196/0/4 and
+1,216 original native PASS), with exact bcb scope and later base noted.
+Existing updater exec/SIGKILL native evidence refreshed on #2810 at
+7cead46c7; actual unplug/key/real signed-release acceptance still needs
+its named holders and attending person. Next: current native/read/base,
+then eligible new Queue work. No permission question or manual merge.
+
+---
+
 ## Current checkpoint: 2026-10-25 03:59 +07, mock Eyes fixture ready
 
 Ready for lamp-voice: yes (#3412 fa82c279e on current bcb540a08).
