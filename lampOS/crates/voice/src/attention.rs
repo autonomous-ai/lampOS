@@ -609,6 +609,16 @@ pub fn called_by_name(heard: &str) -> bool {
 /// alone ([`STAND_ALONE_INS`]) counted as its call when `stand_alone_ins`:
 /// on the second route only ([`Attention::count_stand_alone_ins`]).
 pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
+    name_said_to(heard, stand_alone_ins, true)
+}
+
+/// A literal "lamp" or "lamb" in a call position. The busy-room text
+/// exemption has no name-listener evidence for recognizer stand-ins.
+pub(crate) fn called_by_real_name(heard: &str) -> bool {
+    name_said_to(heard, false, false)
+}
+
+fn name_said_to(heard: &str, stand_alone_ins: bool, recognizer_stand_ins: bool) -> bool {
     let alone = stand_alone(stand_alone_ins);
     // Words, and the punctuation between them that marks a sentence's start
     // or a comma.
@@ -666,7 +676,7 @@ pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
             _ => None,
         })
         .collect();
-    said_to || called_by_stand_in(&words)
+    said_to || (recognizer_stand_ins && called_by_stand_in(&words))
 }
 
 /// Whether what was heard is the lamp's name alone, or a word written for
@@ -4135,6 +4145,35 @@ mod tests {
         ] {
             assert!(!called_by_name(silent), "{silent}");
         }
+    }
+
+    #[test]
+    fn the_real_name_call_keeps_positions_without_recognizer_stand_ins() {
+        for called in [
+            "Lamp.",
+            "Lamp",
+            "Hey Lamp.",
+            "Lamp tell me a joke.",
+            "Lamb, please.",
+            "Can you, lamp, stop.",
+            "Thanks, Lamp.",
+        ] {
+            assert!(called_by_real_name(called), "{called}");
+        }
+        for not_called in [
+            "Plan.",
+            "Man.",
+            "Thanks, Line.",
+            "The lamp.",
+            "I left the lamp on.",
+            "The lamps are new.",
+            "",
+        ] {
+            assert!(!called_by_real_name(not_called), "{not_called}");
+        }
+        // Recognition-supported callers retain their existing substitutes.
+        assert!(called_by_name_on("Plan.", true));
+        assert!(called_by_name_on("Plan.", false));
     }
 
     /// The rule in a busy room, strict as on lamp-4ace: "I left the lamp on"

@@ -2352,8 +2352,12 @@ after a take-over, but now for every turn:
     - a line let out only by someone turned to the lamp must ask it
       something (`BUSY_TURNED`);
     - its name, its words calling it, a tap, or being said close to it let
-      a line out as before. A line whose words call it is never held by the
-      two rules above, whatever else let it out: on lamp-4ace on 24 Oct the
+      a line out as before. A literal "Lamp" or "Lamb" in a call position
+      is never held by the two rules above, whatever else let it out.
+      Recognizer substitutes such as "Man" or "Plan" do not bypass them
+      without separate name-listener evidence. Calls without punctuation,
+      after greetings or set off by a comma retain the same call-position
+      parser; the three-word GOING_ON rule is unchanged. On lamp-4ace on 24 Oct the
       owner's "Lamp.", answered as a call once no line came after it, was
       also let out as the conversation going on and held as a short line
       (`busy_bar`).
