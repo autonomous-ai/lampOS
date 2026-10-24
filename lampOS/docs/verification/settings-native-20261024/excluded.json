@@ -1,0 +1,32 @@
+[
+  {
+    "path": "source-after.paths",
+    "bytes": 664683,
+    "sha256": "3569aec4cdb873bb70f954aee31141ee996282159a777292617f3f9820d558ba"
+  },
+  {
+    "path": "source-after.sha256",
+    "bytes": 1347443,
+    "sha256": "ec1b229b22168f3f7043bad92f6c0f6e6f154688d4674b9766635e71116d2124"
+  },
+  {
+    "path": "source-after.symlinks",
+    "bytes": 96,
+    "sha256": "23baab3405744477c8e1ca40beb0ffa841cb47a67ae12b0e8ca488630f92c9c2"
+  },
+  {
+    "path": "source-before.paths",
+    "bytes": 664683,
+    "sha256": "3569aec4cdb873bb70f954aee31141ee996282159a777292617f3f9820d558ba"
+  },
+  {
+    "path": "source-before.sha256",
+    "bytes": 1347443,
+    "sha256": "ec1b229b22168f3f7043bad92f6c0f6e6f154688d4674b9766635e71116d2124"
+  },
+  {
+    "path": "source-before.symlinks",
+    "bytes": 96,
+    "sha256": "23baab3405744477c8e1ca40beb0ffa841cb47a67ae12b0e8ca488630f92c9c2"
+  }
+]

@@ -1,0 +1,45 @@
+{
+  "head": "8f5c600c1562d7e2459ddd03ccb999206fdf48ad",
+  "tested_merge": "228d9ba85d90c1f002e0680cef8b8bf3af83a7ad",
+  "parents": [
+    "411965dcb659e17188ff81fb4ba4b73b2b62012e",
+    "8f5c600c1562d7e2459ddd03ccb999206fdf48ad"
+  ],
+  "pair": "2/0/0 ignored/3 filtered",
+  "cases": [
+    {
+      "test": "release_6408_settings_reads_6498_and_6498_reads_return",
+      "pair": [
+        6498,
+        6408
+      ],
+      "owned_reaps": 7,
+      "sigkill_servers": 3,
+      "completed_exchanges": 34,
+      "intended_refusal_replies": 18,
+      "matching_snapshot_hashes": 13,
+      "running_server_payload_hashes": 3,
+      "strict_stored_refusals": 2
+    },
+    {
+      "test": "release_6498_settings_reads_6408_and_6408_reads_return",
+      "pair": [
+        6408,
+        6498
+      ],
+      "owned_reaps": 7,
+      "sigkill_servers": 3,
+      "completed_exchanges": 34,
+      "intended_refusal_replies": 18,
+      "matching_snapshot_hashes": 13,
+      "running_server_payload_hashes": 3,
+      "strict_stored_refusals": 2
+    }
+  ],
+  "source_paths": 10347,
+  "all_regular_hashes_and_exact_symlink_text_match_git": true,
+  "source_unchanged": true,
+  "archive_sha256": "208d4e71f5195bcb125fa033c1df92856924c526cd451ba515ca9b6930d75f08",
+  "archive_members": 119,
+  "scope": "retained official native evidence checked; no released execution by reviewer host; transient refusal-bytes additionally enforced by executed fixture assertions"
+}

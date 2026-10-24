@@ -1,0 +1,23 @@
+lamp-settings: invalid_state: saved settings or retry receipts are invalid; no defaults were substituted
+usage: lamp-settings COMMAND [OPTIONS]
+  catalog
+      Print the first three proposed declarations. No owner reads these yet.
+  serve [--enable] --dir ABSOLUTE_PRIVATE_DIR --catalog ABSOLUTE_PRIVATE_FILE
+        [--bus-root ABSOLUTE_DIR] [--seconds N]
+      Without --enable: no file, socket, worker or Bus activity.
+      With it: keep desired settings in DIR/settings.json and answer on
+      DIR/settings.sock. The existing directory and catalog must be 0700/0600.
+  read --socket ABSOLUTE_PATH
+      Read the complete declaration and last durably saved values.
+  status --socket ABSOLUTE_PATH
+      Read health and progress without setting values.
+  set --socket ABSOLUTE_PATH --name OWNER.KEY --value TYPED_JSON
+      --store-id ID --revision N --request-id ID
+      Atomically save one value using the store and revision previously read.
+  apply --socket ABSOLUTE_PATH --file ABSOLUTE_PRIVATE_FILE
+      Save one atomic Mutation JSON document containing guard and changes.
+
+No command applies a value to hardware or another component. Save success is
+durability, not consumer adoption. After a lost reply, reuse the SAME request
+ID, revision and values. Never guess success or retry with a new guard.
+

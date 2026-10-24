@@ -1,0 +1,28 @@
+{
+  "run": 40077708256,
+  "attempt": 1,
+  "head": "8f5c600c1562d7e2459ddd03ccb999206fdf48ad",
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-24T08:28:04.1102011Z      Summary [ 184.614s] 9848/11199 tests run: 9847 passed (1 leaky), 1 failed, 92 skipped"
+  ],
+  "passed_excluding_leak": 9846,
+  "leaks": 1,
+  "failed": 1,
+  "skipped": 92,
+  "selected_unrun": 1351,
+  "case": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+  "unchanged_source": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "sha256": "882d9cf8a1350195a35eb72709d87636963d16d5d5632083149f1bc19e234547",
+      "identical_to_tested_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/room_told.rs",
+      "sha256": "cdc957183f550c809afb6ae54cda0e7c79bea5be812a67614c30a4f2f30e0db3",
+      "identical_to_tested_base": true
+    }
+  ],
+  "primary_log_sha256": "6993bf7dad5e1f1430296b9d0b4cc4939c47430547d3d57a0790e5c82acfa6b8",
+  "scope": "same known fixture-clock case routed to existing #3190; no original-clock capture or failure-cause claim"
+}

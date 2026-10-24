@@ -1,0 +1,53 @@
+{
+  "declarations": [
+    {
+      "default": {
+        "kind": "number",
+        "value": 30.0
+      },
+      "description": "Desired rise above the learned room floor for a sudden sound; Ears integration is pending.",
+      "name": "ears.rise_db",
+      "owner": "ears",
+      "read_only": false,
+      "rule": {
+        "kind": "number",
+        "max": 60.0,
+        "min": 10.0
+      },
+      "unit": "dB above room floor"
+    },
+    {
+      "default": {
+        "kind": "integer",
+        "value": 1
+      },
+      "description": "Desired light level from dimmest to brightest; the ring owner still controls application and privacy.",
+      "name": "light.level",
+      "owner": "light",
+      "read_only": false,
+      "rule": {
+        "kind": "integer",
+        "max": 5,
+        "min": 1
+      },
+      "unit": "level"
+    },
+    {
+      "default": {
+        "kind": "integer",
+        "value": 1209600
+      },
+      "description": "Desired age limit for closed Voice metadata sessions; Records integration and cleanup enablement remain separate.",
+      "name": "records.voice_max_age_seconds",
+      "owner": "records",
+      "read_only": false,
+      "rule": {
+        "kind": "integer",
+        "max": 31622400,
+        "min": 1
+      },
+      "unit": "seconds"
+    }
+  ],
+  "version": 1
+}
