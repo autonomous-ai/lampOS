@@ -5,6 +5,20 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 08:30 — enrollment repair active; Body carry read
+
+- First's face-speaker enrollment assignment was claimed at 08:09 on
+  Queue #3126. Voice and Eyes changes are in progress on
+  `third/remember-speaking-face`, behind an off-by-default switch.
+- #3308 source/base HOLD clears on `a4a4d9e42`: equal two-commit carry,
+  identical tested Body blobs, corrected description and current base.
+  Original independent Mac gates pass, **607/0**; carried-head Linux
+  Clippy passes and ARM64 is pending. [Receipt](verification/remember-speaker-and-body-read-20261024/README.md).
+- Second reports the previously missing landed-tree Linux formatting at
+  `25452b88d`; Fourth reports the historical authored-head receipt.
+  #3276's unexecuted hand trial remains on the Monday list. Third continues
+  the assigned code repair while that waits; no lamp action.
+
 ## 2026-10-24 01:54 — merged product build published and checked
 
 - Product build **6471**, source `25452b88d`, published successfully in

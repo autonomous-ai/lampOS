@@ -1,0 +1,39 @@
+{
+  "head": "a4a4d9e42974ec4846e405d52db0a54583f58bcf",
+  "base": "88b1ad796e5045490ad678eb240eea2dab010c81",
+  "base_is_ancestor_exit": 0,
+  "range_diff": "1:  35d2c8fdf4 = 1:  072d22fd49 lampOS: a joint resting inside its deadband never reports body/hand pushed, whichever lamp's calibration (06c1's joint 0)\n2:  2977f94ef0 = 2:  a4a4d9e429 lampOS: an admitted hand keeps renewing its hold at an eased load, a resting joint keeps the full bound (#3248 carry)\n",
+  "source_hashes": {
+    "lampOS/crates/body/src/body.rs": "80097e9b9b3c211e25896a13f3551097ba464fa10d958d8976f4521bd51480fa",
+    "lampOS/crates/body/src/body/tests.rs": "b3cf7a8e488ecb33b496e10c4b541f3c14cf5aa3c92447dd1d8a581c034e1583",
+    "lampOS/docs/body.md": "9ad124bde39b10e17b94542b2ff38acd3e8edcd3b270df5d9526d1c845881a6c"
+  },
+  "matches_prior_tested_body": true,
+  "prior_independent_gate": "/private/tmp/third-3308-gates/result.json",
+  "new_local_gate": "not repeated; byte-identical Body files, reviewer-two reports exact-head 607/0 gate in issuecomment-6378159674",
+  "authored_tree": "46eae892b3523cec0ea5bca905cb79ba0a0d70a6",
+  "merge_preview": "c19420c75ad24ebadaa569d2431d2f75557d341a",
+  "preview_tree": "46eae892b3523cec0ea5bca905cb79ba0a0d70a6",
+  "preview_parents": [
+    "88b1ad796e5045490ad678eb240eea2dab010c81",
+    "a4a4d9e42974ec4846e405d52db0a54583f58bcf"
+  ],
+  "preview_equals_authored_tree": true,
+  "checks": {
+    "arm64": {
+      "databaseId": 40049289489,
+      "headSha": "a4a4d9e42974ec4846e405d52db0a54583f58bcf",
+      "status": "in_progress",
+      "conclusion": "",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40049289489"
+    },
+    "clippy": {
+      "databaseId": 40049289507,
+      "headSha": "a4a4d9e42974ec4846e405d52db0a54583f58bcf",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40049289507"
+    }
+  },
+  "worktree_status": ""
+}

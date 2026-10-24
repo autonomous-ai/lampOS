@@ -1,0 +1,76 @@
+{
+  "head": "2977f94ef027f25320ddcc7697ad762f54573d5a",
+  "source_before": {
+    "lampOS/crates/body/src/body.rs": "80097e9b9b3c211e25896a13f3551097ba464fa10d958d8976f4521bd51480fa",
+    "lampOS/crates/body/src/body/tests.rs": "b3cf7a8e488ecb33b496e10c4b541f3c14cf5aa3c92447dd1d8a581c034e1583",
+    "lampOS/docs/body.md": "9ad124bde39b10e17b94542b2ff38acd3e8edcd3b270df5d9526d1c845881a6c"
+  },
+  "stages": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 11.63,
+      "log": "/private/tmp/third-3308-gates/fmt.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 18.59,
+      "log": "/private/tmp/third-3308-gates/clippy.log"
+    },
+    {
+      "name": "test",
+      "command": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-body",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 172.91,
+      "log": "/private/tmp/third-3308-gates/test.log"
+    }
+  ],
+  "source_after": {
+    "lampOS/crates/body/src/body.rs": "80097e9b9b3c211e25896a13f3551097ba464fa10d958d8976f4521bd51480fa",
+    "lampOS/crates/body/src/body/tests.rs": "b3cf7a8e488ecb33b496e10c4b541f3c14cf5aa3c92447dd1d8a581c034e1583",
+    "lampOS/docs/body.md": "9ad124bde39b10e17b94542b2ff38acd3e8edcd3b270df5d9526d1c845881a6c"
+  },
+  "status": "",
+  "local_test_result_lines": [
+    "test result: ok. 439 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 48.16s",
+    "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+    "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "local_passed": 607
+}
