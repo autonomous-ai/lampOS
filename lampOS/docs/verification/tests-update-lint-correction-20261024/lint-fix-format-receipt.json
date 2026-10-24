@@ -1,0 +1,44 @@
+{
+  "changed_paths": [
+    "lampOS/crates/update/tests/round/runnable_events.rs"
+  ],
+  "equivalent_change": "Nested conjunction/iflet -> same ordered let-chain, conditions and missing-output/assert/return payload unchanged",
+  "formatter": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "-p",
+      "lamp-update"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS",
+    "started_at": "2026-10-24T15:43:51.066957+00:00",
+    "timeout_seconds": 300,
+    "stdout": "fmt-package.stdout.txt",
+    "stderr": "fmt-package.stderr.txt",
+    "timeout_cleanup": [],
+    "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+    "available_bytes_before_Cargo": 62676373504,
+    "owned_pid": 41364,
+    "owned_process_group": 41364,
+    "timed_out": false,
+    "exit_code": 0,
+    "unexpected_residual_group_after_normal_exit": false,
+    "direct_status_before_cleanup": 0,
+    "owned_group_present_before_cleanup": false,
+    "direct_wait_status": 0,
+    "owned_group_absent_after_cleanup": true,
+    "wall_seconds": 0.726482,
+    "finished_at": "2026-10-24T15:43:51.793665+00:00",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "all_other_candidate_and_product_bytes_modes_mtimes_preserved": true,
+  "no_clippy_build_tests": true,
+  "metadata_not_repeated": true,
+  "before_sha256": "22917963bb8cc2b378c52985fe897c8ba09fb093060444694e62dd643b64642e",
+  "after_sha256": "c9c7efcb0e758eae4d8f6c6f6ab36b80de57419dd0bc5719b2f9faf46d3a1fee",
+  "patch_sha256": "ecb325d55303b973b1bbabb96d793fc2b366b2eedc78bd297ae67590c51af6e8"
+}

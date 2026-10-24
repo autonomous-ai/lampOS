@@ -1,0 +1,20 @@
+{
+  "source_guard_sha256": "fad3bb4811b8395de530a13daf4050d59a7f975bb40cfdc812d4da4390d1ce5e",
+  "started_at": "2026-10-24T15:36:57.014722+00:00",
+  "steps": [],
+  "unrun_steps": [
+    "fmt-check",
+    "clippy",
+    "voice-default-parallel",
+    "readers-default-parallel",
+    "workspace-build"
+  ],
+  "source_unchanged": true,
+  "no_clean_or_mtime_refresh": true,
+  "native_Linux_or_ARM64_claim": false,
+  "status": "Stopped on source/infrastructure/compile/non-test gate/timeout/census failure; no retry",
+  "error": "PermissionError(1, 'Operation not permitted')",
+  "local_output_epoch_guard": true,
+  "finished_at": "2026-10-24T15:37:02.276796+00:00",
+  "runner_exit": 1
+}

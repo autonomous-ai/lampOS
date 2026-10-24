@@ -1,0 +1,27 @@
+--- a/lampOS/crates/update/tests/round/runnable_events.rs
++++ b/lampOS/crates/update/tests/round/runnable_events.rs
+@@ -120,15 +120,16 @@
+         // Recheck time before accepting completion, even if the process exited
+         // while this test thread was descheduled. The next iteration diagnoses it.
+         let deadline = first_byte.map_or(startup_deadline, |at| at + FINISH);
+-        if Instant::now() < deadline && eof {
+-            if let Some(status) = status {
+-                if first_byte.is_none() {
+-                    return Err(format!(
+-                        "updater exited without output: {status}; output={output:?}"
+-                    ));
+-                }
+-                return Ok((status, output));
++        if Instant::now() < deadline
++            && eof
++            && let Some(status) = status
++        {
++            if first_byte.is_none() {
++                return Err(format!(
++                    "updater exited without output: {status}; output={output:?}"
++                ));
+             }
++            return Ok((status, output));
+         }
+         let remaining = deadline.saturating_duration_since(Instant::now());
+         if !remaining.is_zero() {

@@ -1,0 +1,42 @@
+[
+  {
+    "file": "README.md",
+    "sha256": "a114fbc31c3619610b3b40cfcd51d0a2961a102e14a79993b4effe66a0425975"
+  },
+  {
+    "file": "candidate-four-files.patch",
+    "sha256": "87480944e6b2c1ea50930b4faf1150ba40febe2a6ba68eee9b4a0bf5107d0aef"
+  },
+  {
+    "file": "corrected-clean-compile.json",
+    "sha256": "b8efe4d4058eab6cb5cf686cb7745f93df20db3a693eedcb13c07ebb16f13f5b"
+  },
+  {
+    "file": "corrected-full-gate-plan.json",
+    "sha256": "31c7c69fb166d579a2533a4f4c2490d9486b8beff0e5b6bc00b9e3a7d5c61940"
+  },
+  {
+    "file": "lint-fix-format-receipt.json",
+    "sha256": "c3f3109cb39ec9e1e633c0aa45d145e1243c7362b3c09b55db9ba253452c4ce8"
+  },
+  {
+    "file": "lint-only.patch",
+    "sha256": "ecb325d55303b973b1bbabb96d793fc2b366b2eedc78bd297ae67590c51af6e8"
+  },
+  {
+    "file": "original-clippy-results.json",
+    "sha256": "4a405533ddea3f3bba682d8a116b301172d78ad5493b4526252ee8fc2e1adb38"
+  },
+  {
+    "file": "original-clippy.stderr.txt",
+    "sha256": "a8dc5edc1736c8b9a047c8a93931cb4e9f8c4a55e17f9ef1f63984670f24f695"
+  },
+  {
+    "file": "socket-preflight-exception.txt",
+    "sha256": "acfbde6466b73ddbbfce50cf23646deb0a814b83b2b27f538e70d16d525ed956"
+  },
+  {
+    "file": "socket-preflight-failed-results.json",
+    "sha256": "033eafacc36962f36d840855ec36f2ed339cc254e589784539b7a0868e367963"
+  }
+]

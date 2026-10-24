@@ -4264,3 +4264,9 @@ The single planned old-loop witness caught the original timeout at 2.000353195 s
 Ready for lamp-voice: no
 
 Original setup ordering failed at the original body-request assertion with and without the controlled pause. Moving only publication after setup passed both observations. All four predefined outcomes are retained without retry; the unpaused baseline was predicted to pass, so the experiment does not show pause-specific causation. Root verified source/compiled witnesses, raw outcomes, matching profiles, eleven fresh local artifact messages per version, both 27-case inventories and complete owned cleanup. Canonical gates and native checks remain pending. [Raw comparison and exact final patch](verification/tests-no-pause-comparison-20261024/). Update's restored full twelve-package gate now owns the independent qualification target and CPU.
+
+## 24 October, 22:55 — Update lint corrected; failed allocations retained
+
+Ready for lamp-voice: no
+
+The first full allocation failed socket preflight before any Rust command; the properly permitted allocation passed fmt then failed strict Clippy on one collapsible conditional, before tests. Both remain failed. Applied only the equivalent let-chain and one package formatter, then freshly compiled the new source epoch: all 120 local artifact messages are fresh and the executable remains byte-identical to the earlier candidate. Corrected full gates are running with local-socket permission; no full tests are credited yet. [Failures, exact correction and new proof](verification/tests-update-lint-correction-20261024/). NoPause's canonical twelve-package controller is fully source-reviewed and prepared, awaiting the CPU.

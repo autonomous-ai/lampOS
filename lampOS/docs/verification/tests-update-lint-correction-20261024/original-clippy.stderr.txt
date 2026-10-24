@@ -1,0 +1,62 @@
+    Checking lamp-bus v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/bus)
+    Checking lamp-turn-owner v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/turn-owner)
+    Checking lamp-ipc v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/ipc)
+    Checking lamp-local-time v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/local-time)
+   Compiling lamp-camera v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/camera)
+    Checking sonora v0.2.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/third_party/sonora)
+    Checking lamp-ring v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/ring)
+    Checking lamp-msgs v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/msgs)
+    Checking lamp-turn-end-wire v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/turn-end-wire)
+    Checking lamp-audio v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/audio)
+    Checking lamp-gemini v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/gemini)
+    Checking lamp-near-call v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/near-call)
+    Checking lamp-voice-processes v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/voice-processes)
+    Checking lamp-observer v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/observer)
+    Checking lamp-sound-fixtures v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/sound-fixtures)
+    Checking lamp-turn-end v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/turn-end)
+    Checking lamp-same-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/same-voice)
+    Checking lamp-update v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/update)
+    Checking lamp-lean v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/lean)
+    Checking lamp-schedule v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/schedule)
+    Checking lamp-health v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/health)
+    Checking lamp-controls v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/controls)
+    Checking lamp-memory v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/memory)
+    Checking lamp-policy v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/policy)
+    Checking lamp-actions v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/actions)
+    Checking lamp-ears v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/ears)
+    Checking lamp-keeper v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/keeper)
+    Checking lamp-tasks v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/tasks)
+    Checking lamp-body v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/body)
+    Checking lamp-setup v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/setup)
+    Checking lamp-peek v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/peek)
+    Checking lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/voice)
+    Checking lamp-expression v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/expression)
+    Checking lamp-skills v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/skills)
+    Checking lamp-voice-eval v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/voice-eval)
+    Checking lamp-cloud v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/cloud)
+error: this `if` statement can be collapsed
+   --> crates/update/tests/round/runnable_events.rs:123:9
+    |
+123 | /         if Instant::now() < deadline && eof {
+124 | |             if let Some(status) = status {
+125 | |                 if first_byte.is_none() {
+126 | |                     return Err(format!(
+...   |
+132 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+123 ~         if Instant::now() < deadline && eof
+124 ~             && let Some(status) = status {
+125 |                 if first_byte.is_none() {
+...
+130 |                 return Ok((status, output));
+131 ~             }
+    |
+
+error: could not compile `lamp-update` (test "round") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/component-controller/full-gates/run-full-gates.py", line 210, in run
+    unix.bind(str(Path(temporary) / 'p.sock'))
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 1] Operation not permitted
