@@ -1,0 +1,42 @@
+{
+  "3327-native.json": {
+    "bytes": 962,
+    "sha256": "bb91a462432a7b8949542bc3d1e00ffcff3b66c7da6b17facda5fb0e2b9869fa"
+  },
+  "3327-protocol.json": {
+    "bytes": 5927,
+    "sha256": "309e133b85ccbc6bfdd97d124811e889abf2f43cd2f84e6ca2550fc969e585fd"
+  },
+  "3327-source.json": {
+    "bytes": 868,
+    "sha256": "354b34f8fa3c775bd7cb357b1a58fad7b0ae75c60b16b8124d9b1f477e0635cb"
+  },
+  "3330-native.json": {
+    "bytes": 962,
+    "sha256": "eb0565ea8c00ec597e3de207e209288023ae194f77030bee23cb750e248fe140"
+  },
+  "3330-protocol.json": {
+    "bytes": 3242,
+    "sha256": "8f8e3c9ffa222f39971e72361906758dd12f251ad6f71899448abec885103387"
+  },
+  "3330-source-read.json": {
+    "bytes": 1097,
+    "sha256": "67221ddb29530bf61d5c865b8e80f8a0bcf602fbb5b29eb0e566f98e590872b5"
+  },
+  "3330-source-read.md": {
+    "bytes": 6616,
+    "sha256": "3ed8c49357cdf5db27ab4a3b82dbac3226f20d713b73770cf6dc49e0b1b86cee"
+  },
+  "3330-source.json": {
+    "bytes": 868,
+    "sha256": "3b64b8aabaab854cab9da6cbbc20a7438e33e011e935f5794ae3e92f33765989"
+  },
+  "README.md": {
+    "bytes": 4022,
+    "sha256": "a6e0bc9ef660fd9d0d0ad09442f316b55992f2ee864f408a9ffea65ae1a7b14c"
+  },
+  "privacy-clock-plan.md": {
+    "bytes": 8535,
+    "sha256": "ab088d554f4cefe23be262a0911fef8d99f1800cc4b0b354d5e68b00410039e9"
+  }
+}

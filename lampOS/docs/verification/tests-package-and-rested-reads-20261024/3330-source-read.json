@@ -1,0 +1,30 @@
+{
+  "head": "22e5f48736fe9b0e796b3783edee76522b0185c2",
+  "parent": "6c8c52e371353b20fc729ffcdbcccaf839a46321",
+  "files": [
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "sha256": "4861acf71ddf376f46204221bd3fff7a7656cda5437ce5919f880178be18c6bb"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair/README.md",
+      "sha256": "022d427df628d7c9b0380872d1de3f2fa5f7b7c903371c3b62cf6c4ee49b146a"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair/fixture.rs",
+      "sha256": "eb565e3c09972aaaacc1472da1564cf91fc5cec7502ea2b559b70646c987249f"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair/package.rs",
+      "sha256": "93033533c5bbc26809a85463949a5e7fab72afbf0194c8a62831b395d1459920"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "sha256": "f5451d8eb01131a9ee8211221abfed01b17a6df6a6604d70cdac391394e4566f"
+    },
+    {
+      "path": "lampOS/docs/verification/package-state-release-pair-20261024/README.md",
+      "sha256": "ccf05deeac82f6e7d667a3cae2b07c8e16b53e27deb03f222588ff5c012ea508"
+    }
+  ]
+}

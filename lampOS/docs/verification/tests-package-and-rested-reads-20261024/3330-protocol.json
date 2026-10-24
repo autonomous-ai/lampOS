@@ -1,0 +1,80 @@
+{
+  "status": "clean_with_explicit_limits",
+  "head": "22e5f48736fe9b0e796b3783edee76522b0185c2",
+  "tree": "66161bec372a8c7774881851e0f9776657714d3e",
+  "run": {
+    "run_id": "40058259278",
+    "run_attempt": "1",
+    "pr_head": "22e5f48736fe9b0e796b3783edee76522b0185c2",
+    "event": "pull_request"
+  },
+  "archive": {
+    "bytes": 647870,
+    "sha256": "673be2ef3a9da3ca2362bcfa51fd1cb1bf2fb94a5c69a59873557f5586acf936"
+  },
+  "retained_regular_files": 610,
+  "retained_bytes": 2323667,
+  "cases": [
+    {
+      "case": "kp-3DBv9d",
+      "writer": 6408,
+      "reader": 6498,
+      "return_reader": 6408,
+      "transcript": {
+        "bytes": 37418,
+        "sha256": "06e7a9bc2d37fec9cb25a1b09ba8f2662f9a9c88bb6f58a96c70f09bba487242"
+      },
+      "rows": 144,
+      "commands": 30,
+      "success": 16,
+      "expected_refusals": 14,
+      "raw_streams": 60,
+      "positive_archives": 4,
+      "negative_mutations": 6,
+      "disabled_tool_reservation_refusals": 2,
+      "installed_snapshots": 5,
+      "inventory_outputs": 6,
+      "provenance_records_verified": 10,
+      "retained_source_entries": 21,
+      "actual_command_binaries_retained": false
+    },
+    {
+      "case": "kp-TJc2xl",
+      "writer": 6498,
+      "reader": 6408,
+      "return_reader": 6498,
+      "transcript": {
+        "bytes": 37418,
+        "sha256": "092c845af7002e0f33092722f70440729e8ae9bb1f994bd09872da3b15d86095"
+      },
+      "rows": 144,
+      "commands": 30,
+      "success": 16,
+      "expected_refusals": 14,
+      "raw_streams": 60,
+      "positive_archives": 4,
+      "negative_mutations": 6,
+      "disabled_tool_reservation_refusals": 2,
+      "installed_snapshots": 5,
+      "inventory_outputs": 6,
+      "provenance_records_verified": 10,
+      "retained_source_entries": 21,
+      "actual_command_binaries_retained": false
+    }
+  ],
+  "checks": 4276,
+  "verifier": {
+    "bytes": 20718,
+    "sha256": "84d960de2f5f4dfbfbddc70ecbabdf6d77f218c2297947b3c147276f5a424a2a"
+  },
+  "findings": [],
+  "limits": [
+    "This verifier executes no released binary, Cargo command, test or Cloud consumer.",
+    "Executable bytes are omitted from the evidence archive. Recorded per-command before/after identities and final sizes/modes match frozen pins and download receipts; executable bytes cannot be independently rehashed here.",
+    "Original file modes are verified from outer tar headers because safe extraction normalizes local modes. Directory modes are recorded fixture assertions; outer tar contains no directories to independently recheck their original metadata.",
+    "Per-refusal unchanged-tree assertions are bound by exact fixture source and completed test/transcript. Retained pre/post snapshots independently match; there is no separate filesystem snapshot after every individual refusal.",
+    "Provenance verification checks writer JSON bytes against actual package archives only, not installed_from or Cloud consumption.",
+    "The four routine cases and full 6974-file source-to-Git comparison are outside this independent package-only audit and remain root responsibilities.",
+    "No Store trust/signature, updater install, complete product folder set, physical output or power-loss qualification is established."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "head": "22e5f48736fe9b0e796b3783edee76522b0185c2",
+  "run": 40058259337,
+  "job": 120765942477,
+  "counts": {
+    "PASS": 11163,
+    "LEAK": 1
+  },
+  "skipped_from_summary": 77,
+  "summary": "Summary [ 199.911s] 11164 tests run: 11164 passed (1 leaky), 77 skipped",
+  "actual_indices_contiguous": true,
+  "unique_test_identities": 11164,
+  "log_sha256": "c09336efcfe12e4f599c204682ffefb9485b507c986a13f754d0782eae5e54c1",
+  "non_pass_rows": [
+    {
+      "status": "LEAK",
+      "seconds": 0.247,
+      "index": 8992,
+      "total": 11164,
+      "identity": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "dedicated": {
+    "run": 40058259278,
+    "passed": 6,
+    "failed": 0,
+    "ignored": 0,
+    "artifact": 12546092757,
+    "artifact_zip_sha256": "30b391925f4298c88282a4c30d47cc1917332094a1f25127395b9a00eeca17f7",
+    "log_sha256": "dbefb929696496b46dfbc13131d9e60700826d6086dcad7f2d2b92eb54fe9cfb"
+  }
+}

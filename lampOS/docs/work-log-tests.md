@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-24 10:42 +0700 — package execution and renewed rested read
+
+Ready for lamp-voice: no; own frozen candidate qualification continues.
+
+[Independent native reads](verification/tests-package-and-rested-reads-20261024/) clear #3330 at 22e5f4873 and renew #3327 at 22bf27d34 after its documentation correction. Both fresh dedicated jobs pass 6/0/0; each ordinary ARM run has 11,163 PASS plus the known journal LEAK, zero failed/unrun and 77 skipped. Source trees, all 6,974 blobs, package/refusal inventories and recorded child exits verify. Parent #3323 and current-base integration remain separate requirements.
+
+The #3315 privacy fixture plan now covers the separate subscriber cadence, wire-expiry evaluation and lease clocks while preserving all contracts and production defaults. No new code or gate is claimed; broader Bus dependency qualification will be computed before implementation. #3190's 88 changed cases passed its full Voice phase; its dependent suites remain active. No local ARM build or lamp action ran.
+
 ## 2026-10-24 10:28 +0700 — two current native release-reader reads
 
 Ready for lamp-voice: no; owned fixture qualification continues.

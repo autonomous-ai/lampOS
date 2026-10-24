@@ -1,0 +1,20 @@
+{
+  "head": "22e5f48736fe9b0e796b3783edee76522b0185c2",
+  "head_tree": "66161bec372a8c7774881851e0f9776657714d3e",
+  "artifact_revision": [
+    "18c505a60f3ec3dbe416abec60f4b2ac02e2a427",
+    "66161bec372a8c7774881851e0f9776657714d3e"
+  ],
+  "tree_matches": true,
+  "before_after_identical": true,
+  "manifest_sha256": "a85dfa2be99cf6a178a94a9b0dce85f744776b3ea0e4ec2eec8187e2b7d7e04a",
+  "manifest_entries": 6974,
+  "expected_tracked_lampOS_blobs": 6974,
+  "missing": [],
+  "extra": [],
+  "verified_hashes": 6974,
+  "mismatches": [],
+  "symlink_resolution": [],
+  "method": "git ls-tree plus git cat-file blob bytes, relative Git symlink resolution before SHA-256; no checkout or binary execution",
+  "scope": "Every tracked lampOS blob in the native pair source manifest; repository files outside lampOS are covered by matching tree identity, not manifest hashes"
+}
