@@ -1,54 +1,44 @@
-## Current checkpoint: 2026-10-24 10:26 +07, current native pairs green and package continuation opened
+## Current checkpoint: 2026-10-24 11:03 +07, Actions pair passes and Cloud consumer taken
 
-Ready for lamp-voice: yes (#3312 and #3323); both have two current-head reads.
+Ready for lamp-voice: #3312 and #3323, with current independent reads and all
+native gates green on base `9ed44f88c`. The train owns integration.
 
-These are explicitly selected verification fixtures, with no runtime or default
-behavior change. #3323 `6c8c52e37` has both current-head READ-OKs and all native
-gates green. [Current proof](verification/routine-state-current-native-20261024/README.md):
-dedicated **4/0**, ordinary ARM **11,163 PASS + 1 known LEAK**, zero failed,
-75 skipped; Mac **514/0/5 ignored**, strict Clippy and Linux formatting pass.
-The train owns integration; no direct merge is attempted.
+#3312 `4ba9d959f`: dedicated **12/0**, ordinary **11,163 PASS + 1 LEAK**,
+83 skipped. Reviewer-two's fresh full Mac gate passes **4,411/0/32 ignored**.
+The earlier author StaleOwner failure and isolated pass stay retained in
+[the receipts](verification/reminder-task-current-native-20261024/README.md).
 
-#3312 `4ba9d959f` has green dedicated **12/0**, ordinary ARM and Linux Clippy.
-All 6,977 authored source hashes, process reaps and snapshots verify; ordinary
-ARM is **11,163 PASS + 1 known LEAK**, zero failed, 83 skipped.
-[Current native proof](verification/reminder-task-current-native-20261024/README.md). Current Mac coverage **4,411 unique passes**
-includes an unchanged Voice ring `StaleOwner` failure and its isolated pass,
-retained separately rather than presented as an uninterrupted green suite.
+#3323 `6c8c52e37`: dedicated **4/0**, ordinary **11,163 PASS + 1 LEAK**,
+75 skipped; Mac **514/0/5 ignored**. [Native proof](verification/routine-state-current-native-20261024/README.md).
 
-#3327 `8bc821736` resolves the first native run's private-directory collision.
-Corrected dedicated **6/0**, ordinary ARM and Linux Clippy are green; the
-first **4/2** run stays retained. Mac **514/0/7 ignored** and exact-head Linux
-fmt pass. [Final corrected-head proof](verification/rested-state-current-native-20261024/README.md)
-is published. Tests cleared that head; `22bf27d34` then folds the requested
-README execution record only. Fresh Mac **514/0/7 ignored**, strict Clippy and
-Mac/Linux formatting pass; new-head native gates run separately while the
-parent lands.
+#3327 `22bf27d34` and #3330 `22e5f4873` each have two current READ-OKs,
+Mac **514/0/7 ignored**, dedicated **6/0**, ordinary **11,163 PASS + 1 LEAK**,
+77 skipped, strict Clippy and exact Linux formatting green. Both remain draft
+until parent #3323 lands, then each carries onto the latest base and reruns
+its gates. [Rested proof](verification/rested-state-current-native-20261024/readme-22bf/README.md)
+and [package proof](verification/package-state-current-native-20261024/README.md).
+Historical failed/corrected rested runs remain separate.
 
-#3330 `22e5f4873` adds two actual released package/installable-folder cases,
-using offline `pack/install/list` and seven refusal controls per reader.
-Mac fmt, strict Skills Clippy and **514/0/7 ignored** pass. Exact-head Linux
-fmt preserves 6,974 files, cleanup verified. Official dedicated/ordinary/Clippy
-runs are green. The detailed audit verifies both package directions, 60 owned
-command/reap pairs and 28 intended refusals without installed-tree changes;
-[Current native proof](verification/package-state-current-native-20261024/README.md)
-is retained. Parent #3323 lands before this continuation
-is rebased and offered to the train.
+#3334 `65e7b57fa`: actual released Actions cap-state A→B→A cases. Mac fmt,
+strict Clippy and **120/0/2 ignored** pass. Exact Linux fmt preserves **6,971**
+source hashes and its container is removed. Dedicated native run
+**40060504367** passes **2/0**; detailed snapshot/process audit is in progress.
+Ordinary ARM64 and Linux Clippy still run. Both released Actions binaries are
+identical; no output hardware, clock/expiry or power-loss proof is claimed.
 
-#1812 still needs the independently trusted signing key; #2810 still needs
-an attended lamp window. Neither wait stops these software qualifications.
-The independent #3329 source/artifact read found no additional P1/P2; Third's
-existing descendant-cleanup HOLD remains, with no new systemd result claimed.
-Next: finish publication and own-PR findings, carry Third's requested exact
-Linux formatting to #3328 `7fb4feb20`, then the next unclaimed qualification
-boundary.
+Taken on #2809: `second/cloud-provenance-pair`, the actual released Cloud
+`skills.list` consumer explicitly excluded by #3330. Released Skills writers
+will install packages for opposite Cloud readers, both directions, with a
+private MQTT peer and dummy credentials in a network-disabled native
+container. Fixed install paths are private tmpfs, never host lamp state.
+Cloud payloads differ but the parser is unchanged. Implementation is active;
+no native result is claimed.
 
-Taken on #2809: Actions output-cap persistence, `second/caps-release-pair`,
-after open/merged PR and Queue ownership checks. Two actual 6408/6498 A→B→A
-cases will cover active restrictions, cancellation tombstones, exact retries,
-stale/wrong-token refusal and subsequent fresh writes. Both Actions artifacts
-are identical, explicitly disclosed. Private runtime/bus/store only, no mixer,
-device, actuator, broker or provider. No native pass is claimed before execution.
+The #3329 corrected `6f79d33d6` source read closes the scoped recursive-cgroup
+and workflow-path findings; native evidence and final reads belong to its
+readers. Third's #3328 exact Linux formatting carry is published at
+`6f95ea37e`. #1812 still needs the independently trusted signing key and
+#2810 an attended lamp window. Neither wait stops software work.
 
 ---
 

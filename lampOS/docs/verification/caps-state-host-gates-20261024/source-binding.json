@@ -1,0 +1,67 @@
+{
+  "kind": "post-gate evidence publication audit, not a new gate execution",
+  "head": "65e7b57fa785acc37196d4b5a110f576d3741926",
+  "integration_base": "9ed44f88c573837c50451c94f4d88f010e8a6721",
+  "repository_tree": "ff1c931850b7c51974633e388c8785c258996c93",
+  "lampOS_tree": "5986e4acb99f496833878edf5a1755bda4727646",
+  "checked_git_objects": [
+    {
+      "path": "lampOS/crates/actions/tests/release_pair.rs",
+      "sha256": "79914cc7dffae2114e0f72550018a537252f29c63d9ffd6b32548d4ce5d72e82",
+      "bytes": 816,
+      "matches_recorded_frozen_hash": true
+    },
+    {
+      "path": "lampOS/crates/actions/tests/release_pair/fixture.rs",
+      "sha256": "39938659e19860e8a632c5d3d9d917f08512f86206d6bff3f330a5fc36e7d1b1",
+      "bytes": 28732,
+      "matches_recorded_frozen_hash": true
+    },
+    {
+      "path": "lampOS/crates/actions/Cargo.toml",
+      "sha256": "d6aa1c2a6c48254e1842a34ff5eddac1ebf7b897805a7540392e8b598782d910",
+      "bytes": 860,
+      "matches_recorded_frozen_hash": true
+    },
+    {
+      "path": "lampOS/Cargo.lock",
+      "sha256": "0b5c62b8477de47e9d9a6bf7d7f8b1a546f9fb354bdf7247753b60ee8fb5f67d",
+      "bytes": 118289,
+      "matches_recorded_frozen_hash": true
+    },
+    {
+      "path": ".github/workflows/lampos-caps-state-pair.yml",
+      "sha256": "8606184cf2ca3ec84d74db801562d1bfff779f040d62b4831781f482e0a9696c",
+      "bytes": 7570,
+      "matches_recorded_frozen_hash": true
+    }
+  ],
+  "mac_scope": "Recorded frozen fixture/dependency hashes match these committed blobs. No contemporaneous complete-worktree before/after manifest was retained for the Mac gate.",
+  "linux_scope": "The original retained receipt binds a source archive and before/after regular-file manifest digests to the exact head. Those manifest files themselves were not retained outside the removed container.",
+  "source_archive_checked": {
+    "sha256": "7dab2f23e087ff037497e4f9f40c5958945f993244d77718ad6b4d69e730c32b",
+    "bytes": 212879360,
+    "included_in_public_evidence": false
+  },
+  "mac_test_totals": {
+    "passed": 120,
+    "failed": 0,
+    "ignored": 2,
+    "measured": 0,
+    "filtered": 0
+  },
+  "workflow_controls": {
+    "synthetic": true,
+    "positive": 1,
+    "negative": 5,
+    "released_binary_execution": false
+  },
+  "excluded": [
+    "source archive",
+    "local orchestration program",
+    "extracted shell scripts",
+    "binaries",
+    "credentials",
+    "API identity objects"
+  ]
+}
