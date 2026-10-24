@@ -942,6 +942,17 @@ The fixtures distinguish reminder continuity, task restart fencing and delivery
 ledger recovery from real speech, external task completion and physical reboot
 acceptance. See the [pair's artifacts, scope and commands](verification/reminder-task-release-pair-20261024/README.md).
 
+**Published Actions output-cap state** (#2809). The separate Actions
+`release_pair` target runs 6408 → 6498 → 6408 and the reverse using the
+actual pinned executables. It checks active restrictions, cancellation
+tombstones, exact no-op/refusal persistence and a fresh replacement after
+cancellation over private sockets and bus paths. Both published Actions
+binaries are byte-identical. No mixer or output owner participates, so
+durable acceptance and bus publication remain explicitly unconfirmed output.
+The two cases are ignored in ordinary tests and require explicit native
+execution; see the [cap-state verification record](verification/caps-state-release-pair-20261024/README.md)
+for qualification status, retained evidence and limits.
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
