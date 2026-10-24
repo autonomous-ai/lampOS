@@ -1,0 +1,8 @@
+{
+  ".github/workflows/lampos-cloud-provenance-pair.yml": "7036ab52be6bfa8040882cf0661fba2988aedc9d8061b3ec20db533f184145c1",
+  "lampOS/crates/cloud/tests/release_pair.rs": "1dcb9d5aa2e42b57f21bcfeb0f12ab5db6253b7625ef7cfdab0e729dbbb46418",
+  "lampOS/crates/cloud/tests/release_pair/support.rs": "73d7606d14fd7b93024b08c471000a98701ff8e79d57db13a59b7437032cf397",
+  "lampOS/crates/cloud/tests/release_pair/fixture.rs": "607279e2ccc548d282a22fbe9bcb506a8ce3ab88f2a5dc795d2979c58a55bf47",
+  "lampOS/crates/cloud/tests/release_pair/README.md": "dc6bf714740be21e29946f3f9c0c6d8ff7845dcf08c85c83b0cbe7bfeb2cd212",
+  "lampOS/crates/cloud/tests/release_pair/broker.rs": "52f7a9a1b929d75f2b01dc56388079b7576c69ca3d804a0d66a2d2afb9d399ec"
+}

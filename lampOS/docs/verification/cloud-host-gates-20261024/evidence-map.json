@@ -1,0 +1,62 @@
+[
+  {
+    "file": "fixture-binding.json",
+    "original_sha256": "7b5ae719722b6ffcbe2f0dce6e137b62301b0e54fd53d558f0c6415ceb4f8982",
+    "published_sha256": "7b5ae719722b6ffcbe2f0dce6e137b62301b0e54fd53d558f0c6415ceb4f8982",
+    "home_prefix_replacements": 0
+  },
+  {
+    "file": "mac-result.json",
+    "original_sha256": "be37415a55618c5c4218906b87f93a41881423ac150066677f841c892ac55ae2",
+    "published_sha256": "29fff85747e15cc7a594f2ee6e8284c6f5e5da56a64d5f27ba2874027689ba2b",
+    "home_prefix_replacements": 3
+  },
+  {
+    "file": "mac-fmt.txt",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "home_prefix_replacements": 0
+  },
+  {
+    "file": "mac-clippy.txt",
+    "original_sha256": "6246a951ea55826696a8bde18bd9d2bc84ced44df6d7da79dacaee0d3a875a83",
+    "published_sha256": "6246a951ea55826696a8bde18bd9d2bc84ced44df6d7da79dacaee0d3a875a83",
+    "home_prefix_replacements": 0
+  },
+  {
+    "file": "mac-tests.txt",
+    "original_sha256": "b26ee3d35b988c608a752f1c1ca3443e8842353728f6de278379113ccf572d4c",
+    "published_sha256": "a04a9d1432b7263464c07f27815a8283904d5995c78d3f1ff19fb78514046d45",
+    "home_prefix_replacements": 4
+  },
+  {
+    "file": "linux-fmt.json",
+    "original_sha256": "36dfbdaa6dd46e15634417492665678a17a47ea4e321a02b8cb2e2a5dfca9f4b",
+    "published_sha256": "36dfbdaa6dd46e15634417492665678a17a47ea4e321a02b8cb2e2a5dfca9f4b",
+    "home_prefix_replacements": 0
+  },
+  {
+    "file": "linux-fmt-cleanup.json",
+    "original_sha256": "ec7f3c3c824ee803d5a08fc8557dc8a5e55481dc2fd25c87fb4660ee8a46835c",
+    "published_sha256": "ec7f3c3c824ee803d5a08fc8557dc8a5e55481dc2fd25c87fb4660ee8a46835c",
+    "home_prefix_replacements": 0
+  },
+  {
+    "file": "workflow-validation.txt",
+    "original_sha256": "d4618e2ced18c6274be8f159989c8c7f5bfe2e68a0f13e6f9f9877b15febe536",
+    "published_sha256": "d4618e2ced18c6274be8f159989c8c7f5bfe2e68a0f13e6f9f9877b15febe536",
+    "home_prefix_replacements": 0
+  },
+  {
+    "file": "actionlint.txt",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "home_prefix_replacements": 0
+  },
+  {
+    "file": "actionlint-exit.txt",
+    "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "published_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "home_prefix_replacements": 0
+  }
+]
