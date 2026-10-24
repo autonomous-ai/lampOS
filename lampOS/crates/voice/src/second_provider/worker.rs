@@ -12626,7 +12626,12 @@ mod tests {
                 .expect("the local peer did not finish its bounded exchange")
                 .unwrap();
             let authorized = matches!(mode, "direct" | "wrapped");
-            assert_eq!(answer.told, told, "{mode}");
+            let expected_told = if authorized {
+                serde_json::json!({"next":"Say one short confirmation. The recording has only been offered for preparation; playback has not started and may still be refused. Confirm only that you will try to play it. Do not say it is playing, has started, or is ready."})
+            } else {
+                told
+            };
+            assert_eq!(answer.told, expected_told, "{mode}");
             assert_eq!(
                 answer.requested_audio,
                 authorized.then_some(offer),
