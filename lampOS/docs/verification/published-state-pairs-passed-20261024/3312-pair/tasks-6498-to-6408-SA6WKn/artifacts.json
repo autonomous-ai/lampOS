@@ -1,0 +1,14 @@
+{
+  "opposite": {
+    "bytes": 4723536,
+    "release": 6408,
+    "sha256": "7286dde761ab03155d0f867c3c8965759a010c5434e52df7d16756b32bbea003"
+  },
+  "platform": "linux-aarch64",
+  "scope": "actual Tasks store and sockets; fake Harness and Voice, no network or audio",
+  "writer": {
+    "bytes": 4728024,
+    "release": 6498,
+    "sha256": "385d06c433a474ded979fc5953a8e6cc4aec254f37f7ebe32eb86b3bf027a371"
+  }
+}

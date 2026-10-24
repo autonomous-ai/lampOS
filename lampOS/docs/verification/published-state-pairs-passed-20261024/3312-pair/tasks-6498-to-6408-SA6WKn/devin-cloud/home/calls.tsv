@@ -1,0 +1,11 @@
+auth	auth	status	--json
+machines	machines	--json
+new	new	devin-cloud	--machine	0123456789abcdef0123456789abcdef	--name	lamp-8a75feb18c7e0b960cdaa3b9d41331aa	--json	--task	Pair working
+show	show	--machine	0123456789abcdef0123456789abcdef	cloud_1111111111111111	--chars	4000	--json
+machines	machines	--json
+new	new	devin-cloud	--machine	0123456789abcdef0123456789abcdef	--name	lamp-812701c4a8b4bdc6e7e9dfb0d885df43	--json	--task	Pair answered
+show	show	--machine	0123456789abcdef0123456789abcdef	cloud_2222222222222222	--chars	4000	--json
+machines	machines	--json
+new	new	devin-cloud	--machine	0123456789abcdef0123456789abcdef	--name	lamp-a342c5acdaa3df58be1ccc4e48b4c55e	--json	--task	Pair blocked
+auth	auth	status	--json
+auth	auth	status	--json

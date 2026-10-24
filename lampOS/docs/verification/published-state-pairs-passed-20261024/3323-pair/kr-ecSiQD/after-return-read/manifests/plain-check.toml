@@ -1,0 +1,21 @@
+kind = "core"
+version = "1.0.0"
+enabled = true
+
+[permissions]
+topics = ["fixture/pair"]
+body = true
+
+[[trigger]]
+name = "plain"
+topic = "fixture/pair"
+field = "phase"
+equals = "plain"
+rearm = "ends"
+
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { gesture = "nod" }

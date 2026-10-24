@@ -1,0 +1,30 @@
+{
+  "arguments": [
+    "serve",
+    "--enable",
+    "--dir",
+    "/tmp/pair-output/tasks-6408-to-6498-5nlhVM/claude/store",
+    "--socket",
+    "/tmp/ltp-3lKpJY/public",
+    "--voice-socket",
+    "/tmp/ltp-3lKpJY/voice",
+    "--targets",
+    "/tmp/pair-output/tasks-6408-to-6498-5nlhVM/claude/targets.json",
+    "--harness",
+    "/tmp/pair-output/tasks-6408-to-6498-5nlhVM/claude/home/harness",
+    "--bus-root",
+    "/tmp/ltp-3lKpJY/bus",
+    "--boot-id",
+    "release-pair-boot",
+    "--run-for-ms",
+    "60000",
+    "--no-watch",
+    "--set-up-later"
+  ],
+  "release": 6498,
+  "sha256": "385d06c433a474ded979fc5953a8e6cc4aec254f37f7ebe32eb86b3bf027a371",
+  "socket_parent": {
+    "mode": 448,
+    "uid": 0
+  }
+}

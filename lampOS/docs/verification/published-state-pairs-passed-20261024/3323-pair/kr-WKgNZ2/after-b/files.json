@@ -1,0 +1,26 @@
+[
+  {
+    "bytes": 14742,
+    "file": "daily.json",
+    "mode": 384,
+    "sha256": "9a2d4b417a4a16ed1066a3372a51cb7b71a08b0aa329627794fb440daa612e6d"
+  },
+  {
+    "absent": true,
+    "file": "on"
+  },
+  {
+    "absent": true,
+    "file": "off"
+  },
+  {
+    "bytes": 263,
+    "file": "manifests/control-check.toml",
+    "sha256": "8937f302c5cc8a7300846c4bf3f70ae2b44e37852727099071fc3ab600884e6d"
+  },
+  {
+    "bytes": 645,
+    "file": "manifests/daily-check.toml",
+    "sha256": "c2f0fd97ee5d27154218d7aa54f3bcad4160014a0e5c38dafd053d640df29c08"
+  }
+]

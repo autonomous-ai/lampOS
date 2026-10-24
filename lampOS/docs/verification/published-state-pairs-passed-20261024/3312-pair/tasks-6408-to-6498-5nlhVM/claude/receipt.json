@@ -1,0 +1,27 @@
+{
+  "accepted_tasks": 2,
+  "companions_unchanged": true,
+  "completion": "unverified",
+  "cut": {
+    "held_cli": {
+      "pid": 7352,
+      "reaped": true,
+      "signal": 9,
+      "starttime": 990653
+    },
+    "tasks_pid": 7336,
+    "tasks_reaped": true,
+    "tasks_signal": 9
+  },
+  "engine": "claude",
+  "launch_calls": 3,
+  "observations": 2,
+  "old_escaped_prompt_preserved": true,
+  "opposite": 6498,
+  "opposite_write_reopened": true,
+  "replayed_launches": 0,
+  "schema": 1,
+  "seconds": 0.679897034,
+  "store_id_preserved": true,
+  "writer": 6408
+}

@@ -1,0 +1,27 @@
+{
+  "accepted_tasks": 2,
+  "companions_unchanged": true,
+  "completion": "unverified",
+  "cut": {
+    "held_cli": {
+      "pid": 7316,
+      "reaped": true,
+      "signal": 9,
+      "starttime": 990577
+    },
+    "tasks_pid": 7300,
+    "tasks_reaped": true,
+    "tasks_signal": 9
+  },
+  "engine": "devin-cloud",
+  "launch_calls": 3,
+  "observations": 2,
+  "old_escaped_prompt_preserved": false,
+  "opposite": 6408,
+  "opposite_write_reopened": true,
+  "replayed_launches": 0,
+  "schema": 3,
+  "seconds": 0.638167687,
+  "store_id_preserved": true,
+  "writer": 6498
+}
