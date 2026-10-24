@@ -2392,7 +2392,11 @@ bound is the lower of the joint's own and 100 only once the joint is more
 than 15 counts from where its hold began (or where a hand left it, under
 `stay`); still within that, only its own bound counts, so a joint resting
 still at its own load over 100 is let go after its ease and goes back to
-its moods and home, as any eased joint does. On lamp-06c1 on 23 Oct the
+its moods and home, as any eased joint does, unless it went over the full
+bound in this hold and still presses over its own rest load (by its load
+alone, not by how far it stands from where it first gave): a still press at
+300 easing to 130 on the head's 240, from a rest of 25, stays a hand and
+its hold renews against the lower bound. On lamp-06c1 on 23 Oct the
 head pitch read 124 to 136 at rest, its position unmoving all night, and
 judged against 100 it was held for good, out of moods and home. On 22
 Oct it gave way because its goal wandered 20 to 25 counts off it while it

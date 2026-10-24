@@ -5290,6 +5290,53 @@ fn a_head_that_never_moves_while_its_goal_wanders_off_is_let_go_after_its_ease()
     );
 }
 
+/// The same head, pressed past its bound of 240 for a tenth of a second
+/// while it rests at 130: that brief press is no hand left on it, and the
+/// distance from the goal it first gave at is not pressure. Still let go
+/// within its ease (reviewer-two, #3308).
+#[test]
+fn a_head_that_never_moves_pressed_briefly_past_its_bound_is_let_go_after_its_ease() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    // The servo stays at 1,995 whatever its goal; listening asks 1,960.
+    lamp.hand = Some((ms(0), ms(12_000), PITCH, 1_995.0));
+    lamp.strains = vec![
+        (ms(2_000), ms(2_100), PITCH, 192),
+        (ms(2_300), ms(2_400), PITCH, 300),
+        (ms(0), ms(12_000), PITCH, 130),
+    ];
+    let news = || Some((Mood::Listening, 100));
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        giving_way(GiveWay::Return),
+        None,
+        news,
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.eased[0] >= 1, "{report:?}");
+    let first = seen.iter().find(|g| g.hand).map(clock_of).unwrap();
+    // Let go within its ease and a second of giving way, and asked toward
+    // listening's 1,960 again, not left at where it stands.
+    let let_go = seen
+        .iter()
+        .filter(|g| clock_of(g) > first)
+        .find(|g| !g.hand)
+        .map(clock_of);
+    assert!(
+        let_go.is_some_and(|at| at <= first + ms(3_000)),
+        "gave way at {first:?}, let go at {let_go:?}"
+    );
+    assert!(
+        seen.iter()
+            .filter(|g| clock_of(g) > let_go.unwrap())
+            .any(|g| g.goals[0] + 15 < 1_995),
+        "never asked its moods again"
+    );
+}
+
 /// What keeps a joint held over its own resting load: a hand that moved it
 /// 40 counts and holds it there at 120, or one pressing past the head's
 /// bound of 240 without moving it. Either keeps it held for as long as it
