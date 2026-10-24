@@ -1,0 +1,100 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "43ac6c843ea91dfc051a9d25e165c9d93f895942",
+  "carried_head": "b186688acf18b5b1257552f64ba6a03a3c33bb43",
+  "target": "/private/tmp/third-carry-window-target-ld637ldg",
+  "target_scope": "exclusive to this worktree; initially empty for red regression, reused after source edits/rebase; no all-fresh claim",
+  "packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "source_count": 7024,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.313,
+      "log": "/private/tmp/third-carry-window-attempt3-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 38.467,
+      "log": "/private/tmp/third-carry-window-attempt3-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 18.78,
+      "log": "/private/tmp/third-carry-window-attempt3-build.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

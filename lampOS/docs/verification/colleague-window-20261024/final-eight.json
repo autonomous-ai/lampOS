@@ -1,0 +1,64 @@
+{
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/third-carry-colleague-window/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/third-carry-window-target-ld637ldg/debug/deps/lamp_voice-a9b95286b805e668"
+    ],
+    "executable": "/private/tmp/third-carry-window-target-ld637ldg/debug/deps/lamp_voice-a9b95286b805e668",
+    "fresh": false
+  },
+  "executable_sha256": "ce1b8adf05a1ead0082cc5509378add50451f9254e2fb6e9df65317ad739e57b",
+  "executable_unchanged": true,
+  "argv": [
+    "/private/tmp/third-carry-window-target-ld637ldg/debug/deps/lamp_voice-a9b95286b805e668",
+    "second_provider::worker::carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap",
+    "second_provider::worker::carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance",
+    "second_provider::worker::carry_window::tests::missing_future_and_stale_ends_do_not_create_an_extension",
+    "second_provider::worker::carry_window::tests::clearing_cannot_be_undone_by_an_old_answer_or_print",
+    "second_provider::worker::carry_window::tests::delayed_evidence_storage_is_bounded_and_older_ends_expire",
+    "second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap",
+    "second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget",
+    "second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window",
+    "--exact",
+    "--test-threads=1",
+    "--format=pretty"
+  ],
+  "exit": 0,
+  "seconds": 2.783,
+  "log": "/private/tmp/third-carry-window-final-eight.txt",
+  "expected_cases": [
+    "second_provider::worker::carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap",
+    "second_provider::worker::carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance",
+    "second_provider::worker::carry_window::tests::missing_future_and_stale_ends_do_not_create_an_extension",
+    "second_provider::worker::carry_window::tests::clearing_cannot_be_undone_by_an_old_answer_or_print",
+    "second_provider::worker::carry_window::tests::delayed_evidence_storage_is_bounded_and_older_ends_expire",
+    "second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap",
+    "second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget",
+    "second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window"
+  ],
+  "purpose": "exact names and corrected chronological fresh-call control on final compiled source; not a full closure result"
+}

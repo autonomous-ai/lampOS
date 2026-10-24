@@ -1,0 +1,13 @@
+
+running 8 tests
+test second_provider::worker::carry_window::tests::actual_end_sets_an_inclusive_deadline_and_forty_second_cap ... ok
+test second_provider::worker::carry_window::tests::clearing_cannot_be_undone_by_an_old_answer_or_print ... ok
+test second_provider::worker::carry_window::tests::delayed_evidence_storage_is_bounded_and_older_ends_expire ... ok
+test second_provider::worker::carry_window::tests::missing_future_and_stale_ends_do_not_create_an_extension ... ok
+test second_provider::worker::carry_window::tests::repeated_or_late_classification_cannot_renew_the_allowance ... ok
+test second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window ... ok
+test second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap ... ok
+test second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 3745 filtered out; finished in 0.00s
+

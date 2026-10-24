@@ -1,7 +1,7 @@
 {
   "README.md": {
-    "bytes": 5114,
-    "sha256": "a55139a39cdb67684f2f2caeb6a632bc576de75125543dd39d18b36d2b0f112e"
+    "bytes": 6440,
+    "sha256": "2b0b1faa8cf63831b31d2386d1c5f268cd40ee225bc3f56c34548ad44700c6e9"
   },
   "attempt1-clippy.txt": {
     "bytes": 316090,
@@ -51,9 +51,41 @@
     "bytes": 326302,
     "sha256": "d5a8f8b2482432c49c67fedfd014ec9e539f069e1ccdbdfd1c10812a4af8a477"
   },
+  "attempt3-checkpoint-build.txt": {
+    "bytes": 364406,
+    "sha256": "acce2289e8d67de0137de383f0abcd81457c9e0272a5ec0f76ae270bf15650fc"
+  },
+  "attempt3-checkpoint-clippy.txt": {
+    "bytes": 348293,
+    "sha256": "8c4a0abc5c2fb53235ba09f7b8811fa18ee31cb54a3ff91e2b7282b8e85efbbd"
+  },
+  "attempt3-checkpoint-fmt.txt": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "attempt3-checkpoint-gates.json": {
+    "bytes": 2203,
+    "sha256": "2bdb7a06238bb219c869f68bcea97e1361fa7d15ac18b2fda99127a72e2e98d9"
+  },
+  "attempt3-checkpoint-source-after.json": {
+    "bytes": 1460457,
+    "sha256": "1a0269ffa307f3975777d70d12086dc466d9854e53d05acd5eec570f03a931af"
+  },
+  "attempt3-checkpoint-source-before.json": {
+    "bytes": 1460457,
+    "sha256": "1a0269ffa307f3975777d70d12086dc466d9854e53d05acd5eec570f03a931af"
+  },
   "completed-expression-cache-cleanup.json": {
     "bytes": 462,
     "sha256": "4525a8f1802bce77b51a90e3a91f080608621ae127d714ea63d22d91d031a4ab"
+  },
+  "current-compiler-audit.json": {
+    "bytes": 184677,
+    "sha256": "cf8b1f60d321061f6f5cb89877c9d15db2e8762ebb9fb23b688072d0d50439e7"
+  },
+  "current-original-range-diff.txt": {
+    "bytes": 332,
+    "sha256": "41bacef970a5eb88d05c582df38c8c560c86ae200ae5c287e66a5022aab37450"
   },
   "final-cap-removed-compile.txt": {
     "bytes": 300,
@@ -62,6 +94,14 @@
   "final-cap-removed-test.txt": {
     "bytes": 640,
     "sha256": "0a213a194c7a0768f0b80c12810d7578b4fa4ad6bb41228d0c450b37fd65df37"
+  },
+  "final-eight.json": {
+    "bytes": 3299,
+    "sha256": "dfb21e5456e727c002dbfd6a45cc6870f9cf7f5c126861c9e560a2795a812087"
+  },
+  "final-eight.txt": {
+    "bytes": 1033,
+    "sha256": "4a4f14b3a613141425df230d61e616cad21a11a15a8407fa74efe7aba5654fde"
   },
   "final-helper-latency.txt": {
     "bytes": 128,
