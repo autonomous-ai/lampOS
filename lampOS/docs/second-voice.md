@@ -1235,7 +1235,9 @@ order is kept. A written turn is the same from the chat on.
     (Sixth's P3 on c0890e8db). People's names
     have the shape ("Leon", "Lynne", "Laine", "Lon", "Lem"), and a list of
     them always trails (reviewer-three's P2 on 194accd24); the words
-    written for "Lamp" need the near hearing alone. A line that begins
+    written for "Lamp" need the near hearing alone. "Louvre" set off as a
+    name calls the lamp by its text too, near hearing or not
+    (`attention::STAND_ALONE_INS`, 25 Oct, [attention.md](attention.md)). A line that begins
     with an earlier piece's words (`before`) is never rewritten: its start
     is not that word's (the P3). Then "Lamp" takes the word's place, so
     the rule and the model read the call, and a lone one waits for the line
