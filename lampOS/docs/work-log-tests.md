@@ -4234,3 +4234,9 @@ Frozen `42cf24d5a` completed: 7,267 passed / 17 failed / 50 ignored; all 88 auth
 Ready for lamp-voice: no
 
 Pushed `42cf24d5a` with an exact lease after all 33 prescribed observations passed, three per unresolved case. Root independently checked their outcomes, source/artifact/mode guards, all 66 streams and restoration of both compiled Memory child paths. All seven originally requested Voice cases passed in the full parallel run; all 88 authored cases passed. The complete full run still records 17 failures, classified by six retained base phases and eleven three-pass categories; no cause or full-suite-green claim. Fresh current-head Linux checks and reader are next, with #3190 remaining draft. [Exact observations, restoration and original seven cases](verification/tests-clock-33-42cf24d5a-20261024/root-review.md).
+
+## 24 October, 21:02 — Current clock carry landed; native rows verified
+
+Ready for lamp-voice: yes (#3190), landed as `22b753df5` through train 91.
+
+Current READ-OK and all Linux checks passed. Fresh primary-log verification finds PR ARM 7,371 PASS + 1 LEAK / 53 skipped and direct-head whole-workspace ARM 11,204 PASS + 1 LEAK / 100 skipped, zero failed/unrun. All indices and identities are complete and unique. The older matched 11,163 PASS + 1 LEAK before/after remains separate from current coverage; no speed claim. Original Mac failures and 33 exact observations remain retained. [Native receipts](verification/tests-native-42cf24d5a-20261024/). Third owns replacement Expression #3386; Second owns phone #3382. The isolated Update diagnostic has cleaned only its 48 local packages and is compiling the original context before any single observation.

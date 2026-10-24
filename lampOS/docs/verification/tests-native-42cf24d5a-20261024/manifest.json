@@ -1,0 +1,39 @@
+{
+  "files": [
+    {
+      "path": "40089604296-census.json",
+      "bytes": 857449,
+      "sha256": "23df4ad8c80b22124e04c4bff11cc0fed546a65ce40400c0197be54f9468c671"
+    },
+    {
+      "path": "40089604296-run.json",
+      "bytes": 7617,
+      "sha256": "b0ea3e39a39efeb24622e40696ed36146c4a4e8f742ed24810b59844ef879544"
+    },
+    {
+      "path": "40089604301-run.json",
+      "bytes": 3181,
+      "sha256": "dd4b6ae98a288274fac8dcad46b2558411e49e646d29399f102c04501cd6705e"
+    },
+    {
+      "path": "40089798937-census.json",
+      "bytes": 1283047,
+      "sha256": "5d3f0aa265aef9d546973b955f806b7ca0139380b8cef1c4cc1eb213040fa8cb"
+    },
+    {
+      "path": "40089798937-run.json",
+      "bytes": 7622,
+      "sha256": "c23276e11fcec82c227656656ad42a8f0a07f8911ef049095318f8e4b891b904"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2816,
+      "sha256": "42ea352a83c63035544af2389b7ac275a29bac8550d534e8c5e7080b204b1d7d"
+    },
+    {
+      "path": "primary-log-hashes.json",
+      "bytes": 1144,
+      "sha256": "3b16eea52513d384065fb902b5b8bb6753860859a3a8c4eab32cbc1e66e1c1d3"
+    }
+  ]
+}

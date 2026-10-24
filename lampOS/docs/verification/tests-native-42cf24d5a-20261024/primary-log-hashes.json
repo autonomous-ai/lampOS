@@ -1,0 +1,51 @@
+[
+  {
+    "run": 40089604296,
+    "log_bytes": 1824997,
+    "log_sha256": "bce74994a613297c1936f760d1f05985087fa3be2335754e92e1926a4897ad95",
+    "jobs": [
+      [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "success"
+      ],
+      [
+        "report-full-run-failure",
+        "skipped"
+      ],
+      [
+        "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "skipped"
+      ]
+    ]
+  },
+  {
+    "run": 40089604301,
+    "log_bytes": 68184,
+    "log_sha256": "ca868b88d1643aaa437c3a77ba3aacf877b0677b5888a6764c890123f7830589",
+    "jobs": [
+      [
+        "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+        "success"
+      ]
+    ]
+  },
+  {
+    "run": 40089798937,
+    "log_bytes": 2763483,
+    "log_sha256": "43ab617e4bbbbf8d2a14a589ce80c9c8bc78f70cb2e22d9185b4e1e0d0d9f815",
+    "jobs": [
+      [
+        "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "success"
+      ],
+      [
+        "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "skipped"
+      ],
+      [
+        "report-full-run-failure",
+        "skipped"
+      ]
+    ]
+  }
+]
