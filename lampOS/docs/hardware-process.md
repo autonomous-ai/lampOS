@@ -63,6 +63,51 @@ order is the issue's own list.
 - **Pull requests** carry `builder:<name>` and `team:hardware` from the
   moment they open.
 
+## How a hardware builder works
+
+The hardware lead's direction (24 Oct): hardware builders work the way the
+software builders do ([joining.md](joining.md), "The loop"; the software
+Queue, #3126). Only what differs for hardware is written here.
+
+1. **Look before taking.** Search open *and merged* pull requests and the
+   Hardware Queue for the work first. Then post `taken — <what>` on the
+   issue (and add `status:taken`), so no two builders do it twice.
+2. **Gates before a pull request is ready.** Each script has a host test
+   with stand-ins, so it runs with no lamp and no sound (as
+   `tools/routine-tools-test.py` and `tools/routine-run-test.py` do). Run
+   it, plus `bash -n` or `python3 -m py_compile`. Write the exact counts in
+   the pull request: "15 cases, 15 pass", never "tested".
+3. **Read by another builder.** A hardware pull request needs a
+   `READ-OK <sha>` from another hardware builder or `hw-first`, after they
+   ran its tests. Or a `HOLD <sha>` with numbered findings (P1 blocks; P2
+   blocks until answered; P3 is a note). A new push needs a new READ-OK.
+4. **Merged by the train, never by hand.** Once it's read, green and
+   current on `lamp-voice`, post `NEXT TRAIN: #<PR>` on the software Queue
+   (#3126). The train bot carries it with others, runs one ARM64 build and
+   merges by rebase. Nothing merges any other way. Rebase your own pull
+   request when `lamp-voice` moves: a stale one is not carried.
+5. **Sound in the office.** Every lamp in the office hears every other.
+   Before any step that makes a sound (the routine runner's prompts, the
+   self-test, the spoken exchange), post `PLAYING <lamp> HH:MM–HH:MM` on
+   #3126. Before a step that needs silence (a mic check), post `QUIET
+   <lamp> HH:MM–HH:MM`. Never in another builder's slot. Never a test tone
+   or a raised volume: the lamp's own level, and only the sound the step
+   needs.
+6. **When your piece waits,** take the next, in this order, without asking:
+   findings on your own pull requests; your pull requests rebased; your next
+   issue on the Hardware Queue; a stalled hardware pull request (2 hours
+   silent), carried on your own branch with its commits kept; a hardware
+   pull request with fewer than two readers, read and answered with
+   `READ-OK` or `HOLD`.
+7. **A result on a lamp** says the commit tested, the lamp, how many times,
+   what came out, what failed and what was not shown. The run's records go
+   to the fleet record, outside this repository. A public summary keeps no
+   person, face, picture, recording or credential, as joining.md's "What a
+   result on a lamp is" says.
+8. **Hourly line.** Each builder posts one status line on the Hardware
+   Queue each hour while it works: what it ran or pushed, and what's next.
+   `hw-first` posts the hardware side's line there and on #3126.
+
 ## One lamp's run
 
 1. The operator puts the lamp on a station and connects power and network.
