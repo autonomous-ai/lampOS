@@ -1,3 +1,22 @@
+## Current checkpoint: 2026-10-24 21:03 +07, both rebased carries pushed
+
+#3382 is pushed at `6cd08d29c` on `22b753df5`, retaining the original commit
+and both fixture P3 repairs. [Current exact-source gate](verification/phone-news-start-carry-20261024/current-22b753df5/README.md):
+Mac **4,004 / 0 / 21 ignored**, fmt and strict Voice Clippy pass, changed
+phone case once, all tracked inputs unchanged. Exact offline Linux fmt
+passes with 7,023 unchanged files and container removed. Earlier two fault
+controls bind to identical messages.rs bytes. New native/read remains;
+historical Update 2/3 HOLD still waits on Tests/#1569 classification.
+
+#3380 `29cbcd69f` is pushed on the same base. Its exact local **4,005 / 1 /
+21 ignored** is retained, with all remaining targets once complete, captured
+standalone 3/3 and clean-base single 1/0. No networking-policy edit or causal
+waiver. Current Linux fmt/Clippy passed; ARM and reader disposition active.
+Failure/evidence packet is on952fa6200. No full-workspace retry, device or
+release action; physical/key/restoration blockers stay with their holders.
+
+---
+
 ## Current checkpoint: 2026-10-24 20:49 +07, current-base unrelated test observation
 
 #3380 local29cbcd69f on22b753df5 has fmt/strict Voice Clippy and exact Linux

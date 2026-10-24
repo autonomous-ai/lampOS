@@ -1,0 +1,2 @@
+1:  c185843f7 = 1:  adb3a3e57 lampOS: wait for the phone-news round before timing text preemption
+2:  b66b39dbb = 2:  6cd08d29c lampOS: prove phone-round cancellation and guard fixture cleanup
