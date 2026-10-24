@@ -1,0 +1,26 @@
+{
+  "head": "0882cb90474edb19f11130c0771d019509eed9cb",
+  "packet_commit": "eadd636ba78fa1cee05279cd33968fa8c84ac74e",
+  "payload_files_verified": 95,
+  "source_fixture_sha256": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f",
+  "cases": [
+    {
+      "case": "lm-pair-3-0",
+      "successful_rpcs": 41,
+      "full_opposite_A_and_survivor_records_match": true,
+      "all_B_and_room_records_match": true,
+      "logical_final_entries": 3,
+      "reaps_source_assertions_only": 3
+    },
+    {
+      "case": "lm-pair-3-1",
+      "successful_rpcs": 41,
+      "full_opposite_A_and_survivor_records_match": true,
+      "all_B_and_room_records_match": true,
+      "logical_final_entries": 3,
+      "reaps_source_assertions_only": 3
+    }
+  ],
+  "native_ARM_host_execution_claimed": false,
+  "database_byte_restore_claimed": false
+}

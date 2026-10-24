@@ -5,6 +5,18 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-24 15:40 — Memory full-record P2 cleared
+
+- #3333 `0882cb904`: independent exact Mac Memory **314/0/8**, fmt/strict
+  Clippy pass; fresh 95-file packet, both 41-RPC traces and complete
+  survivor values/order verify. Full-record/docs P2s closed.
+- [Read evidence](verification/memory-survivor-read-20261024/README.md).
+  Ordinary ARM64 **1,530/0/14 skipped**, process **12/0**, Clippy pass;
+  tested preview has 44 base differences including newer Memory code.
+  Actual pair is distinct **2/0** binfmt evidence; no stronger reap/DB claim.
+- #3349 `6213596a3` gets Second’s READ-OK and exact Linux fmt; official
+  stacked native runs continue. #3344/#3346 stay cleared for the train.
+
 ## 2026-10-24 15:24 — epoch follow-up pushed; Memory correction arrived
 
 - #3349 `6213596a3` pushed, stacked on #3344 to keep its cleared head:

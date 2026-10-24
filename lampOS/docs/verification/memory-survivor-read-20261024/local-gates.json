@@ -1,0 +1,65 @@
+{
+  "head": "0882cb90474edb19f11130c0771d019509eed9cb",
+  "before": {
+    "crates/memory/tests/release_pair.rs": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f",
+    "crates/memory/src/lib.rs": "5078be0ba597bae3aa7f4f03412287e0236ec0d7a3dae53b1eaebec4aaf8d6d4",
+    "crates/memory/src/main.rs": "62f548e7dffc9f0df01f1ce0e6511dedc6d3303a73df61e9c7cf34f0a80afb24"
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 12.006,
+      "log": "/private/tmp/third-3333-corrected-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-memory",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 21.031,
+      "log": "/private/tmp/third-3333-corrected-clippy.txt"
+    },
+    {
+      "name": "memory",
+      "argv": [
+        "cargo",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-memory",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 572.982,
+      "log": "/private/tmp/third-3333-corrected-memory.txt"
+    }
+  ],
+  "complete": true,
+  "after": {
+    "crates/memory/tests/release_pair.rs": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f",
+    "crates/memory/src/lib.rs": "5078be0ba597bae3aa7f4f03412287e0236ec0d7a3dae53b1eaebec4aaf8d6d4",
+    "crates/memory/src/main.rs": "62f548e7dffc9f0df01f1ce0e6511dedc6d3303a73df61e9c7cf34f0a80afb24"
+  }
+}
