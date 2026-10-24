@@ -1,0 +1,3 @@
+Ruby YAML parse: passed
+All extracted bash blocks: bash -n passed
+7036ab52be6bfa8040882cf0661fba2988aedc9d8061b3ec20db533f184145c1  .github/workflows/lampos-cloud-provenance-pair.yml
