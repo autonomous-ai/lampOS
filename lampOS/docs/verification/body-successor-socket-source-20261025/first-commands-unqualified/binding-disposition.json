@@ -1,0 +1,162 @@
+{
+  "finding": "Candidate exact/full lib artifact is fresh=true with the same path/hash as the earlier baseline artifact. Candidate source/execution qualification is unproven; do not count these as a candidate gate.",
+  "artifacts": {
+    "baseline-exact": {
+      "package_id": "path+file:///private/tmp/second-body-successor-baseline-20261025/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/second-body-successor-baseline-20261025/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+      "post_terminal_sha256": "a0d68f5b95b270eb9a3dd59f722e7846afa8f42f504f49117ca20f8f35250e0e"
+    },
+    "candidate-exact": {
+      "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": true,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+      "post_terminal_sha256": "a0d68f5b95b270eb9a3dd59f722e7846afa8f42f504f49117ca20f8f35250e0e"
+    },
+    "candidate-full": {
+      "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": true,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+      "post_terminal_sha256": "a0d68f5b95b270eb9a3dd59f722e7846afa8f42f504f49117ca20f8f35250e0e"
+    },
+    "ownership-negative": {
+      "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_body",
+        "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+      "post_terminal_sha256": "8376bf0db4428833160a20974240eb6addf1bea75d160579c0c0945c047832fa"
+    }
+  },
+  "command_outcomes_preserved": [
+    {
+      "tag": "baseline-exact",
+      "exit": 0,
+      "literal_test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.03s"
+      ]
+    },
+    {
+      "tag": "fmt",
+      "exit": 0,
+      "literal_test_summaries": []
+    },
+    {
+      "tag": "clippy",
+      "exit": 0,
+      "literal_test_summaries": []
+    },
+    {
+      "tag": "candidate-exact",
+      "exit": 0,
+      "literal_test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.01s"
+      ]
+    },
+    {
+      "tag": "candidate-full",
+      "exit": 0,
+      "literal_test_summaries": [
+        "test result: ok. 440 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.38s",
+        "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "tag": "ownership-negative",
+      "exit": 101,
+      "literal_test_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.02s"
+      ]
+    }
+  ],
+  "new_plan": "Keep all original observations; no baseline or negative repeat. Queue exactly one candidate exact and one full Body qualification after a fresh dedicated target compile, with compile JSON/artifact witness and source maps. This repairs discovered provenance, not an unchanged failed-test retry. New allocation required; Cloud owns current released slot.",
+  "cause": "No Cargo/cache mechanism or historical failure cause claimed."
+}

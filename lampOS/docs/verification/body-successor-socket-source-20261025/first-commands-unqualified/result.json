@@ -1,0 +1,684 @@
+{
+  "base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "stages": [
+    {
+      "tag": "baseline-exact",
+      "cwd": "/private/tmp/second-body-successor-baseline-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--lib",
+        "--message-format=json",
+        "--",
+        "--exact",
+        "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "--test-threads=1"
+      ],
+      "started_at_unix": 1792885049.38162,
+      "expected_exit": null,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "<private-home>/Library/Caches/second-music-mac-20261021-3/target",
+        "GIT_NO_LAZY_FETCH": "1"
+      },
+      "pid": 39311,
+      "exit": 0,
+      "seconds": 54.082,
+      "completed_at_unix": 1792885103.463711,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-baseline-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/private/tmp/second-body-successor-baseline-20261025/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+          "post_terminal_sha256": "a0d68f5b95b270eb9a3dd59f722e7846afa8f42f504f49117ca20f8f35250e0e"
+        }
+      ],
+      "literal_test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.03s"
+      ],
+      "case_observed": true
+    },
+    {
+      "tag": "fmt",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_at_unix": 1792885103.557882,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "<private-home>/Library/Caches/second-music-mac-20261021-3/target",
+        "GIT_NO_LAZY_FETCH": "1"
+      },
+      "pid": 44847,
+      "exit": 0,
+      "seconds": 5.796,
+      "completed_at_unix": 1792885109.353965,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [],
+      "literal_test_summaries": [],
+      "case_observed": false
+    },
+    {
+      "tag": "clippy",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_at_unix": 1792885109.354722,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "<private-home>/Library/Caches/second-music-mac-20261021-3/target",
+        "GIT_NO_LAZY_FETCH": "1"
+      },
+      "pid": 44937,
+      "exit": 0,
+      "seconds": 6.996,
+      "completed_at_unix": 1792885116.3507452,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [],
+      "literal_test_summaries": [],
+      "case_observed": false
+    },
+    {
+      "tag": "candidate-exact",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--lib",
+        "--message-format=json",
+        "--",
+        "--exact",
+        "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "--test-threads=1"
+      ],
+      "started_at_unix": 1792885116.3520699,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "<private-home>/Library/Caches/second-music-mac-20261021-3/target",
+        "GIT_NO_LAZY_FETCH": "1"
+      },
+      "pid": 45075,
+      "exit": 0,
+      "seconds": 0.2,
+      "completed_at_unix": 1792885116.552417,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+          "post_terminal_sha256": "a0d68f5b95b270eb9a3dd59f722e7846afa8f42f504f49117ca20f8f35250e0e"
+        }
+      ],
+      "literal_test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.01s"
+      ],
+      "case_observed": true
+    },
+    {
+      "tag": "candidate-full",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--message-format=json"
+      ],
+      "started_at_unix": 1792885116.6250398,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "<private-home>/Library/Caches/second-music-mac-20261021-3/target",
+        "GIT_NO_LAZY_FETCH": "1"
+      },
+      "pid": 45101,
+      "exit": 0,
+      "seconds": 14.777,
+      "completed_at_unix": 1792885131.402349,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+          "post_terminal_sha256": "a0d68f5b95b270eb9a3dd59f722e7846afa8f42f504f49117ca20f8f35250e0e"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "head_plan",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/head_plan.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/head_plan",
+          "post_terminal_sha256": "fa7a663ef3b2d98c777b4d1177ce69731d0859379164104e36b00ac8810bfe98"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "expression_ask",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/expression_ask.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/examples/expression_ask",
+          "post_terminal_sha256": "e129c75cf13e566f5d4a8e7342dad45eadf4c7fbb702873199ecae9ae24bc449"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-inspect",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body_inspect-d38f7bacaf2b85b7",
+          "post_terminal_sha256": "de1c73de96946e80eaec9eb5c4efbd577f6c0c98f2b82d7580502a4ed79a7293"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-369ac8d6b9ea9cbf",
+          "post_terminal_sha256": "ed23cbda1c3aa428be4b95bc7bc58e40825caf9cf1867138d72d237af4adda6c"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-measure",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-body-measure",
+          "post_terminal_sha256": "921a6f5aeecc13f3a0fc206057bdfa6ec27ed02e390d5e9d63c0be4cf20dd99d"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-measure",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body_measure-cd52da83ee423d25",
+          "post_terminal_sha256": "8b778912f92be9e9670d4367e0dd8096ca4db8ce9983a0281f6010a538c79e5d"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-worker",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body_worker-c65aa512e7eba400",
+          "post_terminal_sha256": "7cd58270cee3402e7172b38c07331c1f84f997af7ae512fb8f16a93de931c4b0"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-inspect",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-body-inspect",
+          "post_terminal_sha256": "200e8d3ef6c9250847d506c03e0c2b9f74f2342bc240651d04697bb04dacbba2"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-mood",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body_mood-f4b35c3af59379b6",
+          "post_terminal_sha256": "7636c283037db5896fbf56c91303a3736ece67fd847c5c929b9e93e70303326a"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-worker",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-body-worker",
+          "post_terminal_sha256": "c2d876e48634b7027b4cfdfe689f5a5138fbd24104ed5886672478ace814c129"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-mood",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-body-mood",
+          "post_terminal_sha256": "9f051b4f172936bfc181d2859766b4a0c2c304ca07a53a8e49d72c2d45b64a51"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/lamp-body",
+          "post_terminal_sha256": "97390030b5f1e606bee2f42b41533a29df787cddbedaaba302033aecca54cade"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/it-c7e7686b8888d0a9",
+          "post_terminal_sha256": "f49930d8727e51f468deb2c76bea2cebb0a006f23dbc7af71a839aa0aed77670"
+        }
+      ],
+      "literal_test_summaries": [
+        "test result: ok. 440 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.38s",
+        "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "case_observed": true
+    },
+    {
+      "tag": "ownership-negative",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--lib",
+        "--message-format=json",
+        "--",
+        "--exact",
+        "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "--test-threads=1"
+      ],
+      "started_at_unix": 1792885131.496923,
+      "expected_exit": 101,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "<private-home>/Library/Caches/second-music-mac-20261021-3/target",
+        "GIT_NO_LAZY_FETCH": "1"
+      },
+      "pid": 47479,
+      "exit": 101,
+      "seconds": 51.063,
+      "completed_at_unix": 1792885182.5597591,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "<private-home>/Library/Caches/second-music-mac-20261021-3/target/debug/deps/lamp_body-da52261ef56da49b",
+          "post_terminal_sha256": "8376bf0db4428833160a20974240eb6addf1bea75d160579c0c0945c047832fa"
+        }
+      ],
+      "literal_test_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.02s"
+      ],
+      "case_observed": true
+    }
+  ],
+  "compiler_jobs": 2,
+  "scope": "Mac scoped Body gate; default full parallelism; original historical failures are separate",
+  "unix_preflight": "passed in same launcher",
+  "candidate_source_restored_unchanged": true,
+  "baseline_source_unchanged": true
+}
