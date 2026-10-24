@@ -953,6 +953,16 @@ The two cases are ignored in ordinary tests and require explicit native
 execution; see the [cap-state verification record](verification/caps-state-release-pair-20261024/README.md)
 for qualification status, retained evidence and limits.
 
+**Published Settings store readers** (#2809). The explicit Settings
+`release_pair` target uses actual pinned 6408/6498 servers for private desired
+values, guarded mutations and retry receipts in both directions and back.
+The ordinary current-CLI driver is separate from the released-artifact cases.
+Unknown stored fields and unknown tagged values remain refused; this test-only
+slice adds no forward-field policy or setting consumer. The
+[scope and artifact contract](verification/settings-release-pair-20261024/README.md)
+separates software store qualification from hardware, updater and power-loss
+acceptance; a pass requires the dedicated official native run.
+
 **A good build cut off from the channel is put back.** The confirmation
 needs the channel: a new lamp-update that cannot reach it for the 10 min of
 the deadline, a network down or a router restarting, is put back and its
