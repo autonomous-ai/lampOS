@@ -1,0 +1,28 @@
+# lampOS memory: what the lamp remembers from one day to the next (lampOS/docs/memory.md).
+# Its own process and unit. With it stopped the voice talks on and says it cannot remember just now.
+# It is the only reader and writer of /var/lib/lampos-memory. Nothing is sent anywhere from here.
+[Unit]
+Description=lampOS memory (lamp-memory)
+
+[Service]
+Type=simple
+User=orangepi
+Group=orangepi
+StateDirectory=lampos-memory
+StateDirectoryMode=0700
+RuntimeDirectory=lampos-memory
+RuntimeDirectoryMode=0755
+ExecStart=/opt/lampOS/memory/cc4673893ebbb7d042d65fe2d852dfad2de4e70be67ec9d31d1e664ad20d151f/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --zone system --memory-days --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=2s
+SyslogIdentifier=lamp-memory
+NoNewPrivileges=yes
+ProtectSystem=strict
+# Its health report (task 28) is written to the bus.
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+
+[Install]
+WantedBy=multi-user.target

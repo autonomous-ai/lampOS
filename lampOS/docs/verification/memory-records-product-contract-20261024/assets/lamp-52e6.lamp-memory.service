@@ -1,0 +1,28 @@
+# lamp-52e6: deploy/lamp-4ace/lamp-memory.service as lamp-4ace runs it, with this
+# lamp's name and build, as a part of lampos.target (docs/keeper.md).
+[Unit]
+PartOf=lampos.target
+Description=lampOS memory (lamp-memory)
+
+[Service]
+Type=simple
+User=orangepi
+Group=orangepi
+StateDirectory=lampos-memory
+StateDirectoryMode=0700
+RuntimeDirectory=lampos-memory
+RuntimeDirectoryMode=0755
+ExecStart=/opt/lampOS/memory/eea06c64222b22c372dc47a95ed6b0c62177557813c26c3ea265b9a24ec4f58f/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --utc-offset-minutes 420 --memory-days --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=2s
+SyslogIdentifier=lamp-memory
+NoNewPrivileges=yes
+ProtectSystem=strict
+# Its health report (task 28) is written to the bus.
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+
+[Install]
+WantedBy=lampos.target

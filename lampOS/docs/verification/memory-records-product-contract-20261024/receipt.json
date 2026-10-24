@@ -1,0 +1,178 @@
+{
+  "published_commit": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+  "current_commit": "5238a6ecdbeb3e63315479f31c541bebd596eaf5",
+  "published_at": "2026-10-24T09:26:46Z",
+  "sampled_files": 16,
+  "same_files": 16,
+  "source_comparisons": [
+    {
+      "path": "lampOS/deploy/product/lamp-memory.service",
+      "published_sha256": "56e15728e6be22424d782463a5d9fb3a887dfc675ef5c80a17114bddb44f6b49",
+      "current_sha256": "56e15728e6be22424d782463a5d9fb3a887dfc675ef5c80a17114bddb44f6b49",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "published_sha256": "47bf48cda169d69c97536a3a569f1de44fdd7d7040b1543ca4e82480fb16983f",
+      "current_sha256": "47bf48cda169d69c97536a3a569f1de44fdd7d7040b1543ca4e82480fb16983f",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-records.service",
+      "published_sha256": "494fc5c1073d9ec4fa94264881450e6b0ccd2740554f7a19a5d4b54de05df3d3",
+      "current_sha256": "494fc5c1073d9ec4fa94264881450e6b0ccd2740554f7a19a5d4b54de05df3d3",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-records.timer",
+      "published_sha256": "5e0a975c32a5cb49b9da40750a5031a10e8abfbebbf20bc7b83c0d8df316cc1b",
+      "current_sha256": "5e0a975c32a5cb49b9da40750a5031a10e8abfbebbf20bc7b83c0d8df316cc1b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/settings/records.json",
+      "published_sha256": "bc562a9a25409d58a84f70cae57b24cc102c3cf0de8f8f4c28b992b1a3ce5074",
+      "current_sha256": "bc562a9a25409d58a84f70cae57b24cc102c3cf0de8f8f4c28b992b1a3ce5074",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/lampos.conf",
+      "published_sha256": "3d5ae5d6c2351dbebc0f5e142441f1637f405c8258b3a6beb30f6f848571bf24",
+      "current_sha256": "3d5ae5d6c2351dbebc0f5e142441f1637f405c8258b3a6beb30f6f848571bf24",
+      "equal": true
+    },
+    {
+      "path": "lampOS/deploy/product/lampos.target",
+      "published_sha256": "cdc90f174f669a873ef44ac575a6628b9de37f62b5dc6adfabf2b17731221b9b",
+      "current_sha256": "cdc90f174f669a873ef44ac575a6628b9de37f62b5dc6adfabf2b17731221b9b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/src/install.rs",
+      "published_sha256": "af713c6d89eaf59cb272ac7d82cdef529da553a1724efd8da675609ca3e3b47e",
+      "current_sha256": "af713c6d89eaf59cb272ac7d82cdef529da553a1724efd8da675609ca3e3b47e",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/src/unit.rs",
+      "published_sha256": "b77d25b64e966243f69e6f54b34a72fd9f8f812d800d7e6dad2634f0c4426f14",
+      "current_sha256": "b77d25b64e966243f69e6f54b34a72fd9f8f812d800d7e6dad2634f0c4426f14",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/src/apply.rs",
+      "published_sha256": "8b6c9d73865dcc61a211486b1bf566bbc61ff626751f1dc24a6e360f80d8a3b7",
+      "current_sha256": "8b6c9d73865dcc61a211486b1bf566bbc61ff626751f1dc24a6e360f80d8a3b7",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/memory/src/application.rs",
+      "published_sha256": "957926fcbbc8b60fdab0fe1a3c3e81e855971469601bed3224fe92e69558064b",
+      "current_sha256": "957926fcbbc8b60fdab0fe1a3c3e81e855971469601bed3224fe92e69558064b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/memory/src/server.rs",
+      "published_sha256": "73039982f1814258d3c37ce342c251b3b4ff73bc7db99b30be4b8b0f8db95f87",
+      "current_sha256": "73039982f1814258d3c37ce342c251b3b4ff73bc7db99b30be4b8b0f8db95f87",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/memory/src/days.rs",
+      "published_sha256": "0e5af850ef24b8e8b032453703fa5191a5d43f871f88c768998aa3f40ac4691d",
+      "current_sha256": "0e5af850ef24b8e8b032453703fa5191a5d43f871f88c768998aa3f40ac4691d",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/records/src/config.rs",
+      "published_sha256": "04cf500e2c92c1aa7be1296f4dc5402fe0f00fec6150d7ef2407112f3bb54263",
+      "current_sha256": "04cf500e2c92c1aa7be1296f4dc5402fe0f00fec6150d7ef2407112f3bb54263",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/records/src/guard.rs",
+      "published_sha256": "205fefd3f4ebb2b77e0d754499dbb627c9987767f5b318b8ba7d95fd54cb65b7",
+      "current_sha256": "205fefd3f4ebb2b77e0d754499dbb627c9987767f5b318b8ba7d95fd54cb65b7",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/setup/fixtures/reset-plan-product.json",
+      "published_sha256": "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b",
+      "current_sha256": "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b",
+      "equal": true
+    }
+  ],
+  "downloaded_asset_checks": [
+    {
+      "name": "lamp-4ace.lamp-memory.service",
+      "bytes": 1019,
+      "sha256": "bd96a07c00c29fc294f5d8c76de1edf8f4b8ac02694a4e4206fb96da03cccbb6",
+      "published_digest": "sha256:bd96a07c00c29fc294f5d8c76de1edf8f4b8ac02694a4e4206fb96da03cccbb6",
+      "digest_equal": true,
+      "size_equal": true
+    },
+    {
+      "name": "lamp-52e6.lamp-memory.service",
+      "bytes": 909,
+      "sha256": "e7f062d09e12fb89dca690bb983508026ca051462efe688b4b1272873b4337c5",
+      "published_digest": "sha256:e7f062d09e12fb89dca690bb983508026ca051462efe688b4b1272873b4337c5",
+      "digest_equal": true,
+      "size_equal": true
+    },
+    {
+      "name": "lampos-manifest.json",
+      "bytes": 13563,
+      "sha256": "8d5e4b88940e01bfad773dec261b621d861c937e6efe4f3dccb9828a32c79bbc",
+      "published_digest": "sha256:8d5e4b88940e01bfad773dec261b621d861c937e6efe4f3dccb9828a32c79bbc",
+      "digest_equal": true,
+      "size_equal": true
+    },
+    {
+      "name": "manifest.json",
+      "bytes": 10042,
+      "sha256": "f755aeac99be7144ddeff10ea650e924c426d89344850b9b1df8739c8a7d8695",
+      "published_digest": "sha256:f755aeac99be7144ddeff10ea650e924c426d89344850b9b1df8739c8a7d8695",
+      "digest_equal": true,
+      "size_equal": true
+    }
+  ],
+  "envelope_decodes_to_exact_manifest": true,
+  "manifest_sequence": 6592,
+  "manifest_commit": "c6dfe980979e0088cd94f1dab1fe4a70ddbcbe46",
+  "published_unit_checks": [
+    {
+      "lamp": "lamp-4ace",
+      "manifest_digest_equal": true,
+      "manifest_size_equal": true,
+      "source_equal": true
+    },
+    {
+      "lamp": "lamp-52e6",
+      "manifest_digest_equal": true,
+      "manifest_size_equal": true,
+      "source_equal": true
+    }
+  ],
+  "unit_lamps": [
+    "lamp-4ace",
+    "lamp-52e6"
+  ],
+  "unit_count": 28,
+  "records_unit_entries": [],
+  "product_unit_entries": [],
+  "memory_and_records_payload_descriptors": [
+    {
+      "name": "lamp-memory",
+      "sha256": "502e4c158437ed8b1e43868a248b5675fa08064eb520b22bca703c69afaf7760",
+      "size": 4765664
+    },
+    {
+      "name": "lamp-records",
+      "sha256": "b18095bc74064e9949d9ed16c8f3c9a4c8c46e35892d3922800cf4aea8bb668f",
+      "size": 1406976
+    }
+  ],
+  "signature_trust_verified": false,
+  "payload_binaries_downloaded": false,
+  "device_access": false
+}
