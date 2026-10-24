@@ -1,0 +1,37 @@
+{
+  "head": "7fc275d47efc0ec980170b2d2b2fd1d61e7fbf88",
+  "tested_merge": "3dfc4ab58cd475c54015db9796235d67c10100ff",
+  "source_files": 10349,
+  "symlink_target_hashes": [
+    "robots/lamp/rootfs/etc/systemd/system/sysinit.target.wants/led-boot.service"
+  ],
+  "source_unchanged_and_matches_git": true,
+  "native_cases": "2/0/0 ignored",
+  "archive_sha256": "8ad825f253077dd7b1a2ffa361c4769d2c46928a04736882aa3c5ce9d8e01484",
+  "archive_members": 281,
+  "cases": [
+    {
+      "test": "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement",
+      "queries": 9,
+      "positive_hashes": 5,
+      "synthetic_null_hashes": 4,
+      "owned_exits": 7,
+      "snapshot_manifests_verified": 18,
+      "snapshot_file_hashes_verified": 72,
+      "actual_package_hashes_verified": 2
+    },
+    {
+      "test": "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement",
+      "queries": 9,
+      "positive_hashes": 5,
+      "synthetic_null_hashes": 4,
+      "owned_exits": 7,
+      "snapshot_manifests_verified": 18,
+      "snapshot_file_hashes_verified": 72,
+      "actual_package_hashes_verified": 2
+    }
+  ],
+  "isolated_container_verified": true,
+  "owned_container_removed": true,
+  "scope": "source, isolation, process exits, actual package hashes, replies and snapshot content/paired manifests audited; transient installed preservation additionally relies on executed fixture"
+}

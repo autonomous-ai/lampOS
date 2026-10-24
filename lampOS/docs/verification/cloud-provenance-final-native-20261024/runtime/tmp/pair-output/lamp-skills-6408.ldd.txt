@@ -1,0 +1,6 @@
+	linux-vdso.so.1 (0x0000ff56b1a7b000)
+	libasound.so.2 => /lib/aarch64-linux-gnu/libasound.so.2 (0x0000ff56b12a0000)
+	libgcc_s.so.1 => /lib/aarch64-linux-gnu/libgcc_s.so.1 (0x0000ff56b1260000)
+	libm.so.6 => /lib/aarch64-linux-gnu/libm.so.6 (0x0000ff56b11b0000)
+	libc.so.6 => /lib/aarch64-linux-gnu/libc.so.6 (0x0000ff56b1000000)
+	/lib/ld-linux-aarch64.so.1 (0x0000ff56b1a30000)

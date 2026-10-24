@@ -1,0 +1,79 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 227B done
+#1 WARN: InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 2)
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/rust@sha256:5e2214abe154fe26e39f64488952e5c991eeed1d6d6da7cc8381ae83927f0cfc
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/2] FROM docker.io/library/rust@sha256:5e2214abe154fe26e39f64488952e5c991eeed1d6d6da7cc8381ae83927f0cfc
+#4 DONE 0.0s
+
+#5 [2/2] RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libasound2 ca-certificates && rm -rf /var/lib/apt/lists/*
+#5 0.188 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#5 0.351 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#5 0.360 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+#5 0.370 Get:4 http://deb.debian.org/debian bookworm/main arm64 Packages [8689 kB]
+#5 0.435 Get:5 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [6936 B]
+#5 0.455 Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [355 kB]
+#5 1.063 Fetched 9293 kB in 1s (10.2 MB/s)
+#5 1.063 Reading package lists...
+#5 1.495 Reading package lists...
+#5 1.924 Building dependency tree...
+#5 2.079 Reading state information...
+#5 2.251 The following additional packages will be installed:
+#5 2.251   libasound2-data
+#5 2.252 Suggested packages:
+#5 2.252   libasound2-plugins alsa-utils
+#5 2.252 Recommended packages:
+#5 2.252   alsa-ucm-conf alsa-topology-conf
+#5 2.268 The following NEW packages will be installed:
+#5 2.269   libasound2 libasound2-data
+#5 2.269 The following packages will be upgraded:
+#5 2.270   ca-certificates
+#5 2.322 1 upgraded, 2 newly installed, 0 to remove and 65 not upgraded.
+#5 2.322 Need to get 508 kB of archives.
+#5 2.322 After this operation, 1432 kB of additional disk space will be used.
+#5 2.322 Get:1 http://deb.debian.org/debian-security bookworm-security/main arm64 ca-certificates all 20250419~deb12u2 [161 kB]
+#5 2.349 Get:2 http://deb.debian.org/debian bookworm/main arm64 libasound2-data all 1.2.8-1 [20.5 kB]
+#5 2.358 Get:3 http://deb.debian.org/debian bookworm/main arm64 libasound2 arm64 1.2.8-1+b1 [327 kB]
+#5 2.484 debconf: delaying package configuration, since apt-utils is not installed
+#5 2.515 Fetched 508 kB in 0s (5454 kB/s)
+#5 2.529 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 23279 files and directories currently installed.)
+#5 2.541 Preparing to unpack .../ca-certificates_20250419~deb12u2_all.deb ...
+#5 2.543 Unpacking ca-certificates (20250419~deb12u2) over (20230311+deb12u1) ...
+#5 2.655 Selecting previously unselected package libasound2-data.
+#5 2.658 Preparing to unpack .../libasound2-data_1.2.8-1_all.deb ...
+#5 2.659 Unpacking libasound2-data (1.2.8-1) ...
+#5 2.679 Selecting previously unselected package libasound2:arm64.
+#5 2.682 Preparing to unpack .../libasound2_1.2.8-1+b1_arm64.deb ...
+#5 2.683 Unpacking libasound2:arm64 (1.2.8-1+b1) ...
+#5 2.719 Setting up libasound2-data (1.2.8-1) ...
+#5 2.721 Setting up ca-certificates (20250419~deb12u2) ...
+#5 3.849 Updating certificates in /etc/ssl/certs...
+#5 4.505 rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+#5 4.510 21 added, 15 removed; done.
+#5 4.525 Setting up libasound2:arm64 (1.2.8-1+b1) ...
+#5 4.527 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#5 4.543 Processing triggers for ca-certificates (20250419~deb12u2) ...
+#5 4.548 Updating certificates in /etc/ssl/certs...
+#5 4.969 0 added, 0 removed; done.
+#5 4.969 Running hooks in /etc/ca-certificates/update.d...
+#5 4.970 done.
+#5 DONE 5.0s
+
+#6 exporting to image
+#6 exporting layers
+#6 exporting layers 0.6s done
+#6 writing image sha256:388b011cf91944f5f59c188a82c17920a1640b2250905eb8c9b1ba6d4dc466eb done
+#6 naming to docker.io/library/cloud-provenance-40072325980-1:runtime done
+#6 DONE 0.6s
+
+ [33m1 warning found (use docker --debug to expand):
+[0m - InvalidDefaultArgInFrom: Default value for ARG ${BASE_IMAGE} results in empty or invalid base image name (line 2)
