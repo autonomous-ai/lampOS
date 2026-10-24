@@ -1,0 +1,1 @@
+{"argv": ["/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-ac9b9993d410d428", "--exact", "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them"], "at": "2026-10-24T17:36:59.952528+00:00", "allocation_consumed_before_launch": true}

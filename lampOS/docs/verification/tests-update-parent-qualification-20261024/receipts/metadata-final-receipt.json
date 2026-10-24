@@ -1,0 +1,23 @@
+{
+  "native_handle": 6366,
+  "terminal": {
+    "valid_complete": true,
+    "finished_at": "2026-10-24T17:21:04.347837+00:00"
+  },
+  "local_package_count": 48,
+  "workspace_members": 46,
+  "complete_metadata_packages": 451,
+  "complete_resolve_nodes": 451,
+  "excluded_local_names": [
+    "sonora",
+    "tough"
+  ],
+  "complete_normalized_graph_equal": true,
+  "raw_metadata_sha256": "2249902ad261f58ee8f09b1a8d99d13ef15bafa240fd66d2ed55a41bb9e0d54b",
+  "proof_sha256": "a039453cccfc6ed2a024341fc919f89a56102a8c17c82bd21d3287345cb907da",
+  "command_exit": 0,
+  "direct_wait_status": 0,
+  "owned_group_absent": true,
+  "new_target_exists": false,
+  "only_metadata_command_executed": true
+}

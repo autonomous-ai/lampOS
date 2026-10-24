@@ -1,0 +1,6 @@
+
+running 1 test
+test voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 3.30s
+

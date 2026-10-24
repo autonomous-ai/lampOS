@@ -1,0 +1,1286 @@
+[
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-8f1260983d9a8ee5.rlib",
+    "bytes": 340184,
+    "sha256": "797174dff5d81f09a3876c7456dd784c893a65dd33139e69081157c61962d43d",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-8f1260983d9a8ee5.rmeta",
+    "bytes": 74267,
+    "sha256": "3b386155cc59f2fff5f854ea565accb402222916a053ee36e221a3fda204c6b9",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-369b42ca2a1af0b5.rlib",
+    "bytes": 2107288,
+    "sha256": "7d93db22b69199fce6c52da435fac9dbf4475da26576b560afd156f0e5b2612c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-369b42ca2a1af0b5.rmeta",
+    "bytes": 563857,
+    "sha256": "afd50cd19183faa973a4236d0c6cc091a0c9468df10dc3e0352dca831239eaa0",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-e594cbcbb156e1ad.rlib",
+    "bytes": 8769504,
+    "sha256": "923a71a82c7709ab08408ca14e2d47d0ff4855c5cb97947c36e8fc55b198ad08",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-e594cbcbb156e1ad.rmeta",
+    "bytes": 6180095,
+    "sha256": "daa70949942aa2cf80640c8c8f45bed6699f423520cacaee0822df6ad7b813d7",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-277bbaf0cada7bd2.rlib",
+    "bytes": 642896,
+    "sha256": "6fbcbaa334e6c507d5cf9521e81c390c67ba3e4ca9ca19853eccf9f1aaec07d5",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-277bbaf0cada7bd2.rmeta",
+    "bytes": 514999,
+    "sha256": "d1916fe2a0bcc3134afac27acb8b9df7a6dd5802b2838bb87d26f53767ca39ac",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-56b22fcefe6ac60a.rlib",
+    "bytes": 194368,
+    "sha256": "5def865bda1f04e4ac70d75e3449c46337200d63a0689a4043b425d9451c5075",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-56b22fcefe6ac60a.rmeta",
+    "bytes": 37496,
+    "sha256": "8164a01648c8059b369f187f2b9346d3247f27bcc559bb5794fea584e4b29fae",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-4b689b221319c667.rlib",
+    "bytes": 783480,
+    "sha256": "7dd123e95e9b9a04434b8b8d2e2a483bd8ca7a420b7179cded7d05f36d420c77",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-4b689b221319c667.rmeta",
+    "bytes": 294130,
+    "sha256": "8600bc7fd2edf632a1918aefe137d485bcfdded8fe6f9af3b763c24c0259f359",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/build/lamp-camera-3b932f7397b2694a/build-script-build",
+    "bytes": 549320,
+    "sha256": "038b97711463043ec3a9991b5c5bc8779e9665e15d4f90f4d37fd5fd455c55dd",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-b6eaaa7961714439.rlib",
+    "bytes": 1308520,
+    "sha256": "da08790f6bfdbd4f15164a6d8daa18e4d4fc3a04f5abd6ebd862377ba96763b2",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-b6eaaa7961714439.rmeta",
+    "bytes": 239729,
+    "sha256": "a589f446e38191ae09a66188ae7109a8c41ab0c9155dfecb3a40ada3e00b7843",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rlib",
+    "bytes": 1391624,
+    "sha256": "3f61d6bef21e6206aa55df3a98bb73af1f34659d0b7b347d1b6b878dfb98c04c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rmeta",
+    "bytes": 537761,
+    "sha256": "46d5d632444001a21bfd7d00dc884fa77ee65247eb556c2be9a5752096a9e140",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-a02db45d035da157.rlib",
+    "bytes": 6539520,
+    "sha256": "3b3ef7819c390fe61d1425cdb87e9416f080000de57bd8e1baf3c4e3f52b1ed1",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-a02db45d035da157.rmeta",
+    "bytes": 3349973,
+    "sha256": "ff71da973de66ea7af8a4d560fd9d7f5bf8c6decbdb66592567592dc76e431fd",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-b9bdd52b3b8cee37.rlib",
+    "bytes": 6417048,
+    "sha256": "227c6b2942dfa7d2410c2e33e0a1a1eb8fe4d4b9d032cf8472871cf616e9ff5c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-b9bdd52b3b8cee37.rmeta",
+    "bytes": 2849141,
+    "sha256": "ee1af6b0c7da836ddc8ffe8e37529f0207eb49c5022daf3fd051517e55b53288",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-7186fec66230c827.rlib",
+    "bytes": 1689832,
+    "sha256": "0b3775286a2c1b75161c81c3b0ad7b071822a7ee3eaadef124361ff9285d18c7",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-7186fec66230c827.rmeta",
+    "bytes": 994802,
+    "sha256": "5c3691f3302ad5c8330caec04a4daeafc554b704a6ed65242966d1c7f9ceb81f",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-9e6bb81336167720.rlib",
+    "bytes": 5246944,
+    "sha256": "5ab8eb88f2bedafc237891a9e2041a3032131faf6ccf5b6ca2670ce7da63ddcc",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-9e6bb81336167720.rmeta",
+    "bytes": 1786840,
+    "sha256": "c114dfa9cfdb03dafeeb08e25a5020a3d7f97ad6de884e5d35f27a029a8de919",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-085b7a55c00bca95.rlib",
+    "bytes": 293968,
+    "sha256": "6000b37acb3aafb68777cdda0276fd0e50cf7f57d41d892f5885fd98bf87a32f",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-085b7a55c00bca95.rmeta",
+    "bytes": 207671,
+    "sha256": "815a03ca72cf1952c6be7c7e688cbee5a26a125149e68e709541d31395ca11fb",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-c2f4b500b657938e.rlib",
+    "bytes": 2630744,
+    "sha256": "50db8177354b9c6570e0d2c07caf6fcc1d606b2074bdd0fdf1c0f84926ac106f",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-c2f4b500b657938e.rmeta",
+    "bytes": 337920,
+    "sha256": "b8749f610a66f2b2d803d778162a2d3c84906e0160d368602f26f410a6745680",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-edb825df46cc8694.rlib",
+    "bytes": 541616,
+    "sha256": "0f42701f61f0961998490c5a9a84e1878a8e0169aa4481def3465207c563f07b",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-edb825df46cc8694.rmeta",
+    "bytes": 189483,
+    "sha256": "0513471c586a4178013d5a3560f04815b9b7976af6dc5535c6f4a66345298ac4",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-69b3eb48bee9b71c.rlib",
+    "bytes": 353392,
+    "sha256": "c2e1588a94d99857e5c6ca18fc4581bd7cafd3c490602b6260b58786f00e0acb",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-69b3eb48bee9b71c.rmeta",
+    "bytes": 97716,
+    "sha256": "9adc6d9ef34e8cf0e83bc7092d246de6e74f6993bdbd37d32202c036765175eb",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-b3f2d2010c28516f.rlib",
+    "bytes": 5129528,
+    "sha256": "40e37f7c64f05190f57708f91e3d51666b2ed1e1f24543da02c8192ac3104a9c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-b3f2d2010c28516f.rmeta",
+    "bytes": 1886777,
+    "sha256": "a1aa4721e002e4262f255f7b4719fe29eac07dd5a67f004a29722343382e67b0",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rlib",
+    "bytes": 53496,
+    "sha256": "a21011df76477144b29289dbc14bd2e3905ced091b2b25a92713b7be81bd331a",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rmeta",
+    "bytes": 33608,
+    "sha256": "0d23f8da1f70a63c7bb859efac945475dff76316f50a4838b64a40e5a77311f3",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-6d82b065d93bd02e.rlib",
+    "bytes": 6089968,
+    "sha256": "380f0808460261fdcb8199875232b370f1d1df9283c890d954821063f5fd74cc",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-6d82b065d93bd02e.rmeta",
+    "bytes": 2708923,
+    "sha256": "7dca66974635eec2e9c0137ced71d7cbfa783ce8da34fa715c190070f651b1e4",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-ece39525cfb64635.rlib",
+    "bytes": 9679400,
+    "sha256": "6c183ce826857bc0d786824c32951358b6ae89a6649cf530af2b4c9d7dd260ac",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-ece39525cfb64635.rmeta",
+    "bytes": 2388516,
+    "sha256": "4c717fc38026a6885d24232e197e30773d082c0907a717c3a8b7b2a6087842a0",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ears-e7b3f46df7d3af23.rlib",
+    "bytes": 838320,
+    "sha256": "e6b204651fefee28083030b2608eac89937546f0604d2f89b002fa21fe69c1bd",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ears-e7b3f46df7d3af23.rmeta",
+    "bytes": 224179,
+    "sha256": "694e04aa66cb4e0b379d64ecde80d22ea6adb656194d20078b0aab2fae411fd1",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-2d9b65f5c3d4d344.rlib",
+    "bytes": 2362328,
+    "sha256": "d28abcad9d6651f4fb7b19d7e1a6f19cab08b77b6b423ac7bcef43b3c83373ba",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-2d9b65f5c3d4d344.rmeta",
+    "bytes": 953729,
+    "sha256": "377cd0b66946cbbd9b1e4d9b5313a7f80699b7156c4b541c00d5e106ab9682b5",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-f75455b2f7a5bf0a.rlib",
+    "bytes": 8408856,
+    "sha256": "9282471332d548b634379f43ac70e900ccfdd0d9f50f3812567df53358b77b78",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-f75455b2f7a5bf0a.rmeta",
+    "bytes": 2004178,
+    "sha256": "c572edd15a8244da65d003c1fdb0e4ef02dcc6cdb22bfe8071de26cf6735219a",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_tasks-c10078e26dc0cb9c.rlib",
+    "bytes": 9393216,
+    "sha256": "6be101336d6a97b91d4e19f6e4f9b960322bbc90e06c64b7b4cb9958303b3467",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_tasks-c10078e26dc0cb9c.rmeta",
+    "bytes": 2801636,
+    "sha256": "3764f9627b3faf5833a06ddea2253ec8a40d7577d4b23ad635384b02b520d4bf",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-f6d937744b3df3c6.rlib",
+    "bytes": 81669368,
+    "sha256": "6428bde9b32ba0afc38737aa195a3f894b3e8ba738aacd44da7c4efb1edbeba6",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-f6d937744b3df3c6.rmeta",
+    "bytes": 22353494,
+    "sha256": "c39459067f8d6095de1ddf2a986beddc8b6ccdf31e5d7e2a0145cf36aba2e31b",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/duplex_lab",
+    "bytes": 2898880,
+    "sha256": "503b767e48a1c93373c0d63c9516271734ed132e46a4145eb30314f1a4b7a101",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/probe_handover",
+    "bytes": 12629880,
+    "sha256": "ddcff6da06fd467127938ab66345f37f516225ba98c5b1792f7f36423dec702b",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/ring_process_probe",
+    "bytes": 5618960,
+    "sha256": "958294afcc6e91a952d2af772a2a9ff863024efb8655fba5be4c1d0560aeca0b",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+    "bytes": 2737048,
+    "sha256": "893b4088a59978765a3fe8ca7bdb2a953c2dd35c67376e5c564dc5c7a9607381",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/hearing_replay",
+    "bytes": 1608688,
+    "sha256": "0fe877afd373d24608e8be747678f18ffbcd9adb736df73e36e11453e142e326",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-voice",
+    "bytes": 40264576,
+    "sha256": "9d774c07090aac2cc1e8545d5cded747d3f8f9a4a718ce20cf2d7045e86b66b3",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-92e5f959ae720155",
+    "bytes": 4822564,
+    "sha256": "1d55c213472f118006e3e3f8d61b37ea066e0ff919f028a8200a37d040d547f2",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/admission_latency",
+    "bytes": 895808,
+    "sha256": "081925d7d968461b49508028e57b46d703ab9d30c0c1cc216f8b65b488812a78",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/render_line_second-d52e8b12a523439f",
+    "bytes": 1435640,
+    "sha256": "4a2922a644c9d4f6cd55679908a42cc5052cbbd975ea09eb541b2c927ef7b970",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/head_qualification_operator",
+    "bytes": 1410504,
+    "sha256": "e1a6cf3cda187dcba6cb58efabcea1ee26d2c0a3f4d3dc7eaf37b333ac65ee38",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/reference_pace",
+    "bytes": 3775120,
+    "sha256": "61376db46c444893dcf5ea40dcd2b4a3016838d769e80137a41e6177ee3a5077",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+    "bytes": 1119920,
+    "sha256": "970849fff9fc2ba32b153134011505cbe2c2ca14ee450817e8c4d70ed9780ecc",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-ac9b9993d410d428",
+    "bytes": 94285972,
+    "sha256": "0fcdf01a377d4043ea3adf7c3302fc6a510ab8b0ae622ee409b7d3aa266e45f0",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "bytes": 114477680,
+    "sha256": "88580c1028aaedd210718c9e7ab6a749eadbf0025c4283039dff777324d50b34",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-515ffa7073d7946e.rlib",
+    "bytes": 642896,
+    "sha256": "4196a0cf81eb7ed7e04d2ac05228c8eeab9d4754ffad109c1072a827f25a736f",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-515ffa7073d7946e.rmeta",
+    "bytes": 514999,
+    "sha256": "2ece9178f9ae58c4e063df8ab4f7fde9239dc3a3d40538d45a0748a1428575d2",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-7031583ac536452d.rlib",
+    "bytes": 341352,
+    "sha256": "9b26a15c6807097dd7cddc6989e9677b10e227267b92eb9aafcd633d2a0970cf",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-7031583ac536452d.rmeta",
+    "bytes": 74267,
+    "sha256": "3f18171f80eadbc5d869a0ebeb14471a5614c652c717a27861c9a77442e11831",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-01b657894b4c39de.rlib",
+    "bytes": 2106856,
+    "sha256": "20b73f1417a87c7a33c475011e4c64a4fe0a9c4ab0d7f473b8e0d62f9d9c05e8",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-01b657894b4c39de.rmeta",
+    "bytes": 563857,
+    "sha256": "e28e1f3b29eee42fe592a27ebc7992432f51f7930cc786dadad12e07915eb804",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-f972405175f02a2a.rlib",
+    "bytes": 194568,
+    "sha256": "db1a9eecda1c24d6488f0600da814266da7db2a4407636e353cf57f3be0e0fb3",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-f972405175f02a2a.rmeta",
+    "bytes": 37496,
+    "sha256": "831ce6ff65daa0bf0d665ff04c773412d50dd91d4e8e15aa3750e40f23066c97",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-0ebcf10ac28b5d74.rlib",
+    "bytes": 293968,
+    "sha256": "4076a467d353b32bb07fdaa649dec1d4a5f2ea2860ebfaea9c4400a2edc9a0f4",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-0ebcf10ac28b5d74.rmeta",
+    "bytes": 207671,
+    "sha256": "faa4d1d074ba48f1d31fb1ecd818f35e8ee6d86518fa17b6a5f4036659e60401",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-b13af4d7c2a1c13b.rlib",
+    "bytes": 541960,
+    "sha256": "1277cb6b19b3b978d31af7ab15d4607a7ecb76b9a1680ac3ebc8fe202774ae6e",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-b13af4d7c2a1c13b.rmeta",
+    "bytes": 189483,
+    "sha256": "4a6ebd2722acfc5aacd42e99876927bb69581abbfb6845d7847aeeb3cea612f1",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-2fb842c4fece0e43.rlib",
+    "bytes": 8769168,
+    "sha256": "2e2a14cfbf3a06b14e6b9f22ce57a2dc50a0dfc4be2104b87444c1a22a623131",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-2fb842c4fece0e43.rmeta",
+    "bytes": 6180095,
+    "sha256": "3d5b47c8828db4a2c5a8e9e6035fbbfa0ea17a17bc83ba75bfcc64fde6eb7efb",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-5998ce19751f065c.rlib",
+    "bytes": 5219672,
+    "sha256": "e9f044b0c9775ff9feefbdd6609dc9aa622542d5e07722576951d4a813d0734e",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-5998ce19751f065c.rmeta",
+    "bytes": 1778386,
+    "sha256": "1b4539140fb5e1a5b83b70fbbc4f86fae94b815511dda2d4ba2bfdd50247bccf",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-171ee0cc6e5a2c74.rlib",
+    "bytes": 5130280,
+    "sha256": "f56ea28367ede552497aa00d919f44335800046630cb89de93526abe6c912546",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-171ee0cc6e5a2c74.rmeta",
+    "bytes": 1886777,
+    "sha256": "7b7c24b3707ae7633b5968191b47e22318affa01718cd6ff332abdcce182513f",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-7e074098734c0793.rlib",
+    "bytes": 782720,
+    "sha256": "cccb099f87eb683fd3c44906b9c70c810a94b4ff57d72b3824d88ecfe6962b4a",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-7e074098734c0793.rmeta",
+    "bytes": 294130,
+    "sha256": "e006a04e726fbd6e657015df92c358a9a48832eb1da1fac63178fd9b87b985d9",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-720153f400b2c976.rlib",
+    "bytes": 2631376,
+    "sha256": "41f174f60abb4068b35db69eecaefe98b06358cf8d0c3a8958723d907b06bf4e",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-720153f400b2c976.rmeta",
+    "bytes": 337920,
+    "sha256": "68d5a1cd8ce8cebdd4599fcf9a70d57d0f985519df71b1770dba84398dff7a1d",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-9f75057ba841b9d3.rlib",
+    "bytes": 1048288,
+    "sha256": "c3333b9bd732621c17a7d9fe843ca71723bf1d63b2d3085a95a902fea46f299e",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-9f75057ba841b9d3.rmeta",
+    "bytes": 230429,
+    "sha256": "bc6b38b14f82811e9e25fd069fc519451f3728f60f3caa9edf192b0813b7b773",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-05e3f2af6e1ebd00.rlib",
+    "bytes": 6417224,
+    "sha256": "cc891bbc96731fab92111efc0125618060df7938c20b366cf99c5b71149f1144",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-05e3f2af6e1ebd00.rmeta",
+    "bytes": 2849141,
+    "sha256": "3a87f34b2e85d723ceff17829fcb3e4219960fd1da3cbf0680c2c959102eaa9b",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-4f14a187f0d81750.rlib",
+    "bytes": 6089336,
+    "sha256": "e52292f080ba92648561d7ee1f13cfc8143b1f18331ce87e72684bcd833bd76c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-4f14a187f0d81750.rmeta",
+    "bytes": 2708923,
+    "sha256": "8be1c0bc02e2164daf67d2d35a6ddcc41a459f09e92bc374cd6ee8a565492040",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-145be2cce359a25e.rlib",
+    "bytes": 352840,
+    "sha256": "21a0389914ebedb8c4cb55bf48ec895a2f11e600d06dfd3bf68400770124a43d",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-145be2cce359a25e.rmeta",
+    "bytes": 97716,
+    "sha256": "97e4cf96710f299f78322bacc2e56db944c2f70f5bd12414a73614070ccc202d",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-8ecfb2d486855012.rlib",
+    "bytes": 1692256,
+    "sha256": "4e05fd4f2b1d246616672c8d1a1ed86132811b69cf17c5f62302f9f3788c8c9c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-8ecfb2d486855012.rmeta",
+    "bytes": 994802,
+    "sha256": "a8cbf714b26c03118b83db26d93e727eba92771588e76ece82f35b6391338206",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_update-9735c7c96b1f3c01.rlib",
+    "bytes": 11466336,
+    "sha256": "a36f93145a00846741cb62eb2f09a68a78e13b026bf5028def323a39f5b2e326",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_update-9735c7c96b1f3c01.rmeta",
+    "bytes": 2457440,
+    "sha256": "5c060c5dfe2eefaa2f71297ee695cddc61113dfaa81b0f6e193377c825378a16",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-5751356a54a8d28d.rlib",
+    "bytes": 6426344,
+    "sha256": "bb366e455f3715bcddd65213f565ae823d8ada5907f1cb3140e47a0a162555a8",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-5751356a54a8d28d.rmeta",
+    "bytes": 3346109,
+    "sha256": "50891c6f1ecc044d0d7441dffe9f1a0def8bd3905c134b4d5f10d60737b7cf6c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_memory-a50fb6ac43874266.rlib",
+    "bytes": 6350040,
+    "sha256": "0f10d8ed9663ee185dfa5c86bea988bd003e457d377e6f6f4b773a3db24dfc17",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_memory-a50fb6ac43874266.rmeta",
+    "bytes": 1600121,
+    "sha256": "b752cdc02d191565888474724c31619c1ac452051345756a7c3771c9ccb8399f",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-e8026e676decaea3.rlib",
+    "bytes": 8301512,
+    "sha256": "3618b14b7be00e4ed3c6dd141bf4603c44b9da00badf6cd5fffd8f1ce457e82f",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-e8026e676decaea3.rmeta",
+    "bytes": 2000001,
+    "sha256": "1e5c75600c64a525928d368ba7b5f035dd15753ee2cddb2d25c4e75f3ed23275",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-7acb63e4279fc441.rlib",
+    "bytes": 2363712,
+    "sha256": "18db00ee8b7472e5d46fa5be3df823eff005c322f28c308347c6c938ba5d3168",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-7acb63e4279fc441.rmeta",
+    "bytes": 953729,
+    "sha256": "83b0411d744827949ebeb98d5f21c4ebf05949073734cd5af6583e32b5613117",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_setup-8faeafe3f45e8161.rlib",
+    "bytes": 4123328,
+    "sha256": "ba6856983456139588876dcbc9e371c8dbe5c35698d3687d67fffd93c12300eb",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_setup-8faeafe3f45e8161.rmeta",
+    "bytes": 1199243,
+    "sha256": "61577b9a3dc22ec7e1a454d8f80e4e06e1b9fec0bbe0e385f07b9431924146e9",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_observer-4b97364c9f89d790.rlib",
+    "bytes": 2158880,
+    "sha256": "b29663e8765285d8b8e4cc48371e02f34e2dd142072edfb12e85a3357f34c76c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_observer-4b97364c9f89d790.rmeta",
+    "bytes": 379060,
+    "sha256": "44e584608b73aca050e94e3ac5b04fd0402795487a1a47aaa01eb92ac5cdc284",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_sound_fixtures-32a062095483e160.rlib",
+    "bytes": 1791384,
+    "sha256": "8ca29e0686de7041afb7ea9117036b409084f1d8a3967eab63d7a09a834806ef",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_sound_fixtures-32a062095483e160.rmeta",
+    "bytes": 496026,
+    "sha256": "deca88ba43072c7aeca3dff2e6389b48470d772a354c08a0b97a8e923c6fd5e8",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_peek-ef038d86b730b63d.rlib",
+    "bytes": 3270264,
+    "sha256": "2ebf8673428d40ab71efc6db101cc1c6b09fbd3b17f8f9c399fc5a98fba70183",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_peek-ef038d86b730b63d.rmeta",
+    "bytes": 365067,
+    "sha256": "804561abacc12419599f3ff1f17ba362ee2c86905328141a8b0865aadf9c716c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_peek-bb7b8ca29d47dc1f",
+    "bytes": 941832,
+    "sha256": "e5b27000ff1b55d47a399f9a0b8deeda8b5a8c20f304febc709b29610e9b3064",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-peek",
+    "bytes": 5955456,
+    "sha256": "af0ade1a3816d4717aa920f4b4e1d907a070ef8b100b9180be8f9912ef1b77c3",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-1999d587d456f0c5.rlib",
+    "bytes": 9677312,
+    "sha256": "fcc66c9d02f386f9c547178aea9b6f09af2e3f027a55187e97febeeb60950a92",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-1999d587d456f0c5.rmeta",
+    "bytes": 2388516,
+    "sha256": "a8729e67a14ec0d620542e920222b7c9939ea855627088b86e9bbeaf4f7ffebe",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/peek-c90c67e1b5376e51",
+    "bytes": 6825120,
+    "sha256": "6546935d0fe408ec5734b53b6240710f699eba539205fc67c88372a72e8762a5",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_skills-a0f7ab198d1e6fcb.rlib",
+    "bytes": 16090960,
+    "sha256": "8cdd1e7e4c2ce6b3a543f89943595aacaff145c024811982f5fc54236d89ec17",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_skills-a0f7ab198d1e6fcb.rmeta",
+    "bytes": 3224056,
+    "sha256": "1c70a8dbcd8fee337369f61e53ee84b60c9507d1e35b3cea11fb9d0b82774f42",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_eval-ac4ab4a405b7c382.rlib",
+    "bytes": 20232920,
+    "sha256": "44b535dd115ca4660eb572e12b50a335af36b0a0de52a6a7a16b10d52d967ea5",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_eval-ac4ab4a405b7c382.rmeta",
+    "bytes": 6572821,
+    "sha256": "4e71bb45ff55041f52c335aa729f360b7728230d8dc1888e09e02c0d403a1981",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_cloud-b9e7e1cef3c46321.rlib",
+    "bytes": 5097248,
+    "sha256": "afa91699b74cfcceabff13b6a4129f62169d82448dba8d130f3503073374b3b6",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_cloud-b9e7e1cef3c46321.rmeta",
+    "bytes": 1472562,
+    "sha256": "69395411937eba0f1df04baa4bd7e8eb32744371d4b80b4f4fb098401c381ecb",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_setup-7641d9289b7af3f6",
+    "bytes": 941832,
+    "sha256": "9a2fffb65103aab9ba27ec6cbed1fa4791ba2b745762f0c7e81ef37344b62304",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_same_voice-33dfcbc2c7874b96.rlib",
+    "bytes": 637048,
+    "sha256": "54279756dfaa5ffb4708c3883996b98e480cc95041faea717c38cd2f052c6b35",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_same_voice-33dfcbc2c7874b96.rmeta",
+    "bytes": 63867,
+    "sha256": "5203037c3aa084babc3708d69c2737ad11bd7621688d2cc1e74d66da2535ba9c",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-9146092c1ea92e5e.rlib",
+    "bytes": 81341168,
+    "sha256": "c4c5540309c443d28730277ab55e73b60d4006ca3353249ce081127fbd103c3d",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-9146092c1ea92e5e.rmeta",
+    "bytes": 22336120,
+    "sha256": "e0765b2548eebc8f27f9b8be193c3fa2fc3d5c00bba7fce51e79ac3e1f895736",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end-63f751939868965d.rlib",
+    "bytes": 1680112,
+    "sha256": "79e4fe835d9524a6d904c2068a3284afa79cc9b789b3eb3ac3c8377c5b9a67ec",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end-63f751939868965d.rmeta",
+    "bytes": 151616,
+    "sha256": "dc446fefb76906eb0e7b54d21bf670ef339bebc7026ad337fb0b1b72deb1c685",
+    "mode": 420
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_skills-e433beab2fb911b9",
+    "bytes": 13211932,
+    "sha256": "2301eecee6aa6a75079483cb51de0eb196e142ff114bb055017efee060116c22",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/requested_audio-6d30f8c0024b0543",
+    "bytes": 13135252,
+    "sha256": "81f5ecc695e7528562c7b4d057aa3d7fa7aa7b7945f22ead1ebe28a7fb2dae0a",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-cloud",
+    "bytes": 23494032,
+    "sha256": "308112021c86438ad479cec09f877b7966ead6d0d5285020b10c80d07095ca84",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-e8f8f4f3f77239bf",
+    "bytes": 2530684,
+    "sha256": "26f4f808fb447418ff63f338a742bf8bf8e658f5ee1a3fcc3a2c6082b7e86e58",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_early_words-ac6d63cbcd0176af",
+    "bytes": 9340732,
+    "sha256": "0f6bf43e251c7f3f00a02b21b14309788ad4c459f32d951755819df6bdf7f8d0",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/paraphrase_fixture-18e0766b1f009ff2",
+    "bytes": 1480224,
+    "sha256": "0e918311a4eb5509c3ae1b642c6cf9d3a159d3580970bc5c60b8e813f044f3e5",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_forget_named-b3b64eb830ff6b4b",
+    "bytes": 9194372,
+    "sha256": "223f3cb7bf35fb0e441ff50173c2fd3031293eea8494e435cce691188f269e70",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_since_until-4fd3a6b392a7d272",
+    "bytes": 9118012,
+    "sha256": "2d972c839b65a67c8ccc85d84aa73582f71cb7ba14f40b682bbd9cf460843d06",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_update-dda903a1250bc605",
+    "bytes": 11214316,
+    "sha256": "555da6c48a8c5f0a69ee56ff7d7497ebc1d3c6e073afc4856b7599db25923209",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-92233006fa485f3a",
+    "bytes": 3693936,
+    "sha256": "5b125c080297801f962fb8fd012ddc8ee1620936368b289fea0dfc8a4ae6f9b3",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_forget_about-8f04a42ed8e04aa3",
+    "bytes": 9109876,
+    "sha256": "bbfb5cb3d4b1b575de24d757e6b14b3ead5b85efd89edf938ae2a28efe81593f",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/forget_person-8deb8a5a5a1bec4c",
+    "bytes": 7943980,
+    "sha256": "02d62fa692caeb1b243f2f145eb7a8b152063cdf085a9498f7c8bd28ad89c0cb",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/self_cli_exec-bc85a62cb2f27284",
+    "bytes": 474024,
+    "sha256": "61fb91665424db76a38946ae2172748ca2164d95891ecb58cead4186fa5bbca8",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/health_control-ac8c12dcd2c7ad1a",
+    "bytes": 2012704,
+    "sha256": "d1e431cd15f7ff47b24c665360d292b3ced3a3d4fe0aea0b4a1edcdf9d50d7d4",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-e881b76de672edbd",
+    "bytes": 2799076,
+    "sha256": "822ef925406f92af1b529d797acf14aaf8bbf7471028df9680b86025aef592ba",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_forget-74ce451f0225a361",
+    "bytes": 9526644,
+    "sha256": "dc0425b9f8b09a1e6e3151e0a51362ee8515abbc5c46323fff523d8684c132f8",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/forgot-0205b773d3329302",
+    "bytes": 4145752,
+    "sha256": "1a8ce6431b6ae8afa13b19b1aa6f5fa068b78f26d1129ed59328edc46162ed52",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_observe-f06824b26415b941",
+    "bytes": 8535108,
+    "sha256": "50ac61dc8e8a5878afbee1d989a4c12e6e92663925997dd42132ed47e90e7d82",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_link_used-caa8157749a15aa8",
+    "bytes": 9269204,
+    "sha256": "6c504d3b18cdda1bf63bd17086d8d6ca38e3e0eb560a05c3914ed501505477c2",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-2daae09844723b26",
+    "bytes": 20864116,
+    "sha256": "02a0c10fb5d18a1fa539bae586664af52f58b78c363979a902268f5484ef017b",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/forget_shared_exchange-14fe9e8e0d114920",
+    "bytes": 5552172,
+    "sha256": "3d953b71c613cc0698d2f44b6f581829d1a2d6ee111be21819da5a320775421a",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-skills",
+    "bytes": 20175340,
+    "sha256": "88718e1afcfaa142df9fdc40527191c42c492e911ead9b408beaceca6d8dedb9",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-bed542c0cfe5e8a7",
+    "bytes": 1655392,
+    "sha256": "254d217d1460c9cb2c2713eae5ce967fd4b5c20e1818b2ff40314b9b1184ca81",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/voice_follows_face-2d49a4baff95c2cd",
+    "bytes": 9282052,
+    "sha256": "fa7352e71fea8977bc8467824c2a14f0fbe0d92cfaec3b39ce5da0110645dbba",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/install-8ab651138ba2189d",
+    "bytes": 13382916,
+    "sha256": "cdfc1a9306c338629c910f5acd09ccc65d2db7886b2c391cb64fb1afec60fefc",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_update-aaea79408ab23117",
+    "bytes": 941840,
+    "sha256": "8ca372c7d8dc5e4f979c8859870eee3b05ba72f4a376510786fbedb5a122904d",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-baf52b4e33708f12",
+    "bytes": 15428572,
+    "sha256": "4f5bed8f22ac9ff4fe4717bfe1d2b0dadbdcc85985a008deb8525a2539eae6cd",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/round-58d23b5bf1a0fe16",
+    "bytes": 16353348,
+    "sha256": "f02b6dcea5f198edd30d78465e28cd186133b950597d9a8f6edf0aae91efaf68",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/turn_end_replay",
+    "bytes": 75422976,
+    "sha256": "6b5781c50de2aadcb95c3eea6a230ac87ea9c6defb7b7becd4ae1392edd5c8da",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/same_voice_pairs",
+    "bytes": 75511656,
+    "sha256": "75a234fce280d2eafe7801ded2c85690e6e0e6881d5f0583c95cb255bcdf388e",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-bea5362949cbd257",
+    "bytes": 14787276,
+    "sha256": "763be4d2725273d6254b2c110696da03b0fa9fa95b8dfe039a70572625180593",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice_eval-390c3d26497b9ea4",
+    "bytes": 6364772,
+    "sha256": "7fb4436513f156f8f207583973446b07f67a30a503911abf4b118e9fca5b161d",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_memory_eval-297b5b933d9c5e5c",
+    "bytes": 1785112,
+    "sha256": "1ecaf4a36775faca8069f3cfdaf8b75a2db5926bbde65983964c7c761538621a",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-voice-eval",
+    "bytes": 28887080,
+    "sha256": "5f124e28be07610c1668f52bee8141b908056310616414872fe3aea9a23df3a4",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-f337388f4e72a80e",
+    "bytes": 15923952,
+    "sha256": "42392ad1fe315d5439daeba7ff79337526947137173e72c8d646d199e77b0cbc",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/self_process_cuts-225e6342b519b0b0",
+    "bytes": 473944,
+    "sha256": "72da66f3abf7322c2d7347e3ffec4110c2ca72f4ef6a0d1bc557db722401d07c",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_cloud-44d498984d4c09df",
+    "bytes": 941832,
+    "sha256": "20d2cdd3ae4846c362caa471cd28af8abb7e10f97d7e7d6985c2dbe464933478",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_memory-3e6428a6ad440a7c",
+    "bytes": 7814108,
+    "sha256": "7b3683b07f19b4fb0099fe9f139f7b79b1d2124c8c6853104fdfb51865192b42",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_memory-b9e503bdd61f7e70",
+    "bytes": 10007556,
+    "sha256": "347a5988b1b47022c17a06d57f2e4a8addb19a2df610f6b853073f90a0f3ae52",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/functions-a019e8e3d9f18c56",
+    "bytes": 18500288,
+    "sha256": "44545b229df5079e025282ad66a590e2d56d88edc1920dfc145ff55e3dee3729",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_cloud-14b8d1ecc993e2b4",
+    "bytes": 29241160,
+    "sha256": "6ad48ed4d9e13a078c00fd99b3a253deb4e69b21d255d39d4c68a6dec6ffb9cc",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/render_relaxing_music",
+    "bytes": 548504,
+    "sha256": "415fa68842419fdddf7ebcf955d6f0846b4a947fb1739842e0a763dd5af63bb0",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-db34648a47ac5161",
+    "bytes": 3645140,
+    "sha256": "ceb3f21b13bc169e1fc956be01cb0951f3f304f0c7cd23ef66e57e42c2a33083",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-setup",
+    "bytes": 15567184,
+    "sha256": "2e4e97bcb1687289886dfc20904b02576b3d17d79083f602e18bab18f0cd51d0",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/wake-1879b0f98b9c49a0",
+    "bytes": 1480288,
+    "sha256": "11b0bcab3e360cb11dbeb8ad4b037e10589780266fcb2bc4c5443b9b554d80a3",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_skills-b2f0ae0b3b02a39a",
+    "bytes": 13778748,
+    "sha256": "9f1ec1253899a90c3199bf15ab92efd91393d7db166db429454c1764826b8b6a",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-c5f75c9d30c5f818",
+    "bytes": 12499068,
+    "sha256": "71b46047bc1147ca18d878a4bb2bcf4d84b792d1f304af7591fcf6eee445c4a2",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_peek-2fa9472102c7793a",
+    "bytes": 3251640,
+    "sha256": "4926a8493810959b69c98aafe1ae580e83dc1d1245b8d255d39b88ddb46e4efe",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice_eval-dbe254449ccce883",
+    "bytes": 24510900,
+    "sha256": "a9d1d49f30d6f93f73519d7cca18a75017fa217bf2f8f2cb2b5f4c9a26961e62",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_expression-367629d2b98fd09c",
+    "bytes": 2443000,
+    "sha256": "82cdce9bb4600c58f6487174a7b9c814b5db85c5335fd88404589f4aee353d5b",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_setup-b7eab6c6ff05712c",
+    "bytes": 10850456,
+    "sha256": "9dd1ad1d376ce10f685ef059210ee2d2b7bd7b11e6935703a4c7422c2132c2eb",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-expression",
+    "bytes": 8533056,
+    "sha256": "9e80092d15d78a5d7fecea3b7ea4306c22aad61d3e90e94b75728a83f8fe83b0",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/check",
+    "bytes": 2156648,
+    "sha256": "5b0ce2d28c34849dd2fad0897e3c6ebffe64629eae004b1fc58f63ec868b9eeb",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/rest_cost",
+    "bytes": 3958856,
+    "sha256": "fbfab0a975dc6fa4f20333314210fd58aa3494a5e622059d0c63d6a6adeb195c",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/recent_playout_cost",
+    "bytes": 3953112,
+    "sha256": "5c49cc124dc6dc0f4c0550e4bd30724f8528174800add7cd863c5e3553765f12",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_lean-bf9e165f7a87ea41",
+    "bytes": 1054320,
+    "sha256": "44abcfe6641114b9f49709c85f63f32b0775ac8427602ef1b6f001d168e229e4",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/runtime-8ba534de81614d18",
+    "bytes": 6631192,
+    "sha256": "651c1bd7e94d392c6472b1fbe98169d0ec72c2fcf52e00b56750c090ddf89daa",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/replay_cost",
+    "bytes": 3940072,
+    "sha256": "7b0332e29f06a4d3cc49cb833669638732964ca102a5f9fbb67e0e4f924854bf",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-memory",
+    "bytes": 7504660,
+    "sha256": "27ae888a70d70be4b4b8d0890829a1edd926b898151697bc376ec3c1aa6edba3",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-71b3c4366a177b0c",
+    "bytes": 3124464,
+    "sha256": "1758c82cf879d192215164bdb401a6cfb74509abd2710b7cc693790f893af192",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-memory-fixture",
+    "bytes": 7762820,
+    "sha256": "17d0e568e291ed4b9978ab3206db55d4a6512eced60fac067dab10313778918f",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/head_plan",
+    "bytes": 1410832,
+    "sha256": "5458418a55044d4373fbc18e2629d457a78e168e9faea00e83d55de34185d61a",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-memory-eval",
+    "bytes": 4017068,
+    "sha256": "25b3f4596ff9cd6c85a622fb0fb178bb8e2ca50ff0f09325bc018ea0cb2e095c",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_body-9ff199928743cc99",
+    "bytes": 2509280,
+    "sha256": "c1f00e2942185696e0ca4b722e9ad807f2936d808caa7d662ba050b61b0f7984",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-body-measure",
+    "bytes": 782320,
+    "sha256": "6028ec5aaf7e6826c925866a9a2fd7c7fc9954bb7341afb7725875496035cc92",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_body_measure-7f0ba0e9571da263",
+    "bytes": 1296104,
+    "sha256": "a138eb4c6caab59796b3f7936236113a631ddacf0b0e33f0c012c9155122c10e",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_body_mood-30267137783a16a9",
+    "bytes": 1031256,
+    "sha256": "00ae69951be577363805fcb11bc35055693003f668525e290557543577b08054",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/expression_ask",
+    "bytes": 1254816,
+    "sha256": "fa6126cb3ab2e4ae9f02e489840eb60d26aa4b073a2f70bb18c478f246b5408b",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-body-worker",
+    "bytes": 634832,
+    "sha256": "b8ff90ce923fa80912268dbe6aa0ed8f91a574cfd5db9f7536e0336fb5fdf91d",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_body_worker-29a1b45163b9be85",
+    "bytes": 1179176,
+    "sha256": "0430b7ac801fee0f4a8c6353f195bcb3e66f7d3b1678611e3e4c8d0749244f6b",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-body-inspect",
+    "bytes": 597368,
+    "sha256": "c58fc3dcdef0b2028f16b167f2da131adf8cdd82521af7897aada2932c0fd5db",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_body_inspect-637ece4159665738",
+    "bytes": 1161944,
+    "sha256": "25eac3229615837ee5a325e820b471fadec0e62e527a99c4bc03464da4b88d78",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-d30071be32c9fc43",
+    "bytes": 12994888,
+    "sha256": "1c64236b505f3de63f74b72f593cbe6bbf3eba2b70c99a33db61080a824bfa08",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-body-mood",
+    "bytes": 473720,
+    "sha256": "ae2bcf2f7a24926170bcbbe7bb433fc9f5021bd655d1769b7821c3a89ee709eb",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-body",
+    "bytes": 910384,
+    "sha256": "840c20c4825c652eb9702c56fbd11bf36c2616bcbf500e47ca129268293ac7d2",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_keeper-a9f34008275109b0",
+    "bytes": 1706112,
+    "sha256": "35038e73fa27fd67c48173483f1907c177a68bf6c5882b96e8039da5341bfe93",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-8bf4d1aea99732a6",
+    "bytes": 5773896,
+    "sha256": "c6fc2641c423e7aa0786a2b656abe3bf72f4e5f764260a4411563b486e736e92",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-update",
+    "bytes": 10798748,
+    "sha256": "631fb777e2ca226fffbd47a7360372dfa421fb3a866b75e68f328fdf7f73b919",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_expression-9c5b6f2fc96ff8fb",
+    "bytes": 6022288,
+    "sha256": "3945e0a2ad604bfd0b2772d628908622768d3185ba78807f25ef96b9f8105950",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_keeper-d493629e7c7f7339",
+    "bytes": 2590808,
+    "sha256": "5aad513db16f7656c83c2705c37aab4984eab024fd4b29617747e8125e175210",
+    "mode": 493
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_body-3bda0a619327d99b",
+    "bytes": 122241960,
+    "sha256": "05d520f75915571d9828084b67ae5a4fbecbea6d8acdf93d3fb3e618a34e6b3b",
+    "mode": 493
+  }
+]

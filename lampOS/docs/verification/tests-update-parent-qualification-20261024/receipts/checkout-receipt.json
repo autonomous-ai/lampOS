@@ -1,0 +1,18 @@
+{
+  "native_handle": 60772,
+  "terminal_exit_code": 0,
+  "head": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "branch": "tests/1569-update-parent-control",
+  "clean": true,
+  "baseline_source_rows": 10442,
+  "candidate_source_rows": 10444,
+  "only_candidate_delta": [
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs",
+    "lampOS/crates/update/tests/round/runnable_events.rs",
+    "lampOS/crates/update/tests/round/self_cuts.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "new_target_exists": false,
+  "source_guards_unchanged": true,
+  "no_Rust_commands_or_target_mutations": true
+}

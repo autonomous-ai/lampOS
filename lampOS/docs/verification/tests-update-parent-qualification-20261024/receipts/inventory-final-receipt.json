@@ -1,0 +1,79 @@
+{
+  "native_handle": 77833,
+  "terminal_exit_code": 0,
+  "terminal": {
+    "valid_complete": true,
+    "finished_at": "2026-10-24T17:33:31.172514+00:00"
+  },
+  "targets": [
+    {
+      "package": "lamp-voice",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "cases": 270,
+      "ignored": 0,
+      "sha256": "0fcdf01a377d4043ea3adf7c3302fc6a510ab8b0ae622ee409b7d3aa266e45f0"
+    },
+    {
+      "package": "lamp-voice",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "cases": 3738,
+      "ignored": 15,
+      "sha256": "88580c1028aaedd210718c9e7ab6a749eadbf0025c4283039dff777324d50b34"
+    },
+    {
+      "package": "lamp-update",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "cases": 122,
+      "ignored": 2,
+      "sha256": "555da6c48a8c5f0a69ee56ff7d7497ebc1d3c6e073afc4856b7599db25923209"
+    },
+    {
+      "package": "lamp-memory",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "cases": 169,
+      "ignored": 5,
+      "sha256": "763be4d2725273d6254b2c110696da03b0fa9fa95b8dfe039a70572625180593"
+    },
+    {
+      "package": "lamp-voice-eval",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_voice_eval",
+      "cases": 378,
+      "ignored": 0,
+      "sha256": "a9d1d49f30d6f93f73519d7cca18a75017fa217bf2f8f2cb2b5f4c9a26961e62"
+    },
+    {
+      "package": "lamp-body",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_body",
+      "cases": 440,
+      "ignored": 0,
+      "sha256": "05d520f75915571d9828084b67ae5a4fbecbea6d8acdf93d3fb3e618a34e6b3b"
+    }
+  ],
+  "target_scoped_unique_cases": 5117,
+  "ignored_cases": 22,
+  "named_cases_once": 10,
+  "full_current_case_and_ignored_sets_equal": true,
+  "file_list_groups_closed": 18,
+  "source_full_modes_mtimes_and_sealed_outputs_verified": true,
+  "compiled_census_sha256": "ff72f5ad6fb5adb351b6ae3e9a1f5a1293d013c25bf5fb8a0266d7f94ac5e96d",
+  "test_observations": 0,
+  "memory_restore": false
+}

@@ -4294,3 +4294,9 @@ One 1.107-second owned pause after joint publication reaches the unchanged Sleep
 Ready for lamp-voice: no
 
 Addressed the reader’s provenance finding by adding unchanged primary compile stdout/stderr to the [SleepingService negative-control evidence](verification/tests-sleep-publication-negative-20261024/). The hashes match the original command receipt; eleven local fresh artifact messages can now be independently reprojected. No compilation or observation was repeated, and the controlled negative and failed suite conclusions are unchanged. Update’s bounded qualification completed: all ten parent cases passed once and all ten original current witnesses passed three of three; the full 7,300/10/52 remains failed while the separate qualification is prepared for publication.
+
+## 25 October, 01:02 — Update qualification recorded and task pushed
+
+Ready for lamp-voice: no
+
+[Complete qualification evidence](verification/tests-update-parent-qualification-20261024/) retains the failed 7,300/10/52 full result separately from ten matched-parent passes and thirty original-current standalone passes. Root independently checked the thirty exact rows/summaries, stream hashes, frozen witnesses and restored Memory binaries/modes. No cause or full-green claim. The four test/docs files were committed as 4e96727d7, then rebased with an equal range-diff onto current 4270083a2 as fb8d2f71b and pushed. New-base local gates and native Linux/ARM64 CI remain pending; the PR stays draft. NoPause’s fixed nine-observation qualification is now running on its original saved executables, with no rebuild.

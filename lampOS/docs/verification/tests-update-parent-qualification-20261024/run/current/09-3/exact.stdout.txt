@@ -1,0 +1,6 @@
+
+running 1 test
+test status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 121 filtered out; finished in 0.26s
+

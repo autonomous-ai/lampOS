@@ -1,0 +1,1 @@
+/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d: Mach-O 64-bit executable x86_64

@@ -1,0 +1,29 @@
+{
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/closed-artifact-witnesses/readonly/5bd4029bea46c8481045156ea08be22b06c3e97b845d9e52159e62917dd04a3a",
+    "--exact",
+    "provider_worker::tests::held_consent::a_held_lines_reports_stop_is_done_and_its_answer_stays_held"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events/lampOS/crates/voice",
+  "started_at": "2026-10-24T17:43:20.905033+00:00",
+  "timeout_seconds": 600,
+  "stdout": "exact.stdout.txt",
+  "stderr": "exact.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 66521,
+  "owned_process_group": 66521,
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "wall_seconds": 0.609299,
+  "finished_at": "2026-10-24T17:43:21.514405+00:00",
+  "stdout_sha256": "5fdf7406ca132c19575bb9a0393a8b524b040ac100ef799ee5f0b807c3da6ba0",
+  "stdout_bytes": 225,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

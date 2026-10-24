@@ -1,0 +1,2301 @@
+{
+  "units": [
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ipc#lamp-ipc@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ipc/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_ipc",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ipc/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-8f1260983d9a8ee5.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-8f1260983d9a8ee5.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/ipc#lamp-ipc@0.1.0\", [\"lib\"], \"lamp_ipc\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-8f1260983d9a8ee5.rlib",
+          "bytes": 340184,
+          "sha256": "797174dff5d81f09a3876c7456dd784c893a65dd33139e69081157c61962d43d",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ipc-8f1260983d9a8ee5.rmeta",
+          "bytes": 74267,
+          "sha256": "3b386155cc59f2fff5f854ea565accb402222916a053ee36e221a3fda204c6b9",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/bus#lamp-bus@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/bus/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_bus",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/bus/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-369b42ca2a1af0b5.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-369b42ca2a1af0b5.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/bus#lamp-bus@0.1.0\", [\"lib\"], \"lamp_bus\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-369b42ca2a1af0b5.rlib",
+          "bytes": 2107288,
+          "sha256": "7d93db22b69199fce6c52da435fac9dbf4475da26576b560afd156f0e5b2612c",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_bus-369b42ca2a1af0b5.rmeta",
+          "bytes": 563857,
+          "sha256": "afd50cd19183faa973a4236d0c6cc091a0c9468df10dc3e0352dca831239eaa0",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/msgs#lamp-msgs@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/msgs/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_msgs",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/msgs/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-e594cbcbb156e1ad.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-e594cbcbb156e1ad.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/msgs#lamp-msgs@0.1.0\", [\"lib\"], \"lamp_msgs\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-e594cbcbb156e1ad.rlib",
+          "bytes": 8769504,
+          "sha256": "923a71a82c7709ab08408ca14e2d47d0ff4855c5cb97947c36e8fc55b198ad08",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_msgs-e594cbcbb156e1ad.rmeta",
+          "bytes": 6180095,
+          "sha256": "daa70949942aa2cf80640c8c8f45bed6699f423520cacaee0822df6ad7b813d7",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/turn-owner/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_turn_owner",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/turn-owner/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-277bbaf0cada7bd2.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-277bbaf0cada7bd2.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0\", [\"lib\"], \"lamp_turn_owner\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "5f375e273e59c81368b0874cffb188b45b8880b8484e0d56ed3c9d454780bb84",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-277bbaf0cada7bd2.rlib",
+          "bytes": 642896,
+          "sha256": "6fbcbaa334e6c507d5cf9521e81c390c67ba3e4ca9ca19853eccf9f1aaec07d5",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_owner-277bbaf0cada7bd2.rmeta",
+          "bytes": 514999,
+          "sha256": "d1916fe2a0bcc3134afac27acb8b9df7a6dd5802b2838bb87d26f53767ca39ac",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/local-time#lamp-local-time@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/local-time/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_local_time",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/local-time/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-56b22fcefe6ac60a.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-56b22fcefe6ac60a.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/local-time#lamp-local-time@0.1.0\", [\"lib\"], \"lamp_local_time\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "24b51e48f1fa051bc201e9b3e75682ed5e4934d35dc9c13bf5ff2f61038787a5",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-56b22fcefe6ac60a.rlib",
+          "bytes": 194368,
+          "sha256": "5def865bda1f04e4ac70d75e3449c46337200d63a0689a4043b425d9451c5075",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_local_time-56b22fcefe6ac60a.rmeta",
+          "bytes": 37496,
+          "sha256": "8164a01648c8059b369f187f2b9346d3247f27bcc559bb5794fea584e4b29fae",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/lean#lamp-lean@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/lean/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_lean",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/lean/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-4b689b221319c667.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-4b689b221319c667.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/lean#lamp-lean@0.1.0\", [\"lib\"], \"lamp_lean\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-4b689b221319c667.rlib",
+          "bytes": 783480,
+          "sha256": "7dd123e95e9b9a04434b8b8d2e2a483bd8ca7a420b7179cded7d05f36d420c77",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_lean-4b689b221319c667.rmeta",
+          "bytes": 294130,
+          "sha256": "8600bc7fd2edf632a1918aefe137d485bcfdded8fe6f9af3b763c24c0259f359",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/camera#lamp-camera@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/camera/Cargo.toml",
+        "target": {
+          "kind": [
+            "custom-build"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "build-script-build",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/camera/build.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/build/lamp-camera-3b932f7397b2694a/build-script-build"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/camera#lamp-camera@0.1.0\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "c59f2f7019d8223764515a0c759900904cc6068b6d82dc91b4deb24f7ea168a8",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/build/lamp-camera-3b932f7397b2694a/build-script-build",
+          "bytes": 549320,
+          "sha256": "038b97711463043ec3a9991b5c5bc8779e9665e15d4f90f4d37fd5fd455c55dd",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/keeper#lamp-keeper@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/keeper/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_keeper",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/keeper/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-b6eaaa7961714439.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-b6eaaa7961714439.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/keeper#lamp-keeper@0.1.0\", [\"lib\"], \"lamp_keeper\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "9c87316d1358df4d45c47f32a283eacef45b5331d99e7337d4ff80ad5d809888",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-b6eaaa7961714439.rlib",
+          "bytes": 1308520,
+          "sha256": "da08790f6bfdbd4f15164a6d8daa18e4d4fc3a04f5abd6ebd862377ba96763b2",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_keeper-b6eaaa7961714439.rmeta",
+          "bytes": 239729,
+          "sha256": "a589f446e38191ae09a66188ae7109a8c41ab0c9155dfecb3a40ada3e00b7843",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/third_party/sonora#0.2.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/third_party/sonora/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "sonora",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/third_party/sonora/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/third_party/sonora#0.2.0\", [\"lib\"], \"sonora\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "3a0cb7d26294106ebc30e6b6357612139b9dcd72c5fb044830bba3b23a1eb734",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rlib",
+          "bytes": 1391624,
+          "sha256": "3f61d6bef21e6206aa55df3a98bb73af1f34659d0b7b347d1b6b878dfb98c04c",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/libsonora-7b13aa1a0c8838b2.rmeta",
+          "bytes": 537761,
+          "sha256": "46d5d632444001a21bfd7d00dc884fa77ee65247eb556c2be9a5752096a9e140",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/body#lamp-body@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/body/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_body",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/body/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-a02db45d035da157.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-a02db45d035da157.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/body#lamp-body@0.1.0\", [\"lib\"], \"lamp_body\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "d3d2c30cc4c2684f542ecb469a9d8b5eee9f32c963d9e60caf64b54de78e9eb5",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-a02db45d035da157.rlib",
+          "bytes": 6539520,
+          "sha256": "3b3ef7819c390fe61d1425cdb87e9416f080000de57bd8e1baf3c4e3f52b1ed1",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_body-a02db45d035da157.rmeta",
+          "bytes": 3349973,
+          "sha256": "ff71da973de66ea7af8a4d560fd9d7f5bf8c6decbdb66592567592dc76e431fd",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/schedule#lamp-schedule@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/schedule/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_schedule",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/schedule/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-b9bdd52b3b8cee37.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-b9bdd52b3b8cee37.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/schedule#lamp-schedule@0.1.0\", [\"lib\"], \"lamp_schedule\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "fccb1e9ba835a2b0be00a8f7dab37d21aee1dc0dc35aa6f075bb98b702993cf2",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-b9bdd52b3b8cee37.rlib",
+          "bytes": 6417048,
+          "sha256": "227c6b2942dfa7d2410c2e33e0a1a1eb8fe4d4b9d032cf8472871cf616e9ff5c",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_schedule-b9bdd52b3b8cee37.rmeta",
+          "bytes": 2849141,
+          "sha256": "ee1af6b0c7da836ddc8ffe8e37529f0207eb49c5022daf3fd051517e55b53288",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/camera#lamp-camera@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/camera/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_camera",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/camera/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-7186fec66230c827.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-7186fec66230c827.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/camera#lamp-camera@0.1.0\", [\"lib\"], \"lamp_camera\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "b7ecc0a42137a663be28f8fa354f3f89cb184bb154cf617bb7ad7056a575e1a4",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-7186fec66230c827.rlib",
+          "bytes": 1689832,
+          "sha256": "0b3775286a2c1b75161c81c3b0ad7b071822a7ee3eaadef124361ff9285d18c7",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_camera-7186fec66230c827.rmeta",
+          "bytes": 994802,
+          "sha256": "5c3691f3302ad5c8330caec04a4daeafc554b704a6ed65242966d1c7f9ceb81f",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/gemini#lamp-gemini@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/gemini/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_gemini",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/gemini/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [
+          "default",
+          "fixture-clock"
+        ],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-9e6bb81336167720.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-9e6bb81336167720.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/gemini#lamp-gemini@0.1.0\", [\"lib\"], \"lamp_gemini\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"fixture-clock\"]]",
+      "source_sha256": "055d74a67aa3d865f67c5a82c6379d7b4faab6e99f798ff2de0df96323d614d0",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-9e6bb81336167720.rlib",
+          "bytes": 5246944,
+          "sha256": "5ab8eb88f2bedafc237891a9e2041a3032131faf6ccf5b6ca2670ce7da63ddcc",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_gemini-9e6bb81336167720.rmeta",
+          "bytes": 1786840,
+          "sha256": "c114dfa9cfdb03dafeeb08e25a5020a3d7f97ad6de884e5d35f27a029a8de919",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ring#lamp-ring@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ring/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_ring",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ring/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-085b7a55c00bca95.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-085b7a55c00bca95.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/ring#lamp-ring@0.1.0\", [\"lib\"], \"lamp_ring\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "cc695499ce6a98bd3329b4ecf27632d9a2bdd5b0da31bbf1204adb9bc8daeefe",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-085b7a55c00bca95.rlib",
+          "bytes": 293968,
+          "sha256": "6000b37acb3aafb68777cdda0276fd0e50cf7f57d41d892f5885fd98bf87a32f",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ring-085b7a55c00bca95.rmeta",
+          "bytes": 207671,
+          "sha256": "815a03ca72cf1952c6be7c7e688cbee5a26a125149e68e709541d31395ca11fb",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/health#lamp-health@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/health/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_health",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/health/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-c2f4b500b657938e.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-c2f4b500b657938e.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/health#lamp-health@0.1.0\", [\"lib\"], \"lamp_health\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "6b293a33153539952d40271b63bdaa0a00807a1a4ad74bf673187b9c51744b61",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-c2f4b500b657938e.rlib",
+          "bytes": 2630744,
+          "sha256": "50db8177354b9c6570e0d2c07caf6fcc1d606b2074bdd0fdf1c0f84926ac106f",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_health-c2f4b500b657938e.rmeta",
+          "bytes": 337920,
+          "sha256": "b8749f610a66f2b2d803d778162a2d3c84906e0160d368602f26f410a6745680",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/turn-end-wire/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_turn_end_wire",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/turn-end-wire/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-edb825df46cc8694.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-edb825df46cc8694.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0\", [\"lib\"], \"lamp_turn_end_wire\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "9a320a7f4fbde07363c4d6ecdb446e5db988359be9e50f1a02b575183067ad81",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-edb825df46cc8694.rlib",
+          "bytes": 541616,
+          "sha256": "0f42701f61f0961998490c5a9a84e1878a8e0169aa4481def3465207c563f07b",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_turn_end_wire-edb825df46cc8694.rmeta",
+          "bytes": 189483,
+          "sha256": "0513471c586a4178013d5a3560f04815b9b7976af6dc5535c6f4a66345298ac4",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/near-call#lamp-near-call@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/near-call/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_near_call",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/near-call/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-69b3eb48bee9b71c.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-69b3eb48bee9b71c.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/near-call#lamp-near-call@0.1.0\", [\"lib\"], \"lamp_near_call\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "10b2507a2d5e010481ec15ac3d6feed78403ace37f104739fbc7b9104918b6c5",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-69b3eb48bee9b71c.rlib",
+          "bytes": 353392,
+          "sha256": "c2e1588a94d99857e5c6ca18fc4581bd7cafd3c490602b6260b58786f00e0acb",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_near_call-69b3eb48bee9b71c.rmeta",
+          "bytes": 97716,
+          "sha256": "9adc6d9ef34e8cf0e83bc7092d246de6e74f6993bdbd37d32202c036765175eb",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/audio#lamp-audio@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/audio/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_audio",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/audio/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-b3f2d2010c28516f.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-b3f2d2010c28516f.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/audio#lamp-audio@0.1.0\", [\"lib\"], \"lamp_audio\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "219df5b434fdeefa7983626c3c6445d84bd9188b85c5131676a5c14686c843f3",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-b3f2d2010c28516f.rlib",
+          "bytes": 5129528,
+          "sha256": "40e37f7c64f05190f57708f91e3d51666b2ed1e1f24543da02c8192ac3104a9c",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_audio-b3f2d2010c28516f.rmeta",
+          "bytes": 1886777,
+          "sha256": "a1aa4721e002e4262f255f7b4719fe29eac07dd5a67f004a29722343382e67b0",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice-processes/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice_processes",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice-processes/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0\", [\"lib\"], \"lamp_voice_processes\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "aad51f3dac5d4decfa49c05739007bc73da2778f43aa25cf528eb00d09b89e81",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rlib",
+          "bytes": 53496,
+          "sha256": "a21011df76477144b29289dbc14bd2e3905ced091b2b25a92713b7be81bd331a",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice_processes-9b8d947130902a95.rmeta",
+          "bytes": 33608,
+          "sha256": "0d23f8da1f70a63c7bb859efac945475dff76316f50a4838b64a40e5a77311f3",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/controls#lamp-controls@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/controls/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_controls",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/controls/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-6d82b065d93bd02e.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-6d82b065d93bd02e.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/controls#lamp-controls@0.1.0\", [\"lib\"], \"lamp_controls\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "64df86c174be57c337d8a697772b0db067dca8c0605e8cb4b168ee1ae9b286a8",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-6d82b065d93bd02e.rlib",
+          "bytes": 6089968,
+          "sha256": "380f0808460261fdcb8199875232b370f1d1df9283c890d954821063f5fd74cc",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_controls-6d82b065d93bd02e.rmeta",
+          "bytes": 2708923,
+          "sha256": "7dca66974635eec2e9c0137ced71d7cbfa783ce8da34fa715c190070f651b1e4",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/policy#lamp-policy@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/policy/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_policy",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/policy/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-ece39525cfb64635.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-ece39525cfb64635.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/policy#lamp-policy@0.1.0\", [\"lib\"], \"lamp_policy\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "7bb49b0580659000447b63d275fd1f30e15f0affeabb71c03f89a00f3ec61c9c",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-ece39525cfb64635.rlib",
+          "bytes": 9679400,
+          "sha256": "6c183ce826857bc0d786824c32951358b6ae89a6649cf530af2b4c9d7dd260ac",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_policy-ece39525cfb64635.rmeta",
+          "bytes": 2388516,
+          "sha256": "4c717fc38026a6885d24232e197e30773d082c0907a717c3a8b7b2a6087842a0",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ears#lamp-ears@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ears/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_ears",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/ears/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ears-e7b3f46df7d3af23.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ears-e7b3f46df7d3af23.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/ears#lamp-ears@0.1.0\", [\"lib\"], \"lamp_ears\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "02f0c7559411ce7a9ed58472e2a2ff4813a623199e1e6c78c3d10c8779038592",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ears-e7b3f46df7d3af23.rlib",
+          "bytes": 838320,
+          "sha256": "e6b204651fefee28083030b2608eac89937546f0604d2f89b002fa21fe69c1bd",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_ears-e7b3f46df7d3af23.rmeta",
+          "bytes": 224179,
+          "sha256": "694e04aa66cb4e0b379d64ecde80d22ea6adb656194d20078b0aab2fae411fd1",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/actions#lamp-actions@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/actions/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_actions",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/actions/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-2d9b65f5c3d4d344.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-2d9b65f5c3d4d344.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/actions#lamp-actions@0.1.0\", [\"lib\"], \"lamp_actions\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-2d9b65f5c3d4d344.rlib",
+          "bytes": 2362328,
+          "sha256": "d28abcad9d6651f4fb7b19d7e1a6f19cab08b77b6b423ac7bcef43b3c83373ba",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_actions-2d9b65f5c3d4d344.rmeta",
+          "bytes": 953729,
+          "sha256": "377cd0b66946cbbd9b1e4d9b5313a7f80699b7156c4b541c00d5e106ab9682b5",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/expression#lamp-expression@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/expression/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_expression",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/expression/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-f75455b2f7a5bf0a.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-f75455b2f7a5bf0a.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/expression#lamp-expression@0.1.0\", [\"lib\"], \"lamp_expression\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "863fbef6e93f0bceb5724f5f4d91a911589c2bf2e32c12a0872938a10988f614",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-f75455b2f7a5bf0a.rlib",
+          "bytes": 8408856,
+          "sha256": "9282471332d548b634379f43ac70e900ccfdd0d9f50f3812567df53358b77b78",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_expression-f75455b2f7a5bf0a.rmeta",
+          "bytes": 2004178,
+          "sha256": "c572edd15a8244da65d003c1fdb0e4ef02dcc6cdb22bfe8071de26cf6735219a",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/tasks#lamp-tasks@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/tasks/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_tasks",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/tasks/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_tasks-c10078e26dc0cb9c.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_tasks-c10078e26dc0cb9c.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/tasks#lamp-tasks@0.1.0\", [\"lib\"], \"lamp_tasks\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "f91b0c597b9eaf7327a0a2541c511c653eb3534e3825c3ea0047e2f54ceb1e02",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_tasks-c10078e26dc0cb9c.rlib",
+          "bytes": 9393216,
+          "sha256": "6be101336d6a97b91d4e19f6e4f9b960322bbc90e06c64b7b4cb9958303b3467",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_tasks-c10078e26dc0cb9c.rmeta",
+          "bytes": 2801636,
+          "sha256": "3764f9627b3faf5833a06ddea2253ec8a40d7577d4b23ad635384b02b520d4bf",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-f6d937744b3df3c6.rlib",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-f6d937744b3df3c6.rmeta"
+        ],
+        "executable": null,
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"lib\"], \"lamp_voice\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-f6d937744b3df3c6.rlib",
+          "bytes": 81669368,
+          "sha256": "6428bde9b32ba0afc38737aa195a3f894b3e8ba738aacd44da7c4efb1edbeba6",
+          "mode": 420
+        },
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/liblamp_voice-f6d937744b3df3c6.rmeta",
+          "bytes": 22353494,
+          "sha256": "c39459067f8d6095de1ddf2a986beddc8b6ccdf31e5d7e2a0145cf36aba2e31b",
+          "mode": 420
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "duplex_lab",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/duplex_lab.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/duplex_lab"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/duplex_lab",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"duplex_lab\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "876436f9040347542318827109b9f591b8b4c48fc16d80d45da3398c8a0b8cb0",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/duplex_lab",
+          "bytes": 2898880,
+          "sha256": "503b767e48a1c93373c0d63c9516271734ed132e46a4145eb30314f1a4b7a101",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "probe_handover",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/probe_handover.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/probe_handover"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/probe_handover",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"probe_handover\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "2a804a16dea0eb9e8e462aa656b7421005454d5634a3c825948d94a4aebb455e",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/probe_handover",
+          "bytes": 12629880,
+          "sha256": "ddcff6da06fd467127938ab66345f37f516225ba98c5b1792f7f36423dec702b",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "ring_process_probe",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/ring_process_probe.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/ring_process_probe"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/ring_process_probe",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"ring_process_probe\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "b1da3708261286f87ff6f976f61b3bda0b1e13a89a916838d0e4f83bfa27cf63",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/ring_process_probe",
+          "bytes": 5618960,
+          "sha256": "958294afcc6e91a952d2af772a2a9ff863024efb8655fba5be4c1d0560aeca0b",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "stop_words_stt_replay",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"stop_words_stt_replay\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]",
+      "source_sha256": "79cd05bfc08e3cbd990e77bc6cd1ce597bfb57489dfe3c59d4c13046c4ef9844",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+          "bytes": 2737048,
+          "sha256": "893b4088a59978765a3fe8ca7bdb2a953c2dd35c67376e5c564dc5c7a9607381",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "hearing_replay",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/hearing_replay.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/hearing_replay"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/hearing_replay",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"hearing_replay\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "1b1f0dbe57f662a6ee836f1e40c3746ab56411106725ae0290a2db54d63a042a",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/hearing_replay",
+          "bytes": 1608688,
+          "sha256": "0fe877afd373d24608e8be747678f18ffbcd9adb736df73e36e11453e142e326",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-voice"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-voice",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"bin\"], \"lamp-voice\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "7aa5e89e08d6a5b122b98db0172eea81026df0a8b87533a37eee89acbf2b973c",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/lamp-voice",
+          "bytes": 40264576,
+          "sha256": "9d774c07090aac2cc1e8545d5cded747d3f8f9a4a718ce20cf2d7045e86b66b3",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "release_pair",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/tests/release_pair.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-92e5f959ae720155"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-92e5f959ae720155",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"test\"], \"release_pair\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]",
+      "source_sha256": "40fdc2fe7bf92b7cee67bba5eb2c9c7aba45acfb82befb374c9f1f01952bcba9",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/release_pair-92e5f959ae720155",
+          "bytes": 4822564,
+          "sha256": "1d55c213472f118006e3e3f8d61b37ea066e0ff919f028a8200a37d040d547f2",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "admission_latency",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/admission_latency.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/admission_latency"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/admission_latency",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"admission_latency\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "25753d599be75bda5dd69a7a80a8f9d420421fe8717965e36aef3fe76aa8c528",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/admission_latency",
+          "bytes": 895808,
+          "sha256": "081925d7d968461b49508028e57b46d703ab9d30c0c1cc216f8b65b488812a78",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "render_line_second",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/render_line_second.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/render_line_second-d52e8b12a523439f"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/render_line_second-d52e8b12a523439f",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"render_line_second\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]",
+      "source_sha256": "ac54479cab86d543c2bc14b4bc2a4c69a7f82bcb320392571a0d69cad0c026bb",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/render_line_second-d52e8b12a523439f",
+          "bytes": 1435640,
+          "sha256": "4a2922a644c9d4f6cd55679908a42cc5052cbbd975ea09eb541b2c927ef7b970",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "head_qualification_operator",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/head_qualification_operator.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/head_qualification_operator"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/head_qualification_operator",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"head_qualification_operator\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "196e988c1ceacd8a7ca548b3ed9bc8496d1443681a975e4cc25e5e7518310e71",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/head_qualification_operator",
+          "bytes": 1410504,
+          "sha256": "e1a6cf3cda187dcba6cb58efabcea1ee26d2c0a3f4d3dc7eaf37b333ac65ee38",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "reference_pace",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/examples/reference_pace.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/reference_pace"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/reference_pace",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"reference_pace\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]",
+      "source_sha256": "dd7676a92e35df1eae61a8611f909a70f9145820227edb59cd417c4b25b3d601",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/examples/reference_pace",
+          "bytes": 3775120,
+          "sha256": "61376db46c444893dcf5ea40dcd2b4a3016838d769e80137a41e6177ee3a5077",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-507b8ab98a2c94b0"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"bin\"], \"lamp-voice\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]",
+      "source_sha256": "7aa5e89e08d6a5b122b98db0172eea81026df0a8b87533a37eee89acbf2b973c",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+          "bytes": 1119920,
+          "sha256": "970849fff9fc2ba32b153134011505cbe2c2ca14ee450817e8c4d70ed9780ecc",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-ac9b9993d410d428"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-ac9b9993d410d428",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"test\"], \"it\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]",
+      "source_sha256": "f740e457cb8a087344c00e9135bb3dc064cd176e968ec32f052a57e7b041f56f",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/it-ac9b9993d410d428",
+          "bytes": 94285972,
+          "sha256": "0fcdf01a377d4043ea3adf7c3302fc6a510ab8b0ae622ee409b7d3aa266e45f0",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    },
+    {
+      "message": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+        ],
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "fresh": false
+      },
+      "unit_key": "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"lib\"], \"lamp_voice\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]",
+      "source_sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+      "outputs": [
+        {
+          "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+          "bytes": 114477680,
+          "sha256": "88580c1028aaedd210718c9e7ab6a749eadbf0025c4283039dff777324d50b34",
+          "mode": 493
+        }
+      ],
+      "current_source_epoch_reuse_proved": true
+    }
+  ],
+  "build_scripts": [
+    {
+      "reason": "build-script-executed",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/camera#lamp-camera@0.1.0",
+      "linked_libs": [],
+      "linked_paths": [],
+      "cfgs": [],
+      "env": [],
+      "out_dir": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/build/lamp-camera-6d4f69c063fd873e/out"
+    }
+  ],
+  "actual_compiler_message_count": 309,
+  "actual_unique_units": 303,
+  "unit_message_multiplicities": {
+    "[\"registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.26\", [\"lib\"], \"unicode_ident\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.5\", [\"lib\"], \"cfg_if\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"proc-macro\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"proc-macro\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"extra_traits\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"result\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.18\", [\"lib\"], \"itoa\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#find-msvc-tools@0.1.14\", [\"lib\"], \"find_msvc_tools\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107\", [\"lib\"], \"proc_macro2\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"proc-macro\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47\", [\"lib\"], \"quote\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"proc-macro\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#shlex@2.0.1\", [\"lib\"], \"shlex\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190\", [\"lib\"], \"libc\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"extra_traits\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.3\", [\"lib\"], \"memchr\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#cc@1.7.0\", [\"lib\"], \"cc\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"derive\", \"serde_derive\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229\", [\"lib\"], \"serde_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"result\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#autocfg@1.5.1\", [\"lib\"], \"autocfg\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#version_check@0.9.5\", [\"lib\"], \"version_check\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"more_lengths\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#bitflags@2.13.2\", [\"lib\"], \"bitflags\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"raw_value\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23\", [\"lib\"], \"zmij\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#typenum@1.20.1\", [\"lib\"], \"typenum\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"const-generics\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#syn@3.0.7\", [\"lib\"], \"syn\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"clone-impls\", \"default\", \"derive\", \"extra-traits\", \"fold\", \"full\", \"parsing\", \"printing\", \"proc-macro\", \"visit\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#smallvec@1.16.3\", [\"lib\"], \"smallvec\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"const_generics\", \"const_new\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#libm@0.2.16\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"arch\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#errno@0.3.14\", [\"lib\"], \"errno\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151\", [\"lib\"], \"serde_json\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"raw_value\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#syn@2.0.119\", [\"lib\"], \"syn\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"clone-impls\", \"default\", \"derive\", \"extra-traits\", \"full\", \"parsing\", \"printing\", \"proc-macro\", \"visit-mut\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-traits@0.2.19\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"i128\", \"libm\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"event\", \"fs\", \"net\", \"pipe\", \"process\", \"std\", \"stdio\", \"thread\", \"time\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#libm@0.2.16\", [\"lib\"], \"libm\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"arch\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.2.17\", [\"lib\"], \"cpufeatures\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#synstructure@0.14.0\", [\"lib\"], \"synstructure\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"proc-macro\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#bytes@1.12.1\", [\"lib\"], \"bytes\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.229\", [\"proc-macro\"], \"serde_derive\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-traits@0.2.19\", [\"lib\"], \"num_traits\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"i128\", \"libm\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#pin-project-lite@0.2.17\", [\"lib\"], \"pin_project_lite\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7\", [\"lib\"], \"generic_array\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"more_lengths\"]]": 2,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#foldhash@0.2.0\", [\"lib\"], \"foldhash\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.3.1\", [\"lib\"], \"cpufeatures\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#cfg_aliases@0.2.2\", [\"lib\"], \"cfg_aliases\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"process\", \"signal\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#crypto-common@0.1.7\", [\"lib\"], \"crypto_common\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\"]]": 2,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229\", [\"lib\"], \"serde\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"derive\", \"serde_derive\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#block-buffer@0.10.4\", [\"lib\"], \"block_buffer\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 2,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#once_cell@1.21.4\", [\"lib\"], \"once_cell\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"race\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#stable_deref_trait@1.2.1\", [\"lib\"], \"stable_deref_trait\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#digest@0.10.7\", [\"lib\"], \"digest\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"block-buffer\", \"core-api\", \"default\", \"std\"]]": 2,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerofrom-derive@0.1.8\", [\"proc-macro\"], \"zerofrom_derive\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#yoke-derive@0.8.4\", [\"proc-macro\"], \"yoke_derive\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5\", [\"lib\"], \"rustix\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"event\", \"fs\", \"net\", \"pipe\", \"process\", \"std\", \"stdio\", \"thread\", \"time\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-integer@0.1.47\", [\"lib\"], \"num_integer\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"i128\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sha2@0.10.9\", [\"lib\"], \"sha2\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 2,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0\", [\"lib\"], \"nix\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"process\", \"signal\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerofrom@0.1.8\", [\"lib\"], \"zerofrom\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"derive\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#getrandom@0.4.3\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\", \"sys_rng\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#ring@0.17.14\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"dev_urandom_fallback\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rand_core@0.10.1\", [\"lib\"], \"rand_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#log@0.4.34\", [\"lib\"], \"log\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"max_level_info\", \"release_max_level_info\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#futures-core@0.3.34\", [\"lib\"], \"futures_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zeroize@1.9.1\", [\"lib\"], \"zeroize\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerocopy@0.8.62\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"derive\", \"simd\", \"zerocopy-derive\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#yoke@0.8.3\", [\"lib\"], \"yoke\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"derive\", \"zerofrom\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerovec-derive@0.11.6\", [\"proc-macro\"], \"zerovec_derive\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustls-pki-types@1.15.1\", [\"lib\"], \"rustls_pki_types\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/ipc#lamp-ipc@0.1.0\", [\"lib\"], \"lamp_ipc\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/bus#lamp-bus@0.1.0\", [\"lib\"], \"lamp_bus\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerovec@0.11.8\", [\"lib\"], \"zerovec\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"derive\", \"yoke\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"result\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#displaydoc@0.2.7\", [\"proc-macro\"], \"displaydoc\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#getrandom@0.4.3\", [\"lib\"], \"getrandom\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\", \"sys_rng\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tokio-macros@2.7.2\", [\"proc-macro\"], \"tokio_macros\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-traits@0.2.19\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"libm\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerocopy-derive@0.8.62\", [\"proc-macro\"], \"zerocopy_derive\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#socket2@0.6.5\", [\"lib\"], \"socket2\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"all\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#mio@1.2.4\", [\"lib\"], \"mio\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"net\", \"os-ext\", \"os-poll\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#getrandom@0.2.17\", [\"lib\"], \"getrandom\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#either@1.19.0\", [\"lib\"], \"either\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\", \"use_std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.104\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#untrusted@0.9.0\", [\"lib\"], \"untrusted\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#ring@0.17.14\", [\"lib\"], \"ring\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"dev_urandom_fallback\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/msgs#lamp-msgs@0.1.0\", [\"lib\"], \"lamp_msgs\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerocopy@0.8.62\", [\"lib\"], \"zerocopy\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"derive\", \"simd\", \"zerocopy-derive\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#matrixmultiply@0.3.11\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"cgemm\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#parking_lot_core@0.9.12\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#httparse@1.10.1\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#http@1.5.0\", [\"lib\"], \"http\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.45\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"ring\", \"std\", \"tls12\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229\", [\"lib\"], \"serde_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"result\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229\", [\"lib\"], \"serde\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#anyhow@1.0.104\", [\"lib\"], \"anyhow\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-traits@0.2.19\", [\"lib\"], \"num_traits\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"libm\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tokio@1.53.1\", [\"lib\"], \"tokio\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"bytes\", \"default\", \"fs\", \"io-util\", \"libc\", \"macros\", \"mio\", \"net\", \"rt\", \"socket2\", \"sync\", \"test-util\", \"time\", \"tokio-macros\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-complex@0.4.6\", [\"lib\"], \"num_complex\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#futures-sink@0.3.34\", [\"lib\"], \"futures_sink\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustls-webpki@0.103.15\", [\"lib\"], \"webpki\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"ring\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tinystr@0.8.4\", [\"lib\"], \"tinystr\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"zerovec\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#litemap@0.8.3\", [\"lib\"], \"litemap\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rawpointer@0.2.1\", [\"lib\"], \"rawpointer\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#scopeguard@1.2.0\", [\"lib\"], \"scopeguard\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#writeable@0.6.4\", [\"lib\"], \"writeable\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#same-file@1.0.6\", [\"lib\"], \"same_file\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#subtle@2.6.1\", [\"lib\"], \"subtle\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#memo-map@0.3.4\", [\"lib\"], \"memo_map\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#walkdir@2.5.0\", [\"lib\"], \"walkdir\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#lock_api@0.4.14\", [\"lib\"], \"lock_api\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"atomic_usize\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#matrixmultiply@0.3.11\", [\"lib\"], \"matrixmultiply\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"cgemm\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_locale_core@2.3.0\", [\"lib\"], \"icu_locale_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"zerovec\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#half@2.7.1\", [\"lib\"], \"half\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"num-traits\", \"std\"]]": 2,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#parking_lot_core@0.9.12\", [\"lib\"], \"parking_lot_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#httparse@1.10.1\", [\"lib\"], \"httparse\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zerotrie@0.2.5\", [\"lib\"], \"zerotrie\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"yoke\", \"zerofrom\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#potential_utf@0.1.6\", [\"lib\"], \"potential_utf\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"zerovec\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#chacha20@0.10.2\", [\"lib\"], \"chacha20\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"rng\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.16.1\", [\"lib\"], \"hashbrown\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default-hasher\", \"inline-more\", \"raw-entry\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#futures-task@0.3.34\", [\"lib\"], \"futures_task\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#slab@0.4.12\", [\"lib\"], \"slab\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_normalizer_data@2.3.0\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#typenum@1.20.1\", [\"lib\"], \"typenum\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#typeid@1.0.3\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.3.0\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#utf8_iter@1.0.4\", [\"lib\"], \"utf8_iter\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_collections@2.3.0\", [\"lib\"], \"icu_collections\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#nom@8.0.0\", [\"lib\"], \"nom\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#nom-language@0.1.0\", [\"lib\"], \"nom_language\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustls@0.23.45\", [\"lib\"], \"rustls\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"ring\", \"std\", \"tls12\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#string-interner@0.20.0\", [\"lib\"], \"string_interner\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"backends\", \"default\", \"inline-more\", \"serde\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_provider@2.3.1\", [\"lib\"], \"icu_provider\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"baked\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#minijinja@2.24.0\", [\"lib\"], \"minijinja\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"adjacent_loop_items\", \"builtins\", \"debug\", \"default\", \"deserialization\", \"macros\", \"multi_template\", \"serde\", \"std_collections\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rand@0.10.3\", [\"lib\"], \"rand\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\", \"std_rng\", \"sys_rng\", \"thread_rng\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#parking_lot@0.12.5\", [\"lib\"], \"parking_lot\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-linalg@0.23.8\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tracing-core@0.1.36\", [\"lib\"], \"tracing_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"once_cell\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#futures-util@0.3.34\", [\"lib\"], \"futures_util\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"futures-sink\", \"sink\", \"slab\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hybrid-array@0.4.15\", [\"lib\"], \"hybrid_array\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#itertools@0.15.0\", [\"lib\"], \"itertools\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"use_alloc\", \"use_std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#dyn-clone@1.0.20\", [\"lib\"], \"dyn_clone\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#inventory@0.3.25\", [\"lib\"], \"inventory\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#pkg-config@0.3.34\", [\"lib\"], \"pkg_config\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#maplit@1.0.2\", [\"lib\"], \"maplit\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tracing-attributes@0.1.31\", [\"proc-macro\"], \"tracing_attributes\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#unicode-xid@0.2.6\", [\"lib\"], \"unicode_xid\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#downcast-rs@2.0.2\", [\"lib\"], \"downcast_rs\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\", \"sync\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#erased-serde@0.4.10\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#lazy_static@1.5.1\", [\"lib\"], \"lazy_static\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#strength_reduce@0.2.4\", [\"lib\"], \"strength_reduce\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#dyn-hash@1.0.0\", [\"lib\"], \"dyn_hash\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#transpose@0.2.3\", [\"lib\"], \"transpose\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#vcpkg@0.2.15\", [\"lib\"], \"vcpkg\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#libsqlite3-sys@0.38.2\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"bundled\", \"bundled_bindings\", \"cc\", \"default\", \"min_sqlite_version_3_34_1\", \"pkg-config\", \"vcpkg\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#ndarray@0.17.2\", [\"lib\"], \"ndarray\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tracing@0.1.44\", [\"lib\"], \"tracing\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"attributes\", \"default\", \"std\", \"tracing-attributes\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#derive_more-impl@2.1.1\", [\"proc-macro\"], \"derive_more_impl\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"debug\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_normalizer_data@2.3.0\", [\"lib\"], \"icu_normalizer_data\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#typeid@1.0.3\", [\"lib\"], \"typeid\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_properties_data@2.3.0\", [\"lib\"], \"icu_properties_data\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#http-body@1.1.0\", [\"lib\"], \"http_body\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#primal-check@0.3.4\", [\"lib\"], \"primal_check\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#derive-new@0.7.0\", [\"proc-macro\"], \"derive_new\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#bit-vec@0.10.1\", [\"lib\"], \"bit_vec\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#byteorder@1.5.0\", [\"lib\"], \"byteorder\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#percent-encoding@2.3.2\", [\"lib\"], \"percent_encoding\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#jiff-core@0.1.1\", [\"lib\"], \"jiff_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"std\", \"tz-fat\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#jiff-tzdb@0.1.9\", [\"lib\"], \"jiff_tzdb\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#pastey@0.2.3\", [\"proc-macro\"], \"pastey\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#signal-hook@0.4.4\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"channel\", \"default\", \"iterator\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#bit-set@0.11.1\", [\"lib\"], \"bit_set\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#jiff@0.2.38\", [\"lib\"], \"jiff\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"perf-inline\", \"serde\", \"std\", \"tz-fat\", \"tz-system\", \"tzdb-bundle-always\", \"tzdb-bundle-platform\", \"tzdb-concatenated\", \"tzdb-zoneinfo\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-data@0.23.8\", [\"lib\"], \"tract_data\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#erased-serde@0.4.10\", [\"lib\"], \"erased_serde\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustfft@6.4.1\", [\"lib\"], \"rustfft\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"avx\", \"default\", \"neon\", \"sse\", \"wasm_simd\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#derive_more@2.1.1\", [\"lib\"], \"derive_more\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"debug\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_properties@2.3.0\", [\"lib\"], \"icu_properties\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"compiled_data\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#block-buffer@0.12.1\", [\"lib\"], \"block_buffer\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#icu_normalizer@2.3.0\", [\"lib\"], \"icu_normalizer\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"compiled_data\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0\", [\"lib\"], \"lamp_turn_owner\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#crypto-common@0.2.2\", [\"lib\"], \"crypto_common\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sonora-simd@0.2.0\", [\"lib\"], \"sonora_simd\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#signal-hook-registry@1.4.8\", [\"lib\"], \"signal_hook_registry\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hashbrown@0.17.1\", [\"lib\"], \"hashbrown\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default-hasher\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sonora-fft@0.2.0\", [\"lib\"], \"sonora_fft\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#const-oid@0.10.2\", [\"lib\"], \"const_oid\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#core-foundation-sys@0.8.7\", [\"lib\"], \"core_foundation_sys\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"link\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.21\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#anymap3@1.1.0\", [\"lib\"], \"anymap3\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tower-service@0.3.3\", [\"lib\"], \"tower_service\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#try-lock@0.2.5\", [\"lib\"], \"try_lock\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#want@0.3.2\", [\"lib\"], \"want\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#libsqlite3-sys@0.38.2\", [\"lib\"], \"libsqlite3_sys\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"bundled\", \"bundled_bindings\", \"cc\", \"default\", \"min_sqlite_version_3_34_1\", \"pkg-config\", \"vcpkg\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#digest@0.11.3\", [\"lib\"], \"digest\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"block-api\", \"default\", \"oid\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hashlink@0.12.2\", [\"lib\"], \"hashlink\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sonora-common-audio@0.2.0\", [\"lib\"], \"sonora_common_audio\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#signal-hook@0.4.4\", [\"lib\"], \"signal_hook\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"channel\", \"default\", \"iterator\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#idna_adapter@1.2.2\", [\"lib\"], \"idna_adapter\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"compiled_data\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/local-time#lamp-local-time@0.1.0\", [\"lib\"], \"lamp_local_time\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#webpki-roots@1.0.9\", [\"lib\"], \"webpki_roots\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tokio-rustls@0.26.6\", [\"lib\"], \"tokio_rustls\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"tls12\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#xattr@1.6.1\", [\"lib\"], \"xattr\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"unsupported\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-linalg@0.23.8\", [\"lib\"], \"tract_linalg\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#filetime@0.2.29\", [\"lib\"], \"filetime\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#atomic-waker@1.1.2\", [\"lib\"], \"atomic_waker\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#fallible-iterator@0.3.0\", [\"lib\"], \"fallible_iterator\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#fallible-streaming-iterator@0.1.9\", [\"lib\"], \"fallible_streaming_iterator\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#bytemuck_derive@1.12.1\", [\"proc-macro\"], \"bytemuck_derive\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#thiserror-impl@2.0.21\", [\"proc-macro\"], \"thiserror_impl\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#bytemuck@1.25.2\", [\"lib\"], \"bytemuck\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"bytemuck_derive\", \"derive\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.21\", [\"lib\"], \"thiserror\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rusqlite@0.40.2\", [\"lib\"], \"rusqlite\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"bundled\", \"cache\", \"default\", \"fallible_uint\", \"ffi-sqlite-wasm-rs\", \"hashlink\", \"modern_sqlite\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tar@0.4.46\", [\"lib\"], \"tar\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"xattr\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hyper@1.12.0\", [\"lib\"], \"hyper\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"client\", \"default\", \"http1\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#security-framework-sys@2.17.0\", [\"lib\"], \"security_framework_sys\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"OSX_10_13\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sha1@0.11.0\", [\"lib\"], \"sha1\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"oid\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#form_urlencoded@1.2.2\", [\"lib\"], \"form_urlencoded\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#idna@1.1.0\", [\"lib\"], \"idna\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"compiled_data\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sync_wrapper@1.0.2\", [\"lib\"], \"sync_wrapper\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"futures\", \"futures-core\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#core-foundation@0.10.1\", [\"lib\"], \"core_foundation\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"link\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#futures-channel@0.3.34\", [\"lib\"], \"futures_channel\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#base64@0.22.1\", [\"lib\"], \"base64\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#simd-adler32@0.3.10\", [\"lib\"], \"simd_adler32\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"const-generics\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#data-encoding@2.11.1\", [\"lib\"], \"data_encoding\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#ipnet@2.12.2\", [\"lib\"], \"ipnet\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#winnow@1.0.4\", [\"lib\"], \"winnow\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#base64@0.23.1\", [\"lib\"], \"base64\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"simd-unsafe\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tower-layer@0.3.3\", [\"lib\"], \"tower_layer\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tower@0.5.3\", [\"lib\"], \"tower\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"futures-core\", \"futures-util\", \"pin-project-lite\", \"retry\", \"sync_wrapper\", \"timeout\", \"tokio\", \"util\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#toml_parser@1.1.5+spec-1.1.0\", [\"lib\"], \"toml_parser\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#glam@0.33.12\", [\"lib\"], \"glam\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"f64\", \"std\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/lean#lamp-lean@0.1.0\", [\"lib\"], \"lamp_lean\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tungstenite@0.30.0\", [\"lib\"], \"tungstenite\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"__rustls-tls\", \"data-encoding\", \"handshake\", \"http\", \"httparse\", \"rustls\", \"rustls-pki-types\", \"sha1\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hyper-util@0.1.21\", [\"lib\"], \"hyper_util\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"client\", \"client-legacy\", \"client-proxy\", \"default\", \"http1\", \"tokio\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/camera#lamp-camera@0.1.0\", [\"custom-build\"], \"build-script-build\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#url@2.5.8\", [\"lib\"], \"url\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#webpki-roots@0.26.11\", [\"lib\"], \"webpki_roots\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sonora-agc2@0.2.0\", [\"lib\"], \"sonora_agc2\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#security-framework@3.7.0\", [\"lib\"], \"security_framework\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"OSX_10_14\", \"alpn\", \"default\", \"session-tickets\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sonora-ns@0.2.0\", [\"lib\"], \"sonora_ns\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#sonora-aec3@0.2.0\", [\"lib\"], \"sonora_aec3\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#serde_spanned@1.1.2\", [\"lib\"], \"serde_spanned\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"serde\", \"std\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/keeper#lamp-keeper@0.1.0\", [\"lib\"], \"lamp_keeper\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#toml_datetime@1.1.2+spec-1.1.0\", [\"lib\"], \"toml_datetime\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"serde\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hound@3.5.1\", [\"lib\"], \"hound\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#itertools@0.13.0\", [\"lib\"], \"itertools\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"use_alloc\", \"use_std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#toml@1.1.8+spec-1.1.0\", [\"lib\"], \"toml\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"parse\", \"serde\", \"std\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/third_party/sonora#0.2.0\", [\"lib\"], \"sonora\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#prost-derive@0.14.4\", [\"proc-macro\"], \"prost_derive\", [\"proc-macro\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rustls-platform-verifier@0.7.1\", [\"lib\"], \"rustls_platform_verifier\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tokio-tungstenite@0.30.0\", [\"lib\"], \"tokio_tungstenite\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"__rustls-tls\", \"connect\", \"handshake\", \"rustls\", \"rustls-pki-types\", \"rustls-tls-webpki-roots\", \"stream\", \"tokio-rustls\", \"webpki-roots\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tower-http@0.6.11\", [\"lib\"], \"tower_http\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"follow-redirect\", \"futures-util\", \"tower\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#hyper-rustls@0.27.10\", [\"lib\"], \"hyper_rustls\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"http1\", \"tls12\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#http-body-util@0.1.5\", [\"lib\"], \"http_body_util\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/body#lamp-body@0.1.0\", [\"lib\"], \"lamp_body\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rand_distr@0.6.0\", [\"lib\"], \"rand_distr\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tokio-util@0.7.20\", [\"lib\"], \"tokio_util\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"io\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tinyvec@1.13.3\", [\"lib\"], \"tinyvec\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"alloc\", \"default\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#unicode-normalization@0.1.25\", [\"lib\"], \"unicode_normalization\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-bigint@0.4.8\", [\"lib\"], \"num_bigint\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#num-rational@0.4.2\", [\"lib\"], \"num_rational\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"num-bigint\", \"std\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/schedule#lamp-schedule@0.1.0\", [\"lib\"], \"lamp_schedule\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/camera#lamp-camera@0.1.0\", [\"lib\"], \"lamp_camera\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#reqwest@0.13.5\", [\"lib\"], \"reqwest\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"__rustls\", \"__tls\", \"rustls-no-provider\", \"stream\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/gemini#lamp-gemini@0.1.0\", [\"lib\"], \"lamp_gemini\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"fixture-clock\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#prost@0.14.4\", [\"lib\"], \"prost\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"derive\", \"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-extra@0.23.8\", [\"lib\"], \"tract_extra\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-nnef@0.23.8\", [\"lib\"], \"tract_nnef\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-hir@0.23.8\", [\"lib\"], \"tract_hir\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-onnx-opl@0.23.8\", [\"lib\"], \"tract_onnx_opl\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/ring#lamp-ring@0.1.0\", [\"lib\"], \"lamp_ring\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/health#lamp-health@0.1.0\", [\"lib\"], \"lamp_health\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/turn-end-wire#lamp-turn-end-wire@0.1.0\", [\"lib\"], \"lamp_turn_end_wire\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/near-call#lamp-near-call@0.1.0\", [\"lib\"], \"lamp_near_call\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#memmap2@0.9.11\", [\"lib\"], \"memmap2\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/audio#lamp-audio@0.1.0\", [\"lib\"], \"lamp_audio\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zune-core@0.4.12\", [\"lib\"], \"zune_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"std\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#rtrb@0.4.0\", [\"lib\"], \"rtrb\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice-processes#lamp-voice-processes@0.1.0\", [\"lib\"], \"lamp_voice_processes\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/controls#lamp-controls@0.1.0\", [\"lib\"], \"lamp_controls\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#zune-jpeg@0.4.21\", [\"lib\"], \"zune_jpeg\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"neon\", \"std\", \"x86\"]]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#jpeg-encoder@0.7.1\", [\"lib\"], \"jpeg_encoder\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\", \"std\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/policy#lamp-policy@0.1.0\", [\"lib\"], \"lamp_policy\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/ears#lamp-ears@0.1.0\", [\"lib\"], \"lamp_ears\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-onnx@0.23.8\", [\"lib\"], \"tract_onnx\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/actions#lamp-actions@0.1.0\", [\"lib\"], \"lamp_actions\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/expression#lamp-expression@0.1.0\", [\"lib\"], \"lamp_expression\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/tasks#lamp-tasks@0.1.0\", [\"lib\"], \"lamp_tasks\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"registry+https://github.com/rust-lang/crates.io-index#tract-core@0.23.8\", [\"lib\"], \"tract_core\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, [\"default\"]]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"lib\"], \"lamp_voice\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"duplex_lab\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"probe_handover\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"ring_process_probe\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"stop_words_stt_replay\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"hearing_replay\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"bin\"], \"lamp-voice\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"test\"], \"release_pair\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"admission_latency\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"render_line_second\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"head_qualification_operator\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"example\"], \"reference_pace\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": false}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"bin\"], \"lamp-voice\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"test\"], \"it\", [\"bin\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]": 1,
+    "[\"path+file://<source-root>/lampOS/crates/voice#lamp-voice@0.1.0\", [\"lib\"], \"lamp_voice\", [\"lib\"], {\"debug_assertions\": true, \"debuginfo\": 0, \"opt_level\": \"0\", \"overflow_checks\": true, \"test\": true}, []]": 1
+  },
+  "boundary": "Fresh:false current-source units or exact per-unit/output reuse from restored source epoch. Full raw IDs and versions/fragments retained, only known source root normalized. No consumer --extern argv claim."
+}

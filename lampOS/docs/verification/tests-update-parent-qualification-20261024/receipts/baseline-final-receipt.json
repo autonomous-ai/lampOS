@@ -1,0 +1,118 @@
+{
+  "native_handle": 21473,
+  "terminal_exit_code": 0,
+  "baseline_head": "22b753df5db6434d21455f40f67926e0ecee9d91",
+  "observations": [
+    {
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 2.811183,
+      "stdout_sha256": "dfec1d4075f6fce3d44ac59e7cd6667d80ad190933c1f9fd154253add114effe",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/01-1"
+    },
+    {
+      "name": "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 2.803348,
+      "stdout_sha256": "e13cb51bb704b7e228f26963724d1df44a3317832c20ce385c693c2b98d6583e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/02-1"
+    },
+    {
+      "name": "provider_worker::tests::held_consent::a_held_lines_reports_stop_is_done_and_its_answer_stays_held",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 0.620045,
+      "stdout_sha256": "e82b32547881916a3718ecf23b3b06c98011a71abfd691683b4bfa1d8f4f257e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/03-1"
+    },
+    {
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 0.163635,
+      "stdout_sha256": "89639fa69efa2096015e07e560ba782f902262c051da60877a19ea189ff58598",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/04-1"
+    },
+    {
+      "name": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 0.06325,
+      "stdout_sha256": "37be633dd66fa9fb593410f930bae143edf6f0b64645fdb0becf5beca596ad83",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/05-1"
+    },
+    {
+      "name": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 1.992612,
+      "stdout_sha256": "7cd2b6b0148fa7b7681eebce0898149e0fff386b31c374d56a4e60e43c7f9f4e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/06-1"
+    },
+    {
+      "name": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 1.955045,
+      "stdout_sha256": "30126f65afd27fb7b970c77c0456aa6c785115da8078890a22fc3fcba9815492",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/07-1"
+    },
+    {
+      "name": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 3.33253,
+      "stdout_sha256": "4f82311c88276d611727f3b6405faf1748b9d8c18c2eae0adac915ac44297897",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/08-1"
+    },
+    {
+      "name": "status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 0.326166,
+      "stdout_sha256": "d39e2da5472b4eea64d08bf2c0fdc41b2cc66b3b68238b0aff2aaadc5b220b91",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/09-1"
+    },
+    {
+      "name": "physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times",
+      "outcome": "ok",
+      "repetition": 1,
+      "exit_code": 0,
+      "seconds": 0.039923,
+      "stdout_sha256": "d834bb4ad24304def071b77344e12aeb67533fda81e4ed19e07aabfbd376afa2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/run/baseline/10-1"
+    }
+  ],
+  "passed": 10,
+  "failed": 0,
+  "consumed": 10,
+  "completed": 10,
+  "unrun": 0,
+  "all_ten_groups_closed_direct_waited_zero": true,
+  "source_full_modes_mtimes_system_children_frozen_witnesses_and_baseline_sealed_outputs_verified": true,
+  "Memory_primary_restoration_performed": false,
+  "current_observations": 0,
+  "baseline_results_sha256": "7db2bc6f15f9e7c3d3bf009ca9a518218780bfe23a575764086d4019afa9ced6",
+  "phase_comparison": "No baseline failure phase reproduced because all ten baseline observations passed. Requires root phase review and separate conditional current observation grant; no historical cause or full-run waiver."
+}

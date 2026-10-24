@@ -1,0 +1,29 @@
+{
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/update-parent22b-cargo-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "--exact",
+    "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/update-events-base22b/lampOS/crates/voice",
+  "started_at": "2026-10-24T17:36:25.190291+00:00",
+  "timeout_seconds": 600,
+  "stdout": "exact.stdout.txt",
+  "stderr": "exact.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 51785,
+  "owned_process_group": 51785,
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "wall_seconds": 2.803348,
+  "finished_at": "2026-10-24T17:36:27.993614+00:00",
+  "stdout_sha256": "e13cb51bb704b7e228f26963724d1df44a3317832c20ce385c693c2b98d6583e",
+  "stdout_bytes": 212,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

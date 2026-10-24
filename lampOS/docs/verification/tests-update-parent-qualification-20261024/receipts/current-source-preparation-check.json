@@ -1,0 +1,6 @@
+{
+  "candidate_rows_actual_verified": 10444,
+  "source_bytes_full_modes_mtimes_equal": true,
+  "guard_sha256": "85f9b76623bea5438f9d16bf954882b490ccf06bf07042bdd14f361f795165fb",
+  "no_Cargo_or_binary_execution": true
+}

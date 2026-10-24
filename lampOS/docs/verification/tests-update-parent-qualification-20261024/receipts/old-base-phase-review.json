@@ -1,0 +1,121 @@
+{
+  "base": "4a84fa5ab6a9133aeec555ec4bc0636dd953f660",
+  "comparisons": [
+    {
+      "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "current": {
+        "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+        "target": "lamp-voice:lib:lamp_voice",
+        "stage": "voice-default-parallel",
+        "assertion_location": "crates/voice/src/coordinator/tests/second_route.rs:384:9",
+        "exact_assertion_phase": "result Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 89753 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]",
+        "excerpt_sha256": "46f12c2640536f9af8d45a2318558b372a04ba486ac090c81fd43f8863b19425",
+        "raw_excerpts": "full-gate-ten-failure-excerpts.json"
+      },
+      "base_failure": {
+        "phase": "voice-default-parallel",
+        "target": "lamp-voice:lib:lamp_voice",
+        "name": "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+        "actual_status": "FAILED",
+        "binary_sha256": "5bb9322e08bbc279e823630e409fbc5db34b6cdb03bcc5390bf4216d84a00ee3",
+        "diagnostic": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+          "original_stream_bytes": 671494,
+          "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+          "byte_offset": 627692,
+          "bytes": 3274,
+          "sha256": "3c7cdf744815a24ac1e498a3cfbcaee6642ba08ed7d24697bd877deaa1ecd299",
+          "utf8": "---- coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture stdout ----\n{\"seconds\":null,\"status\":\"listening_ready\"}\nlamp-voice: the body was pushed: the search ended; its look's picture is dropped; its turn in hand is cut\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture' (717862251) panicked at crates/voice/src/coordinator/tests/second_route.rs:384:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 43867 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"look_asked\", \"provider_first_audio\", \"provider_audio_enqueued\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"look_full_asked\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"look_dropped\", \"search_pushed\", \"hand_control_cancel\", \"turn_finished\", \"speaker_rejected\", \"worker_shutdown_event\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, true, false), (None, false, false)]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: core::panicking::panic_display\n   3: lamp_voice::coordinator::tests::second_route::Run::assert_clean\n   4: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture\n   5: lamp_voice::coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture::{{closure}}\n   6: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n"
+        },
+        "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+      },
+      "classification": "Same concrete assertion/result phase; no cause or full lifecycle source-equivalence claim.",
+      "subphase_limit": "mid-search traces differ by worker_shutdown_event; child PIDs differ. Both report host watchdog plus five child-exit observation timeouts."
+    },
+    {
+      "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "current": {
+        "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+        "target": "lamp-voice:test:it",
+        "stage": "voice-default-parallel",
+        "assertion_location": "crates/voice/tests/it/light_call.rs:90:5",
+        "exact_assertion_phase": "[21.522936ms, 22.163407ms, 22.666622ms, 37.36939ms, 58.643901ms, 74.203291ms, 75.664723ms, 77.887303ms, 95.40068ms, 96.777955ms, 97.620441ms, 108.873253ms, 115.079214ms, 118.674326ms, 131.540205ms, 145.422829ms, 151.549991ms, 153.362743ms, 168.682672ms, 171.122408ms]",
+        "excerpt_sha256": "b0c0837b6599c0cb2b32f3ce997ae94be0895b980191fb5da1b19450cea8b247",
+        "raw_excerpts": "full-gate-ten-failure-excerpts.json"
+      },
+      "base_failure": {
+        "phase": "voice-default-parallel",
+        "target": "lamp-voice:test:it",
+        "name": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+        "actual_status": "FAILED",
+        "binary_sha256": "366ac00c3d3546f83f5c713ba31f5934b606456791209f7780ebd65b4f3ed470",
+        "diagnostic": {
+          "external_source": "/private/tmp/tests-3190-qualification-4a84-20261024/base/run-2026-10-24T021005.949040Z/voice-default-parallel/voice-default-parallel.stdout.txt",
+          "original_stream_bytes": 671494,
+          "original_stream_sha256": "480fa876705db27991f2f68f71b99d3ef11c17dd05c5651ad10c5343c2063227",
+          "byte_offset": 668892,
+          "bytes": 1247,
+          "sha256": "2b08efaa680ec373732818af7c6787191d0085eb9aa42afff20057c9d7daea85",
+          "utf8": "---- light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them stdout ----\nlight calls, fastest to slowest: [23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (717937690) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[23.075348ms, 27.16757ms, 43.833614ms, 44.032555ms, 46.669106ms, 59.052675ms, 63.048043ms, 87.220159ms, 102.111023ms, 105.964428ms, 106.352192ms, 108.157489ms, 108.403002ms, 109.60175ms, 120.718382ms, 125.785744ms, 127.273197ms, 140.786342ms, 161.497947ms, 185.122805ms]\nstack backtrace:\n   0: __rustc::rust_begin_unwind\n   1: core::panicking::panic_fmt\n   2: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them\n   3: it::light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them::{{closure}}\n   4: core::ops::function::FnOnce::call_once\nnote: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.\n\n\n"
+        },
+        "qualification": "Failed observation retained. No claim of inherited cause or failure waiver."
+      },
+      "classification": "Same concrete assertion/result phase; no cause or full lifecycle source-equivalence claim.",
+      "subphase_limit": "Both fail median took[10] <25ms after twenty Done responses and cleanup. Base median106.352192ms/current97.620441ms; not a per-call maximum assertion."
+    }
+  ],
+  "source_comparisons": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "base_sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4",
+      "current_sha256": "418607b8c2f0b03895b7f4f083bd0fbe69e17045c07d7de1ff50ad8e0ca2afb4",
+      "byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "base_sha256": "5e9f9a0801ac87469b96236e1e7ecb49c90a5378ad92137412f2d9281dcda95e",
+      "current_sha256": "8eddd365fd7d0857cca5ffb9439c595543ec7bd1026bda917ccd81fec729c593",
+      "byte_equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/scenario_clock.rs",
+      "base_sha256": "d8924964133dabfcaf5657a682e259fbcc32421b4649940ffd45f5c7c5a77d80",
+      "current_sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "byte_equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/light_call.rs",
+      "base_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "current_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_worker.rs",
+      "base_sha256": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2",
+      "current_sha256": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2",
+      "byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/ring_light.rs",
+      "base_sha256": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+      "current_sha256": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+      "byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/actions/src/lib.rs",
+      "base_sha256": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+      "current_sha256": "86ad090b98e50c11b4946b9a9d97b5e3ebdb2f41bf592adcdc44e42715949965",
+      "byte_equal": true
+    },
+    {
+      "path": "lampOS/crates/actions/src/light.rs",
+      "base_sha256": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+      "current_sha256": "dfbdf2b49476bcf4e934e6980361b3a453d9050f7e6ccc2ae86b028770e1edf9",
+      "byte_equal": true
+    }
+  ],
+  "base_receipt": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/log/lampOS/docs/verification/tests-qualification-pair-4a84fa5ab-20261024/base/failures.json",
+    "sha256": "ea432903f98bb0ba134d95fb03de3663fd3b335b03ca1b6175f7212477836ac8"
+  }
+}

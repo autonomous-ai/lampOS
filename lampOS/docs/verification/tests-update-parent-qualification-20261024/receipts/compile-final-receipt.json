@@ -1,0 +1,52 @@
+{
+  "native_handle": 68863,
+  "terminal_exit_code": 0,
+  "terminal": {
+    "valid_complete": true,
+    "finished_at": "2026-10-24T17:31:17.122713+00:00"
+  },
+  "stages": [
+    {
+      "name": "voice-no-run",
+      "exit_code": 0,
+      "wall_seconds": 225.133808,
+      "actual_compiler_messages": 309,
+      "actual_unique_units": 303,
+      "local_artifact_messages": 40,
+      "local_fresh_false_messages": 40,
+      "local_reuse_messages": 0,
+      "new_local_unit_contexts_first_fresh_false": 40,
+      "local_buildscript_rows": 1,
+      "proof_sha256": "ee39c32df658517f984e25aba3560362db55210d1dec6ca4c9eb233bbffa79e0"
+    },
+    {
+      "name": "readers-no-run",
+      "exit_code": 0,
+      "wall_seconds": 209.725484,
+      "actual_compiler_messages": 428,
+      "actual_unique_units": 422,
+      "local_artifact_messages": 120,
+      "local_fresh_false_messages": 117,
+      "local_reuse_messages": 3,
+      "new_local_unit_contexts_first_fresh_false": 98,
+      "local_buildscript_rows": 1,
+      "proof_sha256": "eb551a9ce950885f1940de9cbd4d80b1702aa4b0b31ae993094b2105b99df4b8"
+    }
+  ],
+  "all_first_local_unit_contexts_fresh_false": 138,
+  "case_bindings": 10,
+  "selected_actual_test_targets": 6,
+  "selected_profile_features_target_contexts_equal": true,
+  "parent_bindings_sha256": "202f25ec04a764590b7b0c8bd29960d2b8347aa7292aee13bc4659c6eec544f6",
+  "sealed_outputs_count": 214,
+  "sealed_outputs_sha256": "c5890a9bab4cd178e8196a998b20268d501b741f7707bc124716cd6040072f66",
+  "whole_baseline_and_current_source_full_modes_mtimes_verified": true,
+  "all_four_metadata_clean_compile_groups_closed": true,
+  "clean_warning_limit": "Retained full clean stderr; Cargo ignores supplied package URL/version for cleaning and selects declared names. Metadata proves no resolved external name collision. No claim about historical same-name generated outputs or thirdparty warm cache reuse.",
+  "commands_not_run": [
+    "inventory",
+    "test",
+    "current-child-restore"
+  ],
+  "shared_CPU": "Baseline4 jobs + NoPause2 maximum; distinct targets; not isolated-load evidence"
+}

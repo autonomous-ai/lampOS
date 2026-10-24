@@ -1,0 +1,39 @@
+{
+  "system": [
+    {
+      "path": "/bin/cat",
+      "resolved_path": "/bin/cat",
+      "sha256": "2b6e8f3f90c42a9d8d1e5471efb4173ad3499fc8ca4039b39327b394616cf39e",
+      "bytes": 118800,
+      "mode": 493
+    },
+    {
+      "path": "/usr/bin/true",
+      "resolved_path": "/usr/bin/true",
+      "sha256": "875c7eea9c66c826091ede3cc44599311dc6818caf17f9e53d97c54c288842b2",
+      "bytes": 84032,
+      "mode": 493
+    }
+  ],
+  "memory": [
+    {
+      "primary": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory",
+      "reader_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/closed-artifact-witnesses/readonly/27ae888a70d70be4b4b8d0890829a1edd926b898151697bc376ec3c1aa6edba3",
+      "reader_sha256": "27ae888a70d70be4b4b8d0890829a1edd926b898151697bc376ec3c1aa6edba3",
+      "workspace_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/lamp-memory-workspace-restore",
+      "workspace_sha256": "26bebadb3fac640cc6bee4916568e85cd28ec8f1c999a6f89fd89f8fc0b5af4c",
+      "original_mode": 493,
+      "original_mtime_ns": 1792859976465203537
+    },
+    {
+      "primary": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/qualification/cargo-target/debug/lamp-memory-fixture",
+      "reader_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/closed-artifact-witnesses/readonly/17d0e568e291ed4b9978ab3206db55d4a6512eced60fac067dab10313778918f",
+      "reader_sha256": "17d0e568e291ed4b9978ab3206db55d4a6512eced60fac067dab10313778918f",
+      "workspace_snapshot": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/update-watchdog-audit/events-current-20261024/lint-fix-epoch/parent-qualification/lamp-memory-fixture-workspace-restore",
+      "workspace_sha256": "2fb36e77f5adac0a2d8a123fd27b16efb290b040cd392fdaf1dcc5dc1cda9fba",
+      "original_mode": 493,
+      "original_mtime_ns": 1792859976568120300
+    }
+  ],
+  "no_primary_mutation": true
+}

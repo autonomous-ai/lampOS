@@ -1,0 +1,12 @@
+{
+  "controller_sha256": "ff98bb7f286f22a088044a6f3a6f76fd08fc39f0b1f87e9ec15ea85f15134e81",
+  "plan_sha256": "8e55f1fbe9f6b39204e002f84f3f294bad252bc6fb269b43ba1330f6bb434175",
+  "manifest_sha256": "0d95ef6ceb7b44383b4d9f3df8c1f80d1ee09812006fd7a1c2e0535eeb8b83ce",
+  "baseline_guard_sha256": "6789728dacab8dd4a5c48175fc29a5d8a4be77299250a6f7933e6a01e9b407c8",
+  "baseline_cases": 10,
+  "current_conditional_maximum": 30,
+  "total_maximum": 40,
+  "actual_tests_executed": 0,
+  "controller_static_AST_only": true,
+  "final_static_child_scope_amendment": "Verify PATH resolution of cat in both configured environments, and exact reader child bytes/modes after every current observation."
+}

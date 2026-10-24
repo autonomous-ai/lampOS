@@ -1,0 +1,6 @@
+
+running 1 test
+test physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 377 filtered out; finished in 0.07s
+
