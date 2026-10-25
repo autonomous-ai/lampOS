@@ -1,0 +1,32 @@
+{
+  "head": "c609cdb9c90030a57f5a923124477d21a1c6d256",
+  "base": "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+  "preview": "fec5d36acd7d461b1cc24741dfde5f5ef73e72af",
+  "head_tree": "33966b125b2fc7665ab47fb7fb26a162689575c4",
+  "arm64": {
+    "run": 40204721470,
+    "event": "pull_request",
+    "conclusion": "success",
+    "passed": 11291,
+    "leaky_included_in_passed": 1,
+    "skipped": 106,
+    "unique_terminal_identities": 11291,
+    "repeated_equal_terminal_rows": 35,
+    "added_regression_pass_counts": {
+      "a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner": 1,
+      "a_late_window_keeps_the_same_voice_sign_for_going_on_same_one": 1,
+      "a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry": 1
+    },
+    "raw_log_sha256": "f85352f0f9294d0efa266aa99683f03e8b4f86f51ff8c1f9976a93c8f7ccd009"
+  },
+  "linux_clippy": {
+    "run": 40204721574,
+    "conclusion": "success"
+  },
+  "limits": "Original CI on this offered head/base and an identical preview tree. Tracked journal fixture leak retained; no lamp, acoustic latency or activation claim.",
+  "preview_tree_matches_head": true,
+  "preview_parents": [
+    "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+    "c609cdb9c90030a57f5a923124477d21a1c6d256"
+  ]
+}

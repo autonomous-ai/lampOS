@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 22:19 — Current parent original Linux gates green
+
+Ready for lamp-voice: yes (#3408; current reader and train disposition remain).
+
+#3408 `c609cdb9c` on current `bf39e4188` passed original ARM64
+**40204721470** and Linux clippy **40204721574**. ARM reconciles
+**11,291 passed (one tracked journal fixture leak), 106 skipped**;
+all three own controls pass. Its executed preview `fec5d36ac` has
+parents bf39/c609 and exactly the offered tree `33966b125`.
+[Native receipt](verification/carry-late-verdict-20261025/native-40204721470.json).
+The raw log retains 35 repeated equal terminal rows and 11,291 unique test
+identities. The PR is ready, with Reviewer-three READ-OK and Reviewer-two's
+current read active. No earlier failure, source scope or physical limitation
+is changed by this result.
+
+The two-face current full suite has passed its Voice library and later
+harnesses so far; final Eval/exit remains. I am finishing that carry and then
+executing the prepared reminder negative while the parent goes through its
+reader/train lane. Child #3420 remains parent-first for actual-base retargeting.
+
 ## 2026-10-25 22:02 — Current parent pushed; two-face current gate active
 
 Ready for lamp-voice: no (current native gates and reads are pending).
