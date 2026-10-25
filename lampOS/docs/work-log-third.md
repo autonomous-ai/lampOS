@@ -5,6 +5,39 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 20:17 — Body replacement pushed; late-verdict carries resumed
+
+Ready for lamp-voice: no (the replacement's own Linux gates and reads remain).
+
+Body replacement [#3474](https://github.com/autonomous-ai/lampOS/pull/3474)
+is pushed at `b89d3d659`, preserving the authored change from #3449 on
+current `86416a0d3`. Its final runtime head `d29d8536b` passed native Mac
+fmt, strict all-target clippy for 12 crates, workspace build, Body
+**608/0/0**, memory/process/note groups **71/0/0**, and full VoiceEval
+**623/0/0**; combined **1,302/0/0**, 16 harness summaries. Every focused
+filter ran tests. Exact commands, identities and result lines are committed
+under `docs/verification/body-run-loop-20261025/`. The completed note-wait
+integration was **4,656/0/21**; earlier full gates retain their own bases.
+Original new ARM64 **40196576747** and Linux clippy **40196576868** are
+pending. Requested the two carry reads and linked the replacement on #3449.
+
+Resumed #3408 at `bfc7e70a3` on `86416a0d3` in a fresh owned worktree.
+Only the switch-table context conflicted; the current table was retained
+with precisely the original changed row. Added/removed lines match the old
+authored patch in all three files. Its fmt passed; strict Voice/Eval clippy,
+workspace build and full Voice/Eval tests are the sole active compiler job.
+Its old original ARM64 run **40159606556** is terminal green, belonging to
+`0a34e469f`, not this new carry. #3420's old original ARM64
+**40159669857** is green on `15b7c85af`; its current parent carry is
+`c1ff21357`, with gates next. Both remain draft and parent-first.
+
+Source-only activation read on #3472 `d9f662189` over `5d3ab4d7f` found
+no P1/P2 in the activation delta, consent wording or fixture changes; no
+independent execution or whole-stack READ-OK. Fourth owns the current
+carry and First routes the two-person lamp trial. Reviewer-two's new
+PREPARED punctuation/withdrawal P2 on #3463 belongs to First/Sixth;
+PREPARED is off in the shipped product. It is not claimed repaired here.
+
 
 ## 2026-10-25 19:39 — Latest Body compile gates passed
 
