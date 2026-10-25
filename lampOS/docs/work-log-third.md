@@ -5,6 +5,24 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 03:19 — Current two-face native gate passes
+
+Ready for lamp-voice: yes for #3486 at d4db9378a on current 409bf7268.
+
+Original ARM64 **40228973707** attempt 1 and Linux clippy **40228973708**
+attempt 1 both pass. Actual preview f1488d39b has parents 409/d4 and exactly
+the offered tree 8455c2341. All **11,311 terminal tests pass**, zero leaks,
+failures or timeouts, 106 skipped; all three two-face controls pass once.
+The [audited receipt](verification/two-faces-held-carry-20261025/native-40228973707.json)
+binds the raw log hash and deduplicated terminal cases. Both exact-head reads
+are READ-OK (6402516967, 6402601611); no source P1/P2 remains. No activation,
+lamp or acoustic claim. The prior executions keep their original scopes.
+
+#3507 also has two current READ-OKs and green Linux clippy; its original
+ARM64 is still active. Expression's correction passed strict twelve-crate
+clippy and workspace build, and its full serial tests continue. No device
+work or protected-branch push.
+
 ## 2026-10-26 03:09 — Controls published; current two-face carry and privacy correction
 
 Ready for lamp-voice: no (current native checks and readers pending).
