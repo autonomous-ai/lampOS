@@ -70,6 +70,8 @@ pub struct Discovery {
     contacts: [Contact; 4],
     /// Each line's last level read in the hands-away phase.
     resting: [Option<bool>; 4],
+    rest_seen: bool,
+    rest_failed: bool,
     /// Each line's last level in the touches, and when it last changed.
     touched: [(Option<bool>, Option<u64>); 4],
 }
@@ -111,6 +113,8 @@ impl Discovery {
             },
             contacts: std::array::from_fn(|_| Contact::default()),
             resting: [None; 4],
+            rest_seen: false,
+            rest_failed: false,
             touched: [(None, None); 4],
         })
     }
@@ -125,6 +129,23 @@ impl Discovery {
                 "invalid or unordered head discovery acquisition",
             ));
         }
+        let rest_start = self.report.started_us + SETTLE_US;
+        let rest_end = rest_start + self.report.rest_us;
+        let previous = self.report.last_us.unwrap_or(self.report.started_us);
+        // Missing coverage only inside hands away matters for its baseline;
+        // a delay in settle or after rest keeps ordinary contact recovery.
+        let missing_rest = at_us.min(rest_end).saturating_sub(previous.max(rest_start));
+        if self.rest_failed
+            || (self.report.rest_us > 0
+                && (missing_rest >= FRESH_US || (at_us >= rest_end && !self.rest_seen)))
+        {
+            self.rest_failed = true;
+            self.contacts = std::array::from_fn(|_| Contact::default());
+            return Err(io::Error::other(
+                "head discovery missed hands-away samples; restart discovery",
+            ));
+        }
+        self.rest_seen |= (rest_start..rest_end).contains(&at_us);
         if self
             .report
             .last_us
@@ -234,6 +255,8 @@ impl Discovery {
         Ok(())
     }
 
+    /// Evidence so far, not a completed calibration: a partial report's
+    /// zero rest changes do not prove its hands-away phase was observed.
     pub fn report(&self) -> &Report {
         &self.report
     }
