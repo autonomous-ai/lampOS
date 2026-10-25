@@ -36,6 +36,11 @@ PrivateTmp=yes
 StateDirectory=lampos-update
 StateDirectoryMode=0700
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
+# The updater moves to each build's own lamp-update too, confirmed by a signed dry round and put back by
+# lamp-update-back within 10 min otherwise (docs/updates.md, "lamp-update switching itself"; shown on
+# lamp-4ace 20 Oct). Without it this unit's updater can change only by running install again on the lamp,
+# which a customer's lamp never has: so a later build could never carry units or settings to it (25 Oct).
+Environment=LAMP_UPDATE_SELF=on
 
 [Install]
 WantedBy=multi-user.target

@@ -2605,7 +2605,7 @@ fn setup_settings_are_written_only_with_setup_on_and_kept_once_changed() {
 
     let ours = fs::read_to_string(lamp.on(serve))
         .unwrap()
-        .replace("\"VN\"", "\"SG\"");
+        .replace("\"US\"", "\"SG\"");
     fs::write(lamp.on(serve), &ours).unwrap();
     lamp.said.clear();
     assert_eq!(lamp.install().unwrap().changed, Vec::<String>::new());
