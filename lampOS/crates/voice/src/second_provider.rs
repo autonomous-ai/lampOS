@@ -515,6 +515,13 @@ pub const BUSY_ENDS_SOONER_ENVIRONMENT: &str = "LAMP_BUSY_ENDS_SOONER";
 /// else (the owner's P1 on Queue #3126, `worker::Heeding::carrying_the_same_speaker`).
 pub const SAME_SPEAKER_CARRIES_ENVIRONMENT: &str = "LAMP_SAME_SPEAKER_CARRIES";
 
+/// Where the worker reads whether a line is in a known person's scope only
+/// when their own face was seen speaking it, else the room's: `on`, and
+/// nothing else, with `LAMP_SECOND_SPEAKING_FACE` ([`Engine::scoping_by_sight`],
+/// `speaking_faces::not_theirs`). Off, only another face seen speaking it
+/// narrows it (reviewer-three's P1 and P2 on #3435).
+pub const PERSON_SCOPE_SEEN_ENVIRONMENT: &str = "LAMP_PERSON_SCOPE_SEEN";
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
@@ -1015,6 +1022,9 @@ struct Shared {
     )>,
     remember_speaker: bool,
     enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
+    /// A line is a known person's only when their own face was seen
+    /// speaking it (`LAMP_PERSON_SCOPE_SEEN`, [`Engine::scoping_by_sight`]).
+    scope_seen: bool,
 }
 
 /// How long after its end a line whose words end before a name waits for
@@ -1853,6 +1863,7 @@ impl Engine {
                 forget_sight: None,
                 remember_speaker: false,
                 enrollment_sight: None,
+                scope_seen: false,
             }),
             output,
             urgent: VecDeque::new(),
@@ -2070,6 +2081,16 @@ impl Engine {
             return self;
         }
         shared.speaking = Some((eyes, known));
+        self
+    }
+
+    /// With [`Self::seeing_who_speaks`], a line is in a known person's
+    /// scope only when their own face was seen speaking it, else the room's,
+    /// at its admission and for a late look's keeper alike
+    /// (`LAMP_PERSON_SCOPE_SEEN=on`, `speaking_faces::not_theirs`).
+    pub fn scoping_by_sight(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.scope_seen = on;
         self
     }
 
@@ -4469,10 +4490,15 @@ async fn spoken(
                 .await
                 .ok()
                 .flatten();
-        if crate::speaking_faces::someone_elses(&speakers, &person, pair) {
+        if crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen) {
             scope.narrow_to_room();
             eprintln!(
-                "lamp-voice second: request {request}: a face not the known person's was seen speaking it: told and kept as the room's"
+                "lamp-voice second: request {request}: {}: told and kept as the room's",
+                if speakers.is_empty() {
+                    "no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)"
+                } else {
+                    "a face not the known person's was seen speaking it"
+                }
             );
             if prepared.take().is_some() {
                 eprintln!(
@@ -4490,6 +4516,7 @@ async fn spoken(
     if let (Some(lease), Some(late_face)) = (scope.as_ref(), late_face) {
         let lease = lease.clone();
         let speaking = shared.speaking.clone();
+        let seen_only = shared.scope_seen;
         tokio::spawn(async move {
             let found = late_face.await.ok().flatten();
             let keeper = match (found, speaking) {
@@ -4501,9 +4528,14 @@ async fn spoken(
                     .await
                     .ok()
                     .flatten();
-                    if crate::speaking_faces::someone_elses(&speakers, &person, pair) {
+                    if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only) {
                         eprintln!(
-                            "lamp-voice second: request {request}: a face not the known face's was seen speaking it: its keep stays the room's"
+                            "lamp-voice second: request {request}: {}: its keep stays the room's",
+                            if speakers.is_empty() {
+                                "no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)"
+                            } else {
+                                "a face not the known face's was seen speaking it"
+                            }
                         );
                         None
                     } else {

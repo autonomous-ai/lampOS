@@ -10,6 +10,7 @@ mod music_warm_name;
 mod name_carries;
 mod name_near;
 mod not_for_me_words;
+mod person_scope_seen;
 mod remember_speaker;
 mod short_done;
 mod unplayed_join;
