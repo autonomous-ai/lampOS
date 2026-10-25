@@ -1,0 +1,25 @@
+
+running 1 test
+second_provider::worker::tests::a_late_window_keeps_the_same_voice_sign_for_going_on_same_one --- FAILED
+
+failures:
+
+---- second_provider::worker::tests::a_late_window_keeps_the_same_voice_sign_for_going_on_same_one stdout ----
+lamp-voice second: request 1: no conversation going on: it was never heard saying words, to their end,, it was never called, 0 lines left alone since it last spoke
+lamp-voice second: request 1: its answer is played: the text shows it was called
+lamp-voice provider: request 2: judged without the voice check: its voice print was not back at its answer
+lamp-voice second: request 2: no sure sign who said it (voice not known, from 1500 ms of speech; faces seen speaking [], turned to the lamp [], the caller's ["b/f1"]): not carried; the carry stands (LAMP_SAME_SPEAKER_CARRIES)
+
+thread 'second_provider::worker::tests::a_late_window_keeps_the_same_voice_sign_for_going_on_same_one' (257498646) panicked at crates/voice/src/second_provider/worker.rs:10520:13:
+assertion `left == right` failed
+  left: Some("a busy room: a conversation with the lamp is going on, but nothing shows the line is from the one it answered: not a reply to its question, not the conversation's voice")
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    second_provider::worker::tests::a_late_window_keeps_the_same_voice_sign_for_going_on_same_one
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3762 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

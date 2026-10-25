@@ -1,0 +1,96 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 4b645214f3..458c9c57ba 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -6534,6 +6534,14 @@ impl Heeding {
+             let likeness = voice.3;
+             voice = self.voice_going_on_in(request, true, busy);
+             voice.3 = likeness.or(voice.3);
++            if self.voice_ends_going_on
++                && let Some(likeness) = likeness
++            {
++                // The first lookup consumed this evidence. Keep the same
++                // classification as voice_going_on_in for downstream rules.
++                voice.1 = likeness < crate::same_voice::DIFFERENT_BELOW;
++                voice.2 = !voice.1;
++            }
+         }
+         let (mut going_on, mut other_voice, same_voice, likeness) = voice;
+         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
+@@ -10499,6 +10507,59 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn a_late_window_keeps_the_same_voice_sign_for_going_on_same_one() {
++        let _one = crate::provider_worker::tests::one_thread();
++        for answered_s in [30, 60] {
++            let mut desk = CarryDesk::new(true);
++            desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
++            desk.answered(answered_s);
++            let answer = desk.heeding.said_until_us.unwrap();
++            desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
++            assert_eq!(
++                desk.line_at(
++                    -1,
++                    "",
++                    "I sent the slides to the client this morning.",
++                    answer + 3_000_000
++                ),
++                None
++            );
++            desk.heeding.going_on_same_one = true;
++            desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
++            let request = desk.request + 1;
++            let began = answer + 25_000_000;
++            let line = (began, began + 2_000_000);
++            desk.heeding.hear(
++                request,
++                crate::second_provider::Heard::Began {
++                    over_the_lamps_voice: false,
++                },
++            );
++            desk.heeding.hear(
++                request,
++                crate::second_provider::Heard::Samples(&[1; 48_000]),
++            );
++            desk.heeding
++                .hear(request, crate::second_provider::Heard::Ended);
++            let mut signs = desk.heeding.signs_begun(request, line, began);
++            assert!(
++                desk.heeding.carried.is_none(),
++                "the late window is not known yet"
++            );
++            // Exercise an independently supplied continuation sign: the
++            // first lookup consumes the owner print before opening the
++            // late window, so the second lookup cannot classify it again.
++            signs.going_on = true;
++            assert_eq!(
++                desk.heeding
++                    .judge(request, line, "Will it rain in the afternoon?", signs),
++                None,
++                "voice-only owner with the same-speaker rule, answer {answered_s} s"
++            );
++        }
++    }
++
+     #[test]
+     fn a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry() {
+         let _one = crate::provider_worker::tests::one_thread();
+diff --git a/lampOS/docs/second-voice.md b/lampOS/docs/second-voice.md
+index 4bcdcfd3f7..c6c23d8b9d 100644
+--- a/lampOS/docs/second-voice.md
++++ b/lampOS/docs/second-voice.md
+@@ -3155,7 +3155,11 @@ after a take-over, but now for every turn:
+   owner's verdict, the worker rechecks the current line's captured start
+   against the newly available window. It always reads the cached reply
+   again and retains any own-voice likeness consumed by the first lookup
+-  in preference to the second result. Neither lookup waits for a print.
++  in preference to the second result, including its same/other-voice
++  classification for the downstream same-speaker rule. Neither lookup
++  waits for a print. A line admitted only by this newly opened late window
++  is not recorded as another eligible colleague end: a later print for
++  that line gives no further extension. This fails closed.
+   In Busy, Unknown and Quiet, that new eligibility still needs the owner's
+   positive face or sufficiently nearer voice; missing, uncertain or
+   confusable voice evidence is held for this verdict without turning a

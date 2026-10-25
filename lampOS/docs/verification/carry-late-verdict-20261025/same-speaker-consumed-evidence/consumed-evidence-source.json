@@ -1,0 +1,19 @@
+{
+  "base": "2f48b0edd24c07c0fda0e67c8985addc8a40cdf2",
+  "rebase_head": "34b776f974e6104d3962c803697923eb40dd9031",
+  "worker_sha256": "7b8697ec4893048e31cd9a170f4305842bb694572ef36f3e5330fa540911acdf",
+  "test_command": "cargo +1.96.0 test -q --locked --offline -p lamp-voice --lib a_late_window_keeps_the_same_voice_sign_for_going_on_same_one -- --test-threads=1",
+  "compiler_jobs": 1,
+  "native_target": "x86_64-apple-darwin",
+  "scope": "Explicit continuation sign; old production plus added regression. Not natural chronological reproduction.",
+  "previous_observations": [
+    {
+      "kind": "preparation error and initial fixed fixture",
+      "result": "0 passed / 1 failed at initial colleague admission; same-speaker rule enabled too early; old-code removal failed from wrong cwd; raw retained separately"
+    },
+    {
+      "kind": "corrected natural chronology old production",
+      "result": "1 passed / 0 failed; non-reproduction, not waived or renamed"
+    }
+  ]
+}
