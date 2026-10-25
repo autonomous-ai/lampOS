@@ -1500,6 +1500,19 @@ normal readiness, whether RoomTold says Unknown, Busy or Quiet. Room
 classification does not delay submission or withdraw its output. Keep the
 existing actual-input, privacy, owed-follow-up and output-ownership checks.
 
+Follow-up reviewed 2026-10-25: V1's actual
+`hal/realtime/resources/system_prompt_gemini.md` distinguishes a delegation
+acknowledgement from a completed action; its ordinary prompt likewise delegates
+reminders to the scheduler. Keep that distinction. Reuse V2's existing shared
+reminder completion slot for the skill's say result, after the coordinator's
+completion join. Change only the inconsistent success report: a reset-invalidated
+receipt cannot abandon the reminder while telling its skill `spoken`. Read the
+recorded `Complete` result without consuming or recreating it; readiness to
+complete is a different, earlier state. Keep the existing playback, owner,
+privacy, failure and durable-Ack checks, with no extra wait, I/O or dependency.
+Authored ticket/cursor fixtures cover the joined outcomes; real-device delivery
+and acoustic quality remain separate evidence.
+
 Use existing serde, rustix and SQLite dependencies. The new cumulative-deadline
 Unix client supplies only Schedule's paths; ordinary off-state tool behavior
 is preserved. All ledger/filesystem/socket work lives in one supervised child
