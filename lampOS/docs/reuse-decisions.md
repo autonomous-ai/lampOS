@@ -1,5 +1,21 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Require observed rest before factory head calibration (2026-10-26)
+
+V1's `hal/drivers/ttp223.py` probes driven lines transiently and measures
+candidate contact from kernel edge timestamps; it has no persisted
+hands-away baseline report. Keep V2's measured-rest factory workflow and
+the existing 100 ms acquisition freshness bound. Apply that bound to the
+missing coverage inside the rest phase, and require an actual sample in
+that phase before accepting later touch evidence. A skipped phase must not
+turn its preinitialized zero transition count into a measured baseline.
+
+Reuse the existing discovery error, CLI failure and factory restoration
+path: an invalid scan stops, Controls resumes, and the pins stay unchanged.
+Successful discovery adds no wait or I/O; no report field, live touch rule
+or product switch changes. Deterministic sampled-time controls establish
+this evidence boundary, not hardware calibration or V1 behavioral parity.
+
 ## Promote an already tested release to a stable feed (2026-10-25)
 
 V1's `scripts/release/promote-ota.sh` separates promotion from building:

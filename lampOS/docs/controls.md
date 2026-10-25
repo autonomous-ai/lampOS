@@ -310,7 +310,27 @@ quick taps on a pad that holds its level, it says none (the reviewer on
 #1965), since `pulses` written for such a pad would never read a resting
 hand. The factory step refuses a pad with any change at rest, or with no
 `reads`, and asks again; it writes `head_rest` only from a report that
-measured both. Tests: `tests/it/head_rest.rs` (cb94's 77 s flip is nothing on a pulse
+measured both.
+
+With a nonempty hands-away phase, discovery also requires sample coverage.
+The existing 100 ms freshness bound (`FRESH_US`) applies to the portion of
+each missing acquisition interval inside that phase, from the end of the
+500 ms settle up to, but not including, the phase's end. Missing coverage
+of 100 ms or more rejects the scan. At least one acquisition must fall
+inside the phase, even when it lasts less than 100 ms; an acquisition at
+its end is already in the touch phase. Rejection lasts for that scan:
+later samples cannot repair it, so discovery must start again. Delays
+wholly before or after the hands-away phase keep the existing gap recovery.
+
+`rest_changes` remains the configured counter of observed transitions;
+zero in a partial report is not a completed baseline. A discovery error
+exits unsuccessfully, and the factory step's existing error path starts
+Controls again and leaves the original pins profile untouched. Successful
+scans add no wait to the 40 s factory flow. No-rest discovery and older
+reports retain their existing behavior and compatibility. The report
+schema, product settings and live touch policy are unchanged.
+
+Tests: `tests/it/head_rest.rs` (cb94's 77 s flip is nothing on a pulse
 pad and a touch, stroke and sleep on a level one; a resting hand from either
 rest; one or two pulses a tap; a bounce or a slow change nothing; a pulse pad
 arms on a line resting high), `tests/it/head_discovery.rs`
