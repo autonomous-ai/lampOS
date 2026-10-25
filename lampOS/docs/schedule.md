@@ -699,12 +699,20 @@ that plainly asks for a timer or a reminder at a sentence's start
 function that sets it (`tool_choice`): `set_timer` for a duration from now,
 `set_reminder` for a clock time, as their descriptions ask. The time must come
 right after the ask ("remind me in three minutes …", "remind me tomorrow at
-6:30 …", "wake me up at seven"), and a clock time must stand as one, so a
-task's length, another sentence's time or "at 180 degrees" forces nothing. It
-errs toward not forcing: the line must be one sentence, the ask (beside a
-greeting), and a line with quote marks, a `%`, or any word that may take the ask
-back, put it in doubt or make it another operation ("every day", "starting at
-noon") ("don't", "no", "wait", "cancel", "actually", "or", …) and a
+6:30 …", "wake me up at seven", "at seven in the morning"), a clock time must
+stand as one, and after the time come only "to" and the task, or "please". A
+task's length stands ("… to exercise for twenty minutes"), but a second time
+or a day in the task ("… at ten", "… tomorrow"), a condition ("… when the oven
+is ready", "… if it rains"), a clause after a comma ("…, translate that into
+French"), another sentence's time or "at 180 degrees" forces nothing, and a
+length runs from now, so "set a timer tomorrow for ten minutes" forces
+nothing. It errs toward not forcing: the line must be one sentence, the ask
+(beside a greeting), and a line with quote marks (single or double), brackets,
+a dash, a `%`, or any word that may take the ask back, put it in doubt or make
+it another operation ("don't", "no", "wait", "cancel", "actually", "or",
+"leave it", …; a repeat or a span: "every day", "on Mondays", "twice a day",
+"for a week"; a later start: "starting at noon"; a condition: "when", "if",
+"once") and a
 question that isn't an ask are asked as before, and the round after the call is asked with its
 result, so the lamp says what the schedule did.
 
