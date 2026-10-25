@@ -955,6 +955,19 @@ audio, cancelled tails and late callbacks cannot acknowledge. The receipt is
 the speaker's ALSA cursor evidence, not proof of acoustic fidelity or that a
 person heard it. A failed reminder does not play a local failure recording.
 
+A skill's `from: schedule` say reads that same local completion record after
+Voice tries the whole-reply join. It reports `spoken` only when the record is
+`Complete` and the existing whole-playback checks still pass. A playback-clock
+reset can invalidate the receipt without adding a playback gap; that case
+reports `dropped` with `reminder_completion_unconfirmed`, never `spoken` beside
+an abandoned reminder. Provider failures and playback gaps keep their existing
+failure reasons. Ordinary says and skill sounds keep their existing checks.
+This read adds no I/O or wait to the audio loop, and does not claim the worker
+has already durably stored completion or acknowledged Schedule. The coordinator
+fixtures pair the actual say ticket with clean, partially accepted, reset, gap,
+failed, silent and privacy-revoked reminder turns; their PCM/cursor evidence is
+synthetic, not a listening test.
+
 Completion is durably stored before Ack. Exact Ack retries preserve the whole
 guard and request; a newer still-pending observation may durably rebase its CAS
 revision. Lost replies are checked against the actual receipt and exact current
