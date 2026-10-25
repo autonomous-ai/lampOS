@@ -1,0 +1,11 @@
+{
+  "current_actual_metadata_sha256": "a028aca64b389125d59dff5c7e5cab44c4751747b5c8daebfd689974cda2827a",
+  "old_actual_metadata_sha256": "a028aca64b389125d59dff5c7e5cab44c4751747b5c8daebfd689974cda2827a",
+  "complete_all_fields_equal_without_normalization": true,
+  "normalization_used": [],
+  "current_packages": 451,
+  "current_nodes": 451,
+  "new_query_authoritative": true,
+  "old_comparison_context_only": true,
+  "no_old_execution_relabel": true
+}

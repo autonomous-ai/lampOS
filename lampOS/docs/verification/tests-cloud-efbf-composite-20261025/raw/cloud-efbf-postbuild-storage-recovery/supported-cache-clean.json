@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "clean",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+  "started_at": "2026-10-25T00:13:38.712886+00:00",
+  "timeout_seconds": 600,
+  "stdout": "supported-cache-clean.stdout.txt",
+  "stderr": "supported-cache-clean.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "available_bytes_before_Cargo": 4843810816,
+  "controller_exception": "AssertionError('Insufficient disk before Cargo')",
+  "wall_seconds": 0.063278,
+  "finished_at": "2026-10-25T00:13:38.776546+00:00",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_bytes": 0,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

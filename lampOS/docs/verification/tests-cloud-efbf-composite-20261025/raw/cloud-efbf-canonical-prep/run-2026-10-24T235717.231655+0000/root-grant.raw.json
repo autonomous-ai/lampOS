@@ -1,0 +1,62 @@
+{
+  "plan_identity": "cloud-efbf-seven-first-launched-canonical-gates",
+  "plan_sha256": "de21191434a25ac348a0462e95a74fd7f4cd38975095bcef7b400125c8e200c5",
+  "controller_sha256": "0808d56b5646b5836de93b807bd3aa6193d6527121e90efdf02e519cfc30cf37",
+  "source_map_sha256": {
+    "canonical": "75944e3e310fb30d886882f1f700341dfb083f26aa8e3e2ffe7b9ffc126518af"
+  },
+  "source_guards": {
+    "canonical": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5"
+  },
+  "source_heads": {
+    "canonical": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2"
+  },
+  "execution_authorized": true,
+  "grant_scope": "seven-new-efbf-canonical-cloud-gates-no-controls",
+  "exclusive_target_grant": {
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "previous_owner_released": true,
+    "cpu_exclusive": false,
+    "target_exclusive": true
+  },
+  "grant_id": "root-cloud-efbf-df389a7742c14d94b5fd9c6068c07041",
+  "concurrency_context": {
+    "mode": "Root-authorized Cloud two jobs after Second released its lane; Fourth external reservation two jobs",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Second release confirmed by Queue6390983252 and6391078369. Root-managed sibling native/compiler sessions are zero. Fourth has a separately owned two-job Linux Skills reservation, possibly active; its native handle is not supplied. Max four jobs across these two newly allocated lanes, not a global host cap. Existing external workloads remain disclosed; no isolation/timing claim.",
+    "other_active_compiler_jobs": 0,
+    "total_bounded_compile_jobs": 2,
+    "this_gate_compiler_jobs": 2,
+    "later_other_compile_job_limit": 2,
+    "maximum_later_total_compile_jobs": 4,
+    "other_active_native_sessions": [],
+    "other_active_targets": [],
+    "budget_scope": "THESE TWO NEW LANES ONLY; not a global host/compiler cap",
+    "external_existing_allocation": {
+      "builder_role": "Name",
+      "reported_phase": "Update TEST",
+      "included_in_two_new_lane_cap": false,
+      "actual_native_handle": "not supplied in this source task",
+      "no_global_budget_or_isolation_claim": true
+    },
+    "queue_source": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6390846602",
+    "resource_context_amendment_sha256": "87b4332dcfaebae53f4e2565f6e35a00bd9f6c6002dd918e0c19c5f4c66f3d10",
+    "allocation_state": "Cloud two-job lane authorized; Fourth external two-job reservation retained",
+    "external_reserved_compiler_jobs": 2,
+    "external_reservation_source": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6390731688",
+    "second_release_source": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6391078369"
+  },
+  "initial_target_decision": {
+    "supported_full_clean_receipt_sha256": "e76c4895d65bc92c3bf91349217cc32e4fefdef9b902615d55c3f54594943ca6",
+    "empty_target_check_approved": true,
+    "storage_capacity_approved": true,
+    "old_forensic_witnesses_preserved": true,
+    "free_bytes_at_grant": 13761556480,
+    "reserve_only_not_peak_guarantee": true
+  },
+  "root_reviewed": true,
+  "zero_execution_old_failure_retained": true
+}

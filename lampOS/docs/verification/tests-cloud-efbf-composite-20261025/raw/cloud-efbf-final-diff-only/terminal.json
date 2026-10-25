@@ -1,0 +1,41 @@
+{
+  "success": true,
+  "record": {
+    "command": [
+      "git",
+      "diff",
+      "--check",
+      "HEAD",
+      "--"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events",
+    "started_at": "2026-10-25T00:24:51.411535+00:00",
+    "timeout_seconds": 60,
+    "stdout": "original-unlaunched-diff-check.stdout.txt",
+    "stderr": "original-unlaunched-diff-check.stderr.txt",
+    "timeout_cleanup": [],
+    "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+    "owned_pid": 58922,
+    "owned_process_group": 58922,
+    "timed_out": false,
+    "exit_code": 0,
+    "unexpected_residual_group_after_normal_exit": false,
+    "direct_status_before_cleanup": 0,
+    "owned_group_present_before_cleanup": false,
+    "direct_wait_status": 0,
+    "owned_group_absent_after_cleanup": true,
+    "wall_seconds": 0.097076,
+    "finished_at": "2026-10-25T00:24:51.509079+00:00",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 0,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "source_guards": {
+    "canonical": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5"
+  },
+  "all_seven_actual_source_gates_passed_across_original_six_and_this_one": true,
+  "original_storage_failure_retained": true,
+  "no_test_compiler_or_formatter_repeated": true,
+  "five_external_witnesses_reverified": true
+}

@@ -1,0 +1,296 @@
+{
+  "success": true,
+  "head": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2",
+  "source_guard_before_after": {
+    "canonical": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5"
+  },
+  "exact_PATH_prefix": "/Users/autonomous/.cargo/bin:",
+  "inherited_PATH_sha256": "3d1ececdb7d7bd3ebee18ed6a4557eb58e94bff5e6c461f6cfb33fa71d75ec86",
+  "effective_PATH_sha256": "d907a22e359ef499fa2bee852f0358def00623bf02d5e87e63d6316028c4004f",
+  "proxies": {
+    "cargo": {
+      "which": "/Users/autonomous/.cargo/bin/cargo",
+      "resolved_proxy": "/Users/autonomous/.cargo/bin/rustup",
+      "proxy_binding": {
+        "path": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "mode": "0o755",
+        "bytes": 12945744,
+        "mtime_ns": 1791604389684037174
+      }
+    },
+    "rustc": {
+      "which": "/Users/autonomous/.cargo/bin/rustc",
+      "resolved_proxy": "/Users/autonomous/.cargo/bin/rustup",
+      "proxy_binding": {
+        "path": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "mode": "0o755",
+        "bytes": 12945744,
+        "mtime_ns": 1791604389684037174
+      }
+    },
+    "rustfmt": {
+      "which": "/Users/autonomous/.cargo/bin/rustfmt",
+      "resolved_proxy": "/Users/autonomous/.cargo/bin/rustup",
+      "proxy_binding": {
+        "path": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "mode": "0o755",
+        "bytes": 12945744,
+        "mtime_ns": 1791604389684037174
+      }
+    },
+    "cargo-clippy": {
+      "which": "/Users/autonomous/.cargo/bin/cargo-clippy",
+      "resolved_proxy": "/Users/autonomous/.cargo/bin/rustup",
+      "proxy_binding": {
+        "path": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "mode": "0o755",
+        "bytes": 12945744,
+        "mtime_ns": 1791604389684037174
+      }
+    },
+    "clippy-driver": {
+      "which": "/Users/autonomous/.cargo/bin/clippy-driver",
+      "resolved_proxy": "/Users/autonomous/.cargo/bin/rustup",
+      "proxy_binding": {
+        "path": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "mode": "0o755",
+        "bytes": 12945744,
+        "mtime_ns": 1791604389684037174
+      }
+    }
+  },
+  "real_tool_bindings": {
+    "cargo": {
+      "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo",
+      "sha256": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+      "mode": "0o755",
+      "bytes": 34365184,
+      "mtime_ns": 1791604158098993625
+    },
+    "rustc": {
+      "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustc",
+      "sha256": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499",
+      "mode": "0o755",
+      "bytes": 401528,
+      "mtime_ns": 1791604178791774138
+    },
+    "rustfmt": {
+      "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustfmt",
+      "sha256": "e0d4e3ba5e00cf354d17cc1e58973e8ead1b67dd5968254baabe950ecbf2461f",
+      "mode": "0o755",
+      "bytes": 4771560,
+      "mtime_ns": 1791604162369453681
+    },
+    "cargo-clippy": {
+      "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo-clippy",
+      "sha256": "9b052995bbadbdfdf6fa00786225a4fac9379604355976d5caa762c59c403d38",
+      "mode": "0o755",
+      "bytes": 1100352,
+      "mtime_ns": 1791604157431546848
+    },
+    "clippy-driver": {
+      "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/clippy-driver",
+      "sha256": "6863d97a19fa9ec53da799f1b24fb80373a5a8ffac8bd31a46beb4503b301b80",
+      "mode": "0o755",
+      "bytes": 14290592,
+      "mtime_ns": 1791604157437720046
+    }
+  },
+  "raw_VERSION_records": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "--version"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+      "started_at": "2026-10-24T23:39:48.198969+00:00",
+      "timeout_seconds": 120,
+      "stdout": "cargo-version.stdout.txt",
+      "stderr": "cargo-version.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "available_bytes_before_Cargo": 11476430848,
+      "owned_pid": 5925,
+      "owned_process_group": 5925,
+      "timed_out": false,
+      "exit_code": 0,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 0,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 0,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 0.057888,
+      "finished_at": "2026-10-24T23:39:48.257137+00:00",
+      "stdout_sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+      "stdout_bytes": 36,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "command": [
+        "rustc",
+        "+1.96.0",
+        "--version",
+        "--verbose"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+      "started_at": "2026-10-24T23:39:53.038785+00:00",
+      "timeout_seconds": 120,
+      "stdout": "rustc-version.stdout.txt",
+      "stderr": "rustc-version.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "owned_pid": 5999,
+      "owned_process_group": 5999,
+      "timed_out": false,
+      "exit_code": 0,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 0,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 0,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 0.117624,
+      "finished_at": "2026-10-24T23:39:53.156510+00:00",
+      "stdout_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+      "stdout_bytes": 191,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "command": [
+        "rustfmt",
+        "+1.96.0",
+        "--version"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+      "started_at": "2026-10-24T23:39:58.011508+00:00",
+      "timeout_seconds": 120,
+      "stdout": "rustfmt-version.stdout.txt",
+      "stderr": "rustfmt-version.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "owned_pid": 6848,
+      "owned_process_group": 6848,
+      "timed_out": false,
+      "exit_code": 0,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 0,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 0,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 0.081238,
+      "finished_at": "2026-10-24T23:39:58.092889+00:00",
+      "stdout_sha256": "58e77f09cbe97eb2d0ab9174e5523494d03814f2879c8e187ed66370320abc7c",
+      "stdout_bytes": 45,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--version"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+      "started_at": "2026-10-24T23:40:02.992809+00:00",
+      "timeout_seconds": 120,
+      "stdout": "clippy-version.stdout.txt",
+      "stderr": "clippy-version.stderr.txt",
+      "timeout_cleanup": [],
+      "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+      "available_bytes_before_Cargo": 11475959808,
+      "owned_pid": 6922,
+      "owned_process_group": 6922,
+      "timed_out": false,
+      "exit_code": 0,
+      "unexpected_residual_group_after_normal_exit": false,
+      "direct_status_before_cleanup": 0,
+      "owned_group_present_before_cleanup": false,
+      "direct_wait_status": 0,
+      "owned_group_absent_after_cleanup": true,
+      "wall_seconds": 0.187139,
+      "finished_at": "2026-10-24T23:40:03.180085+00:00",
+      "stdout_sha256": "bbad497025b736fef6248108743f7d93b5421664e5d3c86c44119cad8d381ad9",
+      "stdout_bytes": 38,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    }
+  ],
+  "versions": {
+    "cargo-version": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
+    "rustc-version": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+    "rustfmt-version": "rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\n",
+    "clippy-version": "clippy 0.1.96 (ac68faa20c 2026-05-25)\n"
+  },
+  "safe_overrides": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "all_environment_value_hashes": {
+    "BROWSER": "d0b6ba29fa444dbefb6c0f735811514bdb0b8646ba06d3917f4d4cd052049629",
+    "CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "CODEX_CI": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "CODEX_HOME": "ba5b6b85484dde803c45d8642c64d8e38e2e5c6cb174fb9a4d080617fafc644c",
+    "CODEX_MANAGED_BY_NPM": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "CODEX_MANAGED_PACKAGE_ROOT": "c3ba0b102f0534b19f9689c7f6e38551a7534f092d1aae73a542882980198b51",
+    "CODEX_SANDBOX": "55ac47ff1fb492c5c046c155cc9ea3f0d9af344002e4608fee13de3877bb1c3b",
+    "CODEX_SANDBOX_NETWORK_DISABLED": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "CODEX_SESSION_ID": "1f3880802d127d84b495722e397d10408929dade7650ac2ef27bb583d97f090f",
+    "CODEX_THREAD_ID": "cb4792de6a50da1316b48b6a60401f644d424e66df44760f110b68dea90561ff",
+    "CODEX_TOOL_CALL_ID": "72ca0cedfc219fd5e0763319db203c1702c05bfedea9186e050d1a848b378d29",
+    "CODEX_VERSION": "2c8734af121bc881e725b17f9170df98aa7eb0366775151022c2b81e4778b202",
+    "COLORTERM": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "COMMAND_MODE": "f9571298e47042c0e2d1cf71c7205787c65625ebfbf4f6be7e885b272f082c50",
+    "DISABLE_AUTO_UPDATE": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+    "GH_PAGER": "77af778b51abd4a3c51c5ddd97204a9c3ae614ebccb75a606c3b6865aed6744e",
+    "GIT_PAGER": "77af778b51abd4a3c51c5ddd97204a9c3ae614ebccb75a606c3b6865aed6744e",
+    "GRID_NO_UPDATE_CHECK": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "HARNESS_NATIVE_LAUNCH_TOKEN": "a3adcd3a1c79eddabf5a92b84ebf58cc5efc92cfdc61aef0ca075dc2dc730f4a",
+    "HARNESS_PREVIOUS_BROWSER": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "HOME": "27190ac24934972eae20178e7d7d6802b5f59e73a4c122d185e1a9e31d47660c",
+    "LANG": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "LC_ALL": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "LC_CTYPE": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "LESS": "dcd721f8f8b3e495d987c362617a4b959d26564e45fdcae0a107479440066e93",
+    "LOGNAME": "6c5e11d2e93c7349d232b9c85b68bc21745ac192c218489b08b651231c7255ae",
+    "LSCOLORS": "70b4197389a8cc428d627b719ab5c428746a96a506b979fbe1cdc6ca052585cd",
+    "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S": "8ac1bba804fae09e89b40848a9ad7de5621ce3b2557c37fddbd8de86c87717a6",
+    "NO_COLOR": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "NVM_BIN": "221f560d911e3de868815a395b16e15641e19c5c98630a990c1ea7f18b9b505e",
+    "NVM_CD_FLAGS": "5ce681666a15a41274346f65b8bcbf56f8e8170ac00706a44a09ee4d786a8609",
+    "NVM_DIR": "e4b8a4a70254ef6919b0f9f35f5f99c031d3e93b33300d9a7d5e72150f68efff",
+    "NVM_INC": "6fbf265e309476a50e7f0f0553076b2f8c6417c5d7093f7fd271d7291a6c58b2",
+    "OLDPWD": "a5f1bea4b9a4cc9261e4eb7f80f296b70b46082d3685ca0c70780293c4b97cf9",
+    "OSLogRateLimit": "a68b412c4282555f15546cf6e1fc42893b7e07f271557ceb021821098dd66c1b",
+    "PAGER": "77af778b51abd4a3c51c5ddd97204a9c3ae614ebccb75a606c3b6865aed6744e",
+    "PATH": "d907a22e359ef499fa2bee852f0358def00623bf02d5e87e63d6316028c4004f",
+    "PWD": "a5f1bea4b9a4cc9261e4eb7f80f296b70b46082d3685ca0c70780293c4b97cf9",
+    "SHELL": "b663616e0c19c82649403596a2fa8185e4ef34c22f2bc3623359e9f0428b9153",
+    "SHLVL": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "SSH_AUTH_SOCK": "9a6e202c29b15daea41e602cf4981c8f1daa23d665cc176987e07712f34250e1",
+    "TERM": "ac996ae492f9a987c84f109f2118d3f6632e2259455d30c455a9ecd66c3c4959",
+    "TERM_PROGRAM": "adb519257aeb1f37c2d1813d52f5d5d9891594019d48462a01ac8820de714b17",
+    "TERM_PROGRAM_VERSION": "56e9f8cb0563a8bd00855de90b49d9f07656d3e6d46816e6f09e37d8f27733fe",
+    "TMPDIR": "b401daa7e11b9ef6591fb61fb53d946efd103389f8daf85e35b2a0f7c03985e9",
+    "TMUX": "4c1bc150a961f8012c6c706d958bb49605c8d09fd9b2ab7670f9e91aa0252e90",
+    "TMUX_PANE": "963000aeef7913ffaf4f989798c50bc4ce4ff8c35e839f0fc23ef8e352301ea9",
+    "USER": "6c5e11d2e93c7349d232b9c85b68bc21745ac192c218489b08b651231c7255ae",
+    "XPC_FLAGS": "b8ad1bd2ff50021ff6a1239585cc9ccde31e70072299c3cc910da54f9e791f7c",
+    "XPC_SERVICE_NAME": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "ZSH": "b275eb9707d06f0eed47e56a3dd740b26462ac8c20fc9c612d5a3908d20b3dfb",
+    "__CFBundleIdentifier": "78eea08273789be6b45ddd7f433f55c20ed90becce56f6783903e3376eced8db",
+    "__CF_USER_TEXT_ENCODING": "bfea86ae0b123713ac5b1af20b2dd4ead4f0bb81822ed654e80347e6fa420f3b",
+    "is_vim": "6851855baeefc152d2e00bd952ba63152e7646d0bc3f69f77c9a5bc76a531b29",
+    "_": "aee8b7b246df8f9039afb4144a1f6fd8d2ca17a180786b69acc140d282b71a49",
+    "CARGO_TARGET_DIR": "dff6fdd784b2fa229ab45ed2f3ee20b1a3bea306b3cdc74db22b5e0bdd1793cf",
+    "CARGO_BUILD_JOBS": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+  },
+  "no_compile_tests_source_format_or_target_operations": true
+}

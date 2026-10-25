@@ -1,0 +1,1 @@
+/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target/debug/deps/lamp_cloud-41eb706784ccd943: Mach-O 64-bit executable x86_64

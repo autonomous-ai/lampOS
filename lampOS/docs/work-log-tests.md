@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-25 07:32 — Cloud local checks complete; source carry pushed
+
+Ready for lamp-voice: no
+
+#3410 is pushed as 2cfbabbc9 on frozen efbf, with equal range-diff from 38. [Complete current-source proof](verification/tests-cloud-efbf-composite-20261025/) records formatting, strict Clippy, full Cloud 196/0/4 and workspace build passing, with 32/32/96 fresh local lineage records. The first allocation stopped below the unchanged 5 GiB reserve before launching its final diff; all 18 launched commands closed zero. After cache-only recovery, the one original unlaunched diff passed in a separate allocation on unchanged source. All raw stops, 36 original streams and five saved executable bindings remain; no test, compiler or formatter repeated. Actual pinned versions and one current metadata query are included; old missing-PATH zero-execution failure is retained. Copies of binaries and scratch script bodies are omitted.
+
+Root preserved the original generic Cargo cleanup refusal, then used a separately documented absolute pinned cleanup-only command on the released target; it closed zero in 563.248555 s. No source/raw/saved witness was deleted and no build/test reserve lowered. Current native checks, latest 162 composition and independent reads remain before ready. The compiler lane is released to Second's queued fresh-target Supervisor qualification; Fourth's independent fixed Skills observations retain their slot and every setup/parser failure. Body Hand controls remain unrun.
+
 ## 2026-10-25 06:17 — Body Hand event sequencing taken
 
 Ready for lamp-voice: no

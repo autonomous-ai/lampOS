@@ -1,0 +1,63 @@
+{
+  "original_native": 30349,
+  "original_packet_unchanged": true,
+  "no_Cargo_executable_started": true,
+  "source_guard_unchanged": true,
+  "files": [
+    {
+      "path": "old-30349-bootstrap/run-2026-10-24T233013.528913+0000/results.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run-2026-10-24T233013.528913+0000/results.json",
+      "sha256": "2023b14655723c1668a5fbd58ee547b085e6490867a2946ced96081e9afb9e53"
+    },
+    {
+      "path": "old-30349-bootstrap/run-2026-10-24T233013.528913+0000/environment.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run-2026-10-24T233013.528913+0000/environment.json",
+      "sha256": "88002a0563b600c19c1cbb6c660c760d2bc3a2dd0bea52a1d9c766b12a3f91f4"
+    },
+    {
+      "path": "old-30349-bootstrap/run-2026-10-24T233013.528913+0000/fmt/fmt.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run-2026-10-24T233013.528913+0000/fmt/fmt.json",
+      "sha256": "be154601199ba150f510e9bbda7fc72f764aacfffc262248ea9f8095880ad93d"
+    },
+    {
+      "path": "old-30349-bootstrap/run-2026-10-24T233013.528913+0000/fmt/fmt.stdout.txt",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run-2026-10-24T233013.528913+0000/fmt/fmt.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "old-30349-bootstrap/run-2026-10-24T233013.528913+0000/fmt/fmt.stderr.txt",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run-2026-10-24T233013.528913+0000/fmt/fmt.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "old-30349-bootstrap/run-2026-10-24T233013.528913+0000/fmt/fmt.guards.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run-2026-10-24T233013.528913+0000/fmt/fmt.guards.json",
+      "sha256": "5d0459ef576c1d9d6299eebfb819df87b2c4e5cb4a798bf1c9d777a7b8cee01e"
+    },
+    {
+      "path": "old-30349-bootstrap/execution-consumed.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/execution-consumed.json",
+      "sha256": "e22ced63560caf699c294249e0df86c705d02330081432e0063fce008fb79ccb"
+    },
+    {
+      "path": "old-30349-bootstrap/consumed-stages/fmt.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/consumed-stages/fmt.json",
+      "sha256": "269f8041238de7c93fdecd23ff559380d44851974dfebe3da189b06d203c7996"
+    },
+    {
+      "path": "old-30349-bootstrap/canonical-source-map.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/canonical-source-map.json",
+      "sha256": "eb2acd7c338b10ef663a570629b9f6424697110445f7ecbac0d4d483fb5cfce7"
+    },
+    {
+      "path": "old-30349-bootstrap/plan.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/plan.json",
+      "sha256": "7bfa8b5ad98f62610d939b2520b1d896284d731b56fec8bb3bd52f677400a6c1"
+    },
+    {
+      "path": "old-30349-bootstrap/root-execution-grant.json",
+      "source_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/root-execution-grant.json",
+      "sha256": "1f17d8b1f6a2092b04f7bcb3b184f346e2faf49f660979578ee3eb0d09f7527c"
+    }
+  ]
+}

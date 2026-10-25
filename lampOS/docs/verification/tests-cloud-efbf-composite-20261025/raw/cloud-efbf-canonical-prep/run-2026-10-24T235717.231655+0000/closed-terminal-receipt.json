@@ -1,0 +1,167 @@
+{
+  "schema": "closed-cloud-terminal-receipt-v1",
+  "results_sha256": "87440d0a754b05dafcb0d8ab1b487880bf9b70f43a911b0a15a0e714ac5f75f4",
+  "native_session": 49426,
+  "native_exit": 1,
+  "status": "incomplete: storage guard prevented final diff-check launch",
+  "source_head": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2",
+  "source_before": {
+    "canonical": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5"
+  },
+  "source_after": {
+    "canonical": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5"
+  },
+  "test_counts": {
+    "passed": 196,
+    "failed": 0,
+    "ignored": 4,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_target_binding": true,
+  "affected_case": [
+    {
+      "package": "lamp-cloud",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS/crates/cloud/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "name": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+      "status": "ok"
+    }
+  ],
+  "commands": [
+    {
+      "path": "clean-before-workspace-build/clean-before-workspace-build.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "fmt/fmt.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/tests.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "clippy/clippy.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "workspace-build/workspace-build.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "clean-before-tests/clean-before-tests.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-lamp_cloud-c7e2f813cf/file.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-lamp_cloud-c7e2f813cf/ignored.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-lamp_cloud-c7e2f813cf/all.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-lamp-cloud-228cdddd7a/file.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-lamp-cloud-228cdddd7a/ignored.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-lamp-cloud-228cdddd7a/all.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-release_pair-e608f9626a/file.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-release_pair-e608f9626a/ignored.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-release_pair-e608f9626a/all.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-it-e164b9f3f2/file.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-it-e164b9f3f2/ignored.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    },
+    {
+      "path": "tests/compiled-census/lamp-cloud-it-e164b9f3f2/all.json",
+      "exit": 0,
+      "wait": 0,
+      "absent": true
+    }
+  ],
+  "frozen_witnesses_verified": 5,
+  "failure_storage": {
+    "checked_at": "2026-10-25T00:10:37.786232+00:00",
+    "available_bytes": 4864983040,
+    "minimum_reserve_bytes": 5368709120,
+    "planned_witness_bytes": 0,
+    "required_bytes": 5368709120,
+    "sufficient": false
+  },
+  "unlaunched_stage": "diff-check",
+  "raw_unrun_steps_limit": "Raw results has unrun_steps=[] because slot was consumed before preflight; diff-check has no command record and was not launched.",
+  "retry": false,
+  "no_cause_claim": true,
+  "cpu_target_release": "Owned native session is terminal; all18 launched command groups closed. Target/files remain unchanged; no further execution authorized."
+}

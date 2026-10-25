@@ -1,0 +1,12 @@
+{
+  "consumed_at": "2026-10-24T23:57:17.230524+00:00",
+  "grant_id": "root-cloud-efbf-df389a7742c14d94b5fd9c6068c07041",
+  "grant_sha256": "00a9870e207eb0b78d54982443f7cbe7ceb1465670f7e48ef662b87cc92bb152",
+  "plan_sha256": "de21191434a25ac348a0462e95a74fd7f4cd38975095bcef7b400125c8e200c5",
+  "controller_sha256": "0808d56b5646b5836de93b807bd3aa6193d6527121e90efdf02e519cfc30cf37",
+  "source_guards": {
+    "canonical": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5"
+  },
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+  "permanent_even_if_aborted": true
+}

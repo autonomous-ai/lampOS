@@ -1,0 +1,15 @@
+{
+  "reason": "Generic helper refused cleanup before Popen because its build reserve applies to every literal cargo command. This separately authorized absolute pinned Cargo invocation ONLY releases the verified completed cache; no build/test reserve is lowered.",
+  "argv": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "clean",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target"
+  ],
+  "prior_zero_launch_refusal_retained": true,
+  "target_exclusive_and_all_prior_command_groups_closed": true,
+  "five_witnesses_outside_target_verified": true
+}

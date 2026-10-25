@@ -1,0 +1,118 @@
+{
+  "started_at": "2026-10-24T23:30:13.547216+00:00",
+  "source_before": {
+    "canonical": "5c84a9bf351ba24907e105ae9ad05802f33e0af48cbe75a6782834062d94cffa"
+  },
+  "steps": [
+    {
+      "id": "fmt",
+      "state": "invalid/incomplete or failed non-test gate",
+      "claim": {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/consumed-stages/fmt.json",
+        "sha256": "269f8041238de7c93fdecd23ff559380d44851974dfebe3da189b06d203c7996",
+        "mode": "0o600",
+        "bytes": 728,
+        "mtime_ns": 1792884615776157540
+      },
+      "storage_before": {
+        "checked_at": "2026-10-24T23:30:15.814807+00:00",
+        "available_bytes": 11493752832,
+        "minimum_reserve_bytes": 5368709120,
+        "planned_witness_bytes": 0,
+        "required_bytes": 5368709120,
+        "sufficient": true
+      },
+      "command": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+        "started_at": "2026-10-24T23:30:18.055373+00:00",
+        "timeout_seconds": 300,
+        "stdout": "fmt.stdout.txt",
+        "stderr": "fmt.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "available_bytes_before_Cargo": 11494305792,
+        "controller_exception": "FileNotFoundError(2, 'No such file or directory')",
+        "wall_seconds": 0.01852,
+        "finished_at": "2026-10-24T23:30:18.074009+00:00",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 0,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    }
+  ],
+  "unrun_steps": [
+    "clippy",
+    "clean-before-tests",
+    "tests",
+    "clean-before-workspace-build",
+    "workspace-build",
+    "diff-check"
+  ],
+  "status": "stopped invalid/incomplete or non-test gate failed; no retry",
+  "execution_consumed": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/execution-consumed.json",
+    "sha256": "e22ced63560caf699c294249e0df86c705d02330081432e0063fce008fb79ccb",
+    "mode": "0o600",
+    "bytes": 664,
+    "mtime_ns": 1792884613528296265
+  },
+  "terminal": false,
+  "all_gates_passed": false,
+  "historical_cause_claim": false,
+  "diagnostic_control_executable_used": false,
+  "concurrency_context": {
+    "mode": "Root-reserved Cloud2 plus future FourthSkills2 on distinct targets; existing Name allocation reported separately",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Fourth is preparing Skills fixed controls, not executing/compiling yet. Name has an existing Mac gate in Update TEST phase and may overlap. Reserve Cloud2 plus future FourthSkills2, at most4 for THESE TWO NEW LANES only, not a global host cap. No isolation claim.",
+    "other_active_compiler_jobs": 0,
+    "total_bounded_compile_jobs": 2,
+    "this_gate_compiler_jobs": 2,
+    "later_other_compile_job_limit": 2,
+    "maximum_later_total_compile_jobs": 4,
+    "other_active_native_sessions": [],
+    "other_active_targets": [],
+    "budget_scope": "THESE TWO NEW LANES ONLY; not a global host/compiler cap",
+    "external_existing_allocation": {
+      "builder_role": "Name",
+      "reported_phase": "Update TEST",
+      "included_in_two_new_lane_cap": false,
+      "actual_native_handle": "not supplied in this source task",
+      "no_global_budget_or_isolation_claim": true
+    },
+    "queue_source": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6390846602",
+    "resource_context_amendment_sha256": "87b4332dcfaebae53f4e2565f6e35a00bd9f6c6002dd918e0c19c5f4c66f3d10"
+  },
+  "isolated_load_or_timing_claim": false,
+  "initialization": {
+    "supported_full_clean_receipt_sha256": "e76c4895d65bc92c3bf91349217cc32e4fefdef9b902615d55c3f54594943ca6",
+    "target_empty_before_new_gates": true,
+    "source_head": "6c4be6cfaf16bf26f9337ffe3edd5470ab9d8a94",
+    "old_execution_relabelled": false,
+    "storage": {
+      "checked_at": "2026-10-24T23:30:13.585969+00:00",
+      "available_bytes": 11494060032,
+      "minimum_reserve_bytes": 5368709120,
+      "planned_witness_bytes": 0,
+      "required_bytes": 5368709120,
+      "sufficient": true
+    }
+  },
+  "error": "FileNotFoundError(2, 'No such file or directory')",
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run.py\", line 331, in main\n    record = command(step['argv'], variant, env, stage, step['id'], step['timeout'], cwd=Path(step.get('cwd', str(wt / 'lampOS'))))\n  File \"/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/run.py\", line 73, in command\n    record = common.run_command(argv, cwd or Path(variant['worktree']) / 'lampOS', env, folder, label, timeout)\n  File \"/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-da570-canonical-prep/support.py\", line 85, in run_command\n    process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=out,\n                               stderr=err, start_new_session=True)\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1038, in __init__\n    self._execute_child(args, executable, preexec_fn, close_fds,\n    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n                        pass_fds, cwd, env,\n                        ^^^^^^^^^^^^^^^^^^^\n    ...<5 lines>...\n                        gid, gids, uid, umask,\n                        ^^^^^^^^^^^^^^^^^^^^^^\n                        start_new_session, process_group)\n                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/Cellar/python@3.14/3.14.2/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py\", line 1989, in _execute_child\n    raise child_exception_type(errno_num, err_msg, err_filename)\nFileNotFoundError: [Errno 2] No such file or directory: 'cargo'\n",
+  "source_after": {
+    "canonical": "5c84a9bf351ba24907e105ae9ad05802f33e0af48cbe75a6782834062d94cffa"
+  },
+  "finished_at": "2026-10-24T23:30:22.442906+00:00",
+  "runner_exit_code": 1
+}

@@ -1,0 +1,5 @@
+{
+  "only_VERSION_commands": true,
+  "no_compiler_test_formatter_execution": true,
+  "PATH_prefix": "/Users/autonomous/.cargo/bin"
+}

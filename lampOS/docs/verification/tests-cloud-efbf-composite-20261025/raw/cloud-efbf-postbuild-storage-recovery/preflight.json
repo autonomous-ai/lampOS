@@ -1,0 +1,8 @@
+{
+  "purpose": "Released compiler-cache recovery after six actual successful gate stages; final diff never launched",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+  "source_head": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2",
+  "five_immutable_saved_executables_verified_outside_target": true,
+  "no_source_raw_or_witness_deletion": true,
+  "prior_gate_receipt_sha256": "ebe266bc18b78f8ce8bfd800530a9b8da6d22f2a8eda767d3fdc52444bd6f5f2"
+}

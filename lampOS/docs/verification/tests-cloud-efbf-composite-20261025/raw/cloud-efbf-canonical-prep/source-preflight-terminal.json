@@ -1,0 +1,41 @@
+{
+  "head": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2",
+  "base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "source_paths": 10460,
+  "source_guard": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5",
+  "controller_sha256": "0808d56b5646b5836de93b807bd3aa6193d6527121e90efdf02e519cfc30cf37",
+  "plan_sha256": "1cd6ae4d9107781f98c9a5b865ade9e883d4d60e310cdd23f51d3e4025e13d80",
+  "controller_diff_sha256": "320bd9806ed255e988ba6152e22dc0b2573dd5f3d4b8151d5a07fd45ef528a02",
+  "source_map_sha256": "75944e3e310fb30d886882f1f700341dfb083f26aa8e3e2ffe7b9ffc126518af",
+  "native_version_preflight_session": 91472,
+  "native_version_preflight_exit": 0,
+  "native_prerequisite_proof_sha256": "157426a07dd092083856b5c421d8b3a8c9291a37d45f121eddd1e1dac4c4d157",
+  "actual_metadata_session": 61089,
+  "actual_metadata_query_count": 1,
+  "actual_metadata_raw_sha256": "a028aca64b389125d59dff5c7e5cab44c4751747b5c8daebfd689974cda2827a",
+  "actual_metadata_proof_sha256": "631cef3f6e78dda4da913a0502b2922931217dd79abb1d40a17823bd21647925",
+  "metadata_counts": {
+    "packages": 451,
+    "resolve_nodes": 451,
+    "local_declared_names": 48,
+    "manifest_lock_config_inputs": 51
+  },
+  "actual_metadata_recorded_started_at": "2026-10-24T23:41:27.704940+00:00",
+  "actual_metadata_recorded_finished_at": "2026-10-24T23:41:31.048171+00:00",
+  "target_before": {
+    "exists": false,
+    "entries": []
+  },
+  "target_after": {
+    "exists": false,
+    "entries": []
+  },
+  "prepare_only_session": 76741,
+  "prepare_only_exit": 0,
+  "module_import_passed": true,
+  "source_guard_unchanged": true,
+  "old30349_preserved_manifest_sha256": "5eed2755dd015e298b3e80f48106229066990341a5174e620134cef53ad98dda",
+  "supported_full_clean_initialization_still83445": true,
+  "compiler_reservation_pending_SecondSupervisor_release": true,
+  "no_gate_compile_test_source_formatter_commit_or_push": true
+}

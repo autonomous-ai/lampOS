@@ -1,0 +1,12 @@
+{
+  "scope": "ONE original unlaunched git diff check only; no compile/test/format repetition",
+  "head": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2",
+  "source_guards": {
+    "canonical": "62f218f30dcc6ca4ca7aba751fb4440d6a7218cfd1df4535a41aad7e4c2fdce5"
+  },
+  "prior_results_sha256": "87440d0a754b05dafcb0d8ab1b487880bf9b70f43a911b0a15a0e714ac5f75f4",
+  "prior_storage_stop_retained": true,
+  "reserve_bytes": 5368709120,
+  "available_bytes": 11273211904,
+  "auxiliary_cache_clean_native11804_may_still_be_running_outside_source": true
+}

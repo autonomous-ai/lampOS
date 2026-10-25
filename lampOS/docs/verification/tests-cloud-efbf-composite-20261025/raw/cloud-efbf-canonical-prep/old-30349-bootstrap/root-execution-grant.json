@@ -1,0 +1,58 @@
+{
+  "plan_identity": "cloud-da570-seven-new-canonical-gates",
+  "plan_sha256": "7bfa8b5ad98f62610d939b2520b1d896284d731b56fec8bb3bd52f677400a6c1",
+  "controller_sha256": "faa666e4b5324c95331f775a35ae54d459bd9760a0d59f48667b415bb6edab05",
+  "source_map_sha256": {
+    "canonical": "eb2acd7c338b10ef663a570629b9f6424697110445f7ecbac0d4d483fb5cfce7"
+  },
+  "source_guards": {
+    "canonical": "5c84a9bf351ba24907e105ae9ad05802f33e0af48cbe75a6782834062d94cffa"
+  },
+  "source_heads": {
+    "canonical": "6c4be6cfaf16bf26f9337ffe3edd5470ab9d8a94"
+  },
+  "execution_authorized": true,
+  "grant_scope": "seven-new-da570-canonical-cloud-stages-no-controls",
+  "exclusive_target_grant": {
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "previous_owner_released": true,
+    "cpu_exclusive": false,
+    "target_exclusive": true
+  },
+  "grant_id": "root-cloud-da570-fe3bd73681d741bf997a54f2334a214b",
+  "concurrency_context": {
+    "mode": "Root-reserved Cloud2 plus future FourthSkills2 on distinct targets; existing Name allocation reported separately",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-cargo-target",
+    "cpu_exclusive": false,
+    "this_target_exclusive": true,
+    "isolated_load_or_timing_claim": false,
+    "scope": "Fourth is preparing Skills fixed controls, not executing/compiling yet. Name has an existing Mac gate in Update TEST phase and may overlap. Reserve Cloud2 plus future FourthSkills2, at most4 for THESE TWO NEW LANES only, not a global host cap. No isolation claim.",
+    "other_active_compiler_jobs": 0,
+    "total_bounded_compile_jobs": 2,
+    "this_gate_compiler_jobs": 2,
+    "later_other_compile_job_limit": 2,
+    "maximum_later_total_compile_jobs": 4,
+    "other_active_native_sessions": [],
+    "other_active_targets": [],
+    "budget_scope": "THESE TWO NEW LANES ONLY; not a global host/compiler cap",
+    "external_existing_allocation": {
+      "builder_role": "Name",
+      "reported_phase": "Update TEST",
+      "included_in_two_new_lane_cap": false,
+      "actual_native_handle": "not supplied in this source task",
+      "no_global_budget_or_isolation_claim": true
+    },
+    "queue_source": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6390846602",
+    "resource_context_amendment_sha256": "87b4332dcfaebae53f4e2565f6e35a00bd9f6c6002dd918e0c19c5f4c66f3d10"
+  },
+  "initial_target_decision": {
+    "supported_full_clean_receipt_sha256": "e76c4895d65bc92c3bf91349217cc32e4fefdef9b902615d55c3f54594943ca6",
+    "empty_target_check_approved": true,
+    "storage_capacity_approved": true,
+    "old_forensic_witnesses_preserved": true,
+    "actual_root_free_bytes": 11496148992,
+    "reserve_only_not_peak_guarantee": true
+  },
+  "root_reviewed": true,
+  "limits": "Seven exact new canonical gates once. No initial clean or A/B/solo controls. All real test0/101 retained; invalid/infrastructure/cleanup/timeout stops, no retry. Cloud2 plus reserved FourthSkills2 only; known external Name workload disclosed, no host cap/isolation claim."
+}
