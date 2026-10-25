@@ -10,6 +10,35 @@ on:
     paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml', '.github/scripts/lampos-*.py']
 
 jobs:
+  imager:
+    name: Image builder — signatures · bootstrap · output
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: image test tools (same Ubuntu release as the builder)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends jq openssl e2fsprogs
+          python -m pip install pytest
+      - name: image shell syntax
+        run: |
+          bash -n scripts/imager/build-orangepi-v2.sh
+          bash -n scripts/imager/lib/verify_lampos_envelope.sh
+          bash -n scripts/imager/tests/test_lampos_envelope.sh
+          bash -n scripts/imager/tests/test_lampos_image_bootstrap.sh
+          sh -n scripts/imager/tests/test_v2_image_output.sh
+      - name: signed bootstrap and output contracts (no image or device)
+        run: |
+          bash scripts/imager/tests/test_lampos_envelope.sh
+          bash scripts/imager/tests/test_lampos_image_bootstrap.sh
+          sh scripts/imager/tests/test_v2_image_output.sh
+      - name: existing image integrity and resize tests (disposable files only)
+        run: python -m pytest scripts/imager/tests -q
+
   go:
     name: Go (system) — build · vet · test
     runs-on: ubuntu-latest

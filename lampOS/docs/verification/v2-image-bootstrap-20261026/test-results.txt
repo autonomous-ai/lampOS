@@ -1,0 +1,66 @@
+Full source gate, before the fixture schema correction:
+Shell syntax: passed
+Workflow YAML: valid
+Cargo formatting: passed
+PASS: exact_bytes_and_trailing_newlines
+PASS: public_key_outer_whitespace
+PASS: changed_manifest_bytes
+PASS: removed_manifest_newlines
+PASS: wrong_trusted_key
+PASS: attacker_key_relabeled_as_trusted
+PASS: wrong_key_fingerprint
+PASS: wrong_envelope_format
+PASS: tampered_signature
+PASS: truncated_signature
+PASS: missing_base64_padding
+PASS: manifest_base64_whitespace
+PASS: malformed_base64
+PASS: truncated_public_key
+PASS: malformed_public_key
+PASS: noncanonical_public_key_padding_bits
+PASS: malformed_envelope_json
+PASS: unknown_envelope_field
+PASS: nonstring_envelope_field
+PASS: multiple_envelope_roots
+PASS: duplicate_envelope_field
+PASS: signed_duplicate_manifest_object
+PASS: signed_duplicate_nested_field
+PASS: signed_multiple_manifest_roots
+PASS: signed_malformed_manifest
+PASS: manifest_size_limit
+PASS: oversized_signed_manifest
+PASS: envelope_size_limit
+PASS: oversized_envelope
+PASS: oversized_public_key_text
+PASS: no_output_on_failure
+Tests: 31 passed, 0 failed
+PASS current/attacker: exit=1, installs=0
+PASS current/mutable-retry: exit=0, installs=2
+PASS current/wrong-record: exit=1, installs=1
+PASS current/tampered: exit=1, installs=0
+PASS current/local: exit=0, installs=1
+PASS: raw_pro_preserves_compressed_outputs
+PASS: compressed_pro_renames_current_output
+PASS: compressed_standard_keeps_same_path
+PASS: default_compression_keeps_same_path
+PASS: missing_raw_rejects_previous_compressed
+PASS: missing_compressed_rejects_previous_outputs
+PASS: empty_raw_is_rejected
+PASS: empty_compressed_is_rejected
+8 passed; 0 failed
+30 passed, 1 skipped in 7.88s
+Final source gate: passed; all input hashes unchanged
+All four Bash files individually parsed; POSIX output suite also parsed
+
+Corrected bootstrap suite, current and historical controls:
+PASS current/attacker: exit=1, installs=0
+PASS current/mutable-retry: exit=0, installs=2
+PASS current/wrong-record: exit=1, installs=1
+PASS current/tampered: exit=1, installs=0
+PASS current/local: exit=0, installs=1
+PASS baseline/attacker: exit=0, installs=1
+PASS baseline/mutable-retry: exit=0, installs=2
+PASS baseline/wrong-record: exit=0, installs=1
+PASS baseline/tampered: exit=1, installs=0
+PASS baseline/local: exit=0, installs=1
+10 behavioral observations passed; evidence retained locally

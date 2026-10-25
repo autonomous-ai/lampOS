@@ -542,7 +542,11 @@ the ship list (#737). It does not install the keeper's unit or setup's yet
 `install` puts lampOS on a lamp; it does not make the image.
 `scripts/imager/build-orangepi-v2.sh` (`make build-v2`, #2538) makes one
 that holds all of this and runs `install --setup on` into it, from one
-signed build (the imager's README, "Lamp V2 image"). It expects to
+signed build (the imager's README, "Lamp V2 image"). The build host authenticates
+the exact manifest with the supplied public key before downloading or executing
+its bootstrap updater. Both install attempts use that staged signed envelope,
+and the recorded sequence and commit must match it; a moving remote channel
+cannot silently select a second build. It expects to
 find, from the third's list on #811 (2026-10-15 17:07) and from what it
 reads itself:
 
