@@ -1,3 +1,17 @@
+## Current checkpoint: 2026-10-26 00:49 +07, Body unplug-gap fixture published
+
+[#3497](https://github.com/autonomous-ai/lampOS/pull/3497) is published non-draft at `382e2573ad69f17739580d8c210e8240d5120f2c`, based on `9e9e6733a`. It preserves the controlled sample-gap sequence and a separate enabled-Adapter lifecycle test; runtime and all other existing test bytes remain unchanged. Original PR CI is starting and current-head reviews are pending.
+
+The Mac gate passes fmt, strict all-target Body Clippy and complete fresh Body test compilation. The direct gap observation is **1 passed / 0 failed / 440 filtered**; the full serial Body command is **609 passed / 0 failed / 0 ignored** across eight summaries. Five distinct one-shot mutations each report **0 passed / 1 failed / 440 filtered**, exit 101 at their intended assertion, with no watchdog timeout. All seven executed Body test artifacts match their compiler/pre-exec bindings. All **7,075 source entries** stay fixed within each observation and return to the candidate after every mutation; owned process groups and temporary roots are closed. [Published proof](https://github.com/autonomous-ai/lampOS/tree/382e2573ad69f17739580d8c210e8240d5120f2c/lampOS/docs/verification/body-unplug-gap-clock-20261026) retains the exact commands, fresh-versus-reused artifact scopes, outcomes and hashes. The original three failed observations remain unchanged; no unchanged baseline was repeated.
+
+The single compiler job was [returned on the Queue](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6400968536). No Second compiler is active. Next is the original CI result and reader findings, with a fresh Main check before any carry or readiness update; the local gate is not Linux ARM64 qualification.
+
+[#3493](https://github.com/autonomous-ai/lampOS/pull/3493) remains landed through train #3494 at `1ee8cf7f0`. Its original and train ARM64 runs each report **7,437 passed (1 leaky), 53 skipped**, all 28 coordinator reminder cases PASS, with both Linux formatting/Clippy runs green. [Existing native evidence](verification/reminder-reset-say-20261025/native/README.md) preserves exact tested-tree identity and parser corrections; the original local Voice **4,053/0/21** retains its own execution scope.
+
+This Body work makes no historical-cause, physical-settling or hardware-latency claim. [#2810](https://github.com/autonomous-ai/lampOS/issues/2810)'s attended updater unplug remains with its lamp/person holders; [#1812](https://github.com/autonomous-ai/lampOS/issues/1812)'s trusted-public-key and device/release acceptance remain with their designated holders. No device or release action was taken.
+
+---
+
 ## Current checkpoint: 2026-10-26 00:14 +07, reminder reset/say landed; unplug fixture resumed
 
 [#3493](https://github.com/autonomous-ai/lampOS/pull/3493) landed through train #3494 as `1ee8cf7f0`. Original ARM64 40213653347 and train ARM64 40213807332 both report **7,437 passed (1 leaky), 53 skipped**; all 28 coordinator reminder cases are literal PASS. Original Linux 40213653364 and train Linux 40213807350 are green. [Native evidence](verification/reminder-reset-say-20261025/native/README.md) binds both actual tested checkouts, original/train heads and landing to complete tree `b33c85e51a2c840b3e22c866c6f89d9220668eec`.
