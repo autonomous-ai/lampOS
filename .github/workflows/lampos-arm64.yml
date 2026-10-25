@@ -72,7 +72,7 @@ name: lampOS on ARM64
 on:
   push:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py', '.github/scripts/lampos-source-times.py', '.github/scripts/lampos-publish*.py']
+    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-pr-crates.py', '.github/scripts/lampos-source-times.py', '.github/scripts/lampos-publish*.py', '.github/tools/lampos-promote/**']
   # A pull request that changes only docs a build never reads skips this run (the
   # project lead, 19 Oct 2026, #1711): the docs' and the role files' Markdown. The
   # docs that code or tests read are named again below, so a change to one still
@@ -102,12 +102,17 @@ on:
       - '.github/scripts/lampos-pr-crates.py'
       - '.github/scripts/lampos-source-times.py'
       - '.github/scripts/lampos-publish*.py'
+      - '.github/tools/lampos-promote/**'
   workflow_dispatch:
     inputs:
       full:
         description: 'Full run: every test including the realtime group, four runners, one test at a time (the nightly run)'
         type: boolean
         default: false
+      promote_sequence:
+        description: 'Promote an already published lamp-voice sequence to the stable feed; no product rebuild or signing (leave empty for a build)'
+        type: string
+        default: ''
 
 concurrency:
   # A full run has its own group, so a merge never cancels the nightly run.
@@ -117,12 +122,13 @@ concurrency:
   # commit with no binaries for the lamps and the cache not renewed
   # (devops007-P2 on #1806). Runs of commits close together now run side by
   # side, one runner each.
-  group: lampos-arm64-${{ inputs.full && 'full-' || '' }}${{ github.event.pull_request.number || (github.ref == 'refs/heads/lamp-voice' && github.sha) || github.ref }}
+  group: lampos-arm64-${{ inputs.promote_sequence && 'promotion-' || '' }}${{ inputs.full && 'full-' || '' }}${{ github.event.pull_request.number || (github.ref == 'refs/heads/lamp-voice' && github.sha) || github.ref }}
   # A newer push to a pull request makes the running one moot: it is cancelled.
   cancel-in-progress: ${{ github.ref != 'refs/heads/lamp-voice' }}
 
 jobs:
   arm64:
+    if: ${{ !inputs.promote_sequence }}
     name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 90
@@ -150,6 +156,9 @@ jobs:
       - name: artifact provenance regression (offline, disposable Cargo workspace)
         if: matrix.shard == 1
         run: python3 -B -I .github/scripts/lampos-publish-artifact-test.py
+      - name: stable promotion tests (offline, disposable test key)
+        if: matrix.shard == 1
+        run: cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
       - name: restore the cache
         id: cache
         # Match publish's eligibility exactly, so signing candidates build cold.
@@ -308,11 +317,50 @@ jobs:
           LAMPOS_UPDATE_KEY: ${{ secrets.LAMPOS_UPDATE_KEY }}
         run: python3 -I .github/scripts/lampos-publish.py --artifact build --source .
 
+  promote-stable:
+    name: lampOS — promote a tested release to the stable feed
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.promote_sequence != ''
+      && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS'
+      && vars.LAMPOS_STABLE_PROMOTION == 'on'
+    # Reuse the already branch-restricted publication environment. This job
+    # receives only its trusted PUBLIC key variable, never the signing secret.
+    environment: lampos-update-publish
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: lampos-promote-stable
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: check promotion failure controls offline
+        run: cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+      - name: verify the published release and replace the stable envelope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROMOTE_SEQUENCE: ${{ inputs.promote_sequence }}
+          PROMOTE_FULL: ${{ inputs.full }}
+          LAMPOS_STABLE_PROMOTION: ${{ vars.LAMPOS_STABLE_PROMOTION }}
+          LAMPOS_UPDATE_PUBLIC_KEY: ${{ vars.LAMPOS_UPDATE_PUBLIC_KEY }}
+        run: |
+          test "$PROMOTE_FULL" = false
+          cargo run --locked --manifest-path .github/tools/lampos-promote/Cargo.toml -- --sequence "$PROMOTE_SEQUENCE"
+
   # A full run that fails opens an issue (or comments on the open one), so a
   # realtime test broken by a merge is not left unseen: no other run has it.
   report-full-run-failure:
     needs: arm64
-    if: failure() && inputs.full
+    if: failure() && inputs.full && !inputs.promote_sequence
     runs-on: ubuntu-latest
     permissions:
       issues: write
