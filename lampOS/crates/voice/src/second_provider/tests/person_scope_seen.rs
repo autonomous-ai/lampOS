@@ -97,10 +97,17 @@ fn feed(
 /// What one line admitted as the owner A's came to: the scope each memory
 /// call ran in, the scope the line's lease ends in, and what its first
 /// round was told.
+/// A memory note asked: whose and on which words.
+type Noted = (Option<String>, String);
+
 struct Outcome {
     calls: Vec<Option<String>>,
     lease: Option<String>,
     told: Message,
+    /// Each memory note asked, as it was asked.
+    noted: Vec<Noted>,
+    /// Whose context each chat was told, in the order asked.
+    asked: Vec<Message>,
 }
 
 async fn one_line(
@@ -111,12 +118,13 @@ async fn one_line(
     boot: &'static str,
     seen: bool,
 ) -> Outcome {
-    one_line_eyes(what, words, chats, f1_speaks, boot, seen, true).await
+    one_line_eyes(what, words, chats, f1_speaks, boot, seen, true, None).await
 }
 
 /// [`one_line`], with `eyes_up` false set up by the worker with a reader
 /// that fails to start ([`failed_reader`]): the engine never gets the
 /// eyes.
+#[allow(clippy::too_many_arguments)]
 async fn one_line_eyes(
     what: &str,
     words: &str,
@@ -125,15 +133,26 @@ async fn one_line_eyes(
     boot: &'static str,
     seen: bool,
     eyes_up: bool,
+    early: Option<&str>,
 ) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(words.to_owned())].into()),
         chats: Mutex::new(chats.into()),
+        early: Mutex::new(
+            early
+                .map(|early| vec![net::Early::Words(early.to_owned())])
+                .into_iter()
+                .collect(),
+        ),
         ..Script::default()
     });
     let (engine, _, _) = scripted(script.clone());
+    // `LAMP_SECOND_PREPARED`, with early words to prepare on.
+    let engine = engine.preparing(early.is_some());
+    let noted: Arc<Mutex<Vec<Noted>>> = Arc::default();
+    let seen_noted = noted.clone();
     let cache = Arc::new(FaceCache::default());
     let calls: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
     let leases: Arc<Mutex<Vec<ScopeLease>>> = Arc::default();
@@ -161,10 +180,18 @@ async fn one_line_eyes(
         failed_reader(engine, &path, seen)
     };
     let mut engine = engine
-        .remembering(Arc::new(move |_, _, lease: Option<&ScopeLease>| {
-            seen_leases.lock().unwrap().extend(lease.cloned());
-            None
-        }))
+        .remembering(Arc::new(
+            move |_, words: &str, lease: Option<&ScopeLease>| {
+                seen_noted.lock().unwrap().push((
+                    lease
+                        .and_then(|lease| lease.scope())
+                        .and_then(|scope| scope.person().map(str::to_owned)),
+                    words.to_owned(),
+                ));
+                seen_leases.lock().unwrap().extend(lease.cloned());
+                None
+            },
+        ))
         .announcing(false);
     engine.memory_camera(true, 1);
     cache.replace(
@@ -186,11 +213,19 @@ async fn one_line_eyes(
             .scope()
             .and_then(|scope| scope.person().map(str::to_owned))
     });
-    let told = script.asked.lock().unwrap()[0][0].clone();
+    let asked: Vec<Message> = script
+        .asked
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|chat| chat[0].clone())
+        .collect();
     Outcome {
         calls: calls.lock().unwrap().clone(),
         lease,
-        told,
+        told: asked[0].clone(),
+        noted: noted.lock().unwrap().clone(),
+        asked,
     }
 }
 
@@ -299,6 +334,7 @@ async fn with_no_eyes_to_read_a_line_is_the_rooms() {
         BOOT,
         true,
         false,
+        None,
     )
     .await;
     assert_eq!(got.calls, [None], "the forget runs as the room's");
@@ -311,9 +347,83 @@ async fn with_no_eyes_to_read_a_line_is_the_rooms() {
         BOOT,
         false,
         false,
+        None,
     )
     .await;
     assert_eq!(got.calls, [Some(a)]);
+}
+
+const TOKYO: &str = "I'm flying to Tokyo next week.";
+const TOKYO_EARLY: &str = "i'm flying to tokyo next week";
+
+/// A chat that answers in words, enough for a prepared round and another.
+fn answers() -> Vec<Vec<net::Result<ChatEvent>>> {
+    vec![
+        vec![text("Have a good trip."), Ok(ChatEvent::Done)],
+        vec![text("Have a good trip."), Ok(ChatEvent::Done)],
+    ]
+}
+
+/// One line with `LAMP_SECOND_PREPARED` and early words.
+async fn prepared_line(what: &str, f1_speaks: bool, seen: bool) -> Outcome {
+    one_line_eyes(
+        what,
+        TOKYO,
+        answers(),
+        f1_speaks,
+        BOOT,
+        seen,
+        true,
+        Some(TOKYO_EARLY),
+    )
+    .await
+}
+
+/// Second's P2 on #3437: with `LAMP_SECOND_PREPARED`, the early words
+/// would ask memory and a chat told the owner's context before the line's
+/// end shows their face never spoke it. With the switch nothing is asked
+/// for them early: memory and the one chat are the room's, on the final
+/// words, and the room's answer comes.
+#[tokio::test]
+async fn an_off_camera_lines_early_words_ask_nothing_for_the_silent_owner() {
+    let got = prepared_line("early-silent", false, true).await;
+    assert_eq!(
+        got.noted,
+        [(None, TOKYO.to_owned())],
+        "memory, the room's, on the final words"
+    );
+    assert_eq!(
+        got.asked,
+        [Message::system("for None")],
+        "one chat, the room's"
+    );
+    assert_eq!(got.lease, None);
+}
+
+/// The owner seen speaking: not prepared early either, and their answer is
+/// asked on the final words in their scope.
+#[tokio::test]
+async fn the_owner_seen_speaking_is_answered_as_theirs_on_the_final_words() {
+    let a = crate::remember::person_id("A");
+    let got = prepared_line("early-owner", true, true).await;
+    assert_eq!(got.noted, [(Some(a.clone()), TOKYO.to_owned())]);
+    assert_eq!(
+        got.asked,
+        [Message::system(format!("for {:?}", Some(a.as_str())))]
+    );
+}
+
+/// Off, the early words prepare as before: memory asked on them for the
+/// owner, and the prepared round stands.
+#[tokio::test]
+async fn without_the_switch_the_early_words_still_prepare() {
+    let a = crate::remember::person_id("A");
+    let got = prepared_line("early-off", false, false).await;
+    assert_eq!(got.noted, [(Some(a.clone()), TOKYO_EARLY.to_owned())]);
+    assert_eq!(
+        got.asked,
+        [Message::system(format!("for {:?}", Some(a.as_str())))]
+    );
 }
 
 /// Off, nothing changes: the silent owner's line stays theirs, as on
