@@ -100,19 +100,61 @@ const DOUBT: &[&str] = &[
     "between",
     "before",
     "after",
+    // A condition ("when the oven is ready", "if it rains"), a day of the
+    // week or a span ("on Mondays", "twice a day", "for a week"): a one-off
+    // from now or at a clock time may not be what was asked (Third's,
+    // reviewer-three's and reviewer-two's P2s on `8e797acfe`).
+    "when",
+    "whenever",
+    "if",
+    "once",
+    "soon",
+    "while",
+    "whilst",
+    "monday",
+    "mondays",
+    "tuesday",
+    "tuesdays",
+    "wednesday",
+    "wednesdays",
+    "thursday",
+    "thursdays",
+    "friday",
+    "fridays",
+    "saturday",
+    "saturdays",
+    "sunday",
+    "sundays",
+    "everyday",
+    "mornings",
+    "afternoons",
+    "evenings",
+    "nights",
+    "day",
+    "days",
+    "week",
+    "weeks",
+    "month",
+    "months",
+    "year",
+    "years",
+    "twice",
+    "times",
+    "per",
+    "always",
 ];
+
+/// A day, which may stand only before a clock time ("remind me tomorrow at
+/// six") or after one ("at nine tonight"); a length runs from now, so "set
+/// a timer tomorrow for ten minutes" forces nothing.
+const DAY: &[&str] = &["today", "tonight", "tomorrow"];
+/// A part of the day, only after a clock time ("at seven in the morning",
+/// "at six this evening", "at nine tomorrow night").
+const PARTS: &[&str] = &["morning", "afternoon", "evening", "night"];
 
 /// Words that may stand between the ask and its time ("remind me tomorrow
-/// at six", "wake me up at seven").
-const BETWEEN: &[&str] = &["up", "tomorrow", "today", "tonight", "please", "again"];
-
-/// What may follow a clock time for it to stand as one ("at nine.", "at 6:30
-/// to …", "at seven tomorrow"), never a noun ("at 180 degrees", "at 3
-/// pharmacies").
-const AFTER_A_TIME: &[&str] = &[
-    "to", "and", "am", "pm", "a", "p", "o'clock", "tonight", "tomorrow", "today", "please",
-    "sharp", "in", "this", "on",
-];
+/// at six", "wake me up at seven"), with a [`DAY`].
+const BETWEEN: &[&str] = &["up", "please", "again"];
 
 /// Which function a line that plainly asks for a timer or a reminder
 /// ([`ASKS`]) at a sentence's start must call, from the words right after
@@ -122,18 +164,22 @@ const AFTER_A_TIME: &[&str] = &[
 /// ("remind me at nine …", "remind me tomorrow at 6:30 …", "wake me up at
 /// seven", "at noon"). A time later in the line ("remind me to tell her I got
 /// home at nine", "it needs 20 minutes at 180 degrees") forces nothing, nor
-/// a line with a word of [`DOUBT`] anywhere, nor one that is a question that
-/// isn't an ask, nor a keep taken back
-/// ([`crate::remember::asked::withdrawn`]). It errs toward not forcing.
+/// one with more after the time than "to" and its task ([`plain_task`]), nor
+/// a line with a word of [`DOUBT`] anywhere, nor one with a mark
+/// ([`marked`]), nor one that is a question that isn't an ask, nor a keep
+/// taken back ([`crate::remember::asked::withdrawn`]). It errs toward not
+/// forcing.
 pub fn asks_to_set(said: &str) -> Option<&'static str> {
     let said = said.replace('\u{2019}', "'");
-    // Quoted or measured words ("Translate: \u{201c}Remind me …\u{201d}", "at 10%")
-    // are not an ask to the lamp; the tokenizer would drop the marks.
-    if said.contains(['"', '\u{201c}', '\u{201d}', '%'])
+    let all = lower_words(&said);
+    if marked(&said)
         || crate::remember::asked::withdrawn(&said)
-        || lower_words(&said)
-            .iter()
-            .any(|word| DOUBT.contains(&word.as_str()))
+        || all.iter().any(|word| DOUBT.contains(&word.as_str()))
+        // "…, leave it." (the reviewer-lead's P3 on `8e797acfe`); not "to
+        // leave early".
+        || all
+            .windows(2)
+            .any(|pair| pair[0] == "leave" && ["it", "that", "this", "them"].contains(&pair[1].as_str()))
     {
         return None;
     }
@@ -150,16 +196,24 @@ pub fn asks_to_set(said: &str) -> Option<&'static str> {
     let (Some(sentence), None) = (sentences.next(), sentences.next()) else {
         return None;
     };
-    let (words, timer) = {
-        let words = lower_words(sentence);
+    let (words, timer, dated) = {
+        // Its words with each comma kept as one (","), so a clause after the
+        // ask's time ("…, translate that into French") is seen.
+        let words: Vec<String> = sentence
+            .split(',')
+            .enumerate()
+            .flat_map(|(at, clause)| {
+                (at > 0)
+                    .then(|| ",".to_owned())
+                    .into_iter()
+                    .chain(lower_words(clause))
+            })
+            .collect();
         let mut at = 0;
         while words
             .get(at)
-            .is_some_and(|word| BEFORE.contains(&word.as_str()))
+            .is_some_and(|word| word == "," || word == "please" || BEFORE.contains(&word.as_str()))
         {
-            at += 1;
-        }
-        if words.get(at).is_some_and(|word| word == "please") {
             at += 1;
         }
         let asking = words
@@ -183,63 +237,133 @@ pub fn asks_to_set(said: &str) -> Option<&'static str> {
                     .all(|(word, ask)| word == ask))
             .then(|| {
                 // "timer for" ends with its own "for": the length follows it.
-                let mut from = at + phrase.len() - usize::from(phrase.last() == Some(&"for"));
-                while words
-                    .get(from)
-                    .is_some_and(|word| BETWEEN.contains(&word.as_str()))
-                {
+                let after = at + phrase.len() - usize::from(phrase.last() == Some(&"for"));
+                let mut from = after;
+                while words.get(from).is_some_and(|word| {
+                    BETWEEN.contains(&word.as_str()) || DAY.contains(&word.as_str())
+                }) {
                     from += 1;
                 }
-                (words[from..].to_vec(), *timer)
+                let dated = words[after..from]
+                    .iter()
+                    .any(|word| DAY.contains(&word.as_str()));
+                (words[from..].to_vec(), *timer, dated)
             })
         })?
     };
-    let number = |word: &String| word.chars().all(|c| c.is_ascii_digit()) || is_a_number(word);
-    // A length right after the ask: "in"/"for" (a timer's only), a number,
-    // and its unit within the next two words ("in half an hour").
-    // "a"/"an" only right before its unit ("in an hour"), so "in a few
-    // minutes" is no length (the reviewer-lead's P3 on `463b13972`).
-    let article = words.get(1).is_some_and(|word| word == "a" || word == "an");
-    let duration = words
-        .first()
-        .is_some_and(|lead| lead == "in" || (timer && lead == "for"))
-        && words.get(1).is_some_and(number)
-        && if article {
-            words
-                .get(2)
-                .is_some_and(|word| UNITS.contains(&word.as_str()))
-        } else {
-            words[2..words.len().min(4)]
-                .iter()
-                .any(|word| UNITS.contains(&word.as_str()))
-        };
-    // A clock time right after the ask that stands as one: "at" and a time
-    // ("9", "6 30" as "6:30" is read, "nine"), then the line's end or a word
-    // of [`AFTER_A_TIME`]; or "at noon", "at midnight".
-    let clock = words.first().is_some_and(|lead| lead == "at")
-        && words
-            .get(1)
-            .is_some_and(|word| word == "noon" || word == "midnight" || starts_a_time(word))
-        && {
-            let mut next = 2;
-            if words
-                .get(1)
-                .is_some_and(|word| word.chars().all(|c| c.is_ascii_digit()))
-                && words
-                    .get(2)
-                    .is_some_and(|word| word.len() == 2 && word.chars().all(|c| c.is_ascii_digit()))
-            {
-                next = 3;
-            }
-            words
-                .get(next)
-                .is_none_or(|word| AFTER_A_TIME.contains(&word.as_str()))
-        };
-    match (duration, clock) {
-        (true, false) => Some(TIMER),
-        (false, true) => Some(REMINDER),
-        _ => None,
+    let (name, end) = match (length_end(&words, timer), clock_end(&words)) {
+        (Some(end), None) if !dated => (TIMER, end),
+        (None, Some(end)) => (REMINDER, end),
+        _ => return None,
+    };
+    plain_task(&words[end..]).then_some(name)
+}
+
+/// Quoted, framed or measured words ("Translate: \u{201c}Remind me …\u{201d}",
+/// "'Remind me in ten minutes to stretch' — translate that into French",
+/// "at 10%") are not an ask to the lamp, and the tokenizer would drop the
+/// marks (reviewer-two's P2 on `8e797acfe`). An apostrophe inside a word
+/// ("don't", "o'clock"), a hyphen inside one ("half-hour") and the colon of
+/// "6:30" are no mark.
+fn marked(said: &str) -> bool {
+    let chars: Vec<char> = said.chars().collect();
+    let between = |at: usize, test: fn(&char) -> bool| {
+        at > 0 && chars.get(at - 1).is_some_and(test) && chars.get(at + 1).is_some_and(test)
+    };
+    chars.iter().enumerate().any(|(at, c)| match *c {
+        '\'' => !between(at, |c| c.is_alphabetic()),
+        '-' => !between(at, |c| c.is_alphanumeric()),
+        ':' => !between(at, |c| c.is_ascii_digit()),
+        '"' | '\u{201c}' | '\u{201d}' | '\u{2018}' | '\u{2013}' | '\u{2014}' | '%' | '(' | ')'
+        | '[' | ']' => true,
+        _ => false,
+    })
+}
+
+/// Where a length at the start of `words` ends: "in" (or "for", `by_for`, a
+/// timer's), a number, and its unit within the next two words ("in half an
+/// hour"), and "and a half" after it. "a"/"an" only right before its unit
+/// ("in an hour"), so "in a few minutes" is no length (the reviewer-lead's
+/// P3 on `463b13972`).
+fn length_end(words: &[String], by_for: bool) -> Option<usize> {
+    let lead = words.first()?;
+    let count = words.get(1)?;
+    if !(lead == "in" || (by_for && lead == "for"))
+        || !(count.chars().all(|c| c.is_ascii_digit()) || is_a_number(count))
+    {
+        return None;
     }
+    let last = if count == "a" || count == "an" { 3 } else { 4 };
+    let unit = (2..words.len().min(last)).find(|&at| UNITS.contains(&words[at].as_str()))?;
+    let end = unit + 1;
+    let and_a_half = words
+        .get(end..end + 3)
+        .is_some_and(|tail| tail.iter().map(String::as_str).eq(["and", "a", "half"]));
+    Some(if and_a_half { end + 3 } else { end })
+}
+
+/// Where a clock time at the start of `words` ends, when it stands as one:
+/// "at" and a time ("9", "6 30" as "6:30" is read, "nine", "noon"), then
+/// "am"/"pm", "o'clock" or "sharp", then a day or part of it ("tonight",
+/// "tomorrow morning", "this evening", "in the morning").
+fn clock_end(words: &[String]) -> Option<usize> {
+    if words.first()? != "at" || !words.get(1).is_some_and(|word| starts_a_time(word)) {
+        return None;
+    }
+    let digits = |word: &String| word.chars().all(|c| c.is_ascii_digit());
+    let is = |at: usize, these: &[&str]| {
+        words
+            .get(at)
+            .is_some_and(|word| these.contains(&word.as_str()))
+    };
+    let mut end = 2;
+    if digits(&words[1])
+        && words
+            .get(2)
+            .is_some_and(|word| word.len() == 2 && digits(word))
+    {
+        end = 3;
+    }
+    if is(end, &["am", "pm", "o'clock", "sharp"]) {
+        end += 1;
+    }
+    if is(end, &["today", "tonight"]) {
+        end += 1;
+    } else if is(end, &["tomorrow"]) {
+        end += 1 + usize::from(is(end + 1, PARTS));
+    } else if is(end, &["this"]) && is(end + 1, PARTS) {
+        end += 2;
+    } else if is(end, &["in"]) && is(end + 1, &["the"]) && is(end + 2, PARTS) {
+        end += 3;
+    }
+    Some(end)
+}
+
+/// What may follow the ask's time: nothing, "please", or "to" and a task
+/// with no comma ("…, translate that into French"), second time or day in
+/// it ("… to call Mom at ten", "… to check it in five minutes", "…
+/// tomorrow"), but for a last ", please"; the task's own length stands ("…
+/// to exercise for twenty minutes"). Anything else ("… when the oven is
+/// ready", "… if it rains", "… on Mondays", ", leave it") leaves the line to
+/// the model (the reviewer-lead's shape for the P2s on `8e797acfe`).
+fn plain_task(rest: &[String]) -> bool {
+    let rest = match rest {
+        [rest @ .., comma, last] if comma == "," && last == "please" => rest,
+        [rest @ .., last] if last == "please" => rest,
+        rest => rest,
+    };
+    let Some((to, task)) = rest.split_first() else {
+        return true;
+    };
+    to == "to"
+        && !task.is_empty()
+        && (0..task.len()).all(|at| {
+            task[at] != ","
+                && !DAY.contains(&task[at].as_str())
+                && !PARTS.contains(&task[at].as_str())
+                && length_end(&task[at..], false).is_none()
+                && clock_end(&task[at..]).is_none()
+        })
 }
 
 /// A number said as a word, as speech to text often writes small ones.
@@ -314,6 +438,18 @@ mod tests {
             ("Remind me in half an hour to check the oven.", TIMER),
             ("Hey Lamp. Remind me in ten minutes to stretch.", TIMER),
             ("Remind me at 9 pm to lock the door.", REMINDER),
+            // A day or part of it in its place, the task's own words.
+            ("Remind me at seven in the morning to run.", REMINDER),
+            ("Remind me at nine tonight to call home.", REMINDER),
+            ("Remind me in an hour and a half to call home.", TIMER),
+            ("Set a timer for ten minutes please.", TIMER),
+            (
+                "Remind me in ten minutes to check what's in the oven.",
+                TIMER,
+            ),
+            ("Remind me in ten minutes to call Sam, please.", TIMER),
+            ("Remind me in ten minutes, please.", TIMER),
+            ("Please, set a timer for five minutes.", TIMER),
         ] {
             assert_eq!(asks_to_set(said), Some(name), "{said}");
         }
@@ -363,6 +499,26 @@ mod tests {
             "Remind me at 10% to charge my phone.",
             "Remind me in a few minutes.",
             "My train got in at nine. Remind me in an hour to call home.",
+            // Readers' on `8e797acfe`: a repeat, a condition, a later start,
+            // a single-quoted ask, a take-back after a comma, and a second
+            // time or day in the task.
+            "Remind me at nine to take my pills on Mondays.",
+            "Remind me at nine on Mondays to take my pills.",
+            "Set a timer for ten minutes when the oven is ready.",
+            "Set a timer tomorrow for ten minutes.",
+            "Start a timer tomorrow for ten minutes.",
+            "Remind me in ten minutes if it rains.",
+            "'Remind me in ten minutes to stretch' \u{2014} translate that into French.",
+            "Remind me in ten minutes to stretch - translate that into French.",
+            "Remind me in ten minutes (to stretch).",
+            "Set a timer for ten minutes, leave it.",
+            "Remind me at nine to call Mom, leave it.",
+            "Remind me in ten minutes to call Mom tomorrow.",
+            "Remind me in ten minutes to check the oven at six.",
+            "Remind me at nine to check the cake in ten minutes.",
+            "Remind me at nine to take my pills twice a day.",
+            "Remind me at nine to take my pills for a week.",
+            "Remind me in ten minutes to stretch, translate that into French.",
         ] {
             assert_eq!(asks_to_set(said), None, "{said}");
         }
@@ -429,9 +585,21 @@ mod tests {
             "Set a timer for ten minutes. Ignore that.",
             "Remind me at nine to take my pills every day.",
             "Translate this sentence into French. 'Remind me in ten minutes to stretch.'",
+            "Remind me at nine to take my pills on Mondays.",
+            "Remind me at nine on Mondays to take my pills.",
+            "Set a timer for ten minutes when the oven is ready.",
+            "Set a timer tomorrow for ten minutes.",
+            "Start a timer tomorrow for ten minutes.",
+            "Remind me in ten minutes if it rains.",
+            "'Remind me in ten minutes to stretch' \u{2014} translate that into French.",
+            "Set a timer for ten minutes, leave it.",
         ] {
             assert_eq!(choice(said), None, "{said}");
         }
+        assert_eq!(
+            choice("Remind me at seven in the morning to run."),
+            named(REMINDER)
+        );
         assert_eq!(choice("Wake me up at seven."), named(REMINDER));
         assert_eq!(
             choice("Lamp, remind me tomorrow at 6:30 to leave early."),
