@@ -785,7 +785,11 @@ the unchanged legacy client, used unless the new Days client is selected.
       voice sends `forget_said {speaker}`. It removes the room's lines with
       their id and their versions, but not a version someone else was seen
       saying (a correction either way stays its speaker's), and the
-      observations made only from those. A kept thing goes only by its own
+      observations made only from those. The replacement walk also stops
+      at any version adopted into a person's private scope: removing its
+      room speaker row does not authorize this room-only forget to erase
+      it. Ordinary per-person `forget` still follows adoption provenance.
+      A kept thing goes only by its own
       id: one someone unseen kept in their conversation stays (#3113). A
       thing also made from someone else's words stays, and so do those
       words. The journal gives the count, never a line. What they are told
