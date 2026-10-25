@@ -697,9 +697,12 @@ minutes later. The two asks before it had called `set_timer`. With
 that plainly asks for a timer or a reminder at a sentence's start
 (`tools::schedule_asked::asks_to_set`) makes its first chat round call the
 function that sets it (`tool_choice`): `set_timer` for a duration from now,
-`set_reminder` for a clock time, as their descriptions ask. A line that says
-neither or both, a question of what is set, a cancel and a line that takes the
-ask back are asked as before, and the round after the call is asked with its
+`set_reminder` for a clock time, as their descriptions ask. The time is read
+only from the ask's own sentence, after the ask, so a task's length ("remind
+me to exercise for ten minutes") or another sentence's time forces nothing. A
+line that says neither or both, a question of what is set, a cancel and a line
+that takes the ask back anywhere ("Actually, don't remind me", "cancel the
+timer") are asked as before, and the round after the call is asked with its
 result, so the lamp says what the schedule did.
 
 ## First's Voice integration contract
