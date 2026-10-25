@@ -449,6 +449,12 @@ pub(crate) const SHORT_DONE_TOGETHER: &str = "Done.";
 /// conversation nobody began (the first builder at 21:03 on #1722).
 pub const NAME_SECOND_SIGN_ENVIRONMENT: &str = "LAMP_NAME_SECOND_SIGN";
 
+/// Where the worker reads whether a hearing of the lamp's name inside one
+/// line's sound stays with that line, never counting for the one begun
+/// after it (`on`, and nothing else;
+/// [`worker::Heeding::keeping_the_name_in_its_line`]).
+pub const NAME_STAYS_ENVIRONMENT: &str = "LAMP_NAME_STAYS_IN_ITS_LINE";
+
 /// Where the worker reads whether a line that begins with the lamp's name,
 /// said to a face turned to the lamp, is always answered (#2191): `on`, and
 /// nothing else. In a busy room the rule does not hold it, and the model's
