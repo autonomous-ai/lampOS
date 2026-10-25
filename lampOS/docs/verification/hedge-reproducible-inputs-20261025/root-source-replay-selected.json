@@ -1,0 +1,23 @@
+{
+  "source_reconstruction_only": true,
+  "source_parent_from_public_Common_recipe": "21d7db4e321b08ac94f370d749fb5c49c4fa1911",
+  "results": [
+    {
+      "case": "positive",
+      "reconstructed_tree": "34acd2140cd3bff4cb655d142238e9ee456ee7ed",
+      "exact": true
+    },
+    {
+      "case": "near",
+      "reconstructed_tree": "af6d42f2150997b90251659d2aca5a88b9b0c3d3",
+      "exact": true
+    },
+    {
+      "case": "relay",
+      "reconstructed_tree": "f0af6a251049244672a92a7699709f5980e71e64",
+      "exact": true
+    }
+  ],
+  "actual_controls_executed": 0,
+  "private_controller_reproduced": false
+}

@@ -1,0 +1,14 @@
+diff --git a/lampOS/crates/voice/src/second_provider/services.rs b/lampOS/crates/voice/src/second_provider/services.rs
+index bfbf759c44d31ef1a99e264ca023306a2906fb99..284ea7b9408f7f431f99ed0e42a35d22edffaf25 100644
+--- a/lampOS/crates/voice/src/second_provider/services.rs
++++ b/lampOS/crates/voice/src/second_provider/services.rs
+@@ -845,9 +845,6 @@ impl Net {
+                     None => return answer.map(Some),
+                 }
+             }
+-            if !allowed().await {
+-                return Ok(None);
+-            }
+             let answer = send_on(&chat, &messages, only, without, fresh).await;
+             if key_fallback
+                 && let (Err(error), Some(refused)) = (&answer, &refused_to)

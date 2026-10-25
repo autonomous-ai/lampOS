@@ -1,0 +1,45 @@
+{
+  "actual_runtime_observations": 0,
+  "all_HOLD_boundaries_retained": true,
+  "commands": "Authored JSON argument vectors/selectors/caps copied from sealed plan, not executable orchestration code",
+  "declared_configuration": "Authored nonsecret build-profile settings and generic guest tool/mount paths are included; these are planned inputs, not captured runtime environment values.",
+  "dependency": "Published Common reconstruction recipe at ../common-public-reconstruction-20261025/REPRODUCTION.md yields exact parent21d7db4e321b08ac94f370d749fb5c49c4fa1911",
+  "excluded": [
+    "private orchestration helper bodies",
+    "raw logs",
+    "captured raw runtime/inherited environment values",
+    "Eyes helper source/payload",
+    "ELF/binary witnesses",
+    "Git author/committer metadata",
+    "Common reconstruction payload"
+  ],
+  "host_binding": "Only a symbolic Root-granted, exclusive, initially-empty host target is named. Actual Root controller host binding stays private and is not independently reproduced; an independent reader must supply its own bound target and owned bounded cleanup.",
+  "mutation_patch_kind": "Each exact3line removal of one inner dispatch permission check in services.rs; all other guards retained",
+  "patches_reconstructed_in_memory_only": true,
+  "positive_patch_kind": "Text-only repository Rust implementation/tests and EN documentation/switch row; no Common carry payload or private controller/helper file",
+  "public_selected_log_commit": "5dfcfe0abf677379367e81d86617111cc44c50f4",
+  "publication": "Root content review and scratch Git reconstruction complete; no runtime execution or qualification",
+  "reported_private_preparation_checks": 73,
+  "repository_patch_paths": [
+    "lampOS/crates/voice/src/process.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/net/chat.rs",
+    "lampOS/crates/voice/src/second_provider/services.rs",
+    "lampOS/crates/voice/src/second_provider/tests.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/switches.md"
+  ],
+  "runtime_qualification_or_READ_OK": false,
+  "source_map": "Hashes/modes/Gitblob identities only, no full-source snapshot/private source payload",
+  "state": "PUBLISHED_UNAPPLIED_REPOSITORY_SOURCE_INPUTS_ONLY",
+  "validation_checks": [
+    "near_patch_exact_in_memory",
+    "positive_patch_exact_in_memory",
+    "relay_patch_exact_in_memory",
+    "fixed_six_commands_exact_plan",
+    "caps_exact_plan",
+    "all_six_selectors_present_in_frozen_source"
+  ],
+  "root_independent_patch_replay": true
+}

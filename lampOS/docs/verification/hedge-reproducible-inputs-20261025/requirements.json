@@ -1,0 +1,99 @@
+{
+  "caps_limit": "Existing controller overall5400 with cleanup allowance; proposed outer6300. Filesystem/syscall stalls not guaranteed interruptible; no new cap or controller design supplied.",
+  "caps_seconds": {
+    "case": 300,
+    "clean": 300,
+    "clean46_overall": 1800,
+    "cleanup": 300,
+    "compile": 2400,
+    "container_absence_each": 30,
+    "container_remove_each": 30,
+    "final_process_wait": 1,
+    "image_inspect": 300,
+    "metadata": 300,
+    "outer_native_proposed": 6300,
+    "overall": 5400,
+    "process_cleanup_poll_interval": 0.1,
+    "process_group_SIGKILL_grace": 5,
+    "process_group_SIGTERM_grace": 5,
+    "toolchain_preflight": 300
+  },
+  "claim_limits": [
+    "73 preparation checks are reported private checks, not independent reproduction or runtime qualification",
+    "Body-attempt counter boundary is narrower than HTTP wire transmission; actual healthy/negative HTTP matrix remains separate",
+    "No FD/jobserver/ASLR/scheduling or hardware equivalence implied",
+    "No execution/allocation/lane grant; current-base/Common3064 parent-order/privacy/acoustic/physical/canonical ordinary gates remain HOLD"
+  ],
+  "compile_profile_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/target",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "TMPDIR": "/tmp"
+  },
+  "container_requirements": [
+    "existing cached image --pull=never",
+    "--platform=linux/amd64",
+    "--user=1000:1000",
+    "--network=none",
+    "--read-only",
+    "--cap-drop=ALL",
+    "--security-opt=no-new-privileges"
+  ],
+  "direct_toolchain": {
+    "cargo_executable": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/cargo",
+    "rustc_executable": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/rustc"
+  },
+  "environment_runtime_inputs": {
+    "actual_context": "Default Cargo command and loader; inherited image environment is a runtime input, not claimed absent.",
+    "base": "Pinned image Config.Env sanitized before launch; actual values private, hash retained.",
+    "independent_reproduction_limit": "Private orchestration helpers and raw environment values excluded; bundle supplies repository source/command requirements, not a standalone controller or full execution equivalence. The actual Root controller host binding stays private; independent readers must supply their own bound target and owned bounded cleanup.",
+    "remove": "Inherited LAMP, RUST_TEST_THREADS, custom flags, compiler/linker/runner overrides; no source Cargo compiler/runner overrides"
+  },
+  "features": {
+    "actual_compiler_features": "Derive and bind actual compiler-artifact features; positive/mutants must match exactly",
+    "profile": "debug0,2compilerjobs,incremental0; all actual target/profile/dependency selections bound",
+    "selection": "Cargo defaults; no --features/all-features/no-default-features arguments"
+  },
+  "image_sha256": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "mounts": {
+    "registry_git": "existing offline read-only caches",
+    "source": "read-only lampOS at /src-hedge-focused and robots at /robots",
+    "target": "one Root-granted writable /target",
+    "tmp": "writable tmpfs /tmp"
+  },
+  "platform": "linux/amd64",
+  "rust_target": "x86_64-unknown-linux-gnu",
+  "source_artifact_evidence_assertions": [
+    "Full immutable tree/files/modes/mtime/HEAD/index source guards before/after all modes and each observation; exact one-check mutant scopes",
+    "Exact46 current canonical local package metadata validated from frozen manifests before initial clean",
+    "Compile-only CargoJSON selects exactly one lamp-voice libtest kindlib/test=true at crates/voice/src/lib.rs, expected packageID/manifest/debug0/path and fresh:false",
+    "Default source loader, no custom source compiler/runner; actual features/profiles and45 other package source signatures match between modes",
+    "ELF64 little-endian x86_64 header, source-target compiler binding, binary size/SHA/inode metadata captured; private witness copy hash equals compiled libtest",
+    "Preexec and post-exec executable identities unchanged; witness digest matches; each mutant libtest SHA differs from positive",
+    "CaseCargoJSON target/profile/features/dependency signatures and executable match compile-only binding",
+    "Exactly one named case and summary per observation; positive1/0 or negative0/1 with sole matching body-attempt assertion, no unrelated panic",
+    "Source, planned-copy/free-space reserve and evidence hashes rechecked; private raw outputs/env/ELF witnesses never included here",
+    "Every attempt preserved with actual exit; source-stability/processgroup-absent/exact-container-removed proofs plus final Voiceclean/mutants-absent required for target release"
+  ],
+  "source_recipe": {
+    "Common_parent": "618158e68667aa2ddcc8f541cbf59fac3defca38",
+    "Common_parent_public_reconstruction_recipe": "PENDING separate Root audit/publication",
+    "current_base_status": "Historical frozen train106 source; latest-main rebase/currentCI pending",
+    "mutant_recipe": "Separate copies of exact positive source plus ONLY respective UNAPPLIED-near/relay.patch; no combined mutant.",
+    "positive_recipe": "Apply UNAPPLIED-positive.patch to exact reconstructed Common618 tree; verify source-map blob/mode identities. Do not rely on unpublished positive checkout alone.",
+    "upstream_base": "da57072b2e6420ae25cf6779f1ee1756178ce724"
+  },
+  "target_requirements": {
+    "between_modes": "Voice-package-only clean; prove45 other package source/profile/features unchanged",
+    "canonical_initial_invalidation": "exact46 validated local workspace PackageIDs only, no whole clean/registry/git clean",
+    "final": "Voice-package-only clean; mutated executable outputs absent and no unknown mutant outputs before release",
+    "free_reserve_bytes": 5368709120,
+    "nominated_existing_empty_root": "<ROOT_GRANTED_EXCLUSIVE_INITIALLY_EMPTY_HOST_TARGET>",
+    "ownership_release_and_actual_identity": "Root reviewed exact canonical retained empty root, actual ownership/dev/inode/mode/release/retirement receipts; new grant required, no probe by bundle preparation. The concrete Root controller host binding stays private and is not independently reproduced here. An independent reader must supply its own canonical bound target, exclusive initially-empty allocation, exact identity/release checks and owned bounded cleanup."
+  },
+  "tool_requirements": "Actual direct same-directory Cargo/rustc1.96 versions and canonical paths verified on first authorized launch; no +selector/shim/network/imagepull."
+}

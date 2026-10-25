@@ -1,3 +1,9 @@
+## 2026-10-25 10:05 — Hedge reproducible review inputs
+
+Ready for lamp-voice: no
+
+Published [unapplied Hedge source and control inputs](verification/hedge-reproducible-inputs-20261025/) for the reviewability P3: exact positive and two selective-negative patches, source map, six selectors/command vectors, profile/tool/image/target rules and numerical bounds. Root independently reconstructed all three exact trees from the now-public Common recipe. Content audit excludes private controllers, captured environment, raw output, binaries and private host paths; declared nonsecret profile settings stay explicit. The 73 private preparation checks remain reported checks, all six runtime controls UNRUN, and ordinary/current/parent/privacy/native/physical holds remain.
+
 ## 2026-10-25 09:59 — Common reproducible source inputs
 
 Ready for lamp-voice: no

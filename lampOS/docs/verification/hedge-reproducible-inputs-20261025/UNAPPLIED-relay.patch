@@ -1,0 +1,14 @@
+diff --git a/lampOS/crates/voice/src/second_provider/services.rs b/lampOS/crates/voice/src/second_provider/services.rs
+index bfbf759c44d31ef1a99e264ca023306a2906fb99..a6a73d0ce4cf7e55766184228b707d6f9b34c029 100644
+--- a/lampOS/crates/voice/src/second_provider/services.rs
++++ b/lampOS/crates/voice/src/second_provider/services.rs
+@@ -855,9 +855,6 @@ impl Net {
+             {
+                 (refused.told)(status);
+                 // The notification itself may invalidate permission.
+-                if !allowed().await {
+-                    return Ok(None);
+-                }
+                 return send_on(&refused.relay, &messages, only, without, fresh)
+                     .await
+                     .map(Some);

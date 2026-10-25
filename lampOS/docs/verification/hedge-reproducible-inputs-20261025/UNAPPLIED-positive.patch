@@ -1,0 +1,1578 @@
+diff --git a/lampOS/crates/voice/src/process.rs b/lampOS/crates/voice/src/process.rs
+index b526dde66822bf188aa2b7fb00016c404d739f69..1bd5223079697a0601ff1d70ba031a1384ac4cd9 100644
+--- a/lampOS/crates/voice/src/process.rs
++++ b/lampOS/crates/voice/src/process.rs
+@@ -1520,6 +1520,7 @@ fn second_route_worker_environment(
+         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
+         crate::remember::FORGET_ASKED_ENVIRONMENT,
+         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
++        crate::second_provider::CHAT_AGAIN_ENVIRONMENT,
+         crate::second_provider::CUE_AFTER_ENVIRONMENT,
+         crate::second_provider::LOOK_NOTE_ENVIRONMENT,
+         crate::second_provider::LOOK_WALK_ENVIRONMENT,
+@@ -1597,6 +1598,7 @@ mod tests {
+             crate::unfinished_words::ENVIRONMENT,
+             crate::same_voice::CALLER_ONLY_ENVIRONMENT,
+             crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
++            crate::second_provider::CHAT_AGAIN_ENVIRONMENT,
+             crate::second_provider::CUE_AFTER_ENVIRONMENT,
+             crate::second_provider::OPEN_NAME_ENVIRONMENT,
+             crate::second_provider::NAME_CARRIES_ENVIRONMENT,
+@@ -2193,6 +2195,7 @@ mod tests {
+                     || name == crate::unfinished_words::ENVIRONMENT
+                     || name == crate::same_voice::CALLER_ONLY_ENVIRONMENT
+                     || name == crate::second_provider::WRITTEN_WAIT_ENVIRONMENT
++                    || name == crate::second_provider::CHAT_AGAIN_ENVIRONMENT
+                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
+                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
+                     || name == crate::second_provider::NAME_CARRIES_ENVIRONMENT
+@@ -2322,6 +2325,7 @@ mod tests {
+                     "LAMP_RELAY_ROUTES=on",
+                     "LAMP_SAME_SPEAKER_CARRIES=on",
+                     "LAMP_SAME_VOICE_CALLER_ONLY=on",
++                    "LAMP_SECOND_CHAT_AGAIN=on",
+                     "LAMP_SECOND_CHAT_KEPT=on",
+                     "LAMP_SECOND_CHAT_WARM=on",
+                     "LAMP_SECOND_CUE_AFTER_MS=on",
+diff --git a/lampOS/crates/voice/src/second_provider.rs b/lampOS/crates/voice/src/second_provider.rs
+index 8dd25a583279ae80748681c4b140d7be39697249..ff3a92d6954fac6e408d3fb87d639ea9be63e6a4 100644
+--- a/lampOS/crates/voice/src/second_provider.rs
++++ b/lampOS/crates/voice/src/second_provider.rs
+@@ -549,6 +549,18 @@ pub const SKILL_LOOK_ENVIRONMENT: &str = "LAMP_SECOND_SKILL_LOOK";
+ /// nothing else (#1854's follow-up, the first builder at 18:28 on #1722).
+ pub const WRITTEN_WAIT_ENVIRONMENT: &str = "LAMP_SECOND_WRITTEN_WAIT";
+ 
++/// A turn's chat round 1 that hasn't begun [`CHAT_AGAIN_AFTER`] after the
++/// words is asked once more on a connection of its own, and the first of the
++/// two to begin is the one said; the other is dropped unread, so nothing is
++/// said twice ([`Engine::chatting_again`]): `on`, and nothing else (#2602, the
++/// first builder's 01:36 on 23 Oct: on lamp-4ace 3 of about 570 chats had not
++/// begun in 4.5 s and ended unanswered). Not for a look's round, whose
++/// picture makes a slow start usual. The give-up's bound stays as it was.
++pub const CHAT_AGAIN_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_AGAIN";
++/// How long round 1 may take to begin before it is asked again
++/// ([`CHAT_AGAIN_ENVIRONMENT`]).
++pub const CHAT_AGAIN_AFTER: Duration = Duration::from_millis(2_500);
++
+ /// Where the worker and the coordinator read whether a look's turn whose
+ /// answer called nothing is told so (`LookNoCall`), so that a skill's
+ /// search the model left after one look gets one note to go on
+@@ -861,6 +873,9 @@ struct Shared {
+     /// The lamp's own written turns may begin as late as
+     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
+     written_wait: bool,
++    /// [`Engine::chatting_again`]: round 1 not begun in [`CHAT_AGAIN_AFTER`]
++    /// is asked once more on a fresh connection.
++    chat_again: bool,
+     /// [`Engine::resending`]: a spoken line whose chat was lost on the
+     /// network is asked once more when the link is back.
+     resend: Option<LinkBack>,
+@@ -1829,6 +1844,7 @@ impl Engine {
+                 speech_tags: None,
+                 short_done: false,
+                 written_wait: false,
++                chat_again: false,
+                 resend: None,
+                 hearing: None,
+                 asked: None,
+@@ -2487,6 +2503,17 @@ impl Engine {
+         self
+     }
+ 
++    /// `LAMP_SECOND_CHAT_AGAIN=on` ([`CHAT_AGAIN_ENVIRONMENT`]): a turn's
++    /// chat round 1 not begun [`CHAT_AGAIN_AFTER`] after the words is asked
++    /// once more on a fresh connection, and the first to begin is said.
++    /// Before any turn only.
++    pub fn chatting_again(mut self, on: bool) -> Self {
++        if let Some(shared) = Arc::get_mut(&mut self.shared) {
++            shared.chat_again = on;
++        }
++        self
++    }
++
+     /// `LAMP_RESEND_LOST_LINE=on`, as on Live (the first builder's 00:02 on
+     /// #1722): a spoken line whose chat was lost on the network
+     /// ([`link::lost`]) before any word was said or anything called is asked
+@@ -7359,12 +7386,94 @@ fn chat_for(
+     messages: Vec<Message>,
+     permitted: ChatPermission,
+ ) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+-    let functions = if held_by_gap(scope) {
++    shared
++        .services
++        .chat_guarded(messages, chat_functions(scope), permitted)
++}
++
++/// The functions a turn's chat is told for this scope: all, or without
++/// memory's reads for a scope held only by a known face's gap.
++fn chat_functions(scope: Option<&crate::memory_scope::ScopeLease>) -> ChatFunctions {
++    if held_by_gap(scope) {
+         ChatFunctions::Without(MEMORY_CALLS)
+     } else {
+         ChatFunctions::All
+-    };
+-    shared.services.chat_guarded(messages, functions, permitted)
++    }
++}
++
++/// `first`, round 1's chat, and once `after` passes with nothing from it,
++/// `again`'s ask beside it ([`CHAT_AGAIN_ENVIRONMENT`]): the first of the two
++/// to begin, its first event any chat event (a word, a call, an end or a
++/// search), is the stream that goes on, and
++/// the other is dropped, its connection closed. One that fails while the
++/// other is still out is not a beginning: the other is waited for, and only
++/// if both fail is the later failure the stream's. Nothing from the dropped
++/// one is ever read past its failure, so nothing is said twice.
++fn asked_again(
++    first: futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>,
++    after: tokio::time::Instant,
++    again: impl FnOnce() -> Option<futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>>
++    + Send
++    + 'static,
++    request: u64,
++) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
++    use futures_util::stream;
++    type Chat = futures_util::stream::BoxStream<'static, net::Result<ChatEvent>>;
++    stream::once(async move {
++        let mut first = first;
++        tokio::select! {
++            item = first.next() => return (item, first),
++            () = tokio::time::sleep_until(after) => {}
++        }
++        // Its scope checked as it goes: a request is never sent with a
++        // context revoked since (Second's P2 on #3107).
++        let Some(second) = again() else {
++            eprintln!(
++                "lamp-voice second: request {request} chat round 1 had not begun in {} ms; not asked again: its scope has lapsed",
++                CHAT_AGAIN_AFTER.as_millis()
++            );
++            return (first.next().await, first);
++        };
++        eprintln!(
++            "lamp-voice second: request {request} chat round 1 had not begun in {} ms; asked once more on a fresh connection",
++            CHAT_AGAIN_AFTER.as_millis()
++        );
++        let (mut first_out, mut second_out): (Option<Chat>, Option<Chat>) =
++            (Some(first), Some(second));
++        let mut failed = None;
++        loop {
++            let (item, which) = match (&mut first_out, &mut second_out) {
++                (Some(one), Some(two)) => tokio::select! {
++                    item = one.next() => (item, 1),
++                    item = two.next() => (item, 2),
++                },
++                (Some(one), None) => (one.next().await, 1),
++                (None, Some(two)) => (two.next().await, 2),
++                (None, None) => return (failed, stream::empty().boxed()),
++            };
++            let who = if which == 1 { "the first ask" } else { "the ask again" };
++            match item {
++                Some(Ok(event)) => {
++                    eprintln!("lamp-voice second: request {request} chat round 1 begun on {who}");
++                    let winner = if which == 1 { first_out } else { second_out };
++                    return (Some(Ok(event)), winner.expect("the stream that answered"));
++                }
++                other => {
++                    eprintln!(
++                        "lamp-voice second: request {request} chat round 1's {who} ended before it began"
++                    );
++                    failed = other.or(failed);
++                    if which == 1 {
++                        first_out = None;
++                    } else {
++                        second_out = None;
++                    }
++                }
++            }
++        }
++    })
++    .flat_map(|(item, rest)| stream::iter(item).chain(rest))
++    .boxed()
+ }
+ 
+ /// The functions [`chat_for`] leaves out for this scope.
+@@ -7969,6 +8078,32 @@ async fn answer(
+                     writing_guard.permission(),
+                 ),
+             };
++            // Round 1 not begun soon is asked once more on a connection of
++            // its own (`LAMP_SECOND_CHAT_AGAIN`, #2602); a look's is not.
++            if round == 1 && shared.chat_again && !looking {
++                let services = Arc::clone(&shared.services);
++                let again = messages.clone();
++                // The functions and the permission of the first ask.
++                let functions = if quoted {
++                    ChatFunctions::Only(&[])
++                } else {
++                    chat_functions(scope.as_ref())
++                };
++                let permitted = writing_guard.permission();
++                stream = asked_again(
++                    stream,
++                    from + CHAT_AGAIN_AFTER,
++                    move || {
++                        // A request sent later checks its permission as it
++                        // goes, and again before each send.
++                        if permitted() == PermissionState::Lost {
++                            return None;
++                        }
++                        Some(services.chat_again(again, functions, permitted))
++                    },
++                    request,
++                );
++            }
+             let mut first = true;
+             let mut split = Sentences::default();
+             let mut text = String::new();
+diff --git a/lampOS/crates/voice/src/second_provider/net/chat.rs b/lampOS/crates/voice/src/second_provider/net/chat.rs
+index ff8687f1825201d5ed1d846f5e1d226bac5ef569..6a912cc1378f4123c5fb237869cdce9b8ae31ce2 100644
+--- a/lampOS/crates/voice/src/second_provider/net/chat.rs
++++ b/lampOS/crates/voice/src/second_provider/net/chat.rs
+@@ -1,7 +1,7 @@
+ //! A streamed OpenAI-compatible chat completion with function tools: text
+ //! as it is written, then the tool calls the model asked for. The caller
+ //! runs the tools and sends their results back as `tool` messages.
+-use super::{Error, Result, chat_client, chunk, openai_base, post};
++use super::{Error, Result, chat_client, chunk, http_client, openai_base, post};
+ use crate::second_config::SecondConfig;
+ use serde::Serialize;
+ use serde_json::{Value, json};
+@@ -540,6 +540,32 @@ impl Chat {
+         messages: &[Message],
+         only: Option<&[&str]>,
+         without: &[&str],
++    ) -> Result<ChatStream> {
++        self.send_on(&self.client, false, messages, only, without)
++            .await
++    }
++
++    /// [`Self::send_without`] on a connection of its own, never one from
++    /// the client's pool (`LAMP_SECOND_CHAT_AGAIN`, #2602): a round that
++    /// hasn't begun may be stuck on a pooled connection the service has
++    /// dropped, and asking again there would wait on it too.
++    pub async fn send_fresh(
++        &self,
++        messages: &[Message],
++        only: Option<&[&str]>,
++        without: &[&str],
++    ) -> Result<ChatStream> {
++        let client = http_client()?;
++        self.send_on(&client, true, messages, only, without).await
++    }
++
++    async fn send_on(
++        &self,
++        client: &reqwest::Client,
++        fresh: bool,
++        messages: &[Message],
++        only: Option<&[&str]>,
++        without: &[&str],
+     ) -> Result<ChatStream> {
+         let body = self.body_without(messages, only, without);
+         let asked = std::time::Instant::now();
+@@ -548,19 +574,23 @@ impl Chat {
+             .lock()
+             .ok()
+             .and_then(|mut last| last.replace(asked));
++        // As it's attempted, before any answer (#2602, Backend's 02:09: three
++        // round 1s that never began never reached the relay). It proves an
++        // attempt only, not that anything was sent: with no answer's line
++        // after it, the attempt failed or hung somewhere (a connection, its
++        // TLS, a reused connection, the service); with no line at all, the
++        // request was never attempted (Second's and reviewer-two's P3s).
++        eprintln!(
++            "lamp-voice second: {}",
++            going_out_told(fresh, before.map(|at| asked.duration_since(at)))
++        );
+         let prefix = Prefix::of(&body);
+         let prefix_before = self
+             .last_prefix
+             .lock()
+             .ok()
+             .and_then(|mut last| last.replace(prefix));
+-        let response = post(
+-            &self.client,
+-            &self.url,
+-            ("authorization", &self.auth),
+-            &body,
+-        )
+-        .await?;
++        let response = post(client, &self.url, ("authorization", &self.auth), &body).await?;
+         // What was asked and how soon the service began to answer, without
+         // words (#1712, the first builder at 18:26: the chat's first event
+         // came in 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe).
+@@ -584,6 +614,23 @@ impl Chat {
+     }
+ }
+ 
++/// A chat request as it goes out, in the journal's words: on the client's
++/// pool or a connection of its own, and how long before it the last request
++/// went (a pooled connection idle long may be one the service has dropped).
++fn going_out_told(fresh: bool, since_last: Option<std::time::Duration>) -> String {
++    format!(
++        "chat request going out on {}; {}",
++        if fresh {
++            "a connection of its own"
++        } else {
++            "the client's pool"
++        },
++        since_last.map_or("the first request of this client".to_owned(), |since| {
++            format!("the last request {} s before", since.as_secs())
++        })
++    )
++}
++
+ /// A chat request in the journal's words: its size, its messages and tools,
+ /// how soon its answer began (the response's headers), and how long before
+ /// it the last request went, which says whether its connection was kept.
+@@ -959,6 +1006,20 @@ mod tests {
+         server.await.unwrap();
+     }
+ 
++    /// #2602: a chat request is journaled as it goes out, before any answer,
++    /// with where it goes and the gap since the last; never its words.
++    #[test]
++    fn a_chat_request_going_out_is_journaled() {
++        assert_eq!(
++            going_out_told(false, Some(std::time::Duration::from_secs(95))),
++            "chat request going out on the client's pool; the last request 95 s before"
++        );
++        assert_eq!(
++            going_out_told(true, None),
++            "chat request going out on a connection of its own; the first request of this client"
++        );
++    }
++
+     /// #1712, the first builder at 18:26: a chat request is journaled by its
+     /// size and counts, how soon its answer began, and the gap since the
+     /// last request; never its words.
+@@ -1707,6 +1768,122 @@ data: [DONE]
+         assert_eq!(connections(None).await, 2);
+     }
+ 
++    /// #2602 (`LAMP_SECOND_CHAT_AGAIN`): a relay that keeps a pooled
++    /// connection open but stops answering on it. `send` reuses that
++    /// connection and waits; `send_fresh` opens a connection of its own,
++    /// which the relay answers, so a stalled round asked again begins.
++    #[tokio::test]
++    async fn a_fresh_send_skips_a_pooled_connection_that_stopped_answering() {
++        use futures_util::FutureExt;
++        use tokio::io::{AsyncReadExt, AsyncWriteExt};
++        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++        let address = listener.local_addr().unwrap();
++        let connections = Arc::new(std::sync::atomic::AtomicUsize::new(0));
++        let accepted = connections.clone();
++        let (stop, mut stopped) = tokio::sync::oneshot::channel();
++        let mut server = tokio::spawn(async move {
++            let mut clients = tokio::task::JoinSet::new();
++            loop {
++                let (mut socket, _) = tokio::select! {
++                    _ = &mut stopped => break,
++                    Some(result) = clients.join_next(), if !clients.is_empty() => {
++                        result.expect("fixture connection task");
++                        continue;
++                    }
++                    accepted = listener.accept() => accepted.unwrap(),
++                };
++                let number = accepted.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
++                clients.spawn(async move {
++                    let mut buffer = [0; 8192];
++                    let mut answered = 0;
++                    loop {
++                        let Ok(n) = socket.read(&mut buffer).await else {
++                            return;
++                        };
++                        if n == 0 {
++                            return;
++                        }
++                        let head = String::from_utf8_lossy(&buffer[..n]).to_string();
++                        // The first connection answers its warming GET, kept
++                        // alive, and then nothing more: the stall.
++                        if number == 1 && answered > 0 {
++                            continue;
++                        }
++                        answered += 1;
++                        let reply = if head.starts_with("GET") {
++                            let body = r#"{"data":[]}"#;
++                            format!(
++                                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
++                                body.len()
++                            )
++                        } else {
++                            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n\
++                             data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n"
++                                .to_owned()
++                        };
++                        if socket.write_all(reply.as_bytes()).await.is_err() {
++                            return;
++                        }
++                    }
++                });
++            }
++            clients.abort_all();
++            while clients.join_next().await.is_some() {}
++        });
++        let outcome = std::panic::AssertUnwindSafe(tokio::time::timeout(
++            std::time::Duration::from_secs(20),
++            async {
++                let chat = Chat::with(
++                    &format!("http://{address}/v1"),
++                    "m",
++                    "k",
++                    Arc::new(Vec::new),
++                )
++                .unwrap();
++                // A connection in the pool, as a warmed or recent chat leaves one.
++                chat.warm().await.expect("warmed");
++                assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 1);
++                let asked = [Message::user("hello")];
++                let pooled =
++                    tokio::time::timeout(std::time::Duration::from_millis(500), chat.send(&asked))
++                        .await;
++                assert!(
++                    pooled.is_err(),
++                    "the pooled connection was reused and stalled"
++                );
++                assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 1);
++                let mut fresh = tokio::time::timeout(
++                    std::time::Duration::from_secs(5),
++                    chat.send_fresh(&asked, None, &[]),
++                )
++                .await
++                .expect("a fresh connection answers")
++                .unwrap();
++                assert_eq!(connections.load(std::sync::atomic::Ordering::SeqCst), 2);
++                assert_eq!(
++                    fresh.next().await.unwrap(),
++                    Some(ChatEvent::Text("Hi".into()))
++                );
++            },
++        ))
++        .catch_unwind()
++        .await;
++        let _ = stop.send(());
++        let cleanup = tokio::time::timeout(std::time::Duration::from_secs(2), &mut server).await;
++        if cleanup.is_err() {
++            server.abort();
++            let _ = server.await;
++        }
++        cleanup
++            .expect("fixture listener and connections joined")
++            .unwrap();
++        match outcome {
++            Ok(Ok(())) => {}
++            Ok(Err(_)) => panic!("fresh connection fixture exceeded its bound"),
++            Err(panic) => std::panic::resume_unwind(panic),
++        }
++    }
++
+     /// A local plain HTTP server sends a recorded stream in two pieces.
+     #[tokio::test]
+     async fn a_streamed_reply_is_read_over_http() {
+diff --git a/lampOS/crates/voice/src/second_provider/services.rs b/lampOS/crates/voice/src/second_provider/services.rs
+index 841444d7c3c2148cc6c8536cce5aeb57d3bedfb0..bfbf759c44d31ef1a99e264ca023306a2906fb99 100644
+--- a/lampOS/crates/voice/src/second_provider/services.rs
++++ b/lampOS/crates/voice/src/second_provider/services.rs
+@@ -173,6 +173,18 @@ pub trait Services: Send + Sync + 'static {
+         };
+         while_chat_permitted(chat, permitted)
+     }
++    /// [`Self::chat_guarded`] asked once more on a connection of its own
++    /// (`LAMP_SECOND_CHAT_AGAIN`, #2602), with the same functions and the
++    /// same permission, checked before each send. Services that can't open
++    /// a fresh connection ask as [`Self::chat_guarded`] does.
++    fn chat_again(
++        &self,
++        messages: Vec<Message>,
++        functions: ChatFunctions,
++        permitted: ChatPermission,
++    ) -> BoxStream<'static, net::Result<ChatEvent>> {
++        self.chat_guarded(messages, functions, permitted)
++    }
+     /// Whether a chat on `messages`, told without the functions named in
+     /// `without`, declares the function `name` ([`Self::chat_without`]), for
+     /// a turn's journal line (`LAMP_MEMORY_REPLACES`, #2510). None, from
+@@ -296,6 +308,9 @@ pub struct Net {
+     /// relay's chat a request goes to when their endpoint refuses it (401,
+     /// 403) before any answer, and what is told of each refusal.
+     refused_to: Option<RefusedTo>,
++    /// Instance-owned in-poll regression barrier; absent from production.
++    #[cfg(test)]
++    near_failure_barrier: Option<Arc<dyn Fn() + Send + Sync>>,
+     /// What [`Self::forcing`] and [`Self::narrowing`] gave the chat, for a
+     /// near chat made later (#2882).
+     force: Option<net::Force>,
+@@ -446,6 +461,24 @@ pub struct RefusedTo {
+     pub told: Arc<dyn Fn(u16) + Send + Sync>,
+ }
+ 
++/// One send of a chat: on a connection of its own for an ask again
++/// (`LAMP_SECOND_CHAT_AGAIN`, #3107), else on the client's pool. Each is
++/// made only after the request's permission is checked, near, own and the
++/// relay alike (Fourth's #3064; reviewer-two's P2 on #3107).
++async fn send_on(
++    chat: &Chat,
++    messages: &[Message],
++    only: Option<&[&str]>,
++    without: &[&str],
++    fresh: bool,
++) -> net::Result<super::net::ChatStream> {
++    if fresh {
++        chat.send_fresh(messages, only, without).await
++    } else {
++        chat.send_without(messages, only, without).await
++    }
++}
++
+ /// Whether a chat's failure is its key refused: the request goes to the
+ /// relay then, and for nothing else.
+ pub fn key_refused(error: &net::Error) -> Option<u16> {
+@@ -493,6 +526,8 @@ impl Net {
+             warm_speech: false,
+             speech_socket: false,
+             refused_to: None,
++            #[cfg(test)]
++            near_failure_barrier: None,
+             force: None,
+             narrow: None,
+             near: None,
+@@ -761,11 +796,25 @@ impl Net {
+         messages: Vec<Message>,
+         functions: ChatFunctions,
+         permitted: Option<ChatPermission>,
++    ) -> BoxStream<'static, net::Result<ChatEvent>> {
++        self.chat_sent(messages, functions, permitted, false)
++    }
++
++    /// [`Self::chat_selected`], each send on a connection of its own when
++    /// `fresh` (an ask again, `LAMP_SECOND_CHAT_AGAIN`), else on the pool.
++    fn chat_sent(
++        &self,
++        messages: Vec<Message>,
++        functions: ChatFunctions,
++        permitted: Option<ChatPermission>,
++        fresh: bool,
+     ) -> BoxStream<'static, net::Result<ChatEvent>> {
+         let chat = self.chat.clone();
+         let refused_to = self.refused_to.clone();
+         let near = self.near_chat();
+         let permission = permitted.clone();
++        #[cfg(test)]
++        let near_failure_barrier = self.near_failure_barrier.clone();
+         let answer = stream::once(async move {
+             let (only, without, key_fallback) = match functions {
+                 ChatFunctions::All => (None, &[][..], true),
+@@ -784,16 +833,22 @@ impl Net {
+                 if !allowed().await {
+                     return Ok(None);
+                 }
+-                let answer = near_chat.send_without(&messages, only, without).await;
++                let answer = send_on(&near_chat, &messages, only, without, fresh).await;
+                 match answer.as_ref().err().and_then(routes::fallback_why) {
+-                    Some(why) => taken.fell(service, &why),
++                    Some(why) => {
++                        taken.fell(service, &why);
++                        #[cfg(test)]
++                        if let Some(barrier) = &near_failure_barrier {
++                            barrier();
++                        }
++                    }
+                     None => return answer.map(Some),
+                 }
+             }
+             if !allowed().await {
+                 return Ok(None);
+             }
+-            let answer = chat.send_without(&messages, only, without).await;
++            let answer = send_on(&chat, &messages, only, without, fresh).await;
+             if key_fallback
+                 && let (Err(error), Some(refused)) = (&answer, &refused_to)
+                 && let Some(status) = key_refused(error)
+@@ -803,9 +858,7 @@ impl Net {
+                 if !allowed().await {
+                     return Ok(None);
+                 }
+-                return refused
+-                    .relay
+-                    .send_without(&messages, only, without)
++                return send_on(&refused.relay, &messages, only, without, fresh)
+                     .await
+                     .map(Some);
+             }
+@@ -1050,6 +1103,15 @@ impl Services for Net {
+         self.chat_told(messages, Some(only))
+     }
+ 
++    fn chat_again(
++        &self,
++        messages: Vec<Message>,
++        functions: ChatFunctions,
++        permitted: ChatPermission,
++    ) -> BoxStream<'static, net::Result<ChatEvent>> {
++        self.chat_sent(messages, functions, Some(permitted), true)
++    }
++
+     fn chat_without(
+         &self,
+         messages: Vec<Message>,
+@@ -1690,6 +1752,179 @@ pub(crate) mod tests {
+             .concat()
+     }
+ 
++    /// #3107, El's P2 and Second's test (02:25): the ask again keeps the
++    /// own key's refusal fallback, as the first ask does: refused, it goes to
++    /// the relay, and the refusal is told.
++    #[tokio::test]
++    async fn an_ask_again_keeps_the_own_key_refusal_relay() {
++        let own = stub(
++            "k-second-refused",
++            vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))],
++        )
++        .await;
++        let relay = stub("k-second-refused", vec![(CHAT, answered("via relay"))]).await;
++        let told: Arc<Mutex<Vec<u16>>> = Arc::default();
++        let observed = told.clone();
++        let net = Net::new(
++            config_at(
++                "second-hedge-refusal",
++                "k-second-refused",
++                &own.url,
++                &own.url,
++            ),
++            Arc::new(Vec::new),
++        )
++        .unwrap()
++        .falling_back_to_the_relay(
++            &relay.url,
++            Arc::new(move |status| observed.lock().unwrap().push(status)),
++        )
++        .unwrap();
++        assert_eq!(
++            words(&net).await,
++            "via relay",
++            "the ordinary request keeps its configured fallback"
++        );
++        assert_eq!(*told.lock().unwrap(), vec![401]);
++        assert_eq!(relay.asked(CHAT), 1);
++        let mut hedged = net.chat_again(
++            vec![Message::user("hello")],
++            ChatFunctions::All,
++            Arc::new(|| PermissionState::Ready),
++        );
++        let next = tokio::time::timeout(std::time::Duration::from_secs(2), hedged.next())
++            .await
++            .unwrap();
++        assert!(
++            matches!(&next, Some(Ok(ChatEvent::Text(text))) if text == "via relay"),
++            "the fresh request must preserve the same configured fallback; got {next:?}"
++        );
++        assert_eq!(*told.lock().unwrap(), vec![401, 401]);
++        assert_eq!(relay.asked(CHAT), 2);
++    }
++
++    /// An ask again whose permission is gone before it goes sends nothing,
++    /// and a later yes does not revive it (#3064's guard, #3107).
++    #[tokio::test]
++    async fn an_ask_again_denied_before_it_goes_sends_nothing() {
++        use std::sync::atomic::{AtomicBool, Ordering};
++        let key = "k-again-denied";
++        let own = stub(key, vec![(CHAT, answered("own"))]).await;
++        let net = Net::new(
++            config_at("again-denied", key, &own.url, &own.url),
++            Arc::new(Vec::new),
++        )
++        .unwrap();
++        let valid = Arc::new(AtomicBool::new(false));
++        let permission = valid.clone();
++        let mut again = net.chat_again(
++            vec![Message::system("PRIVATE_CONTEXT_CANARY")],
++            ChatFunctions::All,
++            Arc::new(move || permission.load(Ordering::Acquire).into()),
++        );
++        assert!(again.next().await.is_none());
++        valid.store(true, Ordering::Release);
++        assert!(
++            again.next().await.is_none(),
++            "a denied ask again cannot revive"
++        );
++        assert_eq!(own.asked(CHAT), 0);
++    }
++
++    /// An ask again whose near address fails on the link, with permission
++    /// lost meanwhile, never goes on to its own address (#3107).
++    #[tokio::test]
++    async fn an_ask_again_never_falls_back_after_its_permission_is_lost() {
++        let key = "k-again-near-lost";
++        let near = stub(key, vec![(CHAT, Some((UNAVAILABLE, Vec::new())))]).await;
++        let own = stub(key, vec![(CHAT, answered("own"))]).await;
++        let net = routed(config_at("again-near-lost", key, &own.url, &own.url), THREE);
++        kept(&net).set(near_chat(&near));
++        net.turn_begins();
++        // Permission lasts until the near address has been asked.
++        let asked_near = near.seen.clone();
++        let mut again = net.chat_again(
++            vec![Message::system("PRIVATE_CONTEXT_CANARY")],
++            ChatFunctions::All,
++            Arc::new(move || (!asked_near.lock().unwrap().iter().any(|l| l.contains(CHAT))).into()),
++        );
++        assert!(again.next().await.is_none());
++        assert_eq!(near.asked(CHAT), 1);
++        assert_eq!(own.asked(CHAT), 0);
++    }
++
++    /// The key-refusal notice cannot let an ask again on to the relay once
++    /// it has taken the permission away (#3064's guard, #3107).
++    #[tokio::test]
++    async fn an_ask_again_key_refusal_cannot_authorize_the_relay_send() {
++        use std::sync::atomic::{AtomicBool, Ordering};
++        let key = "k-again-refused-lost";
++        let own = stub(key, vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))]).await;
++        let relay = stub(key, vec![(CHAT, answered("relay"))]).await;
++        let valid = Arc::new(AtomicBool::new(true));
++        let expire = valid.clone();
++        let net = Net::new(
++            config_at("again-refused-lost", key, &own.url, &own.url),
++            Arc::new(Vec::new),
++        )
++        .unwrap()
++        .falling_back_to_the_relay(
++            &relay.url,
++            Arc::new(move |_| expire.store(false, Ordering::Release)),
++        )
++        .unwrap();
++        let permission = valid.clone();
++        let mut again = net.chat_again(
++            vec![Message::system("PRIVATE_CONTEXT_CANARY")],
++            ChatFunctions::All,
++            Arc::new(move || permission.load(Ordering::Acquire).into()),
++        );
++        assert!(again.next().await.is_none());
++        assert_eq!(own.asked(CHAT), 1);
++        assert_eq!(relay.asked(CHAT), 0);
++    }
++
++    /// Pending retains the original request's opportunity, without sending or
++    /// polling a child; Lost ends it permanently. No grace deadline is added.
++    #[tokio::test]
++    async fn an_ask_again_waits_without_sending_while_permission_is_pending() {
++        use std::sync::atomic::{AtomicU8, Ordering};
++        for resume in [false, true] {
++            let key = "k-again-pending";
++            let own = stub(key, vec![(CHAT, answered("own"))]).await;
++            let net = Net::new(
++                config_at("again-pending", key, &own.url, &own.url),
++                Arc::new(Vec::new),
++            )
++            .unwrap();
++            let state = Arc::new(AtomicU8::new(1));
++            let current = state.clone();
++            let mut again = net.chat_again(
++                vec![Message::system("PRIVATE_CONTEXT_CANARY")],
++                ChatFunctions::All,
++                Arc::new(move || match current.load(Ordering::Acquire) {
++                    0 => PermissionState::Ready,
++                    1 => PermissionState::Pending,
++                    _ => PermissionState::Lost,
++                }),
++            );
++            assert!(futures_util::poll!(again.next()).is_pending());
++            assert_eq!(own.asked(CHAT), 0, "Pending must not dispatch");
++            state.store(if resume { 0 } else { 2 }, Ordering::Release);
++            let next = tokio::time::timeout(std::time::Duration::from_secs(2), again.next())
++                .await
++                .expect("permission transition is bounded");
++            if resume {
++                assert!(matches!(next, Some(Ok(ChatEvent::Text(text))) if text == "own"));
++            } else {
++                assert!(next.is_none());
++                state.store(0, Ordering::Release);
++                assert!(again.next().await.is_none(), "Lost cannot revive");
++            }
++            assert_eq!(own.asked(CHAT), usize::from(resume));
++        }
++    }
++
+     /// #2882 (b): the routes are read in the background, with the relay's
+     /// key, and a turn begun after goes to the near chat they name.
+     #[tokio::test]
+@@ -2189,9 +2424,36 @@ pub(crate) mod tests {
+     /// stream poll, before Prepared gets an event to recheck private authority.
+     #[tokio::test]
+     async fn private_prepared_http_fallback_rechecks_request_and_fresh_proof() {
++        private_http_fallback_rechecks_request_and_fresh_proof(false, None).await;
++    }
++
++    /// The fresh hedge uses the same actual request guard before near->own and
++    /// key-refusal->relay dispatch, not only when the resulting stream is read.
++    #[tokio::test]
++    async fn private_hedged_http_fallback_rechecks_request_and_fresh_proof() {
++        private_http_fallback_rechecks_request_and_fresh_proof(true, None).await;
++    }
++
++    /// Removing only the final near->own check must attempt a body under Lost,
++    /// even if the unchanged outer post-poll check prevents wire transmission.
++    #[tokio::test]
++    async fn a_fresh_near_failure_rechecks_before_attempting_its_own_body() {
++        private_http_fallback_rechecks_request_and_fresh_proof(true, Some(false)).await;
++    }
++
++    /// Key-refusal notification is already a synchronous in-poll barrier.
++    #[tokio::test]
++    async fn a_fresh_key_refusal_rechecks_before_attempting_its_relay_body() {
++        private_http_fallback_rechecks_request_and_fresh_proof(true, Some(true)).await;
++    }
++
++    async fn private_http_fallback_rechecks_request_and_fresh_proof(
++        hedged: bool,
++        dispatch_barrier: Option<bool>,
++    ) {
+         use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+-        use crate::second_provider::{Engine, Prepared, Told};
+-        use std::sync::atomic::{AtomicBool, Ordering};
++        use crate::second_provider::{Engine, Prepared, PrivateContext, Told};
++        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+         use std::time::Duration;
+ 
+         async fn body(socket: &mut tokio::net::TcpStream) -> Vec<u8> {
+@@ -2215,11 +2477,31 @@ pub(crate) mod tests {
+             raw[end..end + length].to_vec()
+         }
+ 
++        // Abort on early assertion failure too. Successful observations explicitly
++        // join every handle below; panic/drop cleanup is not qualified as a pass.
++        struct FixtureTasks(Vec<tokio::task::AbortHandle>);
++        impl Drop for FixtureTasks {
++            fn drop(&mut self) {
++                for task in &self.0 {
++                    task.abort();
++                }
++            }
++        }
+         // Every mode gets actual near->own and own-key->relay HTTP paths.
+         // No Script chat implementation or simulated fallback is used.
+         let mut violations = Vec::new();
+         for key_refusal in [false, true] {
+-            for mode in ["alive", "proof-lost", "scope-revoked", "room", "neutral"] {
++            if dispatch_barrier.is_some_and(|route| route != key_refusal) {
++                continue;
++            }
++            for mode in [
++                "alive",
++                "proof-lost",
++                "scope-revoked",
++                "private-lost",
++                "room",
++                "neutral",
++            ] {
+                 let private = !matches!(mode, "room" | "neutral");
+                 let first = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                 let fallback = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+@@ -2227,6 +2509,7 @@ pub(crate) mod tests {
+                 let fallback_url = format!("http://{}", fallback.local_addr().unwrap());
+                 let (arrived, arrival) = tokio::sync::oneshot::channel();
+                 let (release, released) = tokio::sync::oneshot::channel();
++                let mut tasks = FixtureTasks(Vec::new());
+                 let first_task = tokio::spawn(async move {
+                     tokio::time::timeout(Duration::from_secs(3), async move {
+                         let (mut socket, _) = first.accept().await.unwrap();
+@@ -2245,6 +2528,7 @@ pub(crate) mod tests {
+                     .await
+                     .expect("first HTTP barrier bounded");
+                 });
++                tasks.0.push(first_task.abort_handle());
+                 let seen: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
+                 let observed = seen.clone();
+                 let fallback_task = tokio::spawn(async move {
+@@ -2255,20 +2539,79 @@ pub(crate) mod tests {
+                     socket.write_all(head.as_bytes()).await.unwrap();
+                     socket.write_all(&answer).await.unwrap();
+                 });
++                tasks.0.push(fallback_task.abort_handle());
++                let owner = Arc::new(RequestScope::new(
++                    RequestKey {
++                        worker: lamp_turn_owner::BootId::new([39; 16]).unwrap(),
++                        session: 1,
++                        request: 2,
++                    },
++                    if mode == "room" {
++                        ScopeSnapshot::room()
++                    } else {
++                        ScopeSnapshot::of("Fixture owner")
++                    },
++                ));
++                let lease = owner.lease();
++                assert!(lease.private_context_permitted(true));
++                let valid = Arc::new(AtomicBool::new(true));
++                let revoked = valid.clone();
++                let request = owner.clone();
++                let private_lease = lease.clone();
++                let barriers = Arc::new(AtomicUsize::new(0));
++                let invoked = barriers.clone();
++                let revoke: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
++                    invoked.fetch_add(1, Ordering::SeqCst);
++                    match mode {
++                        "proof-lost" | "room" | "neutral" => {
++                            revoked.store(false, Ordering::Release)
++                        }
++                        "scope-revoked" => request.revoke(),
++                        "private-lost" => {
++                            private_lease.private_context_permitted(false);
++                        }
++                        _ => {}
++                    }
++                });
++                let guard_slot: Arc<Mutex<Option<PrivateContext>>> = Arc::default();
++                let observed_guard = guard_slot.clone();
++                let attempted_after_loss = Arc::new(AtomicUsize::new(0));
++                let attempted = attempted_after_loss.clone();
++                let declare: net::Declare = Arc::new(move || {
++                    if observed_guard
++                        .lock()
++                        .unwrap()
++                        .as_ref()
++                        .is_some_and(|guard| guard.state() == PermissionState::Lost)
++                    {
++                        attempted.fetch_add(1, Ordering::SeqCst);
++                    }
++                    Vec::new()
++                });
++                let refused = revoke.clone();
+                 let key = "k-private-fallback-boundary";
+-                let net = if key_refusal {
++                let mut net = if key_refusal {
+                     Net::new(
+                         config_at("private-key", key, &first_url, &first_url),
+-                        Arc::new(Vec::new),
++                        declare.clone(),
+                     )
+                     .unwrap()
+-                    .falling_back_to_the_relay(&fallback_url, Arc::new(|_| {}))
++                    .falling_back_to_the_relay(
++                        &fallback_url,
++                        Arc::new(move |_| {
++                            if dispatch_barrier.is_some() {
++                                refused();
++                            }
++                        }),
++                    )
+                     .unwrap()
+                 } else {
+-                    let net = routed(
++                    let net = Net::new(
+                         config_at("private-near", key, &fallback_url, &fallback_url),
+-                        THREE,
+-                    );
++                        declare,
++                    )
++                    .unwrap()
++                    .routing_through_the_relay(THREE);
+                     kept(&net).set(Routes {
+                         chat: Some(format!("{first_url}{BASE}/deepseek")),
+                         ..Routes::default()
+@@ -2276,7 +2619,9 @@ pub(crate) mod tests {
+                     net.turn_begins();
+                     net
+                 };
+-                let valid = Arc::new(AtomicBool::new(true));
++                if dispatch_barrier == Some(false) {
++                    net.near_failure_barrier = Some(revoke.clone());
++                }
+                 let fresh = valid.clone();
+                 let text = if private {
+                     "PRIVATE_CONTEXT_CANARY"
+@@ -2293,27 +2638,28 @@ pub(crate) mod tests {
+                     Arc::new(|_, _, _, _| Box::pin(async { panic!("no tools in fixture") })),
+                 )
+                 .guarding_private_context(Arc::new(move |_| fresh.load(Ordering::Acquire).into()));
+-                let owner = RequestScope::new(
+-                    RequestKey {
+-                        worker: lamp_turn_owner::BootId::new([39; 16]).unwrap(),
+-                        session: 1,
+-                        request: 2,
+-                    },
+-                    if mode == "room" {
+-                        ScopeSnapshot::room()
+-                    } else {
+-                        ScopeSnapshot::of("Fixture owner")
+-                    },
+-                );
+-                let lease = owner.lease();
+-                let mut prepared = Prepared::begin(
+-                    &engine.shared,
+-                    Some(&lease),
+-                    "question".into(),
+-                    &[],
+-                    None,
+-                    false,
+-                );
++
++                let mut completion = if hedged {
++                    let guard = PrivateContext::new(&engine.shared, Some(&lease), private);
++                    *guard_slot.lock().unwrap() = Some(guard.clone());
++                    let mut stream = engine.shared.services.chat_again(
++                        vec![Message::system(text)],
++                        ChatFunctions::All,
++                        guard.permission(),
++                    );
++                    tokio::spawn(async move { while stream.next().await.is_some() {} })
++                } else {
++                    let mut prepared = Prepared::begin(
++                        &engine.shared,
++                        Some(&lease),
++                        "question".into(),
++                        &[],
++                        None,
++                        false,
++                    );
++                    tokio::spawn(async move { while prepared.events.recv().await.is_some() {} })
++                };
++                tasks.0.push(completion.abort_handle());
+                 let first_body = tokio::time::timeout(Duration::from_secs(2), arrival)
+                     .await
+                     .unwrap()
+@@ -2322,30 +2668,30 @@ pub(crate) mod tests {
+                     String::from_utf8_lossy(&first_body).contains("PRIVATE_CONTEXT_CANARY"),
+                     private
+                 );
+-                if mode == "proof-lost" {
+-                    valid.store(false, Ordering::Release);
++                if dispatch_barrier.is_none() {
++                    revoke();
++                }
++                if dispatch_barrier.is_none() && mode == "proof-lost" {
+                     assert!(
+                         lease.is_current(),
+-                        "fresh proof loss must not fake lease revocation"
++                        "proof loss is distinct from scope revocation"
+                     );
+-                } else if mode == "scope-revoked" {
+-                    owner.revoke();
+-                    assert!(!lease.is_current());
+-                } else if matches!(mode, "room" | "neutral") {
+-                    valid.store(false, Ordering::Release);
+-                    assert!(lease.is_current());
+                 }
+                 release.send(()).unwrap();
+-                tokio::time::timeout(Duration::from_secs(2), async {
+-                    while prepared.events.recv().await.is_some() {}
+-                })
+-                .await
+-                .expect("prepared HTTP stream completes");
+-                first_task.await.unwrap();
++                let completed = tokio::time::timeout(Duration::from_secs(2), &mut completion).await;
++                if completed.is_err() {
++                    completion.abort();
++                    let _ = completion.await;
++                }
++                completed.expect("guarded HTTP stream completes").unwrap();
++                tokio::time::timeout(Duration::from_secs(2), first_task)
++                    .await
++                    .expect("first listener joined")
++                    .unwrap();
+                 // A bad fallback has already read its complete body before answering;
+                 // stream completion is therefore a deterministic observation barrier.
+                 let bodies = seen.lock().unwrap().clone();
+-                let allowed = !matches!(mode, "proof-lost" | "scope-revoked");
++                let allowed = !matches!(mode, "proof-lost" | "scope-revoked" | "private-lost");
+                 if bodies.len() != usize::from(allowed) {
+                     violations.push((key_refusal, mode, bodies.len(), usize::from(allowed)));
+                 }
+@@ -2357,6 +2703,19 @@ pub(crate) mod tests {
+                     );
+                 }
+                 fallback_task.abort();
++                let _ = tokio::time::timeout(Duration::from_secs(2), fallback_task)
++                    .await
++                    .expect("fallback listener joined");
++                assert_eq!(
++                    barriers.load(Ordering::SeqCst),
++                    1,
++                    "revocation boundary reached"
++                );
++                assert_eq!(
++                    attempted_after_loss.load(Ordering::SeqCst),
++                    0,
++                    "a fallback body was attempted after actual request authority was lost"
++                );
+             }
+         }
+         assert!(
+diff --git a/lampOS/crates/voice/src/second_provider/tests.rs b/lampOS/crates/voice/src/second_provider/tests.rs
+index 16992482bd5537e2d441bf3b619f7245aa8d390c..01606401542c05684e0a9c0287c46937a6766913 100644
+--- a/lampOS/crates/voice/src/second_provider/tests.rs
++++ b/lampOS/crates/voice/src/second_provider/tests.rs
+@@ -41,6 +41,13 @@ struct Script {
+     /// Each of a chat's events waits this long (on the test's clock), as a
+     /// streamed reply's pieces come apart.
+     piece_gap: Option<Duration>,
++    /// Each chat's own wait for its first event, in the order asked, in
++    /// place of `first_event_after` while any are left.
++    chat_after: Mutex<VecDeque<Duration>>,
++    /// Chats asked again on a fresh connection (`LAMP_SECOND_CHAT_AGAIN`).
++    asked_again: AtomicUsize,
++    /// Chats whose stream was dropped before its first event.
++    chats_dropped: Arc<AtomicUsize>,
+     /// Speech of this sentence starts late.
+     slow: Option<&'static str>,
+     /// This sentence's first audio waits for the test to release it.
+@@ -195,12 +202,21 @@ impl Services for Script {
+         }
+         let events = self.chats.lock().unwrap().pop_front().unwrap();
+         let token = self.token.clone();
+-        let delay = self.first_event_after;
++        let delay = self
++            .chat_after
++            .lock()
++            .unwrap()
++            .pop_front()
++            .or(self.first_event_after);
++        // Counted when dropped before it began: a chat that lost the race.
++        let dropped = Dropped(Some(self.chats_dropped.clone()));
+         let gap = self.piece_gap;
+         let scripted = stream::once(async move {
++            let mut dropped = dropped;
+             if let Some(delay) = delay {
+                 tokio::time::sleep(delay).await;
+             }
++            dropped.0 = None;
+         })
+         .filter_map(|()| async { None })
+         .chain(stream::iter(events).then(move |event| async move {
+@@ -230,6 +246,16 @@ impl Services for Script {
+         self.chat(messages)
+     }
+ 
++    fn chat_again(
++        &self,
++        messages: Vec<Message>,
++        functions: ChatFunctions,
++        permitted: ChatPermission,
++    ) -> BoxStream<'static, net::Result<ChatEvent>> {
++        self.asked_again.fetch_add(1, Ordering::Relaxed);
++        self.chat_guarded(messages, functions, permitted)
++    }
++
+     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+         if self.skipped == Some(text.as_str()) {
+             return stream::empty().boxed();
+@@ -291,6 +317,16 @@ impl Services for Script {
+     }
+ }
+ 
++/// Counts one drop unless it was taken out first, at the stream's end.
++struct Dropped(Option<Arc<AtomicUsize>>);
++impl Drop for Dropped {
++    fn drop(&mut self) {
++        if let Some(count) = self.0.take() {
++            count.fetch_add(1, Ordering::Relaxed);
++        }
++    }
++}
++
+ fn text(piece: &str) -> net::Result<ChatEvent> {
+     Ok(ChatEvent::Text(piece.to_owned()))
+ }
+@@ -4214,6 +4250,275 @@ async fn with_its_switch_a_written_turn_waits_seven_seconds_to_begin() {
+     );
+ }
+ 
++/// #2602 (the first builder's 01:36 on 23 Oct): with
++/// `LAMP_SECOND_CHAT_AGAIN=on` a chat round 1 not begun 2.5 s after the
++/// words is asked once more on a fresh connection, and the first to begin is
++/// said. A first ask that stalls is answered by the second, inside the 3 s
++/// give-up; when both answer, the one that began first is said once and the
++/// other is dropped unread; one that begins before 2.5 s is never asked
++/// again. Without the switch, the stalled one ends unanswered as before.
++#[tokio::test(start_paused = true)]
++async fn with_its_switch_a_chat_not_begun_in_two_and_a_half_seconds_is_asked_again() {
++    struct Ran {
++        said: Vec<String>,
++        failed: bool,
++        took: Duration,
++        again: usize,
++        dropped: usize,
++    }
++    async fn ran(on: bool, afters: &[u64], chats: Vec<Vec<net::Result<ChatEvent>>>) -> Ran {
++        let script = Arc::new(Script {
++            chats: Mutex::new(chats.into()),
++            chat_after: Mutex::new(afters.iter().map(|ms| Duration::from_millis(*ms)).collect()),
++            ..Script::default()
++        });
++        let (engine, _, _) = scripted(script.clone());
++        let mut engine = engine.chatting_again(on);
++        engine.submit(written(1, "What's the weather like?"));
++        let begun = tokio::time::Instant::now();
++        let mut said = Vec::new();
++        let failed = loop {
++            match engine.next().await {
++                ProviderOutput::Transcript {
++                    request: Some(_),
++                    text,
++                    ..
++                } if !text.is_empty() => said.push(text),
++                ProviderOutput::TurnComplete { .. } => break false,
++                ProviderOutput::TurnFailed { .. } => break true,
++                _ => {}
++            }
++        };
++        Ran {
++            said,
++            failed,
++            took: begun.elapsed(),
++            again: script.asked_again.load(Ordering::Relaxed),
++            dropped: script.chats_dropped.load(Ordering::Relaxed),
++        }
++    }
++    let answer = |words: &str| vec![text(words), Ok(ChatEvent::Done)];
++
++    // The first ask stalls; the second, asked at 2.5 s, answers at once.
++    let stalled = ran(
++        true,
++        &[60_000, 0],
++        vec![answer("Sunny."), answer("Rain later.")],
++    )
++    .await;
++    assert_eq!(stalled.said, ["Rain later."]);
++    assert!(!stalled.failed);
++    assert_eq!(stalled.again, 1);
++    assert_eq!(stalled.dropped, 1, "the stalled ask is dropped");
++    assert!(
++        stalled.took >= CHAT_AGAIN_AFTER && stalled.took < BEGIN_WITHIN,
++        "{:?}",
++        stalled.took
++    );
++
++    // Both answer: the first ask begins at 2.6 s, before the second's 0.3 s
++    // (2.8 s); only it is said, once, and the second is dropped unread.
++    let both = ran(
++        true,
++        &[2_600, 300],
++        vec![answer("Sunny."), answer("Rain later.")],
++    )
++    .await;
++    assert_eq!(both.said, ["Sunny."]);
++    assert_eq!(both.again, 1);
++    assert_eq!(both.dropped, 1);
++    // And the other way round: the second begins first and is the one said.
++    let second = ran(
++        true,
++        &[2_900, 100],
++        vec![answer("Sunny."), answer("Rain later.")],
++    )
++    .await;
++    assert_eq!(second.said, ["Rain later."]);
++    assert_eq!(second.dropped, 1);
++
++    // Begun before 2.5 s: never asked again.
++    let soon = ran(true, &[2_000], vec![answer("Sunny.")]).await;
++    assert_eq!(soon.said, ["Sunny."]);
++    assert_eq!(soon.again, 0);
++
++    // Both stall: given up at the same 3 s as without the switch.
++    let never = ran(
++        true,
++        &[60_000, 60_000],
++        vec![answer("Sunny."), answer("Rain later.")],
++    )
++    .await;
++    let answered = |said: &[String]| {
++        said.iter()
++            .any(|t| t.contains("Sunny") || t.contains("Rain"))
++    };
++    assert!(!answered(&never.said), "{:?}", never.said);
++    assert_eq!(never.again, 1);
++    assert!(never.took >= BEGIN_WITHIN && never.took < BEGIN_WITHIN + Duration::from_millis(100));
++
++    // The first ask fails at once after 2.5 s: the second is still waited for.
++    let failed_first = ran(
++        true,
++        &[2_550, 200],
++        vec![
++            vec![Err(net::Error::Transport("request"))],
++            answer("Rain later."),
++        ],
++    )
++    .await;
++    assert_eq!(failed_first.said, ["Rain later."]);
++
++    // A quoted line's ask again is told the same functions as its first
++    // ask, none (El's P3 on #3107).
++    let script = Arc::new(Script {
++        chats: Mutex::new([answer("Sunny."), answer("Rain later.")].into()),
++        chat_after: Mutex::new([Duration::from_secs(60), Duration::ZERO].into()),
++        ..Script::default()
++    });
++    let (engine, _, _) = scripted(script.clone());
++    let mut engine = engine.chatting_again(true);
++    engine.submit(ProviderInput::Written {
++        search: false,
++        request: 1,
++        session: 1,
++        privacy_generation: 1,
++        text: "\"What's the weather like?\"".into(),
++        look: false,
++        quoted: true,
++    });
++    loop {
++        if let ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } =
++            engine.next().await
++        {
++            break;
++        }
++    }
++    assert_eq!(script.asked_again.load(Ordering::Relaxed), 1);
++    let told: &[&[&str]] = &[&[], &[]];
++    assert_eq!(*script.told_only.lock().unwrap(), told);
++
++    // Off: the stalled one ends unanswered, and nothing is asked again.
++    let off = ran(false, &[60_000], vec![answer("Sunny.")]).await;
++    assert!(!answered(&off.said), "{:?}", off.said);
++    assert!(off.took >= BEGIN_WITHIN && off.took < BEGIN_WITHIN + Duration::from_millis(100));
++    assert_eq!(off.again, 0);
++}
++
++/// #3107, Second's P2 and their test (02:25): a camera change revokes
++/// personal context without retiring the microphone owner. The ask again is
++/// a new request, so it checks that context as it goes: revoked, no second
++/// request is sent, and the turn goes on as the first ask leaves it.
++#[tokio::test(start_paused = true)]
++async fn an_ask_again_never_sends_a_personal_context_revoked_before_it() {
++    use crate::memory_scope::{FaceCache, ScopeLease};
++
++    const PERSONAL_NOTE: &str = "SYNTHETIC PERSONAL CONTEXT FOR THIS REQUEST";
++    for revoke_camera in [false, true] {
++        let began = Arc::new(tokio::sync::Notify::new());
++        let script = Arc::new(Script {
++            heard: Mutex::new([Ok("Lamp, what is the weather like?".to_owned())].into()),
++            chats: Mutex::new([vec![Ok(ChatEvent::Done)], vec![Ok(ChatEvent::Done)]].into()),
++            chat_after: Mutex::new([Duration::from_secs(60); 2].into()),
++            chat_began: Some(began.clone()),
++            ..Script::default()
++        });
++        let cache = Arc::new(FaceCache::default());
++        let (engine, _, _) = scripted(script.clone());
++        let runner: ScopedToolRunner = Arc::new(|_, _, _, _, _: ScopeLease| {
++            Box::pin(async { panic!("this fixture never calls a tool") })
++        });
++        let mut engine = engine
++            .with_memory_scope(
++                lamp_turn_owner::BootId::new([31; 16]).unwrap(),
++                cache.clone(),
++                runner,
++                Some(Arc::new(|lease: &ScopeLease| {
++                    assert_eq!(
++                        lease.scope().unwrap().person(),
++                        Some(crate::remember::person_id("fixture-person").as_str())
++                    );
++                    Told::from(PERSONAL_NOTE.to_owned())
++                })),
++            )
++            .announcing(false)
++            .chatting_again(true);
++        engine.memory_camera(true, 1);
++        // The existing memory-scope fixture's real observation path. Remove
++        // the file after parsing; the admitted cache owns its observation.
++        let path = std::env::temp_dir().join(format!(
++            "chat-hedge-camera-{}-{:?}",
++            std::process::id(),
++            std::thread::current().id()
++        ));
++        std::fs::write(&path, "fixture-person").unwrap();
++        cache.replace(
++            cache.begin_refresh(),
++            crate::known_faces::FaceObservation::read(&path),
++        );
++        std::fs::remove_file(&path).unwrap();
++        engine.submit(start(1));
++        let lease = engine.memory_lease().expect("an admitted scope");
++        assert!(lease.is_current());
++        assert!(lease.scope().unwrap().person().is_some());
++        engine.submit(audio(1, 1));
++        engine.submit(end(1));
++        tokio::time::timeout(Duration::from_secs(1), began.notified())
++            .await
++            .expect("the first request was actually handed to Services");
++        {
++            let asked = script.asked.lock().unwrap();
++            assert_eq!(asked.len(), 1);
++            assert!(asked[0].contains(&Message::system(PERSONAL_NOTE)));
++        }
++
++        // Paused runtime time, not a wall-clock sleep. The original stream
++        // remains pending, and the 2.5-second hedge has not begun yet.
++        tokio::time::sleep(Duration::from_secs(2)).await;
++        assert_eq!(script.asked_again.load(Ordering::Relaxed), 0);
++        if revoke_camera {
++            // The same call Gate::install makes for a camera close, while
++            // the existing microphone owner is still request 1. Do not
++            // retire the turn: that would hide the missing RPC scope check.
++            engine.memory_camera(false, 2);
++        }
++        assert_eq!(lease.is_current(), !revoke_camera);
++        assert_eq!(engine.turn.as_ref().unwrap().request, 1);
++        assert_eq!(engine.retired_through, 0);
++        assert!(!engine.turn.as_ref().unwrap().task.is_finished());
++
++        // Await the real turn's existing first-event deadline, so the hedge
++        // timer must actually be polled; a single yield is not evidence.
++        // Drain its bounded output queue while waiting for completion.
++        let task = &mut engine.turn.as_mut().unwrap().task;
++        let output = &mut engine.output;
++        tokio::time::timeout(Duration::from_secs(2), async {
++            loop {
++                tokio::select! {
++                    result = &mut *task => break result,
++                    event = output.recv() => assert!(event.is_some()),
++                }
++            }
++        })
++        .await
++        .expect("the existing first-event bound ends the stalled turn")
++        .expect("the turn task did not panic");
++        let expected_hedges = usize::from(!revoke_camera);
++        assert_eq!(
++            script.asked_again.load(Ordering::Relaxed),
++            expected_hedges,
++            "camera revoked {revoke_camera}: a new request needs current scope"
++        );
++        let asked = script.asked.lock().unwrap();
++        assert_eq!(asked.len(), 1 + expected_hedges);
++        assert!(
++            asked
++                .iter()
++                .all(|messages| messages.contains(&Message::system(PERSONAL_NOTE)))
++        );
++    }
++}
++
+ /// The first builder, 21:25: a look's first round may take 5 s, not 3 s;
+ /// past it the lamp says it could not look rather than nothing. A refused
+ /// picture's retry stays inside the same 5 s (Second on #1154).
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 1e1b25f71bac90436a26a7ae5bf258be27e9e41c..23906063e2c20ed8e524737f62fd6ba1af5e34ec 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -2844,6 +2844,19 @@ pub fn serve(
+         );
+     }
+     engine = engine.waiting_for_written(written_wait);
++    // Round 1 not begun soon is asked once more on a fresh connection
++    // (`LAMP_SECOND_CHAT_AGAIN=on`; the first builder's 01:36 on #2602).
++    let chat_again = std::env::var(crate::second_provider::CHAT_AGAIN_ENVIRONMENT)
++        .ok()
++        .as_deref()
++        == Some("on");
++    if chat_again {
++        eprintln!(
++            "lamp-voice second: a chat round 1 not begun in {} ms is asked once more on a fresh connection (LAMP_SECOND_CHAT_AGAIN)",
++            crate::second_provider::CHAT_AGAIN_AFTER.as_millis()
++        );
++    }
++    engine = engine.chatting_again(chat_again);
+     // A line lost on the network is asked once more when a service host
+     // answers again, the link's own check (`LAMP_RESEND_LOST_LINE=on`; the
+     // first builder's 00:02 on #1722). As the only voice, with its hosts.
+diff --git a/lampOS/docs/second-voice.md b/lampOS/docs/second-voice.md
+index 34890938039c0c4a5a6cfc41cada87a574e51e89..5d84a8490cec6548441573d3a9b7db610d6c14c2 100644
+--- a/lampOS/docs/second-voice.md
++++ b/lampOS/docs/second-voice.md
+@@ -365,6 +365,87 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
+   end one (#1712, the first builder at 16:04). A round after a tool ran is
+   not bounded: what was done (a timer set, the light changed) has to be
+   said, or it is asked for and done again.
++  With `LAMP_SECOND_CHAT_AGAIN=on` (off unless set; #2602, the first
++  builder's 01:36 on 23 Oct), a first round not begun 2.5 s after the words
++  (`CHAT_AGAIN_AFTER`) is asked once more, the same request on a connection
++  of its own (`Chat::send_fresh`, never one from the client's pool, where a
++  connection the service stopped answering would hold the second ask too).
++  The first of the two to begin, by any first event (a word, a call, or
++  an end or search event), is the round; the
++  other is dropped unread and its connection closed, so nothing is said
++  twice. One that fails while the other is out is no beginning, and the
++  other is still waited for. The give-up's bound is unchanged, so with the
++  wait sound the second ask has 2 s to begin, and without it only 0.5 s,
++  less than a fresh connection's handshake plus the relay's usual first
++  byte: there it mostly costs and seldom helps (El's P3 on #3107). A
++  look's round is never asked again. The ask again **carries the first ask's
++  functions and its request permission** (#3064's `ChatFunctions` and
++  `ChatPermission`), checked as it is asked and again before each send:
++  one revoked since the first ask (a camera change, a privacy close, a
++  private context lost) sends no second request, a denial mid-way stops it
++  before its next fallback and it never revives, and the turn goes on as
++  the first ask leaves it (Second's and reviewer-two's P2s). It goes the
++  way the first ask went: near first, and a person's own key that is
++  refused falls back to the relay, the refusal told (El's P2), except for a
++  turn without memory's reads, which falls back near to own only, as its
++  first ask does. Journal: each request as it's attempted, `chat request
++  going out on the client's pool` or `on a connection of its own`, with the
++  gap since the last. It proves an attempt, not that the request was sent:
++  with no `its answer began` line after it, the attempt failed or hung
++  somewhere on the way (connecting, TLS, a reused connection, the service),
++  and with no line at all it was never attempted. Then `chat round 1 had not begun in 2500 ms; asked once
++  more on a fresh connection` (or `not asked again: its scope has lapsed`),
++  then `begun on the first ask` or `begun on the ask again`. On lamp-4ace on
++  22 Oct, 3 of about 570 chats had not begun in 4.5 s, and none of the three
++  reached the relay (Backend's 02:09 on #2602), which fits a request written
++  onto a pooled connection that was already gone, though that isn't shown. **What an ask again costs:** a
++  second full prompt, about 10k tokens, mostly a cached prefix, against the
++  relay's daily allowance, or against the person's own account when their
++  key is in use; the dropped ask may be billed for its input too. Before it
++  goes on in the product, `asked once more` lines are counted over a day on
++  lamp-4ace (the first builder's P3).
++  The current carry retains Common's three permission states. `Pending`
++  pauses both chat streams and every fallback dispatch while the original
++  request proof is checked; it supplies no authority and adds no grace to the
++  original first-event deadline. `Lost` drops the streams permanently, so a
++  later positive look cannot revive this request. The hedge uses the same
++  request-owned validator as the first ask, not a visible person's inherited
++  identity or an output-only guard. Stop, privacy close, forget and scope or
++  generation revocation remain authoritative through that validator.
++  The launch boundary is 2,500 ms from the accepted words, and the existing
++  first-chat-event deadline still ends both attempts. Selecting a chat stream
++  is not first acoustic audio: no current device sound-start measurement is
++  claimed. With the switch off, the original pooled path and its permission
++  checks are kept; no fresh-client attempt is created.
++
++  Reuse boundary: V1's voice service keeps generation/cancellation checks
++  around live replies (`d5efe9d7b`, `voice_service.py`, `_live_session` and the
++  reply cleanup immediately before it). Keep that request-cancellation
++  principle through Common's Rust validator. The bounded second chat attempt
++  is a separate opt-in change, not a claim of V1 hedging or acoustic parity.
++  The dispatch regression observes body construction after real request
++  authority is lost, separately from receipt of HTTP bytes. The unchanged
++  outer stream guard can cancel a bad fallback before bytes arrive, so a
++  negative server count alone cannot qualify the inner dispatch check.
++  A test-only instance-owned near-failure hook revokes authority between
++  failure classification and that check; own-key refusal uses its existing
++  callback. The hook and its storage do not exist in production builds.
++  Scope revocation, fresh-proof loss and sticky private-context loss are
++  distinct controls; they do not claim a physical slide or a real forget
++  tool run. Fixture listeners and their connection tasks are owned and
++  bounded through teardown.
++  This train-106 source-only composition uses Common
++  `618158e68667aa2ddcc8f541cbf59fac3defca38` on base
++  `da57072b2e6420ae25cf6779f1ee1756178ce724`. Its Rust runtime/tests
++  retain the earlier hedge source, but no gate, mutant observation, CI,
++  READ-OK or physical/acoustic qualification transfers to this child.
++  The previous source and gate packets remain separate historical epochs.
++  This carry is source-only on an unqualified Common parent; #3064's privacy
++  and integration order, fresh Mac/Linux/native gates, the composed reader
++  review and the lamp stall/privacy rows remain required before readiness or
++  activation. Historical gates on older hedge or Common heads do not qualify
++  this composition.
++
+   A look's first round may take 5 s (`LOOK_BEGIN_WITHIN`): a picture is
+   slower to read, and on lamp-52e6 one of two real looks went past 3 s.
+   Past it the lamp says "I couldn't get a good look." (`COULD_NOT_LOOK`;
+diff --git a/lampOS/docs/switches.md b/lampOS/docs/switches.md
+index 8d80f67ba4b00dd692c0d1ed8f08030d7c499dbe..39a50e339d10316950f05392d4e2b2b800fb854a 100644
+--- a/lampOS/docs/switches.md
++++ b/lampOS/docs/switches.md
+@@ -212,6 +212,7 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
+ | LAMP_SECOND_SKILL_LOOK | `on`; off. On the second route, a skills call (`skills/`, or `use_skill`) answered with `"look": true` (`skills/look-for-things`' `look_for`) asks the coordinator for the turn's full look as `take_a_look` does: the lamp says "Let me look." if nothing was said, the turn ends, the eyes are asked once the answer's first audio plays, and the still goes as the `lamp_looks` turn to the second route's own session, with the skill's note after "When the picture comes:" after its question; dropped if the person speaks first, and in a turn the lamp wrote itself, which goes on to its next round. A search's own written turns (its look's, the look note's) take the skill's next look; every other turn the lamp wrote takes none (#1146). Needs a full look (LAMP_LOOK_FULL and LAMP_EYES_LOOK_FILE); reaches the second route's worker only | — | — | #941 on the second route (#1712) | "Lamp, where are my keys?" with look-for-things installed on lamp-4ace, LAMP_VOICE_ROUTE=second: `look_full_asked` after the answer's first audio, `look_full_still` with the still, and the model saying what it sees; not run | off until that run | Off, the look rests on the model saying "Let me take a look." in a further round (the phrase rule); on, the turn ends without that round, and the lamp's words are "Let me look." | until |
+ | LAMP_SECOND_LOOK_NOTE | `on`; off. With LAMP_SECOND_SKILL_LOOK on, a skill's search on the second route (`skills/look-for-things`' `look_for`) whose look got an answer that called nothing is sent one written note on the same session once that answer has played and the room has been quiet a second: "Not found yet? Call look_for with the next place: left, right, far_left, then far_right. If you can see it, say where and stop." Once a search; never after the person speaks or another turn begins (`look_note_sent`, `look_note_dropped` with why); reaches the second route's worker and the coordinator | — | — | the first builder's step 2 for look-for-things (20 Oct: DeepSeek calls look_for once and never again) | "Lamp, where are my keys?" with look-for-things installed on lamp-4ace, LAMP_VOICE_ROUTE=second, keys off the desk: one `look_note_sent` after the first look's answer, and look_for called with the next place; not run | off until that run | One more turn after a look the model left: its words come a second after the lamp's | until |
+ | LAMP_SECOND_LOOK_WALK | `on`; off. With LAMP_SECOND_SKILL_LOOK and LAMP_SECOND_LOOK_NOTE on, a search on the second route whose note was left too (its answer, or the next look's, called nothing) is walked on by the lamp: the coordinator calls the search's skill itself (`look_for` with the next place not yet asked: left, right, far_left, far_right, then the desk) on a thread of its own, sends each look's picture as the search's next look turn naming the place, and sends the skill's give-up line once past its looks; never after the person speaks, another turn begins, the session changes or a stop by hand (`look_walk_asked` with place, `look_walk_dropped` with why, `look_walk_gave_up`); at most 8 looks; reaches the second route's worker and the coordinator | — | — | the first builder's step 4 for look-for-things (#1871, 20 Oct) | "Lamp, where are my keys?" with look-for-things installed on lamp-4ace, LAMP_VOICE_ROUTE=second, keys off the desk and the model never calling again: five looks (the desk, left, right, far_left, far_right), then the kind give-up line once; not run | off until that run | The lamp turns to places on its own after the model stops asking: five looks at most, one the person asked for | until |
++| LAMP_SECOND_CHAT_AGAIN | `on`; off. On the second route, a turn's chat round 1 not begun 2.5 s after the words (`CHAT_AGAIN_AFTER`) is asked once more on a connection of its own, never one from the client's pool (`Chat::send_fresh`); the first of the two to begin is said and the other dropped unread, so nothing is said twice. One that fails while the other is out isn't a beginning. Not for a look's round. The give-up's bound is unchanged (3 s, or 4.5 s with the wait sound) | — | — | #2602, the first builder's 01:36 on 23 Oct: on lamp-4ace 3 of about 570 chats had not begun in 4.5 s and ended unanswered (`chat round 1 had not begun in 4501 ms`) | Its journal lines on a lamp for a night: `asked once more on a fresh connection`, then `begun on the first ask` or `begun on the ask again`, and the turns still given up | off until that run | Each ask again is a second full prompt (about 10k tokens, mostly cached) against the relay's allowance, or the person's own account with their own key; the dropped one may be billed too. It carries the first ask's functions and request permission (#3064), checked before each send, and keeps its fallbacks. With the wait sound the second ask has 2 s to begin; without it (3 s) only 0.5 s, where it seldom helps | until |
+ | LAMP_SECOND_CHAT_KEPT | `on`; off. On the second route, the chat's client keeps an idle connection in its pool at most 25 s (`CHAT_POOL_IDLE`, from when it went back to the pool), not reqwest's 90 s, and at most one idle connection per host; with the chat's warm (`LAMP_SECOND_CHAT_WARM`) on, the warm comes from 20 s idle rather than 60 s. TCP keepalive is reqwest's default either way (15 s, 3 probes 15 s apart). The other clients are unchanged | — | — | #2602, the first builder's 02:14 on 23 Oct: on lamp-4ace three chat requests on 22 Oct never reached the relay (Backend's 02:09), which fits a pooled connection the path had already dropped (not shown) | A night on lamp-4ace counting `chat round 1 had not begun` against nights without it, with `chat request going out` (#3107) giving the gap since the last request | off until that run | A line whose connection the pool let go opens a new one, a TLS handshake before its first word (not measured here), unless the warm opened one first, which it makes likelier but not certain | until |
+ | LAMP_SECOND_WRITTEN_WAIT | `on`; off. On the second route, a turn the lamp wrote itself (task news, a skill's say, a reminder; not a look, which has its own 5 s) may begin as late as 7 s (`WRITTEN_BEGIN_WITHIN`), not 3 s (`BEGIN_WITHIN`): nobody asked and nobody waits, and a turn given up is news lost | — | — | #1854's follow-up (lamp-75c9, 20 Oct 18:19: "Devin finished" began past 3 s, ended unanswered, `no_audio_answer`, never told) | Task news told on lamp-75c9 with a slow first round | off until that run | A spoken line is bounded as before; the lamp's own lines may be up to 4 s later. That includes written turns someone does wait for: a "Sorry?" after a line it couldn't make out, a hello to someone who just came, and a skill's say the person set off. There, up to 7 s of silence reads as broken (the reviewer's P3 2 on #2307), so the run checks those too before it goes on, or the wait is narrowed to news first | until |
+ | LAMP_SECOND_STT_WARM | `on`; off. The second route's speech to text keeps the next line's socket open (with `KeepAlive`), so a line's sound goes to it from its first block instead of waiting for a new socket and going at once; the first line's is opened before it, once a privacy generation, when the worker's authority allows listening (#2135); kept at most 3 min, closed at once when listening stops or the privacy generation changes | — | on (21 Oct, on the backend's 72 h, #2135; its own before-and-after run still owed) | #1712 (the first builder, 00:25: 8 of 12 lines' words 0.9–2.3 s after the line, Deepgram still hearing the burst); #2135 (the first builder on #1722, 01:15: the first request after a start waited 753 ms for its socket) | the speed arm both ways: each line's `speech to text kept ready in … ms, … of the line's sound waiting`, and `words done`; after a voice restart, request 1 says `kept ready` | on in the product since 21 Oct: KeepAlive only before a line, never sound, and an idle socket is not billed (#2593); its own run still owed (lamp-runs.md) | One idle socket to the relay between lines, and for 3 min after a start | until |

@@ -1,0 +1,11 @@
+{
+  "current_adaptation": "905d6f2713f60a7ee883243403b479bec2b50824",
+  "current_preserved_authored_carry": "51d21732bd3c074fbf6467ab1772fd8de59afa54",
+  "later_original_authored_carry": "67a72d07f75606826487da89aa3d5256e1d78909",
+  "lineage_is_source_carry_history_not_claim_of_direct_git_ancestry": true,
+  "metadata_fields_not_in_bundle": true,
+  "original_authored_metadata_preserved_as_fact_only": true,
+  "original_public_hedge_commit": "8e8b8e82cad788c40e134c143b0cbeec60276a90",
+  "previous_preserved_authored_carry": "fb332534edc834ba8a642f1c0f1a17fb11f449f6",
+  "prior_source_audit_reported_eight_path_authored_delta_multisets_exact": true
+}
