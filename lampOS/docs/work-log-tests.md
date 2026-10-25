@@ -1,5 +1,49 @@
 # Tests work log
 
+## 2026-10-26 00:42 — Whole-workspace journal cleanup verified; Skills qualification next
+
+Ready for lamp-voice: no
+
+[#3488](https://github.com/autonomous-ai/lampOS/pull/3488) is published with
+the corrected 200 ms nextest test default and an explicit erratum for the old
+descriptive field. Neither control overrode the default and none was repeated.
+Reviewer-two independently reproduced LEAK once before and no leak once after
+with the same worker code; its limited Darwin descendant tracking is not
+relabelled a full census. Source reads found no P1/P2.
+
+Comparable whole-workspace ordinary-profile ARM64: main d7d20bfc0 run
+40207005239 passed 11,288 cases (one leaky), 106 skipped, in 208.155 s;
+direct 21e7c3032/D7 run 40209354386 passed the exact same 11,288 cases with
+zero leaks, 106 skipped, in 205.390 s. Both cover 179 binaries; this is not a
+speed benchmark or an all-realtime run. Primary logs and hashes are retained.
+Later PR-subset runs keep their narrower source and selection scope; the d94
+preview passes 7,437 with zero leaks / 53 skipped. Prior x86 full library 3763/0/15
+retains 0ddd scope; no full x86 before count is claimed.
+
+The d94/e1 carry passed formatting, strict 12 all-target Clippy and workflow
+contracts 2/0, with current CI green. Latest 9e9 ancestry/static/build checks
+are active before final readiness. The worker source remains identical; only
+evidence documentation was corrected. #3466 remains code-clear and
+native-green on 2842/bf39, but its real product-installed GOOD/BAD round still
+has no authorized owner. No device action or ARM64 build on the Mac occurred.
+
+Fourth requested the separate #1806 Skills journal observer for Common. Its
+exact cf762 two-file proposal is now locally committed as 71ad69f4a on 9e9, with
+original true/false branches, all assertions, eight-second watchdog and
+three-second negative window unchanged; current Store docs are preserved.
+Fresh metadata passed 451/48 with actual 12-crate reverse closure and absent new
+cold target. Current runtime qualification is next, not yet claimed.
+Historical 518/1/9 remains failed. Ready/Sleep controls remain disabled/unrun;
+a separate cold Ready plan and actual metadata avoid untrusted old cache
+admission.
+
+Shared-disk recovery preserved and verified 28,698 released owned .rcgu.o
+files: 5,498,788,152 original bytes to 1,329,708,213 compressed. All 183
+executable hashes were unchanged; no source, other target, library metadata or
+witness was removed. ENOSPC interrupted the watcher; its complete overlap
+subsequently recovered the gap and the whole-workspace primary log is durable.
+Later shared free-space observations are not credited wholly to this cleanup.
+
 ## 2026-10-25 22:08 — Product carrier delivered; journal cleanup control passes
 
 Ready for lamp-voice: no
