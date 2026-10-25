@@ -1,0 +1,37 @@
+{
+  "public_base": "26102b834632ebd964565f9eba94760a969dc1c0",
+  "fixed_tree": "00137508c233efb1667e2595045bae1c64e184d6",
+  "selective_Ready_tree": "338eb8f358f9952ca9569d31fff9879ade89f471",
+  "only_changed_paths": [
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+    "lampOS/docs/verification/private-callback-http-20261024/README.md"
+  ],
+  "source_patch_replay_exact": true,
+  "source_map": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "before": "100644 blob e5cbf1391bffe91641778932955bad27a85bf9e6\tlampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "after": "100644 blob d4f827796127e2ac716a282a5f5be19889193f8d\tlampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs",
+      "sha256": "923c9cd1273ed69bcf8510c953f35f4426861b477bba356ff343fb183eb5d5a7"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "before": "100644 blob 29919d9ac7530d34c396af4cdf237ecb76197c03\tlampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "after": "100644 blob f052a4643f7f20722c5f1d89680b43f91a6c26aa\tlampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs",
+      "sha256": "58089004d949705e66f7b735607fa55cfe07c7b9d4829c082edbfb4b4428f465"
+    },
+    {
+      "path": "lampOS/docs/verification/private-callback-http-20261024/README.md",
+      "before": "100644 blob 0adf178f33ebd71e7f28e67f353d0b0a2617823f\tlampOS/docs/verification/private-callback-http-20261024/README.md",
+      "after": "100644 blob 7207d1c4c8462728f6324e74623dba28f9bc3ea6\tlampOS/docs/verification/private-callback-http-20261024/README.md",
+      "sha256": "33ce690362b4c9644d2ebf3708c8e7bb5141604b0b698c6db1f8d0036240efb2"
+    }
+  ],
+  "runtime_observations": 0,
+  "private_controllers_raw_env_logs_binaries_excluded": true,
+  "independent_source_checks_reported": 18,
+  "formatting_and_diff_checks_exit": 0,
+  "doc_only_precision_after_audit": "lost lease clarified as lost private-context latch; both Rust blobs unchanged",
+  "current_base_parent_order_and_runtime_gates_pending": true
+}

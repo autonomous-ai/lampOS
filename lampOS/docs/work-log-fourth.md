@@ -1,3 +1,9 @@
+## 2026-10-25 10:40 — Callback refusal source correction
+
+Ready for lamp-voice: no
+
+New #3391 P2/P3 candidate adds actual post-name validator refusal, child stderr canary assertions and exclusive short temporary-root creation. Direct pinned formatting/diff checks and 18 source checks passed; Root reconstructed the exact fix and selective-Ready trees in scratch Git indexes. [Unapplied review inputs](verification/callback-dispatch-denial-source-20261025/) contain exact source and explicit nested-child mutation acceptance. Tests/control remain UNRUN and code stays uncommitted pending gates; existing parent/current/privacy/native/physical holds remain. Final Skills validation remains prepared with 78 checks, waiting on the declared resource handoff.
+
 ## 2026-10-25 10:05 — Hedge reproducible review inputs
 
 Ready for lamp-voice: no

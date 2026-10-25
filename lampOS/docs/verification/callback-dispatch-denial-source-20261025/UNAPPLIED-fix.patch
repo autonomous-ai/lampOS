@@ -1,0 +1,269 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs b/lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs
+index e5cbf1391bffe91641778932955bad27a85bf9e6..d4f827796127e2ac716a282a5f5be19889193f8d 100644
+--- a/lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs
++++ b/lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs
+@@ -57,15 +57,25 @@ fn child(name: &str, mode: &str, markers: usize) -> bool {
+         }
+     }
+     let private_tmp = (mode == "privacy-defaults").then(|| {
+-        use std::os::unix::fs::PermissionsExt;
+-        // Keep nested Unix sockets below SUN_LEN on macOS, whose default
+-        // temporary folder is too long for this child's Memory fixture.
+-        let path =
+-            PathBuf::from("/tmp").join(format!("lv-private-defaults-{}", std::process::id()));
+-        std::fs::create_dir(&path).unwrap();
+-        let owned = OwnedTemp(path);
+-        std::fs::set_permissions(&owned.0, std::fs::Permissions::from_mode(0o700)).unwrap();
+-        owned
++        use std::os::unix::fs::DirBuilderExt;
++        // Exclusive creation sets privacy before the directory is visible.
++        // A short, per-attempt nonce also keeps nested sockets below SUN_LEN.
++        for attempt in 0..32 {
++            let nonce = std::time::SystemTime::now()
++                .duration_since(std::time::UNIX_EPOCH)
++                .unwrap()
++                .as_nanos();
++            let path = PathBuf::from("/tmp").join(format!(
++                "lv-pd-{}-{nonce:x}-{attempt:x}",
++                std::process::id()
++            ));
++            match std::fs::DirBuilder::new().mode(0o700).create(&path) {
++                Ok(()) => return OwnedTemp(path),
++                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
++                Err(error) => panic!("private callback temporary-root creation failed: {error}"),
++            }
++        }
++        panic!("private callback temporary-root collision bound exceeded");
+     });
+     match mode {
+         "days" | "days-room" | "privacy" => {
+@@ -97,6 +107,12 @@ fn child(name: &str, mode: &str, markers: usize) -> bool {
+     let output = command.output().unwrap();
+     let stdout = String::from_utf8_lossy(&output.stdout);
+     let stderr = String::from_utf8_lossy(&output.stderr);
++    if mode == "privacy-defaults" {
++        assert!(
++            !stderr.contains(OWNER) && !stderr.contains(OLD) && !stderr.contains(NEW),
++            "private callback child stderr contains a synthetic private canary"
++        );
++    }
+     assert!(
+         output.status.success() && stdout.contains("1 passed"),
+         "{mode}: {stdout}\n{stderr}"
+diff --git a/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs b/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs
+index 29919d9ac7530d34c396af4cdf237ecb76197c03..f052a4643f7f20722c5f1d89680b43f91a6c26aa 100644
+--- a/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs
++++ b/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs
+@@ -737,7 +737,7 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+             panic!("the Done-only HTTP reply contains no sentence")
+         }
+     }
+-    struct Capture(Option<tokio::task::JoinHandle<(Value, Instant)>>);
++    struct Capture(Option<tokio::task::JoinHandle<Option<(Value, Instant)>>>);
+     impl Drop for Capture {
+         fn drop(&mut self) {
+             if let Some(task) = &self.0 {
+@@ -766,16 +766,32 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+             ("unknown", Some(lamp_msgs::SpeakingState::Unknown), 2),
+             ("no-face", None, 3),
+             ("speaking", Some(lamp_msgs::SpeakingState::Yes), 4),
++            ("dispatch-denied", Some(lamp_msgs::SpeakingState::Yes), 5),
+         ] {
+             let positive = matches!(speaking, Some(lamp_msgs::SpeakingState::Yes));
++            let deny_dispatch = case == "dispatch-denied";
+             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+             let url = format!("http://{}", listener.local_addr().unwrap());
+             let until = tokio::time::Instant::now() + WAIT;
+             let key = format!("fixture-private-defaults-{case}-{}", std::process::id());
+             let capture_key = key.clone();
++            let (stop_capture, mut stopped) = tokio::sync::oneshot::channel();
+             let mut capture = Capture(Some(tokio::spawn(async move {
+                 tokio::time::timeout_at(until, async move {
+-                    let (mut socket, _) = listener.accept().await.unwrap();
++                    // Completion explicitly closes an unused listener. An already
++                    // queued request wins over that signal, so denial cannot hide
++                    // a connection by turning a timeout into success.
++                    let accepted = tokio::select! {
++                        biased;
++                        accepted = listener.accept() => Some(accepted.unwrap()),
++                        result = &mut stopped => {
++                            result.expect("the Engine terminal closes HTTP observation");
++                            None
++                        }
++                    };
++                    let Some((mut socket, _)) = accepted else {
++                        return None;
++                    };
+                     let mut raw = Vec::new();
+                     let end = loop {
+                         if let Some(end) = raw.windows(4).position(|part| part == b"\r\n\r\n") {
+@@ -811,10 +827,10 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+                     let (head, body) = answered("").unwrap();
+                     socket.write_all(head.as_bytes()).await.unwrap();
+                     socket.write_all(&body).await.unwrap();
+-                    (sent, body_parsed_at)
++                    Some((sent, body_parsed_at))
+                 })
+                 .await
+-                .expect("the combined fixture receives a complete HTTP request")
++                .expect("HTTP observation finishes within the original case bound")
+             })));
+             let config_name = format!("combined-private-{case}");
+             let services = Arc::new(HttpChat {
+@@ -826,10 +842,23 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+             let known = memory.directory.join("known");
+             let context_known = known.clone();
+             let dispatch_known = known.clone();
++            // Separate fresh source models a different Eyes epoch arriving
++            // after composition. Do not invalidate the actual callback source.
++            let denied_directory = memory.directory.join("dispatch-unproved");
++            if deny_dispatch {
++                std::fs::create_dir(&denied_directory).unwrap();
++                write_known(&denied_directory, OWNER, "fedcba9876543210", "f7");
++            }
++            let dispatch_unproved = denied_directory.join("known");
+             let cache = Arc::new(FaceCache::default());
+             let eyes = Arc::new(SpeakingFaces::default());
+             let observed_private_name = Arc::new(AtomicBool::new(false));
+             let callback_observed_name = observed_private_name.clone();
++            let dispatch_observed_name = observed_private_name.clone();
++            let dispatch_checks = Arc::new(AtomicUsize::new(0));
++            let denied_checks = dispatch_checks.clone();
++            let dispatch_refusals = Arc::new(AtomicUsize::new(0));
++            let denied_refusals = dispatch_refusals.clone();
+             let hits = super::super::memory_hits(
+                 Arc::new(Mutex::new(Sessions::default())),
+                 memory.socket.clone(),
+@@ -846,7 +875,7 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+                 Arc::new(|_, _, _, _, _| Box::pin(async { panic!("no scoped tools") })),
+                 Some(Arc::new(move |lease| {
+                     let name = known_name_told(face_name, Some(&context_known), Some(lease));
+-                    callback_observed_name.fetch_or(!name.is_empty(), Ordering::Release);
++                    callback_observed_name.fetch_or(name.contains(OWNER), Ordering::Release);
+                     Told {
+                         requires_speaker: !name.is_empty(),
+                         text: format!("{PUBLIC}{name}"),
+@@ -855,7 +884,16 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+                 })),
+             )
+             .guarding_private_context(Arc::new(move |lease| {
+-                super::super::private_context_state(Some(&dispatch_known), lease)
++                if deny_dispatch && dispatch_observed_name.load(Ordering::Acquire) {
++                    denied_checks.fetch_add(1, Ordering::Relaxed);
++                    let state = super::super::private_context_state(Some(&dispatch_unproved), lease);
++                    if state == crate::second_provider::PermissionState::Lost {
++                        denied_refusals.fetch_add(1, Ordering::Relaxed);
++                    }
++                    state
++                } else {
++                    super::super::private_context_state(Some(&dispatch_known), lease)
++                }
+             }))
+             .seeing_who_speaks(eyes.clone(), known.clone())
+             .remembering(hits)
+@@ -957,20 +995,47 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+             assert_eq!(
+                 memory.count("kept") - before,
+                 usize::from(positive),
+-                "private I/O is checked even if final HTTP dispatch was denied: {case}"
++                "private I/O uses the admitted speaker: {case}"
+             );
+-            let (sent, body_parsed_at) =
++            // Only a real terminal, never elapsed quiet time, ends an unused
++            // listener. Await its owned task before evaluating privacy asserts.
++            let _ = stop_capture.send(());
++            let captured =
+                 tokio::time::timeout_at(until, capture.0.as_mut().unwrap())
+                 .await
+                 .expect("HTTP capture finishes")
+                 .unwrap();
+             drop(capture.0.take());
+-            let messages = sent["messages"].as_array().expect("actual HTTP messages");
+-            let payload = serde_json::to_string(messages).unwrap();
+-            assert!(payload.contains(PUBLIC) && payload.contains(QUERY), "{case}");
+-            assert_eq!(payload.contains(OWNER), positive, "name: {case}");
+-            assert_eq!(payload.contains(OLD), positive, "hits: {case}");
+-            assert_eq!(services.chats.load(Ordering::Relaxed), 1, "{case}");
++            let body_parsed_at = if deny_dispatch {
++                if let Some((sent, _)) = captured {
++                    let payload = serde_json::to_string(&sent["messages"]).unwrap();
++                    assert!(
++                        !payload.contains(OWNER) && !payload.contains(OLD),
++                        "private canary reached HTTP after dispatch denial"
++                    );
++                    panic!("a denied private composition must not dispatch even a neutral HTTP body");
++                }
++                // These assertions follow the HTTP check: a Ready-only bypass
++                // must be rejected for private output, not an earlier counter.
++                assert!(dispatch_checks.load(Ordering::Relaxed) > 0);
++                assert_eq!(
++                    dispatch_checks.load(Ordering::Relaxed),
++                    dispatch_refusals.load(Ordering::Relaxed),
++                    "the actual post-name validator refuses every observation"
++                );
++                assert!(lease.private_context_lost());
++                assert_eq!(services.chats.load(Ordering::Relaxed), 0);
++                None
++            } else {
++                let (sent, body_parsed_at) = captured.expect("the neutral or proved HTTP request");
++                let messages = sent["messages"].as_array().expect("actual HTTP messages");
++                let payload = serde_json::to_string(messages).unwrap();
++                assert!(payload.contains(PUBLIC) && payload.contains(QUERY), "{case}");
++                assert_eq!(payload.contains(OWNER), positive, "name: {case}");
++                assert_eq!(payload.contains(OLD), positive, "hits: {case}");
++                assert_eq!(services.chats.load(Ordering::Relaxed), 1, "{case}");
++                Some(body_parsed_at)
++            };
+             assert_eq!(
+                 services.samples.load(Ordering::Relaxed),
+                 50 * lamp_audio::CAPTURE_SAMPLES,
+@@ -983,11 +1048,19 @@ fn private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch() {
+             assert_eq!(reads.len() - before, usize::from(positive), "{case}");
+             assert!(reads.iter().all(|read| read["person"] == person));
+             assert_eq!(memory.count("session_open"), 0, "no other note path");
+-            eprintln!(
+-                "callback check: combined_private_defaults case={case} end_to_http_us={} kept_reads={}",
+-                body_parsed_at.saturating_duration_since(began).as_micros(),
+-                reads.len() - before
+-            );
++            if let Some(body_parsed_at) = body_parsed_at {
++                eprintln!(
++                    "callback check: combined_private_defaults case={case} end_to_http_us={} kept_reads={}",
++                    body_parsed_at.saturating_duration_since(began).as_micros(),
++                    reads.len() - before
++                );
++            } else {
++                eprintln!(
++                    "callback check: combined_private_defaults case={case} terminal_to_closed_http=true validator_refusals={} kept_reads={}",
++                    dispatch_refusals.load(Ordering::Relaxed),
++                    reads.len() - before
++                );
++            }
+             drop(engine);
+             drop(services);
+         }
+diff --git a/lampOS/docs/verification/private-callback-http-20261024/README.md b/lampOS/docs/verification/private-callback-http-20261024/README.md
+index 0adf178f33ebd71e7f28e67f353d0b0a2617823f..7207d1c4c8462728f6324e74623dba28f9bc3ea6 100644
+--- a/lampOS/docs/verification/private-callback-http-20261024/README.md
++++ b/lampOS/docs/verification/private-callback-http-20261024/README.md
+@@ -1,12 +1,16 @@
+ # Private name and hits through the admitted request and HTTP
+ 
+-Test-only follow-up to #3064, based on Common head `e9d00f935029a6d5054ddf35b0203fb8546f7995`. Two existing Voice test files add one top-level regression containing four internal cases. It uses actual Engine Start/Audio/End admission and current-piece speaker sealing, real known-name and memory-hit callbacks, the existing Unix Memory fixture and real Net guarded HTTP serialization. STT is deterministic; ordinary note/history callbacks are omitted so the kept canary has only the hit path.
++Source-only review correction on published `26102b834632ebd964565f9eba94760a969dc1c0`, whose Common parent is `e9d00f935029a6d5054ddf35b0203fb8546f7995`. The two existing Voice test files retain the four original internal rows and add one dispatch-denied row to the same top-level regression. This new source and its selective control are **unrun**; all older observations below keep their original source bindings and supply no qualification for this correction.
+ 
+-Every case inherits the same fresh known-person scope. Silent, Unknown and missing-face audio must return no private name from the real callback, perform zero kept RPCs, complete a neutral HTTP request and send neither private canary. Three distinct positive frames permit one matching-person kept RPC and both canaries in the proved-person case. The name callback records only a nonempty Boolean, asserted before HTTP capture can mask a selector regression. No manual speaker seal or permission Boolean substitutes for admission. A Done-only response avoids TTS/tools. The existing 10 second case bound, header/body limits and capture abort cleanup remain unchanged.
++The four original rows still use actual Engine Start/Audio/End admission, current-piece speaker sealing, real known-name and memory-hit callbacks, the Unix Memory fixture and Net guarded HTTP serialization. Silent, Unknown and missing-face audio return no private name, perform zero kept RPCs and complete neutral HTTP without either canary. The speaking row reads one matching-person kept RPC and sends both canaries. These are selector/composition controls; none of the three original negatives demonstrates a refusing final private-context validator.
+ 
+-The isolated child owns a private temporary root supplied only through that child's TMPDIR. The existing shared config helper alone constructs its child paths; the parent removes the root after child completion, including a failed child. No production path, timeout, source census or global process environment is changed.
++The fifth row uses the same positive microphone and three-frame admission. The real known-name callback must contain the owner canary and the actual hits callback performs its one private read before composition. Before that name returns, validation uses the original fresh matching source. Afterward it uses a separate fresh source from another Eyes boot and calls the real `private_context_state`, which must report Lost. No sleep or pre-callback lease revocation substitutes for that ordering. The Engine must emit its actual idle terminal. Only then does the fixture explicitly stop the unused listener; biased accept takes any already queued connection first, and a bounded owned-task join proves closure. A timeout fails rather than proving absence. No private canary may arrive in HTTP, and the refusal count, lost private-context latch and zero chat-dispatch count are asserted after the HTTP privacy assertion. The original 10 second case bound and header/body limits remain.
+ 
+-## Current corrected local qualification
++The selective **unapplied** control forces Ready only instead of calling the fifth row's refusing validator. It must skip that real call, since calling it and then overwriting Lost would leave the lease irreversibly lost. Expected rejection is the private-canary-at-HTTP assertion after the real callback and terminal; this is a source-derived expectation, not an observed mutant result. Deleting `guarding_private_context` is not an accurate leak control: missing validation defaults to Lost in the Engine. STT remains deterministic, the Done-only HTTP response avoids TTS/tools, and ordinary note/history callbacks remain omitted.
++
++The isolated privacy-defaults child creates its short `/tmp` root exclusively with mode0700 already applied and a per-attempt nonce, allowing at most 32 AlreadyExists collisions. It removes only the root it created after child completion, including failed children; the shared config helper alone constructs nested paths. Before displaying child failure diagnostics, the parent checks stderr for all three synthetic canaries without printing their contents. No new dependency, production path, switch/default, timeout, source census or global process environment is changed.
++
++## Historical corrected local qualification
+ 
+ Tested tree `30eabf6bc5365006a44ebaf17ba617abcb6784d6`. Five stages per host: whole-workspace formatting, strict workspace/all-target Clippy, workspace build, full serial Voice tests and the exact Cargo Update scratch census in `tests/it/main.rs`.
+ 

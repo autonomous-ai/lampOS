@@ -1,0 +1,24 @@
+{
+  "state": "SOURCE_REVIEW_INPUTS_ONLY_NO_RUNTIME_GRANT",
+  "case": "second_provider::worker::kept_name_callback::privacy::private_name_and_hits_share_the_same_admitted_speaker_at_http_dispatch",
+  "ordinary_positive_acceptance": "Qualified ordinary full gate must execute the real parent/isolated-child test with all four original rows and fifth denial row passing; preserve current-source and parent-order requirements.",
+  "selective_negative_acceptance": {
+    "compile_exit_required": 0,
+    "one_future_exact_parent_observation": true,
+    "required_child_failure": "private canary reached HTTP after dispatch denial",
+    "outer_named_case_exit": 101,
+    "nested_parent_child_diagnostics": "Preserve and classify as one semantic observation; child failure and parent status-wrapper panic are expected nesting, not two samples. Raw summary sums do not establish outcome.",
+    "inconclusive": [
+      "compiler failure",
+      "setup or timeout",
+      "stderr-canary assertion",
+      "refusal counter without specific child HTTP privacy failure",
+      "earlier positive-row failure",
+      "cleanup failure"
+    ]
+  },
+  "operator": "Only replace fifth-row real validator call with Ready; skip real Lost call to avoid irreversibly latching loss. Missing builder validation is fail-closed and is not the leak operator.",
+  "observations_executed": 0,
+  "gates_before_code_push": true,
+  "current_base_parent_privacy_native_physical_holds": true
+}

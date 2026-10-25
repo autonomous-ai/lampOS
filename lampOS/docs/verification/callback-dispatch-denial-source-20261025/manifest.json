@@ -1,0 +1,22 @@
+{
+  "README.md": {
+    "bytes": 1571,
+    "sha256": "f77d6bceed9bc7a5e868d2cc13eb2740fa58b094a70f7706c1ab6c5957f82695"
+  },
+  "UNAPPLIED-fix.patch": {
+    "bytes": 19762,
+    "sha256": "c03af5b3cd4e30959d8973016e9208ed37876575823f40872cd7cbcd3ce32c1a"
+  },
+  "UNAPPLIED-force-final-validator-Ready.patch": {
+    "bytes": 1122,
+    "sha256": "f915596f76d737046227ac7cdfe09b1712f10b66259dbb3d4a4f97e2d3d78792"
+  },
+  "planned-acceptance.json": {
+    "bytes": 1457,
+    "sha256": "4d794283c6922551f536cb7e1f43573b56122f32f3c6d1b11570f5ef614fa762"
+  },
+  "source-identity.json": {
+    "bytes": 2293,
+    "sha256": "6318f8c58a01b51caf5e5d09d79d3caf5de80722617deb8aa35bf2034878c2eb"
+  }
+}

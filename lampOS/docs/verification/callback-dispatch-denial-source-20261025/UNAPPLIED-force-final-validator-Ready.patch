@@ -1,0 +1,16 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs b/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs
+index f052a4643f7f20722c5f1d89680b43f91a6c26aa..55a380cb5b0746d9e13a90919070a7065af038fd 100644
+--- a/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs
++++ b/lampOS/crates/voice/src/second_provider/worker/kept_name_privacy_tests.rs
+@@ -886,7 +886,10 @@
+             .guarding_private_context(Arc::new(move |lease| {
+                 if deny_dispatch && dispatch_observed_name.load(Ordering::Acquire) {
+                     denied_checks.fetch_add(1, Ordering::Relaxed);
+-                    let state = super::super::private_context_state(Some(&dispatch_unproved), lease);
++                    let state = {
++                        let _ = &dispatch_unproved;
++                        crate::second_provider::PermissionState::Ready
++                    };
+                     if state == crate::second_provider::PermissionState::Lost {
+                         denied_refusals.fetch_add(1, Ordering::Relaxed);
+                     }
