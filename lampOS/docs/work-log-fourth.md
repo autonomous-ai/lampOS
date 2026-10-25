@@ -1,3 +1,9 @@
+## 2026-10-25 10:44 — Hedge source-recipe status
+
+Ready for lamp-voice: no
+
+Corrected the remaining requirements.json P3: Common’s reconstruction recipe is published in 423f62b3d, with its exact parent tree and relative link recorded. Source patches, commands, caps/profile and all UNRUN/hold boundaries are unchanged; manifest refreshed.
+
 ## 2026-10-25 10:40 — Callback refusal source correction
 
 Ready for lamp-voice: no

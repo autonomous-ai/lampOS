@@ -81,7 +81,7 @@
   ],
   "source_recipe": {
     "Common_parent": "618158e68667aa2ddcc8f541cbf59fac3defca38",
-    "Common_parent_public_reconstruction_recipe": "PENDING separate Root audit/publication",
+    "Common_parent_public_reconstruction_recipe": "Published in 423f62b3d4: ../common-public-reconstruction-20261025/REPRODUCTION.md; exact Common618 tree21d7db4e321b08ac94f370d749fb5c49c4fa1911",
     "current_base_status": "Historical frozen train106 source; latest-main rebase/currentCI pending",
     "mutant_recipe": "Separate copies of exact positive source plus ONLY respective UNAPPLIED-near/relay.patch; no combined mutant.",
     "positive_recipe": "Apply UNAPPLIED-positive.patch to exact reconstructed Common618 tree; verify source-map blob/mode identities. Do not rely on unpublished positive checkout alone.",
