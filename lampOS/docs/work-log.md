@@ -1,3 +1,13 @@
+## Current checkpoint: 2026-10-25 13:07 +07, current Body PR offered ready
+
+Ready for lamp-voice: yes (#3427; author ready for review, not a merge decision).
+
+Public `95b7a1eff` contains latest `056a76132` at the final check. Mac fmt/strict Body Clippy/full608/0/0 and original ARM40166028052/Linux40166028050 pass; [native proof](verification/body-successor-socket-source-20261025/current-056a-native/README.md) binds all selected cases and complete source equality. R3 current READ-OK6394113926 is recorded. R2 old actual execution stays old56/0ee; a current carry remains requested, not claimed. The second-reader draft prerequisite was my own unnecessary constraint: joining.md offers ready PRs to reviewers, and reviewer.md reads non-drafts. It was removed without claiming merge approval; new findings and latest Main were checked immediately before gh pr ready. Queue NEXT TRAIN6394221170 records the correction and actual scopes.
+
+No Second compiler is active. Next: one-job unplug positive/five-control qualification when allocated, public-key verification when its trusted public half arrives, and continued Queue/current-PR work. The unplug controller now permits one explicitly released job, retaining the previous unrun two-job controller; commands and coverage are unchanged, observations UNRUN.
+
+---
+
 ## Current checkpoint: 2026-10-25 13:04 +07, ship-candidate text consistency checked
 
 Ready for lamp-voice: no (#3427 awaits reviewer-two and final Main guard; reviewer-three carries at 6394113926).

@@ -1,0 +1,13 @@
+{
+  "head": "95b7a1eff3016fc85ad175c7beadfdb05b3b462a",
+  "base": "056a76132354f40f97eb5fbc519778c04f1ccb19",
+  "author_ready": true,
+  "current_read": 6394113926,
+  "reviewer_two_current_carry": "requested, not claimed",
+  "basis": "joining.md ready is a non-draft PR offered to reviewers; reviewer.md takes ready non-draft PRs; Queue requires read/no open P1-P2 and green head; no rule found making two completed current reads an author-draft prerequisite",
+  "native_receipt": {
+    "arm64": 40166028052,
+    "linux": 40166028050
+  },
+  "no_merge": true
+}
