@@ -1,3 +1,9 @@
+## 2026-10-25 15:00 — Narrow onboarding activation excludes held observations
+
+Ready for lamp-voice: no
+
+Removed #3450 from the candidate after reading its queued-after-forget and room-observation privacy findings. The product change now carries only #3437 onto train 121: speaking-face enrollment in both peers plus the person-scope guard; OBSERVE, EVENTS, THREADS and FORGET_ALL stay off. The consent note, paired-unit regression and trial plan remain. The broader stack's formatting, Clippy and workspace build passed, but it was deliberately stopped before any Rust test executed; all groups closed and no test pass is claimed. The new nine-file scope passes direct formatting and diff checks and is entering fresh full local gates on one compiler job. First still assigns the two-person played check; no lamp action.
+
 ## 2026-10-25 14:31 — Onboarding guard implemented on current release source
 
 Ready for lamp-voice: no
