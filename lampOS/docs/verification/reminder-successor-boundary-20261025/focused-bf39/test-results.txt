@@ -1,0 +1,13 @@
+unchanged-production/test.log
+the fully retired reminder was abandoned at successor admission
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3779 filtered out; finished in 0.22s
+
+fixed-bf-focused/test-reminders.log
+scenario capture onset read to successor admission: 12000 us; reminder completion to successor admission: 10000 us
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 3751 filtered out; finished in 21.04s
+
+fixed-bf-focused/test-provider-terminal.log
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 3767 filtered out; finished in 3.41s
+
+fixed-bf-focused/test-reminder-roundtrip.log
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3776 filtered out; finished in 6.24s

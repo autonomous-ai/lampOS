@@ -1,0 +1,11 @@
+{
+  "negative": {
+    "test.log": "acb390947767f32716705e1bbf5439de68a8978e2c186c41accf07204acd03d1"
+  },
+  "fixed": {
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-provider-terminal.log": "3291bdff35b5cc796226d9d7e2a259e30d1560d8f3b2032eb62e7e7c5c277598",
+    "test-reminder-roundtrip.log": "db80ffa7075f7944299a0d6025c3a783096f5f037352ab9171892f1180c20adf",
+    "test-reminders.log": "f07eaa28360d8535f573bb74e71df0bb7e63f32ad0070ab1f1ddff65be3d61df"
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "negative": {
+    "head": "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+    "base_tree": "c65e586b1342ce3bf1b0bae69a079b77bce984f8",
+    "source_sha256": {
+      "lampOS/crates/voice/src/coordinator.rs": "53072c920cc2ad2a90ce4ce703fa106781a66978d00085d7999924c90ae92fa3",
+      "lampOS/crates/voice/src/reminders.rs": "c22f2b3b426735697e60b392df5e180181a55c82f4c899601d093e52ca7b5151",
+      "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs": "da4727312b6c5e209ef06cf2a0f7858a6f8ac01ac80f22b80aa447317192dbe1",
+      "lampOS/crates/voice/src/coordinator/tests/reminders.rs": "9c145d719a2cd1686c09eb55bf922beaea4c5c940970954c06d1098c55c3d242"
+    },
+    "started": "2026-10-25T15:25:22.224742+00:00",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "coordinator::tests::reminders::a_settled_reminder_finishes_before_the_live_loop_admits_its_successor",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "environment": {
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0"
+    },
+    "exit": 101,
+    "finished": "2026-10-25T15:28:21.273166+00:00",
+    "source_unchanged": true,
+    "log_sha256": "acb390947767f32716705e1bbf5439de68a8978e2c186c41accf07204acd03d1",
+    "post_execution_binary_sha256": "0bbc9474f3e673576ac171f115e573d4fadb10d73f4e5b8dced950d1e23cd2bb",
+    "expected_regression_reproduced": true,
+    "executed_binary_filename": "lamp_voice-6d619bbdd1df3a0d"
+  },
+  "fixed": {
+    "head": "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+    "source_sha256": {
+      "lampOS/crates/voice/src/coordinator.rs": "96e79f11444ab0a68b6e4c08c7aeb52992b931d14b8d1ffc024431316f6834ac",
+      "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs": "da4727312b6c5e209ef06cf2a0f7858a6f8ac01ac80f22b80aa447317192dbe1",
+      "lampOS/crates/voice/src/coordinator/tests/reminders.rs": "9c145d719a2cd1686c09eb55bf922beaea4c5c940970954c06d1098c55c3d242",
+      "lampOS/crates/voice/src/reminders.rs": "694070a64d4315a0c5e586556c8f50504a8ec34aaa4fdf36aa455356606647e5",
+      "lampOS/docs/reuse-decisions.md": "1beb6c8cdf24c0f210f969dcb31b950087c6f13521b90a50588cb1fb03192f46",
+      "lampOS/docs/schedule.md": "715d00013480c86bba43e97276e647e3a7dcf3a344ed8a1e529901694f669683"
+    },
+    "state": "Focused fixed-production controls passed 46/0; full gate not yet run.",
+    "post_execution_binary_sha256": "96b6148328f323f4e9f363b2c427134bbfefb3c573ef87f01cd11c41a33ea4a9",
+    "timing_lines": [
+      "scenario capture onset read to successor admission: 12000 us; reminder completion to successor admission: 10000 us"
+    ]
+  },
+  "fixed_gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T15:29:07Z",
+      "finished": "2026-10-25T15:29:19Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-reminders": {
+      "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::reminders:: -- --nocapture",
+      "started": "2026-10-25T15:29:19Z",
+      "finished": "2026-10-25T15:31:49Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 29,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-provider-terminal": {
+      "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::provider_terminal::",
+      "started": "2026-10-25T15:31:49Z",
+      "finished": "2026-10-25T15:31:53Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-reminder-roundtrip": {
+      "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::reminder_roundtrip::",
+      "started": "2026-10-25T15:31:53Z",
+      "finished": "2026-10-25T15:32:01Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  }
+}

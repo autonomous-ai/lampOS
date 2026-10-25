@@ -5,6 +5,31 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 22:34 — Reminder admission regression reproduced and fixed locally
+
+Ready for lamp-voice: no (full current gate, commit, PR and Linux gates pending).
+
+The actual coordinator-loop regression on unchanged `bf39e4188` production
+failed **0/1** at the expected assertion: a fully retired reminder was
+abandoned when the successor candidate arrived. Source, raw failure and
+post-execution binary/hash were preserved before applying the qualified guard.
+The fixed source passed formatting and all **46** focused controls: reminders
+**29/0**, provider terminal **13/0**, durable reminder roundtrip **4/0**.
+[Before/after proof](verification/reminder-successor-boundary-20261025/focused-bf39/).
+The stepped scenario measured **12,000 us capture-read to admission** and
+**10,000 us completion to admission**, with the complete ordered prefix kept
+and the next frame quiet. Those are host bounds, not acoustic or lamp results.
+Failed, partial, missing-terminal, reset and privacy delivery stays unacknowledged.
+The separate natural-reset/say mismatch stays with Second.
+
+The fix is now frozen on `d7d20bfc0` for its full formatting, strict Voice/Eval
+clippy, workspace build and complete Voice/Eval gate in the one compiler lane.
+Train136 #3487 already carries #3408 on d7, so its published head remains
+fixed while original train ARM64 40207134196 runs (Linux clippy passed).
+The local parent rebase is preparation only; no new execution claim. #3486
+original ARM64 40206954233 runs and Linux clippy passed; its d7 source carry
+is prepared but untested. #3420 gets actual-base qualification after parent landing.
+
 ## 2026-10-25 22:27 — Current two-face carry published
 
 Ready for lamp-voice: no (#3486; original Linux gates and current reads pending).
