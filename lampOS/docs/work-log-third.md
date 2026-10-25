@@ -5,6 +5,35 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 06:46 — Both fixes published; reminder ship faults taken
+
+Ready for lamp-voice: yes for #3486 at **77232b464**, nominated NEXT TRAIN.
+Original ARM64 **40235459233** and Linux **40235459240**, attempt1, pass.
+The actual preview bb038b7bc equals the offered tree: **11,322 unique PASS,
+zero leaks/failures/timeouts,106 skipped**, all three own controls once.
+[The native receipt](verification/two-faces-held-carry-20261025/native-40235459233.json)
+keeps the source and raw-log identity. Both exact-head reads are READ-OK.
+
+Expression is published as draft **#3512 at7a06aaf61** on3d9722f38, with
+its original7,380/0/52 full run and current364/0 qualification separately
+bound. Preflight is published as draft **#3513 atb43cd9b1f**, samebase:
+fmt/strictClippy/workspacebuild and159/0 affected tests pass, including all
+nine new install controls and metadata-only non-null-device refusal.
+Original native gates are active; no hardware claim.
+
+The approval-review usage limit prevented opening #3512 at04:40; no PR
+was created then. After resumption, the final preflight logs showed every
+stage exit0, and all source hashes matched before publication. The block
+is now resolved without changing permission settings or bypassing review.
+
+Taken Queue6405023231: First's two ship-critical reminder faults from
+build6919. Known user interruption abandons the reminder receipt; consumer
+holds it as unproven. A later pending delivery misses the skill's positive
+edge and waits for10s voice fallback without a look. Trace and regressions
+are in progress on third/reminder-interruption-retry. Unknown/crash
+outcomes remain distinct; no retry is granted before owner fencing and
+successful publication. No lamp access is taken.
+
 ## 2026-10-26 04:32 — Current face carry pushed; privacy full gate complete
 
 Ready for lamp-voice: no; #3486 is draft pending current native checks.
