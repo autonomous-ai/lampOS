@@ -1,0 +1,36 @@
+{
+  "head": "9a5cbf6fd126c95b02211e6af5ac0feaa1f2f8c9",
+  "parent": "92511dc092d46ccb40ca156d7ba3dc41d7975e2e",
+  "release_base": "86416a0d3ff5575c37b48943ada962445ec935f9",
+  "tree": "856bd43515315202f52caf91eede3622a03790cc",
+  "arm64": {
+    "run": 40200191274,
+    "event": "workflow_dispatch",
+    "conclusion": "success",
+    "checkout": "9a5cbf6fd126c95b02211e6af5ac0feaa1f2f8c9",
+    "passed": 11287,
+    "leaky_included_in_passed": 1,
+    "skipped": 106,
+    "unique_terminal_identities": 11287,
+    "repeated_equal_terminal_rows": 35,
+    "new_control_pass_counts": {
+      "two_held_colleagues_keep_the_older_voice_constraint": 1,
+      "held_voice_constraints_close_with_the_carry_and_reject_old_callbacks": 1,
+      "a_full_held_voice_bound_keeps_the_owner_by_face_until_a_fresh_call": 1,
+      "a_recent_call_can_resume_after_forget_without_a_stale_closed_scope": 1,
+      "a_fresh_call_clears_the_previous_callers_held_voice_constraints": 1,
+      "every_held_print_constrains_the_voice_without_eviction": 1,
+      "a_missing_held_print_needs_its_own_cached_reply": 1,
+      "duplicates_fill_missing_evidence_without_replacing_known_evidence": 1,
+      "capacity_exhaustion_stays_face_only_until_a_fresh_call": 1,
+      "closed_scopes_and_old_callbacks_cannot_restore_constraints": 1
+    },
+    "raw_log_sha256": "b1dae42da16c541a4d8c841f7c318a2c3dc9ff86813e48af5c8b24253b84b559"
+  },
+  "linux_clippy": {
+    "run": 40200197617,
+    "head": "9a5cbf6fd126c95b02211e6af5ac0feaa1f2f8c9",
+    "conclusion": "success"
+  },
+  "limits": "Original manual runs on this head and parent containing release base 86416a0d3 only. Current 0ddd07377 carry not qualified by these runs. Tracked journal fixture leak retained; no local ARM64, lamp, acoustic latency or activation claim."
+}

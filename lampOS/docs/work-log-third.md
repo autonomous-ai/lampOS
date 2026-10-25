@@ -5,6 +5,27 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 21:38 — Child original ARM64 gate green
+
+Ready for lamp-voice: no (#3420 remains parent-first and behind the new base).
+
+#3420 offered `9a5cbf6fd`, parent `92511dc09`, release base `86416a0d3`:
+original manual ARM64 **40200191274** and Linux clippy **40200197617**
+passed. The ARM checkout is exactly the offered head: **11,287 passed
+(one tracked journal fixture leak), 106 skipped**. All ten own controls
+passed. The audit reconciles 11,287 unique terminal identities and retains
+35 equal repeated log rows without treating them as extra executions.
+[Native receipt](verification/held-colleague-constraints-20261025/native-40200191274.json).
+No device or activation result; old runs retain their own source identities.
+
+Parent current-base `8b9debb80` is running its full gate on `0ddd07377`;
+fmt, strict clippy and workspace build pass. Child source preparation
+`87e9e7a8b` preserves both own patches above it and has not run a fresh gate.
+The two-face full old-base gate passed **4,662/0/21**, its preserved merge
+is `66cab67e8`, and the latest-base preparation keeps every authored line.
+The reminder regression now drives the real coordinator loop; execution is
+queued behind these gates, with production unchanged for its negative.
+
 ## 2026-10-25 21:19 — Body landed; remaining carries follow the new base
 
 Ready for lamp-voice: no (Body is delivered; remaining carries are qualifying).
