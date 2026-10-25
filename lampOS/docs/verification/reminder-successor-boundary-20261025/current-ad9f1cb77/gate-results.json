@@ -1,0 +1,101 @@
+{
+  "fmt": {
+    "command": "cargo +1.96.0 fmt --all --check",
+    "started": "2026-10-25T15:57:41Z",
+    "finished": "2026-10-25T15:57:54Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "clippy-final": {
+    "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-memory -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+    "started": "2026-10-25T15:57:54Z",
+    "finished": "2026-10-25T16:00:04Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "build": {
+    "command": "cargo +1.96.0 build -q --locked --workspace",
+    "started": "2026-10-25T16:00:04Z",
+    "finished": "2026-10-25T16:01:29Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-memory": {
+    "command": "cargo +1.96.0 test --locked --no-fail-fast -p lamp-memory",
+    "started": "2026-10-25T16:01:29Z",
+    "finished": "2026-10-25T16:10:11Z",
+    "exit": 0,
+    "harnesses": 19,
+    "passed": 327,
+    "failed": 0,
+    "ignored": 8,
+    "disk_error_lines": []
+  },
+  "test-second-worker": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib second_provider::worker::tests::",
+    "started": "2026-10-25T16:10:11Z",
+    "finished": "2026-10-25T16:12:43Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 173,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-reminders": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::reminders:: -- --nocapture",
+    "started": "2026-10-25T16:12:43Z",
+    "finished": "2026-10-25T16:12:53Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 29,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-provider-terminal": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::provider_terminal::",
+    "started": "2026-10-25T16:12:53Z",
+    "finished": "2026-10-25T16:12:54Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 13,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-reminder-roundtrip": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::reminder_roundtrip::",
+    "started": "2026-10-25T16:12:54Z",
+    "finished": "2026-10-25T16:12:58Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-voice-eval": {
+    "command": "cargo +1.96.0 test --locked --no-fail-fast -p lamp-voice-eval",
+    "started": "2026-10-25T16:12:58Z",
+    "finished": "2026-10-25T16:16:18Z",
+    "exit": 0,
+    "harnesses": 4,
+    "passed": 623,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  }
+}
