@@ -74,6 +74,138 @@ fn missing_samples_cannot_extend_a_pulse_and_recovery_needs_idle_again() {
     assert!(scan.ingest(905_000, 16).is_err());
 }
 
+fn skipped_hands_away_phase(initial_sample: bool) {
+    let mut scan = Discovery::with_rest(0, [(false, false); 4], 10_000_000).unwrap();
+    if initial_sample {
+        scan.ingest(0, 0).unwrap();
+    }
+    let first_after_rest = scan.ingest(10_500_000, 0);
+    if first_after_rest.is_ok() {
+        // The original bug accepts two held pads even though none of the
+        // requested hands-away interval was sampled. A delayed first read
+        // does not even increment the report's acquisition-gap counter.
+        feed(&mut scan, 10_505_000, 10_525_000, 0);
+        feed(&mut scan, 10_530_000, 12_525_000, 0b1100);
+        feed(&mut scan, 12_530_000, 12_555_000, 0);
+    }
+    assert!(
+        first_after_rest.is_err(),
+        "unobserved hands-away baseline must refuse before touch evidence: {:?}",
+        scan.report()
+    );
+    assert!(
+        first_after_rest
+            .unwrap_err()
+            .to_string()
+            .contains("hands-away")
+    );
+    assert_eq!(scan.report().last_us, initial_sample.then_some(0));
+    // Later good samples cannot repair a scan whose baseline was missed.
+    for (at, mask) in [(13_000_000, 0), (13_025_000, 0), (14_000_000, 12)] {
+        assert!(scan.ingest(at, mask).is_err());
+    }
+    assert!(
+        scan.report()
+            .lines
+            .iter()
+            .all(|line| line.active_low_candidate.is_none())
+    );
+}
+
+#[test]
+fn a_gap_over_the_hands_away_phase_cannot_qualify_head_pads() {
+    skipped_hands_away_phase(true);
+}
+
+#[test]
+fn a_first_read_after_the_hands_away_phase_cannot_qualify_head_pads() {
+    skipped_hands_away_phase(false);
+}
+
+fn hold_two_pads(scan: &mut Discovery, start: u64) {
+    use lamp_controls::touch_pins::Reads;
+    feed(scan, start, start + 25_000, 0);
+    feed(scan, start + 30_000, start + 625_000, 0b1100);
+    feed(scan, start + 630_000, start + 655_000, 0);
+    for line in &scan.report().lines[2..] {
+        assert_eq!(line.active_low_candidate, Some(false));
+        assert_eq!(line.reads, Some(Reads::Level));
+        assert_eq!(line.rest_changes, Some(0));
+    }
+}
+
+#[test]
+fn missing_rest_coverage_uses_the_existing_freshness_boundary() {
+    for started in [0, 42_000_000] {
+        for missing in [99_999, 100_000] {
+            let mut scan = Discovery::with_rest(started, [(false, false); 4], 1_000_000).unwrap();
+            feed(&mut scan, started, started + 700_000, 0);
+            let next = started + 700_000 + missing;
+            assert_eq!(scan.ingest(next, 0).is_err(), missing == 100_000);
+            if missing < 100_000 {
+                feed(&mut scan, next + 5_000, started + 1_499_999, 0);
+                hold_two_pads(&mut scan, started + 1_505_000);
+            } else {
+                // Even an otherwise fresh backfill after the last accepted
+                // acquisition cannot erase a failure already observed.
+                assert!(scan.ingest(started + 705_000, 0).is_err());
+                assert!(scan.ingest(next + 5_000, 0).is_err());
+            }
+        }
+    }
+}
+
+#[test]
+fn first_rest_sample_and_last_rest_sample_must_cover_the_phase_edges() {
+    for missing in [99_999, 100_000] {
+        // Delay before the first read is measured from the rest boundary,
+        // not from the start of the unrelated settle phase.
+        let mut first = Discovery::with_rest(0, [(false, false); 4], 1_000_000).unwrap();
+        let at = 500_000 + missing;
+        assert_eq!(first.ingest(at, 0).is_err(), missing == 100_000);
+        if missing < 100_000 {
+            feed(&mut first, at + 5_000, 1_499_999, 0);
+            hold_two_pads(&mut first, 1_505_000);
+        }
+
+        // A much longer delay into the touch phase counts only its missing
+        // coverage before rest ended. It still resets contact acquisition.
+        let mut last = Discovery::with_rest(0, [(false, false); 4], 1_000_000).unwrap();
+        feed(&mut last, 0, 1_395_000, 0);
+        last.ingest(1_500_000 - missing, 0).unwrap();
+        assert_eq!(last.ingest(1_700_000, 0).is_err(), missing == 100_000);
+        if missing < 100_000 {
+            assert_eq!(last.report().gaps, 1);
+            hold_two_pads(&mut last, 1_705_000);
+        }
+    }
+}
+
+#[test]
+fn a_short_rest_needs_a_sample_inside_it_not_only_at_its_end() {
+    for sampled_inside in [false, true] {
+        let mut scan = Discovery::with_rest(0, [(false, false); 4], 100).unwrap();
+        if sampled_inside {
+            scan.ingest(500_000, 0).unwrap();
+        }
+        assert_eq!(scan.ingest(500_100, 0).is_err(), !sampled_inside);
+        if sampled_inside {
+            hold_two_pads(&mut scan, 505_000);
+        }
+    }
+}
+
+#[test]
+fn gaps_outside_rest_do_not_prevent_a_fresh_baseline_and_held_pads() {
+    let mut scan = Discovery::with_rest(0, [(false, false); 4], 1_000_000).unwrap();
+    scan.ingest(0, 0).unwrap();
+    scan.ingest(300_000, 0).unwrap();
+    feed(&mut scan, 305_000, 1_600_000, 0);
+    scan.ingest(2_000_000, 0).unwrap();
+    assert_eq!(scan.report().gaps, 2);
+    hold_two_pads(&mut scan, 2_005_000);
+}
+
 /// #711 and #1764: with a hands-away phase, a line whose rest changes is
 /// counted (lamp-cb94's line 97 flipped), a steady one has none, and each
 /// candidate says how a touch showed: pulses under a resting hand, or its

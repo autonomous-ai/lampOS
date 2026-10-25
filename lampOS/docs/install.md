@@ -633,6 +633,17 @@ units stopped:
    baseline, which goes into `head_rest` (its rest, and whether a touch holds
    its level or pulses; controls.md, "Each lamp's own head pads"). A pad
    whose line changed with hands away is refused and nothing is written.
+   Discovery also refuses missing sample coverage of 100 ms or more inside
+   the hands-away phase, using its existing freshness bound, and requires
+   at least one sample inside that phase. Only the portion of a gap inside
+   the phase counts; delays wholly before or after it keep normal recovery.
+   An invalid scan must be started again, rather than repaired by later
+   touches. It exits unsuccessfully, so the existing step restores Controls
+   and leaves the original pins profile untouched. This adds no wait to the
+   40 s flow and changes no report fields or live touch settings. A partial
+   report's zero `rest_changes` is an observed-transition count, not proof
+   of a completed baseline; no-rest discovery and older-report compatibility
+   remain as before.
    The step names each pad as it is found (its line, its rest, and whether
    it read level or pulses). The
    product's default reads all four lines, active-high, with no `head_rest`,
