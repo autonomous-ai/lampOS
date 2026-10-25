@@ -1,0 +1,24 @@
+{
+  "offered_head": "868e8d72ca6ab28335afdce7ed160154cb6da4f4",
+  "arm64_run": 40211578836,
+  "linux_clippy_run": 40211578868,
+  "conclusions": "Both success",
+  "executed_preview": "07d27c6f721ab1473a243dd7870844c0c7efb81e",
+  "preview_tree": "9141ffcda6db4f62ffe48b0d15e4fa7a26b4ee40",
+  "preview_parents": [
+    "56cacbdddd84c85b49af564cb83d95c805c27958",
+    "868e8d72ca6ab28335afdce7ed160154cb6da4f4"
+  ],
+  "passed": 11296,
+  "tracked_leaks_in_passed": 1,
+  "skipped": 106,
+  "unique_terminal_cases": 11296,
+  "repeated_equal_rows": 35,
+  "own_control_pass_counts": {
+    "a_settled_reminder_finishes_before_the_live_loop_admits_its_successor": 1,
+    "the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery_unacknowledged": 1
+  },
+  "raw_log_sha256": "ac996ed7c1d17280c1de0e74713ffd81cb67f3150c98cb169f30ad17f62f6685",
+  "limits": "Original run on offered 868e8d72c and the actual recorded merge preview; later base changes remain separate. No lamp, acoustic latency or activation claim.",
+  "preview_tree_matches_offered": true
+}

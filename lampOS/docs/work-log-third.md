@@ -5,6 +5,41 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 23:50 — Reminder native green; child full qualification complete
+
+Ready for lamp-voice: no (actual e1 carries and current original gates pending).
+
+#3491 `868e8d72c` passed original ARM64 **40211578836** and Linux clippy
+**40211578868**. Actual preview `07d27c6f7` has parents `56cacbddd` and
+`868e8d72c`, and its tree exactly equals the offered source. ARM reconciles
+**11,296 terminal passes including one tracked journal fixture leak, 106
+skipped**, both own controls once and 35 repeated equal terminal rows.
+[Native receipt](verification/reminder-successor-boundary-20261025/native-40211578836.json).
+All additional Go/Python/Web checks passed. Reviewer-three has READ-OK;
+Reviewer-two found no source/proof/native P1/P2 and held readiness only for
+the latest base. Its own execution is still queued, not claimed here.
+The equal three-commit carry `efd08df4c` on `e1c69457a` is frozen for
+fmt, strict Body/Voice/Eval clippy, workspace build and Body supervisor tests.
+Only the Body supervisor test fixture and its documentation changed in that
+base. Earlier full and affected executions keep their separate identities.
+
+#3420's frozen source `597fd5180` on `56cacbddd` passed formatting,
+strict Voice/Eval clippy, workspace build and full Voice/Eval **4,685/0/21**,
+eleven summaries and all ten own controls once. All 7,080 tracked source
+hashes remained fixed. The proof is committed, the parent has landed, and
+the PR targets lamp-voice. Its equal carry `87eaa90e1` on e1 is queued
+behind the reminder's one compiler job for the same narrow base check.
+
+#3486 is now prepared on e1, preserving the original authored commits;
+its documentation P3 states 7/4/4 looks for a 1.5 s span at 250/500/600 ms,
+and four 600 ms looks span 1.8 s. Runtime authored lines are unchanged.
+Reviewer-two clarified that reviewer.md item1 permits the tracked #3315
+full-fails/isolated-passes timing family to be noted without blocking review.
+This corrects the preceding entry's incomplete exemption search: the actual
+**4,674/1/21** failed full and 3.5021 ms isolated pass remain distinct, with
+no established cause, runtime fix or device latency acceptance. Its current
+carry still needs qualification. Third has no lamp and enabled no switch.
+
 ## 2026-10-25 23:27 — Reminder current carry published; child full gate running
 
 Ready for lamp-voice: no (#3491 current original Linux gates/readers pending).
