@@ -1,0 +1,28 @@
+{
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "expected_boundary_reproduced": true,
+  "classification": "Intended read-error tap reopening reproduced",
+  "raw_log_sha256": "34187c329754c10d90df4b5a7be3bf0a17e06759f57fccecbea7efe43a929a92",
+  "binary_sha256_after_execution": "465ab884fac6b035c58be29df21e4e54484ed04a2c334498baf723fa665d7a94",
+  "panic": [
+    "thread 'sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease' (2645071) panicked at crates/expression/tests/runtime.rs:883:13:",
+    "a privacy read error must not reopen the tap's look-up",
+    "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+    "",
+    "",
+    "failures:",
+    "    sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease",
+    ""
+  ],
+  "base": "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+  "command": "cargo +1.96.0 test --offline --locked -p lamp-expression --test runtime sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease -- --exact --test-threads=1",
+  "started": "2026-10-25T19:52:33Z",
+  "finished": "2026-10-25T19:52:38Z",
+  "source_sha256": {
+    "lampOS/crates/expression/src/runtime.rs": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+    "lampOS/crates/expression/tests/runtime.rs": "7ba4470c544843d9baac0d88474a83b72771b66af8f54093ca5cbcac60ac00cb",
+    "lampOS/crates/expression/tests/it/rest_requests.rs": "bd3047673a4c7e8aab5968714db9f6b6f3eba84e36090039330915aa1aef1730"
+  }
+}

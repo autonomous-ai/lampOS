@@ -1,0 +1,106 @@
+{
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "source_patch_sha256": "ff88f0c28df9e269a162ef2f0438f8a15c153fe6bc912ba487d60ebd3c952501",
+  "source_count": 7132,
+  "source_manifest_sha256": "68c05d1ffaf928cea9a852e9db62c4054307eb0fe0792ee040434280e6e7dbb1",
+  "all_source_hashes_unchanged": true,
+  "rust_changes_identical_to_full_409": {
+    "lampOS/crates/expression/src/runtime.rs": "ecc10ed90806472967453dde30ebca572ecde0ac9dc54780dd18b0bc3e284a99",
+    "lampOS/crates/expression/tests/it/rest_requests.rs": "de88407d77189a0bc90ba1ba0c402d897eb1615e16b31bee31aaeb498b7305cb",
+    "lampOS/crates/expression/tests/runtime.rs": "7ba4470c544843d9baac0d88474a83b72771b66af8f54093ca5cbcac60ac00cb"
+  },
+  "documentation_delta": "Privacy topic row includes rest requests; recovery wording preserves successful absence. Latest factory reuse section preserved.",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T21:29:47Z",
+      "finished": "2026-10-25T21:29:59Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-body -p lamp-cloud -p lamp-controls -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-selftest -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-25T21:29:59Z",
+      "finished": "2026-10-25T21:33:15Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-25T21:33:15Z",
+      "finished": "2026-10-25T21:36:18Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-expression": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-expression -- --test-threads=1",
+      "started": "2026-10-25T21:36:18Z",
+      "finished": "2026-10-25T21:37:05Z",
+      "exit": 0,
+      "harnesses": 5,
+      "passed": 340,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-discovery": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-controls --test it head_discovery:: -- --test-threads=1",
+      "started": "2026-10-25T21:37:05Z",
+      "finished": "2026-10-25T21:37:29Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-skills-mask": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --test it welcome_stuck:: -- --test-threads=1",
+      "started": "2026-10-25T21:37:29Z",
+      "finished": "2026-10-25T21:38:31Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-install-doc": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --test install every_part_of_the_lamp_waits_for_setups_marker_itself -- --exact --test-threads=1",
+      "started": "2026-10-25T21:38:31Z",
+      "finished": "2026-10-25T21:38:35Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "own_control_pass_counts": {
+    "sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease": 1,
+    "rest_requests::live_privacy_read_error_refuses_rest_until_a_valid_open_lease": 1
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-expression": "fa4805a6b2437a9160398dda5afc7b80b213afe56464025d73fc301f4c6301aa",
+    "test-discovery": "750a2ca8efe0b3c7980388ed9935a262e5849d0ececc81046fe9a1a7643830ac",
+    "test-skills-mask": "ba217a9cb1ab4b0ec32b0ef0f2baf292777b7331fd4c436cd2acb5517afae27f",
+    "test-install-doc": "2c9388b8e92331584fd9cd91def088bcda2384f99eddea0422f143098c7e84ea"
+  },
+  "limits": "Native x86_64 Mac current-base qualification. The original full twelve-crate run remains on its frozen 409 overlay. No local ARM64 link, physical privacy or latency acceptance."
+}

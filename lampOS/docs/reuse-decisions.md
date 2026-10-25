@@ -24,6 +24,25 @@ implementation target is refusal without waiting for a FIFO writer. This
 does not establish a global filesystem deadline, pathname-race protection
 or physical touch latency; regular-file storage can still be slow.
 
+## Preserve privacy refusal on a retained-read error (2026-10-26)
+
+V1's `hal/drivers/privacy_button.py` retains its previous state when the
+reconcile or watchdog read fails; `device_tap_actions.py` and
+`button_actions.py` honor that retained privacy lock. Keep the distinction
+between an absent route and a failed read. Expression previously discarded
+`Bus::latest` errors and treated them as the no-publisher compatibility case.
+It now treats errors as closed at tap/rest intake and final planning, using
+the existing look cancellation and ordinary-rest cancellation paths.
+
+Keep valid retained-lease semantics, the no-slide exception, no-publisher
+compatibility and claimed night-sleep behavior. A valid open read permits
+new input; reopening alone does not revive cancelled work. A successful
+read with no publisher retains its existing compatibility exception. This adds no
+I/O or delay and changes no message, switch or microphone route. V2's
+conservative refusal on an unreadable envelope is a deliberate correction,
+not a claim that V1 treats every unknown state as closed or proof of physical
+privacy or latency parity.
+
 ## Require observed rest before factory head calibration (2026-10-26)
 
 V1's `hal/drivers/ttp223.py` probes driven lines transiently and measures

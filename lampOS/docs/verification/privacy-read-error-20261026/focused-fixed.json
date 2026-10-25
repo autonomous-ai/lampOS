@@ -1,0 +1,43 @@
+{
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T20:08:03Z",
+      "finished": "2026-10-25T20:08:15Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-tap": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-expression --test runtime sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease -- --exact --test-threads=1",
+      "started": "2026-10-25T20:08:15Z",
+      "finished": "2026-10-25T20:08:24Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-rest": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-expression --test it rest_requests::live_privacy_read_error_refuses_rest_until_a_valid_open_lease -- --exact --test-threads=1",
+      "started": "2026-10-25T20:08:24Z",
+      "finished": "2026-10-25T20:08:31Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-tap": "cd9f0a48898490845ce56ebe6f89fbbcc2e70970272277b203a447bfb17b1bcc",
+    "test-rest": "048738ed004c1cb25f65b0f3d402f86e3a98636a038c1624996655ca78a9f047"
+  },
+  "scope": "Current 409 runtime correction and regression sources, before the full gate; two later documentation clarifications are source-only."
+}
