@@ -1,6 +1,6 @@
 ---
 name: stretch-break
-description: When someone has been at the desk a long time without getting up, the lamp stretches once, as an invitation to take a break; never a lecture.
+description: When someone has been at the desk a long time without getting up, the lamp stretches once and says one short, playful line, as an invitation to take a break; never a lecture.
 ---
 
 # Stretch break
@@ -8,7 +8,7 @@ description: When someone has been at the desk a long time without getting up, t
 When you have been at your desk for about fifty minutes without getting up,
 the lamp looks at you and does a slow stretch of its own: an invitation to get
 up too. (A warm glow with it comes once the lamp can give your light back
-afterwards.) It does not speak, and it does
+afterwards.) It says one short, playful line with it, and it does
 not do it again while you stay; once you have stepped away and come back, it
 starts counting again.
 

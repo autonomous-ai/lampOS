@@ -325,7 +325,8 @@ fn repo_skill_with(dir: &Path, name: &str, from: &str, to: &str) -> PathBuf {
 
 /// The owner, 19 Oct: core skills are always on the lamp, as a phone's own
 /// apps; the rest are installed. Desk tutor and its marks wait for the full
-/// look in the product. Every one says its version.
+/// look in the product. The four wellbeing nudges are core since 25 Oct
+/// (the owner: "do all of them"). Every one says its version.
 #[test]
 fn every_skill_folder_says_its_kind_and_version() {
     let skills: Vec<_> = lamp_skills::load_each(&skills_root())
@@ -356,13 +357,17 @@ fn every_skill_folder_says_its_kind_and_version() {
             "point-light",
             "prepare-unplug",
             "reminders",
+            "rest-your-eyes",
+            "sip-of-water",
             "smoky-air",
+            "stand-up",
             "startle",
             "stretch-break",
             "stuffy-air",
             "task-news",
             "watch-you-leave",
-            "welcome-back"
+            "welcome-back",
+            "wind-down"
         ]
     );
     assert_eq!(
@@ -372,11 +377,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "desk-tutor-marks",
             "guard-mode",
             "look-for-things",
-            "rest-your-eyes",
-            "sip-of-water",
-            "stand-up",
-            "who-was-here",
-            "wind-down"
+            "who-was-here"
         ]
     );
     for skill in &skills {
@@ -10251,7 +10252,8 @@ fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
 /// #1685: the four wellbeing skills and Stretch break as they are in
 /// `lampOS/skills/`, on one engine, through a five-hour sitting from 10:00
 /// with someone moving now and then (each nudge noticed): one nudge an hour
-/// between them, each in the order it came due, and none of them a word.
+/// between them, each in the order it came due, each with one short line
+/// (the owner, 25 Oct: "talk to the user").
 /// Rest your eyes at 45 minutes; Stretch break due at 50, waiting to 105; A
 /// sip of water due at 90, to 165; Stand up due at 100, to 225; then Rest
 /// your eyes again. Wind down is outside its hours. The four share one
@@ -10277,7 +10279,7 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
             "{}",
             skill.name
         );
-        assert!(!skill.permissions.speak, "{}", skill.name);
+        assert!(skill.permissions.speak, "{}", skill.name);
         if skill.name != "stretch-break" {
             assert!(skill.most_a_day.is_some() && skill.rest.is_some());
             assert_eq!(skill.stop.as_ref().unwrap().tool, "wellbeing_nudges");
@@ -10313,8 +10315,12 @@ fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
             None,
         ) {
             if !run.calls.is_empty() {
-                assert!(
-                    !run.calls.iter().any(|call| matches!(call, Call::Say(_))),
+                assert_eq!(
+                    run.calls
+                        .iter()
+                        .filter(|call| matches!(call, Call::Say(_)))
+                        .count(),
+                    1,
                     "{run:?}"
                 );
                 nudged.push((half / 2, run.skill));

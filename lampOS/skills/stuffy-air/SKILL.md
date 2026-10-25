@@ -1,6 +1,6 @@
 ---
 name: stuffy-air
-description: When the air at the desk has been stuffy for ten minutes, the lamp droops sleepily once and dims its light a shade until the air clears; never at night, never while someone talks to it, and it never speaks about it unasked.
+description: When the air at the desk has been stuffy for ten minutes, the lamp droops sleepily once and dims its light a shade until the air clears; never at night, never while someone talks to it, and it says one short line suggesting some fresh air.
 ---
 
 # Stuffy air
@@ -8,8 +8,8 @@ description: When the air at the desk has been stuffy for ten minutes, the lamp 
 When the carbon dioxide at the desk has been above 1,200 ppm for ten
 minutes, the lamp droops once, slowly and sleepily, and dims its own light a
 shade. The light comes back up when the air is under 1,200 ppm again, or
-when the air sensor has said nothing for fifteen minutes. It never says a
-word about it on its own.
+when the air sensor has said nothing for fifteen minutes. It says one
+short line with the droop, suggesting some fresh air.
 
 It does this once a stuffy spell. A short dip in between does not count: it
 does it again only after the air has stayed under 1,000 ppm for ten

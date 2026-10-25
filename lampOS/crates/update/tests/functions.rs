@@ -30,10 +30,11 @@ const LEFT_OUT: &str = "left out: ";
 const CHAT: &str = "chat: ";
 
 /// What a product lamp declares now: the voice's own 13, the actions part's
-/// 17 and the skills' 1 (Dance's), one under the bound. A change to it is a
-/// change to what every session is told: say in its pull request what is
-/// left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 31;
+/// 17 and the skills' 2 (Dance's, and the wellbeing nudges' one
+/// `wellbeing_nudges` since they joined the product on 25 Oct), at the bound.
+/// A change to it is a change to what every session is told: say in its pull
+/// request what is left out past the bound, if anything.
+const PRODUCT_FUNCTIONS: usize = 32;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {

@@ -13,3 +13,9 @@ at = "100m"
 within = "1m"
 call = "body.gesture"
 args = { gesture = "curious" }
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "say"
+args = { note = "They have been sitting for a very long time. In one short, friendly line, suggest standing up and moving about for a minute." }

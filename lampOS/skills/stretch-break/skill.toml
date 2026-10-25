@@ -1,16 +1,17 @@
-# Stretch break: one quiet, wordless invitation to get up after a long sitting
+# Stretch break: one quiet invitation to get up after a long sitting
 # (lampOS/docs/creature.md: "once in a while, a stretch of its own, as an
 # invitation, never a lecture"). Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it", #938).
-needs = ["eyes", "body"]
+needs = ["eyes", "body", "voice"]
 # Comes with the lamp and is always there (docs/skills.md, "Core and
-# installable skills"): wordless, eyes and body only.
+# installable skills"): eyes, body and one short line from the voice.
 kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: the faces, the voice's state,
-# what the person at the desk is doing, and the body. It never speaks.
+# what the person at the desk is doing, and the body. It says one short line, worded by the voice (the owner, 25 Oct).
 [permissions]
+speak = true             # one short line, worded by the voice (the owner, 25 Oct: a lamp that talks to you, not only hints)
 topics = ["humans/faces/tracked", "voice/state", "room/activity"]
 body = true
 
@@ -28,10 +29,17 @@ rearm = "leaves"          # once per sitting; again only after they have left
 cooldown = "90m"
 wait = "10m"              # talking when the 50 minutes come: it stretches once the talk ends, within ten minutes (#1021)
 
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
 [[while]]                 # not in the middle of a conversation
 topic = "voice/state"
 field = "state"
 equals = "resting"
+for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
 
 [[while]]                 # not while they read or write, head down (#1678): it waits for them to look up,
 topic = "room/activity"   # within the ten minutes above, and lets this sitting's stretch go if they do not.
@@ -57,3 +65,4 @@ body = { gesture = "stretching" }
 # A warm glow with the stretch waits for the light to be given back after it
 # (the third's arbitration and leases, #940): until then a light step would
 # change the person's own light for good.
+say = "They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too."
