@@ -1285,6 +1285,14 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   ordinary settings handling without imposing a head-reader restart.
   Settings-off preserves old pins; a unit change
   incompatible with those preserved pins is refused before writes.
+  Local head-pair reads inspect the same descriptor they open without
+  waiting for a FIFO writer. Regular files and regular-file symlinks keep
+  their existing behavior; actual null-device masks remain empty without a
+  device read, while other nonregular inputs refuse. Missing files and
+  dangling links retain the previous absence behavior. This applies to
+  units, drop-ins, known Body calibration and pins when read by this check,
+  including the settings helper's projection and verification. It is not
+  a deadline for regular-file storage or a new live-touch wait.
   For a head-pins write, candidate units and links are placed after the
   journal but before apply, so the helper reads the units being installed.
   No service is restarted until the resulting pins match those units.

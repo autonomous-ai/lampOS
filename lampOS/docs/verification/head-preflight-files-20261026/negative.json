@@ -1,0 +1,21 @@
+{
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "production_unchanged": true,
+  "original_production_sha256": "8a3096797778d5072eef0187f4d10ed3c7245bb8d83fcb4dd619279868be5bf0",
+  "test_sha256": "53c5ee00727ac8fd4c80316f12cc19f60b075274b73d387dd7ea1e89b4d0d148",
+  "test_overlay_sha256": "708f423259f2e52dccd8dae48b3c25eb30121a26bce6273ead3ecc0a700939a7",
+  "source_count": 7132,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "cf8939dc5039b59b00bcc1938176495abf37523fcc5b5b1a2b4785cf446f68ee",
+  "command": "cargo +1.96.0 test --offline --locked -p lamp-update --test install head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation -- --exact --test-threads=1 --nocapture",
+  "started": "2026-10-25T21:27:18Z",
+  "finished": "2026-10-25T21:28:56Z",
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "failure": "After ready, the actual installer reached the FIFO reader and exceeded the five-second deadline; parent killed and reaped it before removing scratch.",
+  "binary_name": "install-56b9137cd677b603",
+  "binary_sha256": "d59d0610115a155c4c3756113df843c1d59ac0debb8de6e604c886bd6b988117",
+  "raw_log_sha256": "794eaae0fb994bb37f58ca4beea4270af3a112e024d9c6a828c382859ea85f2c",
+  "limits": "Native x86_64 Mac; one original-production FIFO regression. Not a compile/setup failure, no device or physical interaction measurement."
+}
