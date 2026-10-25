@@ -1,4 +1,16 @@
-Ready for lamp-voice: Skills landed; own-keys current-base qualification running.
+Own-keys failure qualification active; music trace boundary regression taken.
+
+## Current checkpoint: 2026-10-26 04:08 +07, frozen own-keys result; emitted music trace regression
+
+The own-keys carry's full nine-crate Mac run on base `0a40aa50b`, authored carry `4674cd4ba` plus its frozen repair, finished **6,667 passed / 1 failed / 44 ignored**, exit 101. All 7,126 source entries and compiled-artifact hashes stayed unchanged. Formatting, strict all-target Clippy, focused installer **7/0** and matcher **1/0** passed. The lone failure is Voice's `second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short`, in unchanged worker source: its missing-second-look/Unknown assertion did not refuse joining. The failed full result and executable are retained; exact replay and a clean unchanged-Main compilation are in progress. No cause, baseline failure or full-gate pass is claimed yet.
+
+The repair and activation stay separate: only the historical regular-file template is retired, and #2094 plus fresh lamp acceptance still hold product activation. Main advanced to `3d9722f38`; the prepared rebase continuation covers its Controls change and the actual compiled installer-document reader. It will preserve the earlier full result's identity and outcome. Third owns the independently reported FIFO preflight reader repair.
+
+The missing emitted-record coverage from [#3319's read](https://github.com/autonomous-ai/lampOS/pull/3319#issuecomment-6382635577) is [taken on the Queue](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6403205989) on `second/music-refusal-trace`, based on `3d9722f38`. Open and merged PR checks found no duplicate. A minimal private extraction shares the unchanged coordinator admission/recording arm with deterministic tests: fixed refusal text, explicitly present null on acceptance, exact trace keys with no private offer fields, and stale/missing envelope/service handling. Two source files are prepared and formatted; no compile or execution result exists yet. Journal counting and #2793's physical/provider acceptance are not claimed. This uses no second compiler.
+
+The log rebase preserves all **14,008** earlier verification blobs and modes. No lamp, provider, real-key or release action ran; no owner input is needed.
+
+---
 
 ## Current checkpoint: 2026-10-26 03:30 +07, Skills landed; own-keys fixture boundary corrected
 
