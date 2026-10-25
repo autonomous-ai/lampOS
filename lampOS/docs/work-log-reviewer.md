@@ -1,5 +1,25 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two published two-face carry at 04:34 +07)
+
+Published #3486 head 77232b464 contains current 3d9722f38. Its authored parent 1b6100a29 has exactly executed tree 03b0cfcb3, and the complete feature binary delta over 3d equals cleared d4 over 409. Its final commit adds only three proof files. All seven original author/date/subject records are preserved. The six proof commits preserve their complete changed lines; the feature's crate changes match original 031990a89, while its docs retain the already-reviewed wall-expiry qualification and 7/4/4 cadence corrections. The intermediate 0a-to-4dd versus 3d-to-1b seven-entry range-diff reproduces with every entry equal. This does not claim the corrected docs equal the earliest uncorrected feature patch. The actual new-head original ARM64 40235459233 is being followed; Linux Clippy 40235459240 succeeds. Current-base/native readiness stays tied to these actual events.
+
+The following are the literal argv commands of the independent current-composition run, in execution order. Its working directory was the source-only exported tree's lampOS directory. The runner set RUSTUP_TOOLCHAIN=1.96.0, CARGO_BUILD_JOBS=1, CARGO_INCREMENTAL=0, CARGO_PROFILE_DEV_DEBUG=0, CARGO_PROFILE_TEST_DEBUG=0, CARGO_TARGET_DIR=/tmp/lampos-reviewer-target and TMPDIR=/tmp/lr2-e9-t. It removed all LAMP_ variables and inherited RUSTFLAGS, RUSTC_WRAPPER, RUSTC_WORKSPACE_WRAPPER, CARGO_ENCODED_RUSTFLAGS and CARGO_BUILD_TARGET before starting. Output was retained separately per command; every exit was zero and every owned process group closed.
+
+```sh
+cargo fmt --all --check
+cargo clippy --locked -p lamp-body -p lamp-cloud -p lamp-controls -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-selftest -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings
+cargo build --locked --workspace
+cargo test --locked -p lamp-controls -p lamp-skills --no-run --message-format=json
+cargo test --locked -p lamp-update --test install --no-run --message-format=json
+cargo test --locked -p lamp-update --test install -- --test-threads=1
+cargo test --locked -p lamp-controls --test it head_discovery:: -- --test-threads=1
+cargo test --locked -p lamp-skills --test it welcome_stuck:: -- --test-threads=1
+cargo test --locked --no-fail-fast -p lamp-controls -p lamp-skills -- --test-threads=1
+```
+
+Full Controls/Skills remains 1,038/0/12, with separate install 92/0, discovery 16/0 and masking 7/0. The focused cases overlap the full run. All 10,588 source entries remained fixed; twelve actual binaries are preserved. The focused Controls executable has its own actual single-package command binding rather than a false combined-compilation binding. No new full Voice run, author rerun, late-verdict/two-face combination, device activation or physical trial is claimed. Earlier failures and successful full/delta executions retain their original heads and scopes.
+
 ## 2026-10-26 (reviewer-two current composition qualification complete at 04:23 +07)
 
 The requested #3486 / Skills / Controls current-base gate completes on public d4db9378a plus 3d9722f38, frozen tree 03b0cfcb3. Formatting, strict fourteen-crate all-target Clippy, workspace build, both compilation stages and every serial test command exit zero. Full Controls/Skills gives 1,038 passed, zero failed, 12 ignored, zero filtered: 12 summaries and 1,050 unique terminal cases. Controls is 516/0/3 and Skills 522/0/9. Separately, compiled Update install gives 92/0, focused discovery 16/0 and focused masking 7/0. Focused coverage overlaps full coverage and is never added to its total. All eleven new controls pass once in each applicable execution. Full test command time is 266.176 seconds; installation command time is 843.385 seconds. Raw full-test SHA-256 is b841bd7951e0fee3898aaa3bf98385e34ea36e0b3ad43aaddd95b981e03a16a6.
