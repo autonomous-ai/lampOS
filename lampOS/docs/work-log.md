@@ -1,3 +1,11 @@
+## Current checkpoint: 2026-10-25 13:16 +07, Body loop source read recorded
+
+Ready for lamp-voice: yes (#3427 at 95b7a1eff, author-ready; reviewer/train merges).
+
+[Independent #3449 source read](verification/body-dyn-loop-source-read-20261025/README.md) at 6394261995 found no source P1/P2: removing the added wrapper/signature recreates the entire prior file, and argument order is preserved. This is no reader gate or runtime/lamp measurement. No Second compiler is active. The one-job unplug gate remains UNRUN/unallocated; the trusted public key and attended updater acceptance remain with their holders. The bounded Queue/own-PR/Main watcher continues.
+
+---
+
 ## Current checkpoint: 2026-10-25 13:07 +07, current Body PR offered ready
 
 Ready for lamp-voice: yes (#3427; author ready for review, not a merge decision).

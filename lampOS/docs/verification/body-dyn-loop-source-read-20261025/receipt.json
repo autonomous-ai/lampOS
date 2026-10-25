@@ -1,0 +1,15 @@
+{
+  "head": "f430a182ba081caab3840356fec2f9b1b5c9ca1f",
+  "base": "056a76132354f40f97eb5fbc519778c04f1ccb19",
+  "file": "lampOS/crates/body/src/body.rs",
+  "base_file_sha256": "139dde29f41c1bec00642fd5231d81e9f1acd0b1d34a986b9db9f369a974c7ed",
+  "head_file_sha256": "43f389952267da8b31268bfb713493e59d3cb77f15ed87da1d24c49b1f396d83",
+  "removing_wrapper_and_new_signature_reconstructs_base_bytes": true,
+  "wrapper_preserves_argument_order": true,
+  "loop_body_and_remaining_file_bytes_unchanged": true,
+  "new_dispatch": "three closure types erased into mutable trait object references; port and runtime remain generic",
+  "new_threads_allocations_or_queues_in_diff": false,
+  "tests_run_by_this_reader": false,
+  "runtime_or_lamp_latency_measured_by_this_reader": false,
+  "scope": "Independent exact-source read only. Does not establish reader gate, runtime cost, lamp acceptance or merge readiness."
+}
