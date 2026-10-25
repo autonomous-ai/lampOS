@@ -1,3 +1,15 @@
+## 2026-10-26 02:44 — Onboarding runtime result and next isolated Peek piece
+
+Ready for lamp-voice: no
+
+On frozen abc79d609, onboarding's workspace formatting, strict all-target Clippy, build and test discovery passed. The original compiler procedure then stopped at its disk-reserve guard before any test ran (exit 125). After actual closure, only identified local incremental caches were reclaimed; all compiled drivers and seven independent failure witnesses stayed unchanged. The separate runtime continuation reused those drivers and completed Voice/VoiceEval/Body with 5,296 clean passes, one same-voice journal LEAK, zero failures and 21 skips. Update installation and the remaining reader/documentation stages are still active; this is not a completed gate.
+
+Current Main is 409bf7268. Its intervening Rust change repairs the journal fixture's worker ownership; the other changes concern image construction and its evidence. After the active procedure closes and its leaky driver is preserved, the same source path will receive the ten-file onboarding carry and focused current-base qualification. The earlier failed epochs remain failed. The successful intended-speaker two-person lamp trial still needs First's assigned owner; Fourth has no lamp.
+
+Claimed #2789's remaining own-account Peek piece after checking open and delivered work: an explicit sessions-only mode reuses the landed projected metadata reader and constructs no bus, watcher or journal capability. The dedicated office unit accepts only that mode, which preceding binaries treat as off. Full mode remains explicit and unchanged. Source and regression work is in progress; no compiler, installation, permission change or physical acceptance is claimed for it. Photo's twelve stricter observation controls are also prepared and unrun; Common's fourteen-package gate follows onboarding publication.
+
+The Queue now continues on #3504. Its complete initial thread is read, current status is posted there, and both Queue and own-PR comments remain watched. The primary clean tracked branch is fast-forwarded to current Main; unrelated untracked files are untouched.
+
 ## 2026-10-26 01:55 — Current onboarding gate and stricter Photo observations
 
 Ready for lamp-voice: no
