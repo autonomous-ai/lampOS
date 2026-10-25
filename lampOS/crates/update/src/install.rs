@@ -321,6 +321,15 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // classes behind the privacy route, the eyes' activity).
     "watch-you-leave",
     "music-sway",
+    // The wellbeing nudges (#1685), each saying one short line since the
+    // owner's 25 Oct "talk to the user": water, the eyes, standing up and
+    // winding down, with Stretch break's budget of one an hour between them.
+    // Their one function, `wellbeing_nudges` (their `[stop]`), is a product
+    // session's 32nd of its 32.
+    "sip-of-water",
+    "rest-your-eyes",
+    "stand-up",
+    "wind-down",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "light-out",
     "light-scenes",
@@ -420,32 +429,6 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          `toward` and the lamp's `--gaze`, and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`",
     ),
-    // #1685's four wellbeing nudges: installable skills their owner puts on,
-    // off until each has been seen on a lamp with a person. The four share
-    // one function, `wellbeing_nudges` (their `[stop]`), so with all four a
-    // product session declares 32 of its 32 without `LAMP_USE_SKILL=on`.
-    (
-        "rest-your-eyes",
-        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its tilt and \
-         softer light read as a cue to look away, not a fault, is for the lamp check; with the \
-         other three it adds one function, `wellbeing_nudges`, a product session's 32nd",
-    ),
-    (
-        "sip-of-water",
-        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its slow blue \
-         breath reads as a hint to drink, never a status light, is for the lamp check",
-    ),
-    (
-        "stand-up",
-        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its turn and \
-         tilt after a long sitting read as an invitation, never a nag, is for the lamp check",
-    ),
-    (
-        "wind-down",
-        "an installable wellbeing nudge, not yet tried on a lamp (#1685): its hours are the \
-         owner's own bedtime, and its hand-over to Bedtime and Morning (#1732) is for the lamp \
-         check",
-    ),
     (
         "who-was-here",
         "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
@@ -536,6 +519,14 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("watch-you-leave", "SKILL.md"),
     skill_file!("watch-you-leave", "moves/watch-left.json"),
     skill_file!("watch-you-leave", "moves/watch-right.json"),
+    skill_file!("sip-of-water", "skill.toml"),
+    skill_file!("sip-of-water", "SKILL.md"),
+    skill_file!("rest-your-eyes", "skill.toml"),
+    skill_file!("rest-your-eyes", "SKILL.md"),
+    skill_file!("stand-up", "skill.toml"),
+    skill_file!("stand-up", "SKILL.md"),
+    skill_file!("wind-down", "skill.toml"),
+    skill_file!("wind-down", "SKILL.md"),
     skill_file!("music-sway", "skill.toml"),
     skill_file!("music-sway", "SKILL.md"),
     skill_file!("music-sway", "moves/sway.json"),

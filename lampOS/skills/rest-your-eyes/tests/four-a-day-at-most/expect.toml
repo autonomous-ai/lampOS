@@ -14,6 +14,11 @@ within = "1m"
 call = "light"
 args = { dim = 1 }
 
+[[expect]]
+at = "45m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
 
 [[expect]]
 at = "105m"
@@ -27,6 +32,11 @@ within = "1m"
 call = "light"
 args = { dim = 1 }
 
+[[expect]]
+at = "105m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
 
 [[expect]]
 at = "165m"
@@ -40,6 +50,11 @@ within = "1m"
 call = "light"
 args = { dim = 1 }
 
+[[expect]]
+at = "165m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }
 
 [[expect]]
 at = "225m"
@@ -52,3 +67,9 @@ at = "225m"
 within = "1m"
 call = "light"
 args = { dim = 1 }
+
+[[expect]]
+at = "225m"
+within = "1m"
+call = "say"
+args = { note = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away." }

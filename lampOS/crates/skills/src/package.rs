@@ -816,8 +816,11 @@ fn tool_holder(skills: &Path, name: &str, tool: &str) -> Option<(String, SkillKi
 /// session does past its room (`docs/tools.md`). Inventory may include
 /// disabled skills that still reserve a name but offer no function.
 fn functions_said(skills: &[Skill]) -> String {
-    // A skill's `[stop]` is one function more (#1685).
-    let tools: Vec<&str> = skills
+    // A skill's `[stop]` is one function more (#1685), and one `[stop]`
+    // shared by several skills is one function, as the tools file has it
+    // (the four wellbeing nudges' `wellbeing_nudges`).
+    let mut tools: Vec<&str> = Vec::new();
+    for tool in skills
         .iter()
         .filter(|skill| skill.enabled)
         .flat_map(|skill| {
@@ -827,7 +830,11 @@ fn functions_said(skills: &[Skill]) -> String {
                 .into_iter()
                 .chain(skill.stop.as_ref().map(|stop| stop.tool.as_str()))
         })
-        .collect();
+    {
+        if !tools.contains(&tool) {
+            tools.push(tool);
+        }
+    }
     if tools.is_empty() {
         return "The skills here give the model no function.".into();
     }

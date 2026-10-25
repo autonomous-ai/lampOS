@@ -1,13 +1,13 @@
 ---
 name: wind-down
-description: In the hour before bedtime, when someone has been at the desk twenty minutes, the lamp gives one slow sleepy droop and dims a shade until they leave, a wordless hint that the day is ending; it never speaks.
+description: In the hour before bedtime, when someone has been at the desk twenty minutes, the lamp gives one slow sleepy droop and dims a shade until they leave, a hint that the day is ending, with one short, gentle line.
 ---
 
 # Wind down
 
 In the hour before your bedtime, if you have been at your desk for twenty
 minutes, the lamp gives one slow, sleepy droop and its light goes a shade
-dimmer: a hint that the day is ending. The light stays that shade dimmer
+dimmer, and it says one short, gentle line: a hint that the day is ending. The light stays that shade dimmer
 while you stay, and is given back when you leave the desk (a couple of
 minutes after you go).
 

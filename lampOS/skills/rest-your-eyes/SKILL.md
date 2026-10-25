@@ -1,6 +1,6 @@
 ---
 name: rest-your-eyes
-description: After someone has been at the desk three quarters of an hour, the lamp gives a small curious tilt and softens its light a shade while it tilts, a wordless cue to look away from the screen; it never speaks.
+description: After someone has been at the desk three quarters of an hour, the lamp gives a small curious tilt and softens its light a shade while it tilts, a cue to look away from the screen, with one short line suggesting a rest for the eyes.
 ---
 
 # Rest your eyes
@@ -9,7 +9,8 @@ When you have been at your desk for three quarters of an hour, between
 09:00 and 20:00, the lamp gives a small curious tilt, as if something across
 the room caught its eye, and its light softens a shade for the three
 seconds of the tilt: a cue to look up from the screen and rest your eyes on
-something far away. Then the light is as it was.
+something far away. It says one short line suggesting it. Then the light
+is as it was.
 
 The lamp sees faces, not screens: "screen time" here is time sitting at
 the desk.

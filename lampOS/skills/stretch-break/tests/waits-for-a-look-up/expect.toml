@@ -11,3 +11,7 @@ args = { look_at = "face" }
 [[expect]]
 call = "body.gesture"
 args = { gesture = "stretching" }
+
+[[expect]]
+call = "say"
+args = { note = "They have been sitting a while. In one short, playful line, suggest a quick stretch, as the lamp stretches too." }

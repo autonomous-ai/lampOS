@@ -1,19 +1,20 @@
-# Rest your eyes: after long screen time at the desk, a small wordless cue
+# Rest your eyes: after long screen time at the desk, a small cue
 # to look away for a moment (#1685, "a design, before code: habits and
 # wellbeing nudges"). The lamp's eyes see faces, not screens: long screen
 # time is a long sitting at the desk. Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it").
-needs = ["eyes", "body", "light"]
+needs = ["eyes", "body", "light", "voice"]
 # Its owner puts it on (`lamp-skills install`) and takes it off; not in the
 # product's install.
-kind = "installable"
+kind = "core"
 version = "1.0.0"
 # Four a day at most, counted from the local midnight.
 most_a_day = 4
 
 # What it may read and use, and nothing more: the faces, the voice's state,
-# one small gesture and a shade of its light. It never speaks.
+# one small gesture and a shade of its light. It says one short line, worded by the voice (the owner, 25 Oct).
 [permissions]
+speak = true             # one short line, worded by the voice (the owner, 25 Oct: a lamp that talks to you, not only hints)
 topics = ["humans/faces/tracked", "voice/state", "room/activity"]
 body = true
 light = true
@@ -27,10 +28,17 @@ gap = "2m"                # looking away or leaning out of view does not end the
 cooldown = "60m"          # once an hour while they stay; talking when the time
                           # comes, at the first face after the talk ends
 
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
 [[while]]                 # never in the middle of a conversation
 topic = "voice/state"
 field = "state"
 equals = "resting"
+for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
 
 [[while]]                 # not while they read or write, head down (#1678), as Stretch break:
 topic = "room/activity"   # it waits for them to look up. Without the eyes' room/activity
@@ -65,7 +73,7 @@ after_ignored = 2
 # (#1685): it stops the one that came last, or with all, every one.
 [stop]
 tool = "wellbeing_nudges"
-about = "When someone asks you to stop a wellbeing nudge, the lamp's wordless hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
 
 [ask]
 policy = "nudge"
@@ -73,3 +81,4 @@ policy = "nudge"
 [[do]]
 body = { gesture = "curious" }      # a small tilt (3 s), as if something across the room caught its eye
 light = { dim = 1 }                 # a shade softer while it tilts, then as it was
+say = "They have looked at the screen for a long while. In one short, light line, suggest resting their eyes for a moment, perhaps looking at something far away."

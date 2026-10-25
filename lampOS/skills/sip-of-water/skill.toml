@@ -1,19 +1,20 @@
-# A sip of water: one wordless nudge after a long sitting (#1685, "a design,
-# before code: habits and wellbeing nudges"). It never speaks: a spoken
-# reminder is one the person asks for ("remind me to drink water at three"),
-# which the voice keeps and says (Reminders). Written to lamp-skills' schema
+# A sip of water: one short nudge after a long sitting (#1685, "a design,
+# before code: habits and wellbeing nudges"), said in one short line since the
+# owner's 25 Oct "talk to the user"; a reminder at a set time is still one the
+# person asks for (Reminders). Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it").
-needs = ["eyes", "body", "light"]
+needs = ["eyes", "body", "light", "voice"]
 # Its owner puts it on (`lamp-skills install`) and takes it off; not in the
 # product's install.
-kind = "installable"
+kind = "core"
 version = "1.0.0"
 # Three a day at most, counted from the local midnight.
 most_a_day = 3
 
 # What it may read and use, and nothing more: the faces, the voice's state,
-# a turn toward the face and its light. It never speaks.
+# a turn toward the face and its light. It says one short line, worded by the voice (the owner, 25 Oct).
 [permissions]
+speak = true             # one short line, worded by the voice (the owner, 25 Oct: a lamp that talks to you, not only hints)
 topics = ["humans/faces/tracked", "voice/state", "room/activity"]
 body = true
 light = true
@@ -28,10 +29,17 @@ rearm = "leaves"          # once a sitting; again only after they have left
 cooldown = "90m"
 wait = "10m"              # talking when the time comes: once the talk ends, within ten minutes
 
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
 [[while]]                 # never in the middle of a conversation
 topic = "voice/state"
 field = "state"
 equals = "resting"
+for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
 
 [[while]]                 # not while they read or write, head down (#1678), as Stretch break:
 topic = "room/activity"   # it waits for them to look up. Without the eyes' room/activity
@@ -66,7 +74,7 @@ after_ignored = 2
 # (#1685): it stops the one that came last, or with all, every one.
 [stop]
 tool = "wellbeing_nudges"
-about = "When someone asks you to stop a wellbeing nudge, the lamp's wordless hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
 
 [ask]
 policy = "nudge"
@@ -74,3 +82,4 @@ policy = "nudge"
 [[do]]
 body = { look_at = "face" }
 light = { colour = "blue", level = 2, for = "6s", pattern = { kind = "breathe", period = "6s" } }
+say = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health."

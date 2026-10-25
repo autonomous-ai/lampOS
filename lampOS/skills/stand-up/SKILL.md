@@ -1,13 +1,13 @@
 ---
 name: stand-up
-description: After someone has sat at the desk over an hour and a half without getting up, the lamp turns to them with a small curious tilt, a wordless invitation to stand and move; never a word about posture.
+description: After someone has sat at the desk over an hour and a half without getting up, the lamp turns to them with a small curious tilt, an invitation to stand and move, with one short, friendly line; never a word about posture.
 ---
 
 # Stand up
 
 When you have been at your desk for an hour and forty minutes without
 getting up, between 08:00 and 20:00, the lamp turns to you and gives a
-small curious tilt: shall we? It is later than Stretch break's stretch (at
+small curious tilt, and says one short line: shall we? It is later than Stretch break's stretch (at
 fifty minutes) and reads your sitting the same way, from your face at the
 desk; a short look away does not end it, getting up for a few minutes does.
 

@@ -13,3 +13,9 @@ at = "90m"
 within = "1m"
 call = "light"
 args = { colour = "blue" }
+
+[[expect]]
+at = "90m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about an hour and a half. Suggest a sip of water in one short, warm line, the way a friend would: no lecture, nothing about health." }
