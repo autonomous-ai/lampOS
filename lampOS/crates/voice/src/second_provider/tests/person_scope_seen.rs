@@ -108,6 +108,8 @@ struct Outcome {
     noted: Vec<Noted>,
     /// Whose context each chat was told, in the order asked.
     asked: Vec<Message>,
+    /// What the turn said, from its `said:` labels.
+    said: Vec<String>,
 }
 
 async fn one_line(
@@ -204,7 +206,11 @@ async fn one_line_eyes(
     engine.submit(audio(1, 1));
     tokio::time::sleep(Duration::from_millis(40)).await;
     engine.submit(end(1));
-    turn(&mut engine).await;
+    let said = turn(&mut engine)
+        .await
+        .into_iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
     done.store(true, Ordering::Release);
     feeder.join().unwrap();
     clean(&path);
@@ -226,6 +232,7 @@ async fn one_line_eyes(
         told: asked[0].clone(),
         noted: noted.lock().unwrap().clone(),
         asked,
+        said,
     }
 }
 
@@ -398,6 +405,11 @@ async fn an_off_camera_lines_early_words_ask_nothing_for_the_silent_owner() {
         "one chat, the room's"
     );
     assert_eq!(got.lease, None);
+    assert_eq!(
+        got.said,
+        ["said:Have a good trip."],
+        "the room's answer comes"
+    );
 }
 
 /// The owner seen speaking: not prepared early either, and their answer is
@@ -411,6 +423,7 @@ async fn the_owner_seen_speaking_is_answered_as_theirs_on_the_final_words() {
         got.asked,
         [Message::system(format!("for {:?}", Some(a.as_str())))]
     );
+    assert_eq!(got.said, ["said:Have a good trip."], "answered as theirs");
 }
 
 /// Off, the early words prepare as before: memory asked on them for the
