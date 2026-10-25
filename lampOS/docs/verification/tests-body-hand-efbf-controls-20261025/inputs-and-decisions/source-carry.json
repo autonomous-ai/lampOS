@@ -1,0 +1,32 @@
+{
+  "old_base": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+  "new_base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "before": {
+    "lampOS/crates/body/src/bus_out.rs": {
+      "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+      "mode": 420,
+      "mtime_ns": 1792883971626050137
+    },
+    "lampOS/docs/body.md": {
+      "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+      "mode": 420,
+      "mtime_ns": 1792883971683195442
+    }
+  },
+  "after": {
+    "lampOS/crates/body/src/bus_out.rs": {
+      "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+      "mode": 420,
+      "mtime_ns": 1792885070454857534
+    },
+    "lampOS/docs/body.md": {
+      "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+      "mode": 420,
+      "mtime_ns": 1792885070455505853
+    }
+  },
+  "patch_sha256": "fd764cede5a2d7e2c4d90c2abbcbc16c0dd6026041d61af934d647ed3c25d422",
+  "content_and_full_modes_identical": true,
+  "actual_new_mtimes_disclosed_not_restored": true,
+  "no_compiler_or_test_executed": true
+}

@@ -1,0 +1,14 @@
+{
+  "scope": "Fixed frozen-efbf baseline1/candidate1 controls only, no final-source gate claim. Actual metadata once; all 0/101 retained. No other Root compiler; cleanup24124 terminal. Third released2 toHand; Fourth released separate2 toSecond.",
+  "root_compile_jobs": 2,
+  "declared_second_lane_jobs_upper_bound": 2,
+  "total_declared_compiler_bound": 4,
+  "global_host_isolation_claimed": false,
+  "quiet_window_scope": "No concurrent Root owned compiler allocations; peer current-base qualification may use its separately reserved2 jobs.",
+  "unchanged_source_controller_commands_env": true,
+  "original_plan_sha256": "5c6f80b3d8760f53151007e7f2c64e447ebd76d42de692ee22c04234ad621465",
+  "enabled_plan_sha256": "9afc05e89c5871252517c64fc73897d0dd5286e4a879c437b47dda7202faef8f",
+  "available_bytes": 33573761024,
+  "minimum_free_bytes": 5368709120,
+  "prepare_only_pending": true
+}

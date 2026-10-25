@@ -1,0 +1,26 @@
+[
+  {
+    "private_file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/run-controls.py",
+    "sha256": "ba496fcef1c38e91db10c3be4d8fa48bcb2cae61c16c0c7e345774934a3344a3",
+    "bytes": 13967,
+    "body_excluded": true
+  },
+  {
+    "private_file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/source_guard.py",
+    "sha256": "571749f64bd81e53ba46b49211bb8aeb28807956ec789375ee1c98df06318825",
+    "bytes": 2660,
+    "body_excluded": true
+  },
+  {
+    "private_file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/support.py",
+    "sha256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "bytes": 5896,
+    "body_excluded": true
+  },
+  {
+    "private_file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/census.py",
+    "sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+    "bytes": 14714,
+    "body_excluded": true
+  }
+]

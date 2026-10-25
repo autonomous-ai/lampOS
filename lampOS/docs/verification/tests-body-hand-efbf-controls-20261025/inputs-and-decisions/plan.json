@@ -1,0 +1,136 @@
+{
+  "identity": "BodyHand-efbf-baseline1-candidate1",
+  "execution_ready": true,
+  "head": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events",
+  "branch": "tests/1806-body-hand-events",
+  "recovery_root": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target",
+  "owned_files": {
+    "lampOS/crates/body/src/bus_out.rs": {
+      "baseline": {
+        "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+        "bytes": 64180,
+        "mode": 420,
+        "kind": "file"
+      },
+      "candidate": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/body.md": {
+      "baseline": {
+        "sha256": "936e01931c5ae0068f16d2d47bd8a0396ca2f966600d6e5f987d6c2a83128c12",
+        "bytes": 203745,
+        "mode": 420,
+        "kind": "file"
+      },
+      "candidate": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "kind": "file"
+      }
+    }
+  },
+  "environment": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_PROFILE_DEV_DEBUG": null,
+    "CARGO_PROFILE_TEST_DEBUG": null,
+    "CARGO_INCREMENTAL": null,
+    "CARGO_NET_OFFLINE": null,
+    "CARGO_TERM_COLOR": null,
+    "RUSTUP_TOOLCHAIN": null,
+    "RUST_BACKTRACE": null,
+    "RUST_TEST_THREADS": null,
+    "CARGO_BUILD_TARGET": null,
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_TARGET_TMPDIR": null,
+    "RUSTC_WRAPPER": null,
+    "RUSTC_WORKSPACE_WRAPPER": null,
+    "LAMP_RELAY_PID_CONTROL_DIR": null
+  },
+  "minimum_free_bytes": 5368709120,
+  "case": "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+  "reference_profile": {
+    "opt_level": "0",
+    "debuginfo": 2,
+    "debug_assertions": true,
+    "overflow_checks": true,
+    "test": true
+  },
+  "reference_features": [],
+  "metadata_command": [
+    "cargo",
+    "+1.96.0",
+    "metadata",
+    "--offline",
+    "--locked",
+    "--format-version",
+    "1"
+  ],
+  "clean_command": [
+    "cargo",
+    "+1.96.0",
+    "clean",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-body"
+  ],
+  "compile_command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-body",
+    "--lib",
+    "--no-run",
+    "--message-format=json-render-diagnostics",
+    "--jobs",
+    "2"
+  ],
+  "fixed_schedule": [
+    "baseline",
+    "candidate"
+  ],
+  "observations_per_variant": 1,
+  "outer_seconds": 120,
+  "compiler_jobs": 2,
+  "runtime_jobs": 4,
+  "actual_compiler_allocation_granted": true,
+  "source_transition_scope": "Future root grant ONLY: baseline/candidate sameWT/root differexact2files, finallyrestoreoriginalcandidatebytes/fullmodes, recordactualnewmtimes. InitialunchangedWTguard snapshot and source carry retained. No write authorized now.",
+  "lineage_scope": "Every actual local+registry compilerunit profile/features/manifest/targetsrc and full actual package-tree input digest/output hashes. Initial new target rejects unexplainedfreshreuse; only same-command/priorcapturedproducer cache accepted. LocalBody mustcompilefresh eachvariant aftersupportedBodyclean. NonBodyunit+source+profile/features+output ledger exactlyequal acrossvariants. FullWTsourceguards bind alltracked inputs/sharedworkspace/vendor; no --extern consumer-edge assertion.",
+  "scope": "Exactlyone currentbaseline andone currentcandidate existingcase, all0/101retained; invalidsetup/provenance/census/outertimeout stops without retry. No newtests/fault hooks, speed/isolation/historicalcause claim; oldfc31Hand0/3 separate. No compiled/systemchildren; only owned BusOut worker thread.",
+  "input_hashes": {
+    "census.py": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+    "owned/baseline/lampOS/crates/body/src/bus_out.rs": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+    "owned/baseline/lampOS/docs/body.md": "936e01931c5ae0068f16d2d47bd8a0396ca2f966600d6e5f987d6c2a83128c12",
+    "owned/candidate/lampOS/crates/body/src/bus_out.rs": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+    "owned/candidate/lampOS/docs/body.md": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+    "run-controls.py": "ba496fcef1c38e91db10c3be4d8fa48bcb2cae61c16c0c7e345774934a3344a3",
+    "source-carry.json": "77f7076d339253b4989e9e59b10be587a525525df709ac55534724e895ff5316",
+    "source-map.json": "bc58d5106c32afeb7038b807a6a88c12f29f81f3ee74d24aa4c8c2588b407661",
+    "source_guard.py": "571749f64bd81e53ba46b49211bb8aeb28807956ec789375ee1c98df06318825",
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+    "tool-version-receipt.json": "8a0dea4e4b7679e4272f82babe37f12165140aac758fb505ea011b4001928229"
+  },
+  "selected_cfg_test_provenance_requirements": {
+    "actual_body_selected_artifact_fresh": false,
+    "Cargo_profile_test": true,
+    "target_test": true,
+    "selected_same_basename_dep_info_rule_required": true,
+    "actual_changed_bus_out_source_in_module_closure": true,
+    "candidate_executable_sha_must_differ_baseline_before_candidate_observation_consumption": true,
+    "on_violation": "Stop/preserve both raw compile proofs; do not silently switch targets or repeat observations. Dedicated fresh-target repair requires another scoped review.",
+    "hazard_context": "Root-reported Supervisor candidate reused identical baseline executable at fresh:true, comment6390989725; no claim that this happened to BodyHand."
+  },
+  "import_preflight_after_guard_update_pending": false
+}

@@ -1,0 +1,16 @@
+{
+  "lampOS/crates/body/src/bus_out.rs": {
+    "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+    "bytes": 64386,
+    "mode": 420,
+    "mtime_ns": 1792885070454857534,
+    "kind": "file"
+  },
+  "lampOS/docs/body.md": {
+    "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+    "bytes": 204107,
+    "mode": 420,
+    "mtime_ns": 1792885070455505853,
+    "kind": "file"
+  }
+}

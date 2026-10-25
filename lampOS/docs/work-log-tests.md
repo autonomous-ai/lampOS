@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-25 08:39 — Fixed Hand proof published; current-source metadata bound
+
+Ready for lamp-voice: no
+
+[Primary fixed Hand proof](verification/tests-body-hand-efbf-controls-20261025/) records baseline1/0 and candidate1/0 exactlyonce onfrozenefbf; no oldfc31failure reproduction, speed/cause/isolation/latercarry claim. Root and independentaudit verify13commands/26streams,440equalcaseinventories, selectedfresh:falsecfgtest/moduleclosure, two distinct0555executables, dependency/source/profile/outputparity,10460reconstructedsourcepaths andrestoration/cleanup. Per-variant storage.json overwrote the pre-witness copy-budget measurement; that precisionlimit isexplicit, without inventing a missing value or resampling. Source/code/controller/binary identities and omittedprivatepayloads are labeled.
+
+The exacttwoBodyfiles carried onto0ee withunchangedbytes/modes andnewrecordedmtimes. Current-source10460pathmap isced81d098f. One actualmetadata query23774closed0,451packages/48locals, raw9e2937a526, before/aftersourceguardsequal; no build/test. Literal12packagecanonicalbinding is being finalized before any gate allocation. Skills separatejournalWT remains source15db11e184/format0 withallassertions; docs now limit the prefix check to observed bytes and pending1MiB reads, explicitly excluding between-poll replacement/rewrites and bounding I/O/finaldiagnostics by the outer watchdog. No newSkillsobservation or product/API change.
+
+
 ## 2026-10-25 08:28 — Released cache recovered; Hand controls complete
 
 Ready for lamp-voice: no for the current repairs

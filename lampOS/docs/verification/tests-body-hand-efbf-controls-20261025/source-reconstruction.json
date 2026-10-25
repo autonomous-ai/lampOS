@@ -1,0 +1,75 @@
+{
+  "frozen_base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "branch": "tests/1806-body-hand-events",
+  "recorded_tracked_source_rows": 10460,
+  "unmodified_source_reconstruction": "source-map.json outside2ownedfiles matched each efbfGitblob byte/size plus Git executablekind; fullfilesystem modes/mtimes are captured in immutable snapshot and closedguard receipts, not inferred from Git permissions.",
+  "owned": {
+    "lampOS/crates/body/src/bus_out.rs": {
+      "baseline": {
+        "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+        "bytes": 64180,
+        "mode": 420,
+        "kind": "file"
+      },
+      "candidate": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/body.md": {
+      "baseline": {
+        "sha256": "936e01931c5ae0068f16d2d47bd8a0396ca2f966600d6e5f987d6c2a83128c12",
+        "bytes": 203745,
+        "mode": 420,
+        "kind": "file"
+      },
+      "candidate": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "kind": "file"
+      }
+    }
+  },
+  "restoration": [
+    {
+      "path": "lampOS/crates/body/src/bus_out.rs",
+      "before": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "mtime_ns": 1792891100159073841,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "mtime_ns": 1792891357611292419,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "lampOS/docs/body.md",
+      "before": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "mtime_ns": 1792891100161168000,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "mtime_ns": 1792891358373242761,
+        "kind": "file"
+      }
+    }
+  ],
+  "audit_sha256": "fe10953ef9fb12bb46422f4ec33b61fe6646da0d2a9c6a1fc81dcde0d833991b",
+  "later_carry_not_qualified": true,
+  "no_personal_Git_metadata_included": true
+}

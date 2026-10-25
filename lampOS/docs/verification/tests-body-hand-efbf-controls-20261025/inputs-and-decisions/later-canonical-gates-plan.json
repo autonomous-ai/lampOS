@@ -1,0 +1,124 @@
+{
+  "execution_ready": false,
+  "head": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events",
+  "scope": "Canonicalcandidateonly aftercontrolclosure/allrawproof+finallysource restoration; separategrant/controllerreview. No extraA/B, no full12test rerun.",
+  "reverse_clippy_policy_pending": true,
+  "compiler_jobs": 2,
+  "steps": [
+    {
+      "id": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "timeout": 300
+    },
+    {
+      "id": "clean-before-clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body"
+      ],
+      "timeout": 600
+    },
+    {
+      "id": "strict-clippy-POLICY-PENDING",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--jobs",
+        "2",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "clean-before-full-Body",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body"
+      ],
+      "timeout": 600
+    },
+    {
+      "id": "full-Body",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-fail-fast",
+        "--jobs",
+        "2",
+        "--message-format=json"
+      ],
+      "timeout": 7200
+    },
+    {
+      "id": "clean-before-workspace-build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body"
+      ],
+      "timeout": 600
+    },
+    {
+      "id": "workspace-build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--jobs",
+        "2",
+        "--message-format=json-render-diagnostics"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "HEAD",
+        "--"
+      ],
+      "timeout": 60
+    }
+  ],
+  "prerequisites": "Actualmetadata/reverseclosurepolicy before strictargvfreeze; complete Body target+case/ignored/doctest census and raw compiler/dependency ledger; preservealltest+CLIwitnesses beforeBodyclean; freshBody/no unexplaineddependencyreuse. Other affectedstrictpackages only whenpolicyexplicit, no speculative otherpackage fulltests."
+}

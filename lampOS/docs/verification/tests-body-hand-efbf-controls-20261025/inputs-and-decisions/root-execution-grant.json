@@ -1,0 +1,22 @@
+{
+  "root_reviewed": true,
+  "scope": "fixed-baseline1-candidate1-only",
+  "plan_sha256": "9afc05e89c5871252517c64fc73897d0dd5286e4a879c437b47dda7202faef8f",
+  "controller_sha256": "ba496fcef1c38e91db10c3be4d8fa48bcb2cae61c16c0c7e345774934a3344a3",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target",
+  "target_exclusive": true,
+  "previous_owner_released": true,
+  "compiler_jobs": 2,
+  "actual_other_compiler_jobs": 2,
+  "other_jobs_measurement_scope": "Declared Second current-base lane upper bound2 afterFourthrelease; not a global host/process census.",
+  "quiet_case_window_no_other_owned_compilers": true,
+  "quiet_window_scope": "Root owns only this BodyHand allocation; Rootcleanup24124 closed and Skills only source formatting. External peer lane may be active; no isolated-host or timing claim.",
+  "source_execution_identity": "Frozenefbf sameWT baseline/candidate2file variants only; latest0ee carry/gates separate.",
+  "fixed_observations": 2,
+  "no_retries": true,
+  "final_preflight_tool_result_sha256": "467d2b45c71e3da60fee1008a89ad4cc479719360b44df17c1ba83954570c9cb",
+  "cleanup_terminal_sha256": "139538fa670cdbf80d5157cdcae993efa722cad1a937cff78ff3604d88edce9b",
+  "actual_available_bytes": 33295839232,
+  "minimum_free_bytes": 5368709120,
+  "canonical_gates_authorized": false
+}

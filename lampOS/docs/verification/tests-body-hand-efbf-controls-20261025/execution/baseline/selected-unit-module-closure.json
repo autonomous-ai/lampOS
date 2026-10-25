@@ -1,0 +1,443 @@
+{
+  "selected_executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2",
+  "dep_info": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2.d",
+  "dep_info_binding": {
+    "sha256": "ec8408bddeb06ef78a334334cc315aecb4aa40de10b06e75b14f4c0949064a4e",
+    "bytes": 4482,
+    "mode": 420,
+    "mtime_ns": 1792890968335481800,
+    "kind": "file"
+  },
+  "module_inputs": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/lib.rs",
+      "binding": {
+        "sha256": "d3d2c30cc4c2684f542ecb469a9d8b5eee9f32c963d9e60caf64b54de78e9eb5",
+        "bytes": 3909,
+        "mode": 420,
+        "mtime_ns": 1792883875705354545,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/ask.rs",
+      "binding": {
+        "sha256": "49c0a39c3d61f8665ae25c163a35f2abe2b48fb4faad4f1301d537ff23a125c1",
+        "bytes": 1175,
+        "mode": 420,
+        "mtime_ns": 1792883875278655945,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/body.rs",
+      "binding": {
+        "sha256": "139dde29f41c1bec00642fd5231d81e9f1acd0b1d34a986b9db9f369a974c7ed",
+        "bytes": 313345,
+        "mode": 420,
+        "mtime_ns": 1792883875375524457,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/body/tests.rs",
+      "binding": {
+        "sha256": "f8c94302a250b37b8fb06b32b3c406ad823aa86965047ab88ddcaca70904c245",
+        "bytes": 503715,
+        "mode": 420,
+        "mtime_ns": 1792883875433823393,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bus_out.rs",
+      "binding": {
+        "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+        "bytes": 64180,
+        "mode": 420,
+        "mtime_ns": 1792890933618709583,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/exit_report.rs",
+      "binding": {
+        "sha256": "5c4523767ea1d4b4299be1d0becb747c07a78cdd5b9f3ad7094587f0794789ac",
+        "bytes": 12452,
+        "mode": 420,
+        "mtime_ns": 1792883875587754825,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/expression_in.rs",
+      "binding": {
+        "sha256": "404c609b4632e90f2ab3927850d2a61c9eeec8a077ca81e4652b627cc3aee665",
+        "bytes": 14253,
+        "mode": 420,
+        "mtime_ns": 1792883875609352322,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/hold_in.rs",
+      "binding": {
+        "sha256": "4aa35fe46b288fec6afe6fb7464a12b1d9a59fac5ce28fe77ae4b7ebf605058d",
+        "bytes": 3323,
+        "mode": 420,
+        "mtime_ns": 1792883875667500042,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/inspection.rs",
+      "binding": {
+        "sha256": "3df570c1072b2a495901ceb78d08aaa227b2597fd1d61952f0c645ee80d615f0",
+        "bytes": 22011,
+        "mode": 420,
+        "mtime_ns": 1792883875668427827,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/inspection/tests.rs",
+      "binding": {
+        "sha256": "703438692793866bd6d665a0024c26b53cb312e7081c86836492ce527f96a075",
+        "bytes": 17725,
+        "mode": 420,
+        "mtime_ns": 1792883875686797752,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/name_in.rs",
+      "binding": {
+        "sha256": "e836f968b673f1b4c643c7e6b814b71de8d5dbfb615aaf3e0cf1682e12e6920d",
+        "bytes": 1873,
+        "mode": 420,
+        "mtime_ns": 1792883875744331655,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/pause_in.rs",
+      "binding": {
+        "sha256": "25be39033efd04726ab997048f793c19b7a25633e2809ae021de7a357533de5a",
+        "bytes": 2295,
+        "mode": 420,
+        "mtime_ns": 1792883875762500598,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/sleep_in.rs",
+      "binding": {
+        "sha256": "b406059a14e47add99081f6b4e50a7fb987de02ee5f804304008ca24c31f7124",
+        "bytes": 7556,
+        "mode": 420,
+        "mtime_ns": 1792883875899726345,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/calibration.rs",
+      "binding": {
+        "sha256": "0fdaba574b805e1f809d682c7ae07cbc38814a90259248ae7c63df3ef7dd055d",
+        "bytes": 15510,
+        "mode": 420,
+        "mtime_ns": 1792883875471364036,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/clips.rs",
+      "binding": {
+        "sha256": "2bfc703b3e2a47048daf046d01ec14edd69c5b80d52f0d46b9951672c12eca5c",
+        "bytes": 7737,
+        "mode": 420,
+        "mtime_ns": 1792883875471687909,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/cog.rs",
+      "binding": {
+        "sha256": "276341f4088fa136c84afe55ba44e81f9f266119883051b44bf52d6208807451",
+        "bytes": 10369,
+        "mode": 420,
+        "mtime_ns": 1792883875512570468,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/command.rs",
+      "binding": {
+        "sha256": "306d7a65d7465551a2ae4056d7fedbe9d442551a12d3e2c9491825d5bd3eaf17",
+        "bytes": 3806,
+        "mode": 420,
+        "mtime_ns": 1792883875531549346,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/control.rs",
+      "binding": {
+        "sha256": "d5502205df3e703a831d013524c2babf6b5398f359130fee2a70c1d4d9efcd17",
+        "bytes": 50580,
+        "mode": 420,
+        "mtime_ns": 1792883875550284339,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/control/profile.rs",
+      "binding": {
+        "sha256": "99d2863d131e9842b228ed50ed9977483431f363d936174df32e93a39ddfd4d5",
+        "bytes": 12039,
+        "mode": 420,
+        "mtime_ns": 1792883875569034354,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/first_stand.rs",
+      "binding": {
+        "sha256": "241b1054d15abc087ca23b4b9645effb48e07f98a95406762ff490a98f3b2980",
+        "bytes": 64527,
+        "mode": 420,
+        "mtime_ns": 1792883875610161967,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/gaze.rs",
+      "binding": {
+        "sha256": "7b3b39d1a23a440098e36f36801451da57e1a2681f0f72183bca4d5992455418",
+        "bytes": 19256,
+        "mode": 420,
+        "mtime_ns": 1792883875629827206,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/gesture.rs",
+      "binding": {
+        "sha256": "66f58d6624bb280e708e542c3f3057f781378b482b85eed1934b22035fc49393",
+        "bytes": 13505,
+        "mode": 420,
+        "mtime_ns": 1792883875649354480,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/idle.rs",
+      "binding": {
+        "sha256": "1c0cb1c4fc69b0494fbda0783151ce93397b301b1660389935f0fc98d8e8959a",
+        "bytes": 7200,
+        "mode": 420,
+        "mtime_ns": 1792883875668034256,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/moves.rs",
+      "binding": {
+        "sha256": "c9c6f1c247daa7b4282e631e1c67fb252c8ce5ce0511310296ac3d15f0bc9612",
+        "bytes": 27880,
+        "mode": 420,
+        "mtime_ns": 1792883875743582963,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/poses.rs",
+      "binding": {
+        "sha256": "a63ee0e1974b2be9437008e3c46e131d690e881e21247f8cee05ea044f2e00b5",
+        "bytes": 21036,
+        "mode": 420,
+        "mtime_ns": 1792883875762909147,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/protocol.rs",
+      "binding": {
+        "sha256": "0ee44a05d7dc200998fc8001da40fa28afcb9799d553a43745902da12141a7b4",
+        "bytes": 19074,
+        "mode": 420,
+        "mtime_ns": 1792883875763547325,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/readback.rs",
+      "binding": {
+        "sha256": "d12fb28306798b2ccc5f5e7c9f8f88cd64dade5a343262302a46e0c2b013598e",
+        "bytes": 6780,
+        "mode": 420,
+        "mtime_ns": 1792883875763924112,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime.rs",
+      "binding": {
+        "sha256": "f70ac6cb58b472a85130c8b81eed4258f689afc644de9ffbab98e087f71a0c8b",
+        "bytes": 612,
+        "mode": 420,
+        "mtime_ns": 1792883875782690769,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime/channel.rs",
+      "binding": {
+        "sha256": "c6891b0b0fbca1b6cdc869815d7089fb6f61c22ab0da81f5fc1a08bd041ccd80",
+        "bytes": 6490,
+        "mode": 420,
+        "mtime_ns": 1792883875783300275,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime/config.rs",
+      "binding": {
+        "sha256": "15fa0ccdee58294599b365a0505ccb9e4d6cc8ff6528f3255668c67b2ebcb4e4",
+        "bytes": 9317,
+        "mode": 420,
+        "mtime_ns": 1792883875802685830,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime/qualification.rs",
+      "binding": {
+        "sha256": "4b3efdc859875623dcc0ca0742ce127286019df56f79bca35f62a7954c738cd1",
+        "bytes": 19052,
+        "mode": 420,
+        "mtime_ns": 1792883875822721734,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime/supervisor.rs",
+      "binding": {
+        "sha256": "f3f997ed7fe30b77ba6c0753ca118ec26f96bbd1c128505f8ea773256f942c8d",
+        "bytes": 23862,
+        "mode": 420,
+        "mtime_ns": 1792883875842451744,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime/supervisor/tests.rs",
+      "binding": {
+        "sha256": "fbb37e7834f64f5990a9097136ada08aee0b316d7add4a9beec765b476a98a8a",
+        "bytes": 33339,
+        "mode": 420,
+        "mtime_ns": 1792883875861171802,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/tests/runtime/support.rs",
+      "binding": {
+        "sha256": "d0d048c2097ad9d754be451dd790ce8417be094eb4bedca56a9306c0fbfcb00b",
+        "bytes": 11437,
+        "mode": 420,
+        "mtime_ns": 1792883876072313891,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime/wire.rs",
+      "binding": {
+        "sha256": "a3839247e015df2b8d7c38c4e8eb2588f7c48f7ad2a21a1d27c2018028bbbc59",
+        "bytes": 7003,
+        "mode": 420,
+        "mtime_ns": 1792883875861574309,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/runtime/worker.rs",
+      "binding": {
+        "sha256": "a04814e4bc9caec030a1504cd063ec5c01535357f647a15b6ea54954180829bf",
+        "bytes": 24023,
+        "mode": 420,
+        "mtime_ns": 1792883875879237612,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/trajectory.rs",
+      "binding": {
+        "sha256": "d0c36bc57efdc6d768e3c83dc12a9e63f665ab529974c32fcd2f89e645b2fa6f",
+        "bytes": 6870,
+        "mode": 420,
+        "mtime_ns": 1792883875900361453,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/units.rs",
+      "binding": {
+        "sha256": "aacfa21e3c444279c653104381a7a69c40ee94b0ced0a8c91cb1a6fd11e1af52",
+        "bytes": 3849,
+        "mode": 420,
+        "mtime_ns": 1792883875935665515,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/unplug.rs",
+      "binding": {
+        "sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf",
+        "bytes": 43590,
+        "mode": 420,
+        "mtime_ns": 1792883875954362791,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/docs/verification/wake-lamp-52e6-20261014/wake-yaw-home-back.json",
+      "binding": {
+        "sha256": "3810a42c4655a5c62598d2c4fa5cdcc9279a29e09d87791899e4dfab4aa303ee",
+        "bytes": 3378,
+        "mode": 420,
+        "mtime_ns": 1792883913025510991,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/clips/data.rs",
+      "binding": {
+        "sha256": "fcb96cb9da4b07f3146b1ba2397a07deb32c9cb12fa9b2024e4cdc0636fcd517",
+        "bytes": 78831,
+        "mode": 420,
+        "mtime_ns": 1792883875511772391,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/deploy/lamp-4ace/lean-first-software.json",
+      "binding": {
+        "sha256": "c78dda2dc87459e13e06171a7e1113fe41835ba5aa07bb71fe169e95faf3a8ad",
+        "bytes": 2279,
+        "mode": 420,
+        "mtime_ns": 1792883893504446673,
+        "kind": "file"
+      }
+    }
+  ],
+  "changed_bus_out_bound": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bus_out.rs",
+    "binding": {
+      "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+      "bytes": 64180,
+      "mode": 420,
+      "mtime_ns": 1792890933618709583,
+      "kind": "file"
+    }
+  }
+}

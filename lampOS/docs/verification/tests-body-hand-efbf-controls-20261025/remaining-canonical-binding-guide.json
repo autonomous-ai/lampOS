@@ -1,0 +1,28 @@
+{
+  "execution_authorized": false,
+  "canonical_scaffold_reference": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep",
+    "runner_sha256": "5227d4939e8fc0ab17a5c4b6030b216e4c578cbf323591401cf6202cae767e44",
+    "plan_sha256": "419a7a3536bca9ebbc78427a56d1ae1f134afa3ff96069f050633156384d09c9"
+  },
+  "do_not_change_frozen_experiment": "All controls stay efbf + exactsaved2filevariants. No liveWTread is needed to reconstruct them after carry.",
+  "next_binding_requirements": [
+    "Actual final candidate HEAD/branch/WT, clean-or-declared owned paths and whole-source fullmode/mtime/byte/path snapshot; efbf controls do not qualify a later carry.",
+    "Complete fixed baseline1/candidate1 results, restoration/owned-process closure and Root disposition; no result overwritten/relabelled.",
+    "Actual locked metadata command+raw bytes+source guards from the final source, exact48locals/12reverse closure, resolved features and alltargets/customharness/doc inventory audit.",
+    "Closed source-equivalence/carry mapping if control epoch and canonical head differ; changed dependency inputs explicitly recorded.",
+    "Prior control readonly executable/CLI witness manifest verified outside target before any clean; two fixed observations and all0/101 retained.",
+    "Complete prior producer unit/input/output ledger from controls; external cache reuse must have exact known producer. Unresolved local/output promotion reuse is not waived.",
+    "Root final source/scope/resource review and exact controller/plan/input hashes plus released exclusive Body target; no compiler allocation inferred.",
+    "Final peer-declared lane roster/slotpost binding and separate Root resource grant; unknown peer nativehandles allowed, never invent target/handle or imply global process census. Current proposal Second inherits Fourth2; RootHand upperbound2; declared total<=4."
+  ],
+  "additional_notes": [
+    "FinalRootsource/base/branch/WT/fulltrackedsource-map must be captured after acceptedcarry and bound to newcanonicalepoch; preserveall oldcontrols.",
+    "Actual final-source locked metadata is a NEWseparatelyapproved query, not oldefbf metadata relabelled. Confirm12reverse/48locals, resolvedfeatures/targets/doc/customprotocol, manifestdrift and sourceguards.",
+    "Priorprivatewitnessmanifest can reference saved baseline/candidateexes outsideCargoTarget; these bytes/modes rehashed in independentclosedaudit. Do notpublishbinarybytes.",
+    "Seed final producerledger from captured candidate/unit-ledger-after-compile.json; local48namecleans perapprovedcanonicalepoch, allnewunexplainedreuse stops.",
+    "Bindactual peer-declared roster/slotpost and Rootupper2 separately; no knownnativehandles/globalcount/exclusivity inferred.",
+    "Retainedstorage.json is lastcheck only; pre-witnessbudget measurement overwritten, so do notclaim it as independentlyretained rawmeasurement.",
+    "Oldlater-canonical-gates-plan.json is included as unexecuted historicalpending-policy input only; newerliteral12scaffold remains disabled and was NOTmutated by thispacket."
+  ]
+}

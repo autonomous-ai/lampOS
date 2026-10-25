@@ -1,0 +1,36 @@
+[
+  {
+    "path": "lampOS/crates/body/src/bus_out.rs",
+    "before": {
+      "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+      "bytes": 64386,
+      "mode": 420,
+      "mtime_ns": 1792885070454857534,
+      "kind": "file"
+    },
+    "after": {
+      "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+      "bytes": 64180,
+      "mode": 420,
+      "mtime_ns": 1792890933618709583,
+      "kind": "file"
+    }
+  },
+  {
+    "path": "lampOS/docs/body.md",
+    "before": {
+      "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+      "bytes": 204107,
+      "mode": 420,
+      "mtime_ns": 1792885070455505853,
+      "kind": "file"
+    },
+    "after": {
+      "sha256": "936e01931c5ae0068f16d2d47bd8a0396ca2f966600d6e5f987d6c2a83128c12",
+      "bytes": 203745,
+      "mode": 420,
+      "mtime_ns": 1792890933621071398,
+      "kind": "file"
+    }
+  }
+]

@@ -1,0 +1,2610 @@
+{
+  "observations": [
+    {
+      "variant": "baseline",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/run/baseline/current-test-executable",
+          "--exact",
+          "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS",
+        "started_at": "2026-10-25T01:18:16.380948+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 20441,
+        "owned_process_group": 20441,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 1.896042,
+        "finished_at": "2026-10-25T01:18:18.277056+00:00",
+        "stdout_sha256": "4c3ff2292c3c14c9a29775d290debe70e78cf2f5f21908c3a17c9b41f1e1e5e6",
+        "stdout_bytes": 214,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2",
+        "sha256": "a47604fcee2bd74aaafa2320e5c6b6d20cf5d7914d2db4aca113f05895afc00f",
+        "bytes": 143553032,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/Cargo.toml",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "26a5410cdabf6ec20ff44c36a353e870c0da1b01a2ca8f4d4310f307ff237d91"
+      },
+      "actual_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/run/baseline/current-test-executable",
+      "no_children": true
+    },
+    {
+      "variant": "candidate",
+      "record": {
+        "command": [
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/run/candidate/current-test-executable",
+          "--exact",
+          "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began"
+        ],
+        "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS",
+        "started_at": "2026-10-25T01:22:25.321345+00:00",
+        "timeout_seconds": 120,
+        "stdout": "exact.stdout.txt",
+        "stderr": "exact.stderr.txt",
+        "timeout_cleanup": [],
+        "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+        "owned_pid": 28639,
+        "owned_process_group": 28639,
+        "timed_out": false,
+        "exit_code": 0,
+        "unexpected_residual_group_after_normal_exit": false,
+        "direct_status_before_cleanup": 0,
+        "owned_group_present_before_cleanup": false,
+        "direct_wait_status": 0,
+        "owned_group_absent_after_cleanup": true,
+        "wall_seconds": 7.80728,
+        "finished_at": "2026-10-25T01:22:33.128723+00:00",
+        "stdout_sha256": "5563a52f0b6fb5102c1bb228131ff2fade53987704bc4656309a1c1b8c05c2e5",
+        "stdout_bytes": 214,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      },
+      "test_binding": {
+        "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2",
+        "sha256": "08570f2a7024948196877bab69edb1501f940a4ab2b01caad351b47c221a5fe7",
+        "bytes": 143544464,
+        "compiler_artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+          "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/Cargo.toml",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2"
+          ],
+          "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body-a2ec0ab27b9045a2",
+          "fresh": false
+        },
+        "source_aggregate_sha256": "fe9591373ff3266eb3b8a8b8f6c76af780111071447def7b19135a31c94f1fe3"
+      },
+      "actual_readonly": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/run/candidate/current-test-executable",
+      "no_children": true
+    }
+  ],
+  "variants": [
+    {
+      "test_sha256": "a47604fcee2bd74aaafa2320e5c6b6d20cf5d7914d2db4aca113f05895afc00f",
+      "dependencies": {
+        "29fdc547ea00003fa2286349cc48dd56bf79060a62540a30759c63ba3be230ed": {
+          "package_input_sha256": "20f8ceeef51802bf2679a697016564f943a50171ebec0ccd558ad3a401e63287",
+          "manifest_sha256": "c6049e170e4f7c2b48749fefab59db583bfac4e466cde6d0c53e4f49bc5044f7",
+          "entry_source_sha256": "7bc6b1eec8913ff4cd8e4b9b92cd04a82a4f38beb30a0b73a64c1e6e49f07b5f",
+          "outputs": [
+            {
+              "sha256": "7c60f9e62aa1f72896c192065c409bc2d9e0c826cb1b2fe84218f12f260eb8af",
+              "bytes": 570872,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "d56f82d769c5bdad757670d53eb3ad4eccf9da682aba348f060e58810bd283e3": {
+          "package_input_sha256": "86b6592743dd2c2183b83668a8777e1631232b787d880b5264e1bb880c67a63d",
+          "manifest_sha256": "6bdbe54a7f052e552dcfca90351764476e2767237ec3f954df8bd9f602861056",
+          "entry_source_sha256": "baeb20b52f6b536be8657a566591a507bb2e34a45cf8baa42b135510a0c3c729",
+          "outputs": [
+            {
+              "sha256": "757aa090cc56c4e9cce83f88e3bbbe2297c3e8a034bc433a62ae13315df989bf",
+              "bytes": 595376,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "24365aacf6278c17e3df2531ee224819e3d11e9d674421d1158122d104e1f9f1": {
+          "package_input_sha256": "32d670261086495e2656b9969198c3b928ebeafd71639ec651277713d31236c2",
+          "manifest_sha256": "f70dabc0fe831788a202762e62cc76c19941680960e2e2710d1ee9e79877d9af",
+          "entry_source_sha256": "145270c2d14e3e8771f2d1a2f05445b52957481924f30fc7d5db9102fc8af69b",
+          "outputs": [
+            {
+              "sha256": "1c073106e2a58e053bca0d72fa7ede77f32cbf81d36713bd7c41ce4c67cc1426",
+              "bytes": 52064,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "2ed0c20229e51c4750b75425836f92e47853296d6cc0a2533a09dbaea54d4c5c",
+              "bytes": 34583,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "a2bb3ddabbf353ca9ee3a8bfcb377403bb676f34ce19e90b596e9ae21d0a423b": {
+          "package_input_sha256": "3caad66902f5728908711135744d16620183c9ada14f56ee56859c91df47e789",
+          "manifest_sha256": "13d8c50837f14aff48cd622349f98fb2c46350b7a0c08fd574cf7de4def27d06",
+          "entry_source_sha256": "cd6808c02e476b09a520105e2c6f6d325cccb1ecd542cbbcc836a0ae6f6fb0f1",
+          "outputs": [
+            {
+              "sha256": "e8a687c994035c93ce300ff55a35e9f16390c4f426c2f920ba4fade46d3d5a04",
+              "bytes": 540256,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "78737d51059f747629fd0a40518e4d0f5be6fc45c2ad6e54fa5ba287be9c12bb": {
+          "package_input_sha256": "421d0dde5280402d8c3a4a91a00a01fe9f338ac492620885b008ad3b92c8e976",
+          "manifest_sha256": "399ea74400a173c02eabe91cb9487d0cf351117857a5d2ebc6231f0efde67681",
+          "entry_source_sha256": "01bb86088ba281d511ae002aa939bb30b747f47ace5ea13a46de554a3117806e",
+          "outputs": [
+            {
+              "sha256": "11429a6e0b26cb5f7b01a29c04d04809c870d08f7ef4646744666b1225c7720a",
+              "bytes": 347792,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "e5e3e191610fe39021bdd391d73accad1424ee0e5ac8eb9298dace790d6067af",
+              "bytes": 75095,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "d70b85f1872116327ce52ae040c79769da9bcb97e4a14713968f0bc042c9c1b7": {
+          "package_input_sha256": "eacd7f7da0ab5ef4f43dfc7c6202ea31723ba870da0a97f7d68f455a9ee9af50",
+          "manifest_sha256": "4b5daed75505275d11f4854dd9172f910da61d9856ca2936d95e2e6e0c9040e4",
+          "entry_source_sha256": "08fa30c4a2c1ad24fe5f987e721dfb20131f45ea5b5dc3e836dcf88a8e33248c",
+          "outputs": [
+            {
+              "sha256": "3bbe6337b3693db4dae7f169d9299e2a1a04c93716801899699d71f1e0840620",
+              "bytes": 607544,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "846e547a68803ec113a5092a13a2fa618beb207e9125283a3259d536584429e4": {
+          "package_input_sha256": "86b6592743dd2c2183b83668a8777e1631232b787d880b5264e1bb880c67a63d",
+          "manifest_sha256": "6bdbe54a7f052e552dcfca90351764476e2767237ec3f954df8bd9f602861056",
+          "entry_source_sha256": "ed6bf5e3c3b4fc952d4bdf9b48b149087bceaebf5392befce0bc6cae590a008d",
+          "outputs": [
+            {
+              "sha256": "c795dbfa18df5039ebccec5e8b373b56f239cb6e7ec32b59267cedab4006ab0d",
+              "bytes": 920456,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "c12255d4bbab0de0748b2a73abceb6045aa5483a00b22358f82e1702d97bcf29",
+              "bytes": 342101,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "8feae8a33cacc15932f360849550fc96df7e3b621c837bcf6b1d7d335e810708": {
+          "package_input_sha256": "3caad66902f5728908711135744d16620183c9ada14f56ee56859c91df47e789",
+          "manifest_sha256": "13d8c50837f14aff48cd622349f98fb2c46350b7a0c08fd574cf7de4def27d06",
+          "entry_source_sha256": "e01ca26adfe51a087813d1fc1154efd8a8c9cb5b5a81f314194b4904a4422c71",
+          "outputs": [
+            {
+              "sha256": "678afc8309965f7364894dccb1f6ab0501518bbb3e9bc787182e313408990c90",
+              "bytes": 414792,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "c19184787d6253f9ea146812d78cce9058cc956b9afd7b7e3f8ab78e0584e96b",
+              "bytes": 269662,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "2ad67f57f162f027108ad6a677e8e888ac435a311736885a65c68f283964ac7c": {
+          "package_input_sha256": "631491255d164e5c6cd509ef41b5c1a34fe60283220f6ae7197750da57febb5d",
+          "manifest_sha256": "00785a81eae34b3298dfdde78a6bd96fe3ec000de46edd509bd13b7cab7a9870",
+          "entry_source_sha256": "0cf99cbd6f5597dd42618d603e1f453f6484e01e8f6e72d328ca5206191bc9f3",
+          "outputs": [
+            {
+              "sha256": "4284d052d8fb14003a93c175ee96a21800b34f1dab1c085a92a241f92e8c0f64",
+              "bytes": 2740816,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "0c6f083daac0757dd0cc56a7a59e99c3e2463ada27b33009d44a690cf01ff7cd",
+              "bytes": 2720555,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9852bdcf294319bc7cbe822676069ea4baddec7a3f7967362bf931e1ebab9538": {
+          "package_input_sha256": "ab3accfeaa7a5acddd5274fc304dd012a21cf966a7517435dc185a3652a2f2f2",
+          "manifest_sha256": "b31420c7a806fae5b9ea2438dd4cbb99dcb3a22da67697fdf2776cc44a69527e",
+          "entry_source_sha256": "ad320bc635887879bdbbf1b9322da4a157ec2c5a4243bd7c2cf9b6884a3b2a41",
+          "outputs": [
+            {
+              "sha256": "e2fedeab78ec046ae2cf292885c08bc1ad02ae3f32d2e0a608156b9882a310ec",
+              "bytes": 542944,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "1abea3d4f056775b332adefb717f57b00f5e7f0fe5d07781fe16542f69783bc2": {
+          "package_input_sha256": "20f8ceeef51802bf2679a697016564f943a50171ebec0ccd558ad3a401e63287",
+          "manifest_sha256": "c6049e170e4f7c2b48749fefab59db583bfac4e466cde6d0c53e4f49bc5044f7",
+          "entry_source_sha256": "4e5c396d38ff5d9abf45b826a67ec3444654ed0802d057f46400ebe26f5879f8",
+          "outputs": [
+            {
+              "sha256": "2ca8462ef11ce2f229f976cc1c83d079059125143869786f54a7e5a47add90a1",
+              "bytes": 5081696,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d20e83ac52dd099ef93e35b4f413e7bc769ce3221b456acc3a321b54ed7365e5",
+              "bytes": 4749226,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "fbabd79e83750bd161c1ff1b531711e038eb8a378c11e77aabc3bba215cfe2e1": {
+          "package_input_sha256": "eacd7f7da0ab5ef4f43dfc7c6202ea31723ba870da0a97f7d68f455a9ee9af50",
+          "manifest_sha256": "4b5daed75505275d11f4854dd9172f910da61d9856ca2936d95e2e6e0c9040e4",
+          "entry_source_sha256": "20b64b4359b0e82a3523fd536ad06de25e174cead734cffd3fa5f7c48f659247",
+          "outputs": [
+            {
+              "sha256": "17b60b33152ccda4b518d01c860bb359bfdd959e21aabec9742942d57399d41d",
+              "bytes": 817896,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d84db9b2a51b26a349b87a8a98c57931534c5ea38e135b1894e105f638cb9400",
+              "bytes": 809020,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "831fe91fceff2266aed397aa9266c118315fd0918d77ad6551f88c72ae6b25a8": {
+          "package_input_sha256": "be9404c7157f5d53ef2307363539bbe1aa3ec93cc43ad9389ad2d4f6568f9be5",
+          "manifest_sha256": "6883caefd46e86eb15d22d3a6d274ad304c5e7934ab70eb58d81b7c4a29ef9db",
+          "entry_source_sha256": "e2ea6a7a82f5404c3e28cb055883c737ee7903367a10206fbb47b75c009f0eb3",
+          "outputs": [
+            {
+              "sha256": "406fdd75a846d769d2409732315e064e4c7b962dc9e8024e1049e84643d505f1",
+              "bytes": 570368,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "60396d7332ad8133612fd833223998594f17685c0de6b49de4618981ef1def17": {
+          "package_input_sha256": "450b6105d3519df706aa2baff632c26862af2ad4f6de6f40efcb84ed5d460232",
+          "manifest_sha256": "00b920255c320a278bf25b962b491263a19d8c90e12e4a91c1d823db71eabb2f",
+          "entry_source_sha256": "a681e754be844c7dbef957f5d2d00b01f37c5dca160ef1055a8d8f975697a881",
+          "outputs": [
+            {
+              "sha256": "c2db78f0139bf535c6aab906a66c393bb19e74de0b3e1967287f2e73af03e600",
+              "bytes": 457080,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "0c2128affac2c782cd057c6e9f5c5a9bfcd2df833a3fa913379c37c4e983e9eb": {
+          "package_input_sha256": "ab3accfeaa7a5acddd5274fc304dd012a21cf966a7517435dc185a3652a2f2f2",
+          "manifest_sha256": "b31420c7a806fae5b9ea2438dd4cbb99dcb3a22da67697fdf2776cc44a69527e",
+          "entry_source_sha256": "0bdb8cd6a8835af08b5ca60956df283732f1b5aa940c750b1ec5dc78bf245b61",
+          "outputs": [
+            {
+              "sha256": "45845394aa01f70f332f89b2725b9200e4259248befa370b384bec7c15cf619d",
+              "bytes": 575600,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d66001c4f7d794a4b5d3b2d5e8c348299ec7c2a145ef0fbd31f2c5cfb611339f",
+              "bytes": 421108,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "da580377cce50e09008a5d4c8126d133b1b914f9d256abc318d91870d987f58f": {
+          "package_input_sha256": "802ca98729a25dd334d4f36ffb09e4d875d80363fa502c77fad956e0e415bd6a",
+          "manifest_sha256": "d646663ec1bd4e8e795bd6a386cff9c374880d6237bbfa36bbac08b7f26ce65c",
+          "entry_source_sha256": "2fe40504f7a897ac6b742a85bdf8c4b5b2c6de87cdd72d0cf49fa50585ac9955",
+          "outputs": [
+            {
+              "sha256": "184e0f5d8d1ef162449b9d93ca326e3826adf58c2940bbb9a58890fdad2e91b8",
+              "bytes": 7136,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "1fa6a7e72377f95e60830666604212b23e6c4990ee6f0f47f24706121593aa1e",
+              "bytes": 5855,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "5ce60955e33c8d637d6d2f856bb4ee5851a2896eedd7059a4a66be373a0c8f8f": {
+          "package_input_sha256": "34941ab96ab22bc01a88ff213421ef63d66caf5cfad33062b18fbf0070024a16",
+          "manifest_sha256": "d93eb5890ed725266e757d38baa0ed701c3bb163e8e10377e85c78dd87426511",
+          "entry_source_sha256": "650ea08bc6e033e313440f3fa12dd7162f1c7a25610ebcde994ba43bdc0043a7",
+          "outputs": [
+            {
+              "sha256": "5e573dabcd281f6db2638655d80027fc0e851613be63daa43e7ae504aa853b09",
+              "bytes": 4905832,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "94c0828b60ca7363b35f4c995fe5e9634f857c17c695ed44813d4290556a99bf",
+              "bytes": 2217373,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "863ddbeba3a4e856868e278dfaf7523bc7838bca2982283b413f6938ff85bfe5": {
+          "package_input_sha256": "2f7d58ed597579ee5ef80792ccc1a0e8512fa2db1ced00c5b33926c246173800",
+          "manifest_sha256": "a14f68b8fa55f15fd03b15dced37bcf66a0a628f568eedc82817cdb7f9281951",
+          "entry_source_sha256": "614f778a41e88a29ea0ceb8e92c839dbb6b5a61c967f8bfd962975e18f932c71",
+          "outputs": [
+            {
+              "sha256": "b72603091fa40d0ede02b32c4b2a5f87e050711bf1887ec4acf7dbe0493dffb6",
+              "bytes": 2112584,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "c634b1ce4bdffae5cf1fa8f980a40eb875cc28039635eaee38fe4c7c38d13aeb",
+              "bytes": 1289240,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "87536447e95b630bbfb810aa03b48e0ae260c17a281f343537741bae7cb1c4be": {
+          "package_input_sha256": "14c0471446510513fa111510ad023670d835171b30b4c1824f4efb9a6aebeaee",
+          "manifest_sha256": "894c215e4e7e973b556b0e9627bf9b6a719a043fac9b5af9838660816392a09f",
+          "entry_source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
+          "outputs": [
+            {
+              "sha256": "1abf3e5e0630ef0161ea00fb22ad50fec8be3bc1a51be1d42453528baa35e2a0",
+              "bytes": 144600,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "bb98f287a9eed510d13f0151687ec064064c04427f5bb5bacdaeb9925becdbbd",
+              "bytes": 60163,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9c223b2dc17a6838d9d42c983ae61daa1423f2ef902c3804ebba54edbbc438da": {
+          "package_input_sha256": "4ae4f47cd16cdb9eb7c9c2f5d1466e3c70d7ef141279190f9923c3c75e8f1e71",
+          "manifest_sha256": "5d410962aefee7ac5916c9cdd915a717228576dbe3c8a09460fd58c4ec751e2c",
+          "entry_source_sha256": "feede9bdbbcf70c6409faef8fb2f2c065e942107eb6596677bb36dce6c5075fb",
+          "outputs": [
+            {
+              "sha256": "e8e6d9bce4a622f72448375323315554e17c5f618fe609bc004993ed61c6bf7b",
+              "bytes": 641744,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "ee44e3e9e5cb055153747f3efffadefa7c21f822d5aa6b8c7777c25c6ab89269": {
+          "package_input_sha256": "5d8b9f216be63954988a08d5df00eb187ebdfaddb085d16685710eb0952b3bb1",
+          "manifest_sha256": "d2581160ffa61baa386f882e08b0db20051dc3c782a82268d6473998b61c926e",
+          "entry_source_sha256": "9c8efaaaad77caa41178ca4316bff1ccbb7a864673d88639d258b7c5619a4ad4",
+          "outputs": [
+            {
+              "sha256": "fb3ee2386299c7d27b922c284329539e0e7cce9c5fce377321fcaffbd4df58bb",
+              "bytes": 3258040,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "093d17241b09937fea72374dccee27eccf4008f5bfad97cb1322d476274c8b33": {
+          "package_input_sha256": "450b6105d3519df706aa2baff632c26862af2ad4f6de6f40efcb84ed5d460232",
+          "manifest_sha256": "00b920255c320a278bf25b962b491263a19d8c90e12e4a91c1d823db71eabb2f",
+          "entry_source_sha256": "34a1ddabdcf4759d9a6c64a2e851372546d635d1a578ad902d962fef3c45de58",
+          "outputs": [
+            {
+              "sha256": "ba9a9dcbbe84c7617cce4d2600eff9c2977f727e539f1d7b22a0712b6611d86e",
+              "bytes": 3407328,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "976c03414288f8e5ba1ef47aec785f58405cb5ee14a5d5aff070e0fd62f39edf",
+              "bytes": 1424816,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9ea6a5dc6bf743535dd1f8f7d2026d44fc4e2f9fe26bc073c8961041280686f5": {
+          "package_input_sha256": "0321dbbd3f0a1150232bed2891bc05ca66b14e9899ba0ef17dd00243c33986ee",
+          "manifest_sha256": "303682a6a66fdc98de8a011ac275e18c523f1535ed8de2a291a4fcad91de8348",
+          "entry_source_sha256": "5dd00d7ea362d1e4fc06141aae07a0f15166a0b8836ac8e8713f7d7f31d26a1e",
+          "outputs": [
+            {
+              "sha256": "149f21540eed35ec38822b9721def0c15b578313b051abda4097c708aacfe1c0",
+              "bytes": 32696,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "8b2ab189da9d3ef976c80506e8709cf59c84ba40b2a1c0e59679f07f19976930",
+              "bytes": 27769,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9d525f90caa18d9da03aa072a98d70dbca2a2e3da3fd3959df836730caa285f1": {
+          "package_input_sha256": "e60894718ba628de068bd2827254360cace108f9217be2ed6fdb9775cc5453ba",
+          "manifest_sha256": "c76e4bd298cd6223882238449e31939d75613e82757ca87e249df843decf5f9a",
+          "entry_source_sha256": "b437252d389042d894b1ef17859b043e827d2bd2a1bca4b5311c67dff565274d",
+          "outputs": [
+            {
+              "sha256": "08d5836d8346fe8e36c166230ec6033b611865674d5ac5902c36dd9b950fd9e2",
+              "bytes": 55256,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "182781b1d25e90cc7bf80e159cb6b8eb790dfdc8c409eb1aa4916e3007be4ba1",
+              "bytes": 50409,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "ec412d79b0834026a587c4c00dc8f0742bc9142e6897752023b90ab52e7d693a": {
+          "package_input_sha256": "d82c7172ef0c5bceef893eff98921b2652f0324eea79d26da9f3495d347aceaa",
+          "manifest_sha256": "f0cc2fc18c6e7f3533658b9e59d71b55e641e7d8226e5d1b915a5e7c0a1d3f36",
+          "entry_source_sha256": "5128199102bf0f7638fba0bbcf42b23822e31065841fb0c4304b64f681fde961",
+          "outputs": [
+            {
+              "sha256": "aa6d63bc2243627ce9cd122aae1716288103fa1928ec421535e816f5eb38090b",
+              "bytes": 176864,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "23d5ee51658a160e3968d47a4a1eb85e3e6a2ed81c6405be6ead1d96a2e192e8",
+              "bytes": 169942,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "7b43ca439ee08be34e83183ff67728b38a1479a385ae43f80304cff7b4d8ab4c": {
+          "package_input_sha256": "be9404c7157f5d53ef2307363539bbe1aa3ec93cc43ad9389ad2d4f6568f9be5",
+          "manifest_sha256": "6883caefd46e86eb15d22d3a6d274ad304c5e7934ab70eb58d81b7c4a29ef9db",
+          "entry_source_sha256": "9fcd921cee5dc64077f4027a3b42347253fdc3f3d9b88660e8c872c316db3620",
+          "outputs": [
+            {
+              "sha256": "d95bf9c7a6acd5378c75ec155b9660436a0323520d3562cf6bc54eb539020064",
+              "bytes": 1042192,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d58ab30ffc5b48735630e66462f0bd709512f562d8114083bd04c5561c662403",
+              "bytes": 825825,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "e9700d6c98364afe14ae84bf7e56d870a6ffc0097a26e4c3842253f7efc0e020": {
+          "package_input_sha256": "1d0cc9333b5ae5ea36437ca0247d874f227b4df2a3787765f809a645601f538b",
+          "manifest_sha256": "25160ea4dfa195721d352d42827b882a41f18f4c55fff58e5c3878ecae84ca44",
+          "entry_source_sha256": "3d633614ff24afdba603e4f2d3e36bdb7b190fff9e7f0d2b385c1f9d5d8144d1",
+          "outputs": [
+            {
+              "sha256": "002d0599930e13358e13979f2461ee0b148e767a7e4f978b44ca82ff2d3fc3a0",
+              "bytes": 40616,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "1f0d140f173c9eb98e50e1f283f3210d3cb6e2d37de1f9084197cbd3db9e8e4d",
+              "bytes": 39320,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "7ddd56a8fa884f16b3de5c520dffb282191078973283d3a43d4c0dd1a19cd448": {
+          "package_input_sha256": "1dbb3c720b80b4c6ee4dfb58354ca138f7393a6d659504f957771743ae711d39",
+          "manifest_sha256": "714317efebb5635660abe816709d2a7e5831cd9496bc169d2f898c4bbcf470c1",
+          "entry_source_sha256": "fdec633aa893dc52e6aa6e9ff6738e828c18aae0bc8499c1288273cdd62c99f7",
+          "outputs": [
+            {
+              "sha256": "e180135630a1c678ecee25412cf56d37d1ba2cd5961dfa11eca5eb03f57ecba9",
+              "bytes": 18824,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "b26a2f15218c3d2eba568536ca8740ea8f4c46420d2f81b3c21503293f3fcfff",
+              "bytes": 17994,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "f69ee5937f08092dff418897a1942801433096d96d8393c918dd87c9a93580db": {
+          "package_input_sha256": "a52620b5231dd7e544b7909701b9c7dd87381b2cbde37cefcd6054d5a8681561",
+          "manifest_sha256": "30a3d3032dda335327557f9b1fca7bccf70c8f46b024221fe842f8a707b6f6cf",
+          "entry_source_sha256": "7e47b7c39f11b745b4eb3d30560be80247ebaba1342c9ac62c4a8bfdd463e977",
+          "outputs": [
+            {
+              "sha256": "9bb00033554f5b34ea11e21cc2935eaa5b96dd44aefe5dabeb8ebf4fd51c1605",
+              "bytes": 572632,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "e388559692d72394fe8522c28834aab02272e70630e891cdded1a5823472db1b": {
+          "package_input_sha256": "4ae4f47cd16cdb9eb7c9c2f5d1466e3c70d7ef141279190f9923c3c75e8f1e71",
+          "manifest_sha256": "5d410962aefee7ac5916c9cdd915a717228576dbe3c8a09460fd58c4ec751e2c",
+          "entry_source_sha256": "cafe1fc6498cc4c972cabc7a6efb4e244d7d68e002eda108cfd5ae045f33331c",
+          "outputs": [
+            {
+              "sha256": "98a8211108779e8de9ce5e5e475537f6bfa63f788ef04d931de59edea1a1f3c0",
+              "bytes": 3769000,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "8cf71972ead910d1d18ef7f592669eeffc92285732656ae2dcbf3b59ed2cf703",
+              "bytes": 3455729,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "0ec7faf900e1f4f18f6eb88d0b45440f1fa7914828eb94e1cd8ce793fd9c3a30": {
+          "package_input_sha256": "3fe2142c6c17da7c9a260b794a7f03f4b8ddcab235f1850eff341cd0014f0803",
+          "manifest_sha256": "f5b86209df69360114aaee67a66c3fcd31d8c840b8f34b9ad383aacd63cd15da",
+          "entry_source_sha256": "b519427535b1855bbe8c3d0517b2f3d04a607cf0cb4327cc716cd5d90da5dbf1",
+          "outputs": [
+            {
+              "sha256": "d79e2d2ed980d12e8dab9f6d58a05baa2dd301b65a2995107ae7b08b0a3c5bf1",
+              "bytes": 1010688,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "ac66138ca0614cfb50efa8d67924edbcdd212fa3f7f8746f488fad34e9c1a18f",
+              "bytes": 653593,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "e56a26f4e23290743f7bfdb0ea6bdbf9bafb21067b358c2779413e4667f7ec3b": {
+          "package_input_sha256": "7736d75ab736bcf452feaa93acd77b10598e8a4ddd8858b3a50706e1e979db28",
+          "manifest_sha256": "562e660adbb084de042fc9ecc5ac7ba32b5f565d53188823bab9159a027b2b44",
+          "entry_source_sha256": "f8d141a1ba6b1996b33eb34669786ef389d4d5226edad46cec22a561588c324b",
+          "outputs": [
+            {
+              "sha256": "716e8b4fa61d5c030864be54218f769f1c7965dc6b01e9a24618b97187c51ece",
+              "bytes": 386880,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "8ebb36913d583687c4acdaf0f520d8262ff2cc9e9609503d9338cf77946c83aa",
+              "bytes": 221882,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "93c4ec7e47ffb8e3e8358061c1339b4abbb58fd68d5062d84e662c4958e277df": {
+          "package_input_sha256": "b0b13a4a0d5627b6af6cc2ec5c185c197e7f155234895236db56a6f704ac7a10",
+          "manifest_sha256": "f57824af546c008210d8d6d63bc0fe866a3887d06100469448de3432ffa108ec",
+          "entry_source_sha256": "f7609b919173e7121493266d0f89db724a1e47bb105ebd05397f869639603eec",
+          "outputs": [
+            {
+              "sha256": "d85bff96bdbaa495748bc6e281bafb53dcb38e8b3580e7e8e06ccfed5540c894",
+              "bytes": 595376,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "256358bf6232530523dbd215e77f9647f748504dc268cf4808e5750a5500f94e": {
+          "package_input_sha256": "d57679b744b15a4ba79a584df73d1c0649d1bc09a437bb5247dfecf5c37c6bff",
+          "manifest_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+          "entry_source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+          "outputs": [
+            {
+              "sha256": "1adc4cfdfad2b4c01369684442e75edef0f35c4134c3f4dbdff63f24edfcba80",
+              "bytes": 6532448,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "f94c2a5e2222d3117234ce8c558fe84057054c9a1222f399409664a82f15110d",
+              "bytes": 563266,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "7b1e1fd1e6678c0b1bdb0d9598f0f86fe983755011ce646c13ee173d0a677f78": {
+          "package_input_sha256": "ba8c0bdc08669708ca42729fcc497d08e6a0e8314a554190a10d8193fb2ae40d",
+          "manifest_sha256": "a25f16ccaa127602fc0cc9d1c80186619a0b8f42331a27b6f04b6bfa4aa29de2",
+          "entry_source_sha256": "abcf06f19da51626d557d8f53955b3361a3f2a86a89227600d01f2d5c2f5562f",
+          "outputs": [
+            {
+              "sha256": "8706590170f20f0b89447d6e5d8331f08ae8127fd08dbe2476e7f4ad932d5763",
+              "bytes": 62576,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "b596de6aeede451d9f3f35c64b0da9b0cc4306737c8be31d843179e72153be22",
+              "bytes": 16112,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "392a57405725280dc2b9990080c84129e283753538aa27303e1a031f6a30458b": {
+          "package_input_sha256": "b0b13a4a0d5627b6af6cc2ec5c185c197e7f155234895236db56a6f704ac7a10",
+          "manifest_sha256": "f57824af546c008210d8d6d63bc0fe866a3887d06100469448de3432ffa108ec",
+          "entry_source_sha256": "7c1bae7844fd63bfdab112e8b3bfa443f7bc7e6b78e59c33b0a162509c855d65",
+          "outputs": [
+            {
+              "sha256": "88765d2398a21e1fc8729f686d427fc33d4d575d37ed711691da05f4c861e339",
+              "bytes": 7399264,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d5eca7d84ad52e26fe63ffca2a1e9a54805ffd7e82515d22ea2bc6259765f3bb",
+              "bytes": 4682891,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "0bbca5c01c1683f02bb4bdc7ea603c99088b4e87328d75579cebdb986737811f": {
+          "package_input_sha256": "a52620b5231dd7e544b7909701b9c7dd87381b2cbde37cefcd6054d5a8681561",
+          "manifest_sha256": "30a3d3032dda335327557f9b1fca7bccf70c8f46b024221fe842f8a707b6f6cf",
+          "entry_source_sha256": "c9bc3d8a2c1b067b15988ee7c0c40a5e62762da910d4f0174f06ed1bc262fe06",
+          "outputs": [
+            {
+              "sha256": "320e573aae1aa6aa12c6921382a717dcb354359e42a7bb53d65b80dedb8d81f4",
+              "bytes": 1440296,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "502b3d18e95ef1348f803e9eb5e0024445fb0ee01cd647ffd533dab9bdc371bc",
+              "bytes": 791560,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9b589157ccae51ced6f1ad9367c1e63f4b935715b79aadd6adee25f3acce96ce": {
+          "package_input_sha256": "ccec92286fdb20454fb3214b05abb95c36bfec7174e45570229cf9e562239dc2",
+          "manifest_sha256": "08a35c14efa4b083210613451d339b9c9921b3b6fd7464a998b246a1980e0690",
+          "entry_source_sha256": "0c9e28215cbbf11ebf1267b7f37eb59cc2f25a397f2f722a3dba2f83f125d701",
+          "outputs": [
+            {
+              "sha256": "987f7a594cca22873ffa1af0c5d56c113418814d97da718111e915c2ca183987",
+              "bytes": 6818696,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "b80c1dfe3c6b0289f8b09f8b684f643f017db6ded4f1c83757af2acab93d465e",
+              "bytes": 6434195,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "f15fe882082968044d2a7c46ddc1acdaf92309546a650ca7555fe1ecabe3671d": {
+          "package_input_sha256": "76c89c4dbd0e19bea82bd7afe779e7545d00ad9aa7cb0583001065f1ce32fc86",
+          "manifest_sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec",
+          "entry_source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+          "outputs": [
+            {
+              "sha256": "921b64fb725b27430da4a1e6ace303ca3175fa57c1f282bc9680301f650178a6",
+              "bytes": 15009872,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "00319d73010fbeceaabd9eec1ae7fc5cfacef74fac880b4109c5002a963399f7",
+              "bytes": 6169538,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "3b0a616bc794411298639db60d612ac71e89d69ba7faeecf17dfcbc866a2ba2b": {
+          "package_input_sha256": "38f83034a8abe013e0d89d58d0ebc21fb2c2531102274efda45407baabb8adeb",
+          "manifest_sha256": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6",
+          "entry_source_sha256": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a",
+          "outputs": [
+            {
+              "sha256": "ea60b645033b99d107829253b69906536a66ca352643c87298decbb64e60e418",
+              "bytes": 1904208,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d0b788de6dff7f7e58b99ca7cbe799f1b5658c149370a9bde81c28b8bf3bd61a",
+              "bytes": 294323,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "d5468922259d617f48b7372905863181e33a0efc96d97e4f0d283c1ba5d495fa": {
+          "package_input_sha256": "58c16540f914018d93b25aa884f7505cca82ffc400114a35734ae32160b8248a",
+          "manifest_sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54",
+          "entry_source_sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "outputs": [
+            {
+              "sha256": "487221b324cdc4ff3f5d312be7306b0c800c147d9bb430aa0c86ed4f130f5170",
+              "bytes": 1439504,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "6deb898bfddf677d3489d560422b5d48296cb428c094be07791c9a72cfe3e8fc",
+              "bytes": 74319,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "228d74009cebfcc3130802ca78e9ce82a33e04460ca2b9164136d99695f57dae": {
+          "package_input_sha256": "863d4299d363e6a2546cfa7881f3e5afd6414d8472827ef548fc73a517955440",
+          "manifest_sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44",
+          "entry_source_sha256": "9c87316d1358df4d45c47f32a283eacef45b5331d99e7337d4ff80ad5d809888",
+          "outputs": [
+            {
+              "sha256": "9e051079b757c7e06f6cc9d5def51f7bde271dce0615828c27908f8f341b4ea5",
+              "bytes": 4511056,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "97c660ee245f2e91d211f72cd4d69ebad904b303c4f7d051e72f22f137b65d61",
+              "bytes": 239590,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "bfe4efa1f0e2662e428e35b45b7c67c63e701e360f6648e63da289d7ac59ca37": {
+          "package_input_sha256": "c216d76687c41e03aa060e380f1089758e2bf09712afe34745baeb52b5f5fb00",
+          "manifest_sha256": "ec4874833178228f469757f2a652bb9f16408cd2bcdfa0552e75c94e216d76d4",
+          "entry_source_sha256": "5f375e273e59c81368b0874cffb188b45b8880b8484e0d56ed3c9d454780bb84",
+          "outputs": [
+            {
+              "sha256": "25f4536bcb736805e002482f416b283e9c63a12e005b083d93ce2006cd40fce5",
+              "bytes": 958232,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "51433d64071f566891ed485639f33acfbffc16e672f890c4ced3b644f5d8776c",
+              "bytes": 514226,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        }
+      },
+      "variant": "baseline",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "compiled_cases": [
+        "body::tests::a_base_found_far_from_home_is_taken_hold_of_where_it_lies_only_with_limp",
+        "body::tests::a_base_held_gently_by_a_hand_is_not_sent_back_into_it",
+        "body::tests::a_base_still_pushed_a_second_after_it_stopped_makes_the_lamp_slump_as_v1",
+        "body::tests::a_base_that_meets_a_hand_is_not_swayed_on_by_expression",
+        "body::tests::a_base_that_sticks_34_behind_a_slow_goal_is_led_round_and_settles",
+        "body::tests::a_base_turned_300_counts_comes_home_without_moving_away_or_faster_than_waking",
+        "body::tests::a_base_turning_to_a_face_that_meets_a_hand_is_left_where_it_is",
+        "body::tests::a_body_with_eyes_says_why_it_does_not_look",
+        "body::tests::a_call_is_glanced_for_over_a_shift_at_rest",
+        "body::tests::a_conversation_nod_playing_when_a_conversation_begins_plays_on",
+        "body::tests::a_cool_joint_glitching_at_random_one_read_in_27_runs_ten_minutes",
+        "body::tests::a_cool_joint_glitching_one_read_in_27_runs_on_for_a_minute",
+        "body::tests::a_cool_joint_glitching_within_the_flap_window_runs_ten_minutes",
+        "body::tests::a_failed_read_again_after_a_hot_first_read_is_refused_and_let_go",
+        "body::tests::a_fast_rise_after_a_low_first_read_still_stops_near_the_limit",
+        "body::tests::a_fault_while_lowering_the_shoulder_stands_whatever_its_hold",
+        "body::tests::a_first_read_at_the_limit_then_one_below_starts_as_usual",
+        "body::tests::a_flag_that_stays_or_a_missing_home_keeps_it_folded_and_it_runs_as_before",
+        "body::tests::a_flag_while_a_standing_lamp_folds_writes_that_joint_nothing_more",
+        "body::tests::a_folded_elbow_lifted_and_held_by_a_hand_goes_back_down_once_let_go",
+        "body::tests::a_folded_lamp_listens_thinks_speaks_and_comes_home",
+        "body::tests::a_folded_lamp_whose_elbow_temperature_is_unreadable_lets_go",
+        "body::tests::a_folded_lamps_warm_shoulder_is_not_read_again",
+        "body::tests::a_force_limit_is_written_to_the_joints_that_carry_the_lamp_and_read_back",
+        "body::tests::a_force_limit_that_is_not_kept_ends_the_run_before_anything_moves",
+        "body::tests::a_force_limited_arm_lets_go_at_80_percent_of_its_limit",
+        "body::tests::a_gesture_asked_as_the_lamp_would_fold_keeps_it_up_until_it_ends",
+        "body::tests::a_gesture_asked_as_the_reading_lean_eases_in_holds_it_where_it_was",
+        "body::tests::a_gesture_asked_higher_ends_the_one_playing_and_one_asked_no_higher_is_dropped",
+        "body::tests::a_gesture_asked_of_a_folded_lamp_stands_it_up_and_then_plays",
+        "body::tests::a_gesture_asked_while_the_lamp_rises_for_a_turn_plays",
+        "body::tests::a_gesture_dropped_or_ended_is_told_whose_it_was_and_who_holds_the_body",
+        "body::tests::a_gesture_ended_for_a_higher_ask_says_dropped_not_over",
+        "body::tests::a_gesture_past_v1s_tip_over_line_is_refused_whole_and_one_inside_it_plays",
+        "body::tests::a_gesture_the_anti_tip_rule_refuses_says_dropped_on_body_gesture",
+        "body::tests::a_gesture_the_lamp_never_stands_up_for_goes_stale_and_is_said",
+        "body::tests::a_gesture_waiting_when_the_lamp_is_put_to_sleep_is_dropped",
+        "body::tests::a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not",
+        "body::tests::a_glitch_of_32_between_47_and_48_is_dropped",
+        "body::tests::a_goal_register_far_from_the_arm_is_not_taken_as_its_goal",
+        "body::tests::a_hand_from_the_test_input_is_said_as_a_push",
+        "body::tests::a_hand_gone_does_not_keep_the_next_answer_from_leaning",
+        "body::tests::a_hand_holding_a_joint_off_where_it_gave_says_a_hand_until_it_lets_go",
+        "body::tests::a_hand_letting_go_mid_ease_out_leaves_no_jump",
+        "body::tests::a_hand_on_the_elbow_does_not_take_the_fold_past_its_pose",
+        "body::tests::a_hand_slump_then_an_overload_rests_and_comes_back_instead_of_ending_the_run",
+        "body::tests::a_hand_that_presses_the_base_while_the_shoulder_comes_down_lets_go_again",
+        "body::tests::a_hand_that_stops_the_shoulder_coming_down_lets_go_again_and_the_arm_stays",
+        "body::tests::a_hand_that_turns_the_base_while_the_shoulder_comes_down_lets_go_again",
+        "body::tests::a_head_creeping_back_from_a_glance_with_pauses_keeps_its_lead",
+        "body::tests::a_head_dipped_before_its_rest_has_lasted_is_led_back_up",
+        "body::tests::a_head_found_pressed_on_the_base_rises_out_of_it_slowly_and_then_runs",
+        "body::tests::a_head_found_without_torque_and_unreadable_is_left_while_the_arm_folds",
+        "body::tests::a_head_goal_past_the_servos_range_never_reaches_the_wire",
+        "body::tests::a_head_held_off_its_goal_by_a_hand_at_a_low_load_is_in_the_hand",
+        "body::tests::a_head_held_part_way_back_from_a_glance_is_not_led_into_the_hand",
+        "body::tests::a_head_held_while_it_waits_is_judged_by_the_runs_load_and_heat",
+        "body::tests::a_head_lifting_itself_after_a_slump_does_not_make_the_lamp_slump_again",
+        "body::tests::a_head_moved_and_held_or_pressed_past_its_bound_stays_held_while_the_hand_does",
+        "body::tests::a_head_resting_still_at_its_own_load_over_100_is_let_go_after_its_ease",
+        "body::tests::a_head_rising_slowly_back_from_a_glance_stays_led_until_it_arrives",
+        "body::tests::a_head_slumped_on_the_base_lifts_before_the_base_turns",
+        "body::tests::a_head_that_cannot_lift_ends_the_wake_held_where_it_is_and_says_how_far_it_got",
+        "body::tests::a_head_that_drooped_in_a_power_cut_is_lifted_home_with_lamp_52e6s_options",
+        "body::tests::a_head_that_never_moves_pressed_briefly_past_its_bound_is_let_go_after_its_ease",
+        "body::tests::a_head_that_never_moves_while_its_goal_wanders_off_is_let_go_after_its_ease",
+        "body::tests::a_head_that_settles_32_short_of_home_wakes_there_and_runs_from_where_it_is",
+        "body::tests::a_held_lean_folds_with_the_arm_without_a_jump",
+        "body::tests::a_held_shoulder_eases_out_as_an_elbow_does",
+        "body::tests::a_hold_at_a_reading_that_just_jumped_is_not_written_and_the_fault_stands",
+        "body::tests::a_hold_from_before_the_answer_does_not_keep_it_from_leaning",
+        "body::tests::a_hold_let_go_by_the_fold_eases_and_does_not_stop_the_lamp",
+        "body::tests::a_hold_let_go_by_the_rise_eases_and_does_not_stop_the_lamp",
+        "body::tests::a_home_it_is_given_is_reached_slowly_from_where_it_is_found",
+        "body::tests::a_hot_first_read_that_does_not_repeat_starts_as_usual",
+        "body::tests::a_hot_first_read_that_repeats_is_refused_as_before",
+        "body::tests::a_hot_first_read_with_one_low_glitch_read_again_is_still_refused",
+        "body::tests::a_hot_joint_whose_reads_never_settle_stops_as_unreadable",
+        "body::tests::a_joint_at_800_for_a_second_and_a_half_lets_go_of_all_five_and_is_taken_up_again_slowly",
+        "body::tests::a_joint_beyond_what_waking_brings_back_is_refused",
+        "body::tests::a_joint_flapping_between_60_and_64_stops_on_heat",
+        "body::tests::a_joint_found_without_torque_is_given_it_goal_first_and_does_not_move",
+        "body::tests::a_joint_pushing_without_moving_is_told_to_stop_after_a_second_and_a_half",
+        "body::tests::a_joint_really_at_70_after_a_first_read_of_40_still_stops_on_heat",
+        "body::tests::a_joint_still_loaded_after_it_stopped_pushing_ends_the_run",
+        "body::tests::a_joint_that_cannot_keep_up_ends_the_gesture_and_not_the_run",
+        "body::tests::a_joint_that_does_not_answer_its_first_writes_is_taken_hold_of_a_little_later",
+        "body::tests::a_joint_that_has_arrived_is_not_pushed_at_and_a_small_change_does_not_move_it",
+        "body::tests::a_joint_that_meets_resistance_stops_pushing_for_two_seconds_and_then_goes_on",
+        "body::tests::a_joint_that_moves_when_its_torque_comes_on_ends_the_run",
+        "body::tests::a_joint_that_really_warms_still_stops_after_its_hot_steps",
+        "body::tests::a_joint_warming_behind_bad_reads_stops_as_unreadable_within_a_second",
+        "body::tests::a_jump_that_stays_becomes_the_reading_and_stops_on_heat",
+        "body::tests::a_lamp_found_standing_whose_start_is_refused_folds_then_lets_go",
+        "body::tests::a_lamp_found_standing_with_a_warm_or_unreadable_elbow_folds_then_lets_go",
+        "body::tests::a_lamp_held_by_a_hand_drops_a_gesture_and_says_so",
+        "body::tests::a_lamp_is_not_stood_up_farther_back_than_v1s_line",
+        "body::tests::a_lamp_put_to_sleep_drops_a_gesture_and_says_so",
+        "body::tests::a_lamp_s_own_pitch_window_holds_the_head_and_must_fit_its_servo",
+        "body::tests::a_lean_eases_out_from_a_hand_still_there_after_the_answer",
+        "body::tests::a_lean_eases_out_from_where_a_hand_held_it",
+        "body::tests::a_let_go_run_outside_the_window_standing_or_without_folded_counts_is_refused",
+        "body::tests::a_let_go_run_outside_the_window_with_its_arm_folded_writes_torque_off_only",
+        "body::tests::a_light_head_lifted_by_hand_stays_when_told_to_and_comes_back_when_not",
+        "body::tests::a_listening_lamp_dips_its_head_for_expression_and_comes_back",
+        "body::tests::a_load_of_800_for_less_than_a_second_and_a_half_changes_nothing",
+        "body::tests::a_load_that_rises_stops_it_where_it_is_and_lets_the_whole_lamp_go",
+        "body::tests::a_lowering_that_fails_after_an_overload_ends_the_run_and_lets_the_whole_lamp_go",
+        "body::tests::a_mood_that_stops_arriving_is_rest",
+        "body::tests::a_new_flag_a_moved_elbow_or_a_hot_joint_stops_it",
+        "body::tests::a_nod_right_after_a_hand_lets_go_of_the_arm_does_not_stop_the_lamp",
+        "body::tests::a_nod_says_began_and_then_over_on_body_gesture",
+        "body::tests::a_pause_after_a_gesture_was_taken_drops_it_and_the_lamp_folds",
+        "body::tests::a_pause_during_a_second_gesture_after_the_first_ended_still_folds",
+        "body::tests::a_pause_during_the_rise_says_dropped_on_body_gesture",
+        "body::tests::a_pause_while_the_gesture_it_stood_up_for_plays_lets_it_end_and_folds",
+        "body::tests::a_paused_lamp_drops_a_gesture_and_says_so",
+        "body::tests::a_paused_skill_or_idle_gesture_ends_when_the_lamp_answers_and_eases_out",
+        "body::tests::a_pinned_pitch_held_thirteen_counts_away_still_says_a_hand_before_slump",
+        "body::tests::a_pitch_contact_during_glance_cooling_is_said_as_a_hand_before_it_slumps",
+        "body::tests::a_press_on_a_held_joint_while_the_shoulder_comes_down_is_in_the_peaks",
+        "body::tests::a_press_that_stops_the_lowering_while_a_joint_reads_off_never_holds_the_misread",
+        "body::tests::a_reading_lamp_keeps_its_lean_through_a_gesture",
+        "body::tests::a_reading_lamp_looks_down_at_the_desk_holds_it_and_comes_back",
+        "body::tests::a_reading_lamp_makes_the_whole_of_a_gestures_pitch",
+        "body::tests::a_reading_lamp_turns_toward_the_place_it_is_asked_and_back",
+        "body::tests::a_resting_arm_goal_more_than_a_step_away_is_refused_not_eased_toward",
+        "body::tests::a_resting_head_back_within_its_way_after_a_glance_is_not_led",
+        "body::tests::a_resting_head_dipped_by_a_glance_is_led_back_up_where_it_stops_short_lifting",
+        "body::tests::a_resting_joint_jittering_inside_its_band_never_says_a_hand",
+        "body::tests::a_resting_lamp_glances_with_the_switch_and_comes_back_to_rest",
+        "body::tests::a_run_that_is_not_only_a_let_go_outside_the_window_is_still_refused",
+        "body::tests::a_search_does_not_turn_toward_the_side_a_face_is_seen_on",
+        "body::tests::a_seated_lamp_at_1755_with_home_1760_wakes_home_and_without_waking_is_refused",
+        "body::tests::a_second_gesture_asked_while_the_lamp_rises_for_the_first_plays",
+        "body::tests::a_shift_starts_and_ends_at_expressions_rest_offset",
+        "body::tests::a_short_push_a_contact_floor_and_the_arm_under_a_hand",
+        "body::tests::a_shoulder_already_pushed_when_the_lamp_stands_learns_no_load_and_still_stops",
+        "body::tests::a_shoulder_flapping_between_55_and_61_runs_20_minutes_judged_at_61",
+        "body::tests::a_shoulder_left_up_by_a_power_cut_is_lowered_first_and_the_lamp_may_then_stand",
+        "body::tests::a_shoulder_lowered_in_a_start_after_a_wait_is_watched_each_step",
+        "body::tests::a_shoulder_reading_150_degrees_once_is_counted_and_never_a_peak",
+        "body::tests::a_shoulder_resting_short_at_the_same_place_is_counted_once",
+        "body::tests::a_shoulder_that_stops_short_while_lowered_is_let_go_and_waited_for",
+        "body::tests::a_shoulder_that_will_not_come_down_ends_the_run_and_lets_the_whole_lamp_go",
+        "body::tests::a_skill_asked_while_a_conversation_gesture_waits_is_dropped",
+        "body::tests::a_skill_gesture_eases_out_on_the_very_step_the_listening_mood_is_read",
+        "body::tests::a_skill_gesture_paused_for_a_line_left_alone_goes_on_where_it_was",
+        "body::tests::a_skill_gesture_paused_three_seconds_or_more_ends",
+        "body::tests::a_skill_gesture_pauses_on_the_very_step_the_listening_mood_is_read",
+        "body::tests::a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out",
+        "body::tests::a_skill_gesture_playing_ends_when_a_hand_comes_on_the_lamp",
+        "body::tests::a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input",
+        "body::tests::a_skill_gesture_still_waiting_is_dropped_when_a_hand_comes_on_the_lamp",
+        "body::tests::a_skill_move_asked_while_a_hand_holds_the_lamp_is_dropped_by_the_hand",
+        "body::tests::a_skill_move_ended_for_a_conversation_gesture_eases_out_and_then_it_plays",
+        "body::tests::a_skill_or_idle_gesture_playing_ends_when_a_conversation_begins_and_eases_out",
+        "body::tests::a_skills_move_plays_as_a_kept_move_does_and_one_past_v1s_line_is_refused",
+        "body::tests::a_slump_during_an_ease_back_leaves_no_offset_after_the_take_up",
+        "body::tests::a_slumped_lamp_is_not_stood_up_by_a_gesture",
+        "body::tests::a_small_glitch_near_the_limit_then_a_flicker_down_is_not_heat",
+        "body::tests::a_speaking_lamp_leans_in_and_back_and_its_base_sways_for_expression",
+        "body::tests::a_speaking_lamp_still_lets_its_lean_go_for_a_gesture",
+        "body::tests::a_speaking_lean_and_an_arbitration_ease_out_never_step_past_the_arm",
+        "body::tests::a_standing_arm_carrying_its_own_weight_counts_no_stall_and_a_push_well_over_it_counts_one",
+        "body::tests::a_standing_lamp_nods_and_is_left_exactly_where_it_was",
+        "body::tests::a_standing_lamp_put_to_sleep_drops_a_gesture_as_it_folds",
+        "body::tests::a_standing_lamp_whose_elbow_temperature_is_unreadable_folds_then_lets_go",
+        "body::tests::a_standing_pose_is_taken_only_inside_its_caps",
+        "body::tests::a_standing_session_never_moves_an_arm_goal_more_than_a_step_a_write",
+        "body::tests::a_standing_shoulder_pushing_short_of_its_goal_is_told_to_stop_and_keeps_its_torque",
+        "body::tests::a_steady_wrong_elbow_reading_as_the_arm_comes_to_rest_is_not_its_resting_goal",
+        "body::tests::a_steady_wrong_elbow_reading_before_cancelled_is_not_written_at_the_exit",
+        "body::tests::a_steady_wrong_elbow_reading_under_load_as_the_arm_comes_to_rest_is_not_its_resting_goal",
+        "body::tests::a_step_says_a_hand_while_a_joint_is_held_where_it_gave_way_and_never_without_one",
+        "body::tests::a_surprise_while_a_standing_lamp_folds_keeps_it_folding_then_lets_go",
+        "body::tests::a_sustained_gentle_push_is_said_until_the_hand_lets_go",
+        "body::tests::a_true_value_settles_through_glitches_after_a_low_first_read",
+        "body::tests::a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps",
+        "body::tests::a_wire_failing_mid_lean_keeps_the_lean_as_it_stands",
+        "body::tests::a_wire_that_fails_for_a_moment_is_ridden_out",
+        "body::tests::a_wire_that_goes_silent_stops_it_after_half_a_second",
+        "body::tests::after_a_wait_its_run_is_watched_without_a_gap",
+        "body::tests::an_arm_found_off_its_way_is_not_lowered_and_the_lamp_runs_folded",
+        "body::tests::an_arm_goal_farther_than_a_hold_release_is_refused_not_eased_toward",
+        "body::tests::an_arm_goal_is_never_more_than_a_step_from_the_last_unless_it_holds_where_the_arm_is",
+        "body::tests::an_arm_goal_outside_its_window_is_not_eased_toward",
+        "body::tests::an_arm_goal_outside_its_window_never_reaches_the_wire",
+        "body::tests::an_arm_goal_refused_in_a_step_ends_the_run_at_that_step",
+        "body::tests::an_arm_held_while_it_speaks_is_not_leaned_into_again",
+        "body::tests::an_arm_joint_taken_hold_of_outside_its_window_is_not_given_that_goal",
+        "body::tests::an_arm_pose_whose_window_would_reach_the_seam_is_refused",
+        "body::tests::an_arm_resting_short_of_its_fold_and_pushing_is_left_where_it_lies",
+        "body::tests::an_arm_still_strained_two_seconds_on_ends_the_run_where_it_is",
+        "body::tests::an_arm_that_strains_goes_back_down_and_stays_down_for_a_while",
+        "body::tests::an_arm_that_sways_7_counts_as_the_base_wakes_is_let_and_one_that_moves_20_is_not",
+        "body::tests::an_ask_dropped_as_busy_says_dropped",
+        "body::tests::an_ask_dropped_as_held_by_a_hand_says_dropped",
+        "body::tests::an_elbow_goal_register_past_its_range_is_never_written_as_a_goal",
+        "body::tests::an_elbow_pushing_under_an_old_overload_is_told_to_stop_and_then_carries_the_lamp",
+        "body::tests::an_elbow_read_far_off_in_the_last_step_is_not_written_back_at_the_exit",
+        "body::tests::an_elbow_read_past_its_range_just_before_cancelled_is_never_written_as_a_goal",
+        "body::tests::asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop",
+        "body::tests::asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop",
+        "body::tests::asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop",
+        "body::tests::asleep_a_gesture_asked_higher_does_not_end_the_one_playing",
+        "body::tests::at_rest_a_joint_that_stopped_short_is_no_longer_pushed",
+        "body::tests::bad_temperatures_in_a_row_do_not_stop_the_run",
+        "body::tests::called_with_a_face_in_view_it_does_not_glance_and_speaking_it_takes_no_call",
+        "body::tests::called_with_nobody_in_view_it_rises_and_glances_once",
+        "body::tests::every_step_can_be_watched_with_the_mood_it_acted_on",
+        "body::tests::expression_is_held_to_its_own_reach_and_the_joints_and_does_not_stir_a_resting_lamp",
+        "body::tests::found_standing_it_is_taken_as_it_is_and_folds_down_when_asked_to_stop",
+        "body::tests::found_standing_out_of_range_it_is_refused_as_before_and_not_let_go",
+        "body::tests::garbage_with_one_good_read_in_50_still_stops_within_seconds",
+        "body::tests::held_reads_after_a_hot_streak_do_not_add_to_the_arm_heat_streak",
+        "body::tests::held_reads_after_a_hot_streak_do_not_add_to_the_head_heat_streak",
+        "body::tests::it_does_not_shift_while_talked_to_folded_or_held",
+        "body::tests::it_does_not_start_on_a_lamp_that_is_not_as_expected",
+        "body::tests::it_shifts_over_expressions_rest_stream_and_not_while_held_still_or_paused",
+        "body::tests::it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there",
+        "body::tests::let_go_standing_with_the_arm_still_up_nothing_is_lowered_and_it_stands_from_there",
+        "body::tests::let_go_standing_with_the_elbow_fallen_it_is_folded_and_stands_again_when_spoken_to",
+        "body::tests::lone_flaps_around_a_good_value_that_returns_still_stop",
+        "body::tests::no_shift_starts_within_thirty_seconds_of_a_drift",
+        "body::tests::nobody_setting_it_straight_it_stops_asking_and_reads_less",
+        "body::tests::off_is_the_body_before_give_way_was_on_by_default",
+        "body::tests::one_bad_read_of_a_joint_is_counted_and_skipped",
+        "body::tests::one_hot_reading_while_it_moves_is_not_heat",
+        "body::tests::one_reading_off_while_the_shoulder_comes_down_is_not_a_hand",
+        "body::tests::paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds",
+        "body::tests::put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_now",
+        "body::tests::reads_within_the_flap_window_of_a_stale_good_one_still_stop",
+        "body::tests::refused_for_its_pose_it_lets_go_says_so_and_stays_let_go_while_out_of_range",
+        "body::tests::refused_with_its_head_tipped_up_it_keeps_holding_the_head",
+        "body::tests::resistance_for_the_fourth_time_in_a_minute_ends_the_run",
+        "body::tests::set_back_in_range_it_takes_hold_where_it_is_and_starts_by_itself",
+        "body::tests::shifts_at_rest_and_the_call_are_not_from_outside",
+        "body::tests::spoken_to_in_the_middle_of_a_shift_it_lets_it_go_at_once",
+        "body::tests::spoken_to_it_stands_up_and_left_alone_it_folds_down_again",
+        "body::tests::standing_with_nothing_to_do_it_shifts_rarely_and_irregularly",
+        "body::tests::stationary_pressure_clears_within_one_tick_after_load_and_displacement_clear",
+        "body::tests::stationary_pressure_remains_a_hand_when_it_eases_above_half_the_bound",
+        "body::tests::stood_up_the_head_may_look_down_as_far_as_up_and_folded_it_may_not",
+        "body::tests::stood_up_the_head_tilts_to_listen_and_folded_it_does_not",
+        "body::tests::the_arm_is_taken_hold_of_only_on_a_lamp_that_may_stand",
+        "body::tests::the_eyes_take_the_head_further_round_than_any_pose_does",
+        "body::tests::the_fold_line_counts_a_sit_down_for_a_strain_on_the_way_up_or_standing",
+        "body::tests::the_gesture_pause_is_on_for_on_only",
+        "body::tests::the_head_keeps_its_folded_pose_until_the_arm_has_lifted_it_clear",
+        "body::tests::the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up",
+        "body::tests::the_heads_pitch_never_passes_its_window_however_it_is_found",
+        "body::tests::the_hold_after_a_surprise_writes_the_arm_where_it_was_last_read",
+        "body::tests::the_ranges_waited_for_are_the_starts_own_bounds",
+        "body::tests::the_three_writes_are_exactly_these_bytes",
+        "body::tests::the_two_writes_of_a_lamp_that_stands_are_exactly_these_bytes",
+        "body::tests::three_bad_reads_of_a_joint_in_a_row_stop_the_body_naming_it",
+        "body::tests::three_bad_reads_while_let_go_stop_the_body_on_the_third",
+        "body::tests::three_bad_reads_while_lowering_the_shoulder_stop_the_body_on_the_third",
+        "body::tests::three_bad_reads_while_waking_stop_the_body_on_the_third",
+        "body::tests::three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run",
+        "body::tests::told_to_return_a_base_turned_by_hand_under_its_load_gives_way_and_comes_back",
+        "body::tests::told_to_return_a_head_tilted_and_held_by_hand_gives_way_again_and_comes_back",
+        "body::tests::told_to_stay_a_head_moved_by_hand_stays_and_the_next_mood_is_relative_to_it",
+        "body::tests::told_to_stay_a_head_pushed_past_its_reach_is_kept_at_the_edge",
+        "body::tests::told_to_stay_a_short_push_still_gives_way_and_comes_back",
+        "body::tests::two_fates_in_one_step_are_both_kept",
+        "body::tests::two_first_reads_of_150_then_45_start_as_usual_standing",
+        "body::tests::unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off",
+        "body::tests::unplug_brings_a_base_looking_aside_home_before_it_attests",
+        "body::tests::unplug_during_hand_recovery_wake_stops_before_it_finishes",
+        "body::tests::unplug_during_startup_wake_stops_automatic_motion",
+        "body::tests::unplug_during_take_hold_retry_never_turns_torque_back_on",
+        "body::tests::unplug_folds_now_and_latches_over_later_inputs",
+        "body::tests::unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold",
+        "body::tests::unplug_never_attests_an_arm_stuck_away_from_its_fold",
+        "body::tests::unplug_ready_stays_ready_through_a_second_turn",
+        "body::tests::unplug_ready_survives_a_bad_read",
+        "body::tests::unplug_released_stands_through_the_ordinary_rise_unless_paused",
+        "body::tests::waking_on_a_lamp_found_as_expected_writes_exactly_what_it_did_without",
+        "body::tests::with_eyes_the_head_turns_to_the_face_while_it_listens_and_not_beyond_its_reach",
+        "body::tests::with_waking_a_head_held_35_short_at_rest_rests_where_it_is",
+        "body::tests::without_a_face_or_without_eyes_nothing_is_added_to_what_the_mood_wants",
+        "body::tests::without_a_window_of_its_own_the_lamp_runs_exactly_as_before",
+        "body::tests::without_the_switch_a_called_lamp_writes_exactly_as_one_never_called",
+        "body::tests::without_the_switch_a_resting_lamp_writes_exactly_as_when_nothing_is_asked",
+        "body::tests::woken_after_a_hands_sleep_it_stands_at_once",
+        "bus_out::tests::a_body_let_go_for_its_pose_says_what_it_asks",
+        "bus_out::tests::a_body_let_go_reports_once_per_change_and_slowly_again",
+        "bus_out::tests::a_drop_says_whose_it_was_why_and_who_holds_the_body_only_when_telling",
+        "bus_out::tests::a_fold_is_said_once_when_it_ends_with_its_time_and_the_joints",
+        "bus_out::tests::a_fold_that_rises_again_is_not_said_and_a_retreat_on_the_way_is",
+        "bus_out::tests::a_gesture_that_replaces_another_says_the_first_over_and_a_stop_ends_the_last",
+        "bus_out::tests::a_hand_after_a_slow_joints_write_is_aged_by_it",
+        "bus_out::tests::a_hand_that_waited_in_the_queue_is_not_said_as_fresh",
+        "bus_out::tests::a_paused_body_says_paused_and_nothing_else_changes",
+        "bus_out::tests::a_thread_with_no_room_costs_the_loop_a_step_and_never_a_wait",
+        "bus_out::tests::how_fast_each_joint_turns_is_worked_out_from_the_step_before",
+        "bus_out::tests::only_a_let_go_bodys_ask_is_an_ask",
+        "bus_out::tests::steps_offered_reach_the_bus_and_the_last_word_is_why_it_stopped",
+        "bus_out::tests::tell_says_the_journal_lines_and_publishes_every_piece",
+        "bus_out::tests::the_bad_reads_are_said_at_the_first_step_and_every_five_minutes",
+        "bus_out::tests::the_body_is_well_unless_a_joint_is_warm_or_one_lately_met_resistance",
+        "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+        "bus_out::tests::the_joints_are_named_in_servo_order_in_radians_from_the_middle_of_the_turn",
+        "bus_out::tests::what_became_of_each_gesture_is_said_on_body_gesture_whatever_the_step",
+        "bus_out::tests::why_the_body_stopped_is_said_in_words_and_only_being_asked_is_not_a_fault",
+        "clips::tests::a_clip_is_read_between_its_frames_and_is_over_at_its_end",
+        "clips::tests::every_clip_begins_and_ends_at_nothing_and_stays_inside_its_speed_and_size",
+        "clips::tests::the_small_moves_at_rest_move_the_head_alone_inside_a_glance_at_rest",
+        "cog::tests::a_count_outside_the_servos_range_is_refused_not_clamped",
+        "cog::tests::a_step_that_would_lean_back_past_the_ceiling_is_cut_short_as_v1_cut_it",
+        "cog::tests::every_built_in_clip_passes_v1s_rule",
+        "cog::tests::the_centre_of_gravity_is_v1s_on_the_motor_readings_v1_was_checked_on",
+        "exit_report::tests::a_body_older_than_the_temperature_fields_still_reads",
+        "exit_report::tests::a_truncated_newest_report_is_said_not_replaced_by_an_older_one",
+        "exit_report::tests::lamp_4ace_1525_reads_as_plain_lines",
+        "exit_report::tests::the_last_report_wins_and_none_is_none",
+        "expression_in::tests::a_request_that_is_stale_out_of_order_or_not_of_this_machine_is_not_taken",
+        "expression_in::tests::stillness_adds_nothing_and_a_request_is_not_applied_before_its_time",
+        "expression_in::tests::what_is_asked_counts_until_it_runs_out_and_is_given_in_counts",
+        "first_stand::tests::a_body_that_never_ends_is_killed_past_its_bound",
+        "first_stand::tests::a_brush_is_not_the_yes_and_an_unknown_state_breaks_a_hold",
+        "first_stand::tests::a_busy_rooms_ask_names_the_touch_alone",
+        "first_stand::tests::a_put_off_is_no_yes",
+        "first_stand::tests::a_short_yes_is_a_yes_and_anything_that_takes_it_back_is_not",
+        "first_stand::tests::a_spoken_yes_is_taken_only_after_the_ask_alone_and_with_someone_near",
+        "first_stand::tests::a_stopped_body_is_waited_for_while_it_folds",
+        "first_stand::tests::a_touch_held_a_second_after_a_release_is_the_yes",
+        "first_stand::tests::an_armed_stop_takes_the_first_touch",
+        "first_stand::tests::controls_not_ready_are_not_known",
+        "first_stand::tests::controls_unknown_for_a_second_while_it_moves_stop_it",
+        "first_stand::tests::near_is_a_fresh_face_big_enough",
+        "first_stand::tests::no_tail_of_the_ask_is_a_yes",
+        "first_stand::tests::the_confirmed_file_has_this_arms_stand_and_says_so",
+        "first_stand::tests::the_joined_line_is_judged_not_each_piece",
+        "first_stand::tests::the_lamp_asks_twice_at_most_ten_minutes_apart_and_never_after_a_stand",
+        "first_stand::tests::the_lamps_own_words_are_never_its_yes",
+        "first_stand::tests::the_record_says_its_outcome_in_words",
+        "first_stand::tests::the_spoken_yes_is_turned_off_only_by_off",
+        "first_stand::tests::the_stand_is_read_from_the_last_full_stand_line",
+        "first_stand::tests::the_stop_is_any_new_touch_after_the_yes_is_let_go",
+        "first_stand::tests::what_the_voice_hears_is_subscribed_by_this_name",
+        "gaze::stray::a_turn_toward_a_place_is_the_turn_to_a_face_seen_there",
+        "gaze::stray::one_stray_sight_among_three_moves_nothing",
+        "gaze::tests::a_gain_set_too_high_still_settles_and_the_reach_is_never_passed",
+        "gaze::tests::it_does_not_correct_from_a_moving_picture_or_while_it_thinks_or_rests",
+        "gaze::tests::it_turns_to_a_face_in_a_few_corrections_and_then_keeps_still",
+        "gaze::tests::the_datagram_is_the_one_the_eyes_send_and_a_gaze_is_taken_only_inside_its_caps",
+        "gaze::tests::with_nobody_there_it_does_nothing_and_after_a_while_lets_go",
+        "gesture::tests::every_pose_stays_within_a_few_degrees_of_where_the_head_was_found",
+        "gesture::tests::listening_lifts_and_tilts_and_the_side_alternates_between_exchanges",
+        "gesture::tests::rest_is_exactly_where_it_was_found",
+        "gesture::tests::speaking_nods_on_the_voice_and_settles_when_it_is_steady",
+        "gesture::tests::the_look_away_is_a_glance_that_deepens_only_while_the_thinking_goes_on",
+        "hold_in::tests::only_held_as_the_first_word_holds_the_head",
+        "hold_in::tests::the_file_is_read_at_most_every_tenth_of_a_second_and_none_is_free",
+        "idle::tests::a_move_is_seldom_the_one_before_and_all_of_them_come",
+        "idle::tests::two_moves_do_not_take_strict_turns",
+        "idle::tests::waits_are_irregular_and_inside_their_bounds",
+        "inspection::tests::a_latched_status_flag_ends_the_plan_at_that_joint_unless_faults_are_reported",
+        "inspection::tests::all_partial_write_and_read_sizes_preserve_exact_requests",
+        "inspection::tests::bytes_returned_after_deadline_are_counted_but_never_decoded",
+        "inspection::tests::cancellation_before_and_during_transaction_stops_all_future_requests",
+        "inspection::tests::cancellation_observed_after_write_keeps_accepted_count_but_discards_reply",
+        "inspection::tests::checksum_noise_and_missing_joint_are_explicit_failures",
+        "inspection::tests::clock_regression_and_failed_cancellation_source_cannot_admit_another_operation",
+        "inspection::tests::continuous_initial_traffic_never_reaches_a_request",
+        "inspection::tests::duplicate_reply_faults_instead_of_starting_another_request",
+        "inspection::tests::finite_plan_sends_only_ten_read_only_requests_and_decodes_30_replies",
+        "inspection::tests::initial_stale_bytes_are_counted_not_accepted_as_replies",
+        "inspection::tests::operation_budget_terminates_even_if_clock_and_poll_never_advance",
+        "inspection::tests::partial_write_cannot_accept_an_early_stale_response",
+        "inspection::tests::read_only_profile_window_reports_all_raw_bytes_without_scale_or_write",
+        "inspection::tests::telemetry_target_reports_measured_delay_separately_from_fault_deadline",
+        "inspection::tests::timed_out_request_is_not_retried_and_late_reply_is_not_reused",
+        "inspection::tests::truncated_reply_deadline_keeps_partial_count_and_never_returns_a_snapshot",
+        "inspection::tests::unknown_model_stops_before_using_sts_specific_register_decoders",
+        "inspection::tests::write_zero_and_busy_writer_are_bounded_not_retried_as_new_transactions",
+        "moves::tests::a_folder_of_moves_is_read_in_file_order_and_each_plays_as_a_gesture",
+        "moves::tests::a_folder_that_cannot_be_read_is_an_error_and_an_oversized_one_is_refused_whole",
+        "moves::tests::a_move_sent_whole_is_checked_as_a_file_is_and_kept_once",
+        "moves::tests::a_move_the_body_cannot_play_is_refused_with_why_and_the_rest_are_taken",
+        "moves::tests::a_source_is_kept_whole_up_to_64_printable_bytes_or_not_at_all",
+        "moves::tests::the_documented_example_is_a_move_this_body_takes",
+        "moves::tests::the_promise_is_the_built_in_clips_own",
+        "name_in::tests::only_a_sound_and_recent_hearing_is_a_call",
+        "pause_in::tests::it_is_paused_only_while_the_kept_value_says_so",
+        "poses::tests::a_home_pitch_far_outside_the_body_s_range_is_refused",
+        "poses::tests::a_home_pitch_inside_the_body_s_range_is_kept_as_read",
+        "poses::tests::a_home_pitch_just_outside_the_body_s_range_is_brought_to_its_edge",
+        "poses::tests::a_rest_read_becomes_the_lamps_own_poses",
+        "poses::tests::a_seated_read_holds_only_the_head_and_its_window",
+        "poses::tests::only_a_complete_read_with_torque_off_is_taken",
+        "poses::tests::poses_the_body_would_refuse_are_refused_with_why",
+        "runtime::supervisor::tests::abrupt_parent_channel_loss_expires_authority_in_real_child",
+        "runtime::supervisor::tests::actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement",
+        "runtime::supervisor::tests::audit_crashed_child_does_not_leak_owned_ipc_directory",
+        "runtime::supervisor::tests::audit_failed_privacy_send_inhibits_supervisor_immediately",
+        "runtime::supervisor::tests::crashed_child_is_reaped_without_a_successful_shutdown_claim",
+        "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "runtime::supervisor::tests::failed_control_before_connection_revokes_admission_and_retains_owned_child",
+        "runtime::supervisor::tests::hung_owned_child_is_killed_and_reaped_after_missing_inhibit",
+        "runtime::supervisor::tests::identity_and_cleanup_receipts_fail_closed",
+        "runtime::supervisor::tests::inert_child",
+        "runtime::supervisor::tests::inert_child_stop_timing_samples_are_host_ipc_only",
+        "runtime::supervisor::tests::inhibition_measurement_must_be_between_spawn_and_publication",
+        "runtime::supervisor::tests::malformed_peer_cannot_bypass_expired_watch_or_keep_child_alive",
+        "runtime::supervisor::tests::no_peer_cleanup_before_observed_reap_even_after_owned_kill",
+        "runtime::supervisor::tests::partial_child_bind_is_cleaned_after_reap_without_waiting_for_second_socket",
+        "runtime::supervisor::tests::qualification_rejects_wrong_supervisor_before_any_channel_dispatch",
+        "runtime::supervisor::tests::real_core_fault_receipts_are_accepted_by_supervisor_without_restamping_stop",
+        "runtime::supervisor::tests::replacing_directory_does_not_remove_original_or_replacement_contents",
+        "runtime::supervisor::tests::serial_cleanup_failure_and_stalled_teardown_never_become_clean_exit",
+        "runtime::supervisor::tests::socket_mode_transition_waits_without_accepting_nonprivate_or_wrong_type_peer",
+        "runtime::supervisor::tests::socket_replacement_is_retained_and_cleanup_failure_blocks_replacement",
+        "sleep_in::tests::a_sleep_another_part_says_is_not_taken",
+        "sleep_in::tests::an_old_sleep_is_not_asleep",
+        "sleep_in::tests::it_is_asleep_only_while_the_voice_says_a_mute_for_sleep",
+        "sleep_in::tests::only_on_turns_it_on",
+        "unplug::tests::a_cancel_while_folding_finishes_the_fold_first",
+        "unplug::tests::a_failed_preparation_is_never_cancelled",
+        "unplug::tests::a_gap_after_the_time_limit_is_not_a_timeout_once_ready",
+        "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "unplug::tests::a_hand_after_the_cancel_delays_the_stand_and_never_fails_it",
+        "unplug::tests::a_matching_cancel_at_ready_stands_only_after_the_spoken_line",
+        "unplug::tests::a_new_request_within_the_three_seconds_keeps_the_latch",
+        "unplug::tests::an_invalid_read_between_polls_resets_proof",
+        "unplug::tests::disabling_live_unplug_does_not_treat_a_filesystem_error_as_an_absent_latch",
+        "unplug::tests::disabling_live_unplug_never_bypasses_a_kept_startup_latch",
+        "unplug::tests::foreign_other_request_or_malformed_cancels_are_not_cancels",
+        "unplug::tests::kept_request_vetoes_restart_without_hardware",
+        "unplug::tests::live_foreign_source_cannot_start_a_fold_even_with_a_malformed_payload",
+        "unplug::tests::malformed_skills_request_keeps_live_fail_closed_behavior",
+        "unplug::tests::pause_or_a_commanded_fold_supplies_no_physical_proof",
+        "unplug::tests::readiness_requires_half_a_second_of_fresh_safe_evidence",
+        "unplug::tests::restart_with_a_request_and_its_cancel_starts_normally",
+        "unplug::tests::stale_body_evidence_never_stands_after_a_cancel",
+        "unplug::tests::the_running_adapter_unlatches_on_a_matching_cancel",
+        "unplug::tests::with_no_proof_after_the_cancel_it_fails_at_sixty_seconds"
+      ],
+      "units": 44
+    },
+    {
+      "test_sha256": "08570f2a7024948196877bab69edb1501f940a4ab2b01caad351b47c221a5fe7",
+      "dependencies": {
+        "d56f82d769c5bdad757670d53eb3ad4eccf9da682aba348f060e58810bd283e3": {
+          "package_input_sha256": "86b6592743dd2c2183b83668a8777e1631232b787d880b5264e1bb880c67a63d",
+          "manifest_sha256": "6bdbe54a7f052e552dcfca90351764476e2767237ec3f954df8bd9f602861056",
+          "entry_source_sha256": "baeb20b52f6b536be8657a566591a507bb2e34a45cf8baa42b135510a0c3c729",
+          "outputs": [
+            {
+              "sha256": "757aa090cc56c4e9cce83f88e3bbbe2297c3e8a034bc433a62ae13315df989bf",
+              "bytes": 595376,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "a2bb3ddabbf353ca9ee3a8bfcb377403bb676f34ce19e90b596e9ae21d0a423b": {
+          "package_input_sha256": "3caad66902f5728908711135744d16620183c9ada14f56ee56859c91df47e789",
+          "manifest_sha256": "13d8c50837f14aff48cd622349f98fb2c46350b7a0c08fd574cf7de4def27d06",
+          "entry_source_sha256": "cd6808c02e476b09a520105e2c6f6d325cccb1ecd542cbbcc836a0ae6f6fb0f1",
+          "outputs": [
+            {
+              "sha256": "e8a687c994035c93ce300ff55a35e9f16390c4f426c2f920ba4fade46d3d5a04",
+              "bytes": 540256,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "29fdc547ea00003fa2286349cc48dd56bf79060a62540a30759c63ba3be230ed": {
+          "package_input_sha256": "20f8ceeef51802bf2679a697016564f943a50171ebec0ccd558ad3a401e63287",
+          "manifest_sha256": "c6049e170e4f7c2b48749fefab59db583bfac4e466cde6d0c53e4f49bc5044f7",
+          "entry_source_sha256": "7bc6b1eec8913ff4cd8e4b9b92cd04a82a4f38beb30a0b73a64c1e6e49f07b5f",
+          "outputs": [
+            {
+              "sha256": "7c60f9e62aa1f72896c192065c409bc2d9e0c826cb1b2fe84218f12f260eb8af",
+              "bytes": 570872,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "24365aacf6278c17e3df2531ee224819e3d11e9d674421d1158122d104e1f9f1": {
+          "package_input_sha256": "32d670261086495e2656b9969198c3b928ebeafd71639ec651277713d31236c2",
+          "manifest_sha256": "f70dabc0fe831788a202762e62cc76c19941680960e2e2710d1ee9e79877d9af",
+          "entry_source_sha256": "145270c2d14e3e8771f2d1a2f05445b52957481924f30fc7d5db9102fc8af69b",
+          "outputs": [
+            {
+              "sha256": "1c073106e2a58e053bca0d72fa7ede77f32cbf81d36713bd7c41ce4c67cc1426",
+              "bytes": 52064,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "2ed0c20229e51c4750b75425836f92e47853296d6cc0a2533a09dbaea54d4c5c",
+              "bytes": 34583,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "78737d51059f747629fd0a40518e4d0f5be6fc45c2ad6e54fa5ba287be9c12bb": {
+          "package_input_sha256": "421d0dde5280402d8c3a4a91a00a01fe9f338ac492620885b008ad3b92c8e976",
+          "manifest_sha256": "399ea74400a173c02eabe91cb9487d0cf351117857a5d2ebc6231f0efde67681",
+          "entry_source_sha256": "01bb86088ba281d511ae002aa939bb30b747f47ace5ea13a46de554a3117806e",
+          "outputs": [
+            {
+              "sha256": "11429a6e0b26cb5f7b01a29c04d04809c870d08f7ef4646744666b1225c7720a",
+              "bytes": 347792,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "e5e3e191610fe39021bdd391d73accad1424ee0e5ac8eb9298dace790d6067af",
+              "bytes": 75095,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "d70b85f1872116327ce52ae040c79769da9bcb97e4a14713968f0bc042c9c1b7": {
+          "package_input_sha256": "eacd7f7da0ab5ef4f43dfc7c6202ea31723ba870da0a97f7d68f455a9ee9af50",
+          "manifest_sha256": "4b5daed75505275d11f4854dd9172f910da61d9856ca2936d95e2e6e0c9040e4",
+          "entry_source_sha256": "08fa30c4a2c1ad24fe5f987e721dfb20131f45ea5b5dc3e836dcf88a8e33248c",
+          "outputs": [
+            {
+              "sha256": "3bbe6337b3693db4dae7f169d9299e2a1a04c93716801899699d71f1e0840620",
+              "bytes": 607544,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "846e547a68803ec113a5092a13a2fa618beb207e9125283a3259d536584429e4": {
+          "package_input_sha256": "86b6592743dd2c2183b83668a8777e1631232b787d880b5264e1bb880c67a63d",
+          "manifest_sha256": "6bdbe54a7f052e552dcfca90351764476e2767237ec3f954df8bd9f602861056",
+          "entry_source_sha256": "ed6bf5e3c3b4fc952d4bdf9b48b149087bceaebf5392befce0bc6cae590a008d",
+          "outputs": [
+            {
+              "sha256": "c795dbfa18df5039ebccec5e8b373b56f239cb6e7ec32b59267cedab4006ab0d",
+              "bytes": 920456,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "c12255d4bbab0de0748b2a73abceb6045aa5483a00b22358f82e1702d97bcf29",
+              "bytes": 342101,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "8feae8a33cacc15932f360849550fc96df7e3b621c837bcf6b1d7d335e810708": {
+          "package_input_sha256": "3caad66902f5728908711135744d16620183c9ada14f56ee56859c91df47e789",
+          "manifest_sha256": "13d8c50837f14aff48cd622349f98fb2c46350b7a0c08fd574cf7de4def27d06",
+          "entry_source_sha256": "e01ca26adfe51a087813d1fc1154efd8a8c9cb5b5a81f314194b4904a4422c71",
+          "outputs": [
+            {
+              "sha256": "678afc8309965f7364894dccb1f6ab0501518bbb3e9bc787182e313408990c90",
+              "bytes": 414792,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "c19184787d6253f9ea146812d78cce9058cc956b9afd7b7e3f8ab78e0584e96b",
+              "bytes": 269662,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "1abea3d4f056775b332adefb717f57b00f5e7f0fe5d07781fe16542f69783bc2": {
+          "package_input_sha256": "20f8ceeef51802bf2679a697016564f943a50171ebec0ccd558ad3a401e63287",
+          "manifest_sha256": "c6049e170e4f7c2b48749fefab59db583bfac4e466cde6d0c53e4f49bc5044f7",
+          "entry_source_sha256": "4e5c396d38ff5d9abf45b826a67ec3444654ed0802d057f46400ebe26f5879f8",
+          "outputs": [
+            {
+              "sha256": "2ca8462ef11ce2f229f976cc1c83d079059125143869786f54a7e5a47add90a1",
+              "bytes": 5081696,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d20e83ac52dd099ef93e35b4f413e7bc769ce3221b456acc3a321b54ed7365e5",
+              "bytes": 4749226,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9852bdcf294319bc7cbe822676069ea4baddec7a3f7967362bf931e1ebab9538": {
+          "package_input_sha256": "ab3accfeaa7a5acddd5274fc304dd012a21cf966a7517435dc185a3652a2f2f2",
+          "manifest_sha256": "b31420c7a806fae5b9ea2438dd4cbb99dcb3a22da67697fdf2776cc44a69527e",
+          "entry_source_sha256": "ad320bc635887879bdbbf1b9322da4a157ec2c5a4243bd7c2cf9b6884a3b2a41",
+          "outputs": [
+            {
+              "sha256": "e2fedeab78ec046ae2cf292885c08bc1ad02ae3f32d2e0a608156b9882a310ec",
+              "bytes": 542944,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "2ad67f57f162f027108ad6a677e8e888ac435a311736885a65c68f283964ac7c": {
+          "package_input_sha256": "631491255d164e5c6cd509ef41b5c1a34fe60283220f6ae7197750da57febb5d",
+          "manifest_sha256": "00785a81eae34b3298dfdde78a6bd96fe3ec000de46edd509bd13b7cab7a9870",
+          "entry_source_sha256": "0cf99cbd6f5597dd42618d603e1f453f6484e01e8f6e72d328ca5206191bc9f3",
+          "outputs": [
+            {
+              "sha256": "4284d052d8fb14003a93c175ee96a21800b34f1dab1c085a92a241f92e8c0f64",
+              "bytes": 2740816,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "0c6f083daac0757dd0cc56a7a59e99c3e2463ada27b33009d44a690cf01ff7cd",
+              "bytes": 2720555,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "fbabd79e83750bd161c1ff1b531711e038eb8a378c11e77aabc3bba215cfe2e1": {
+          "package_input_sha256": "eacd7f7da0ab5ef4f43dfc7c6202ea31723ba870da0a97f7d68f455a9ee9af50",
+          "manifest_sha256": "4b5daed75505275d11f4854dd9172f910da61d9856ca2936d95e2e6e0c9040e4",
+          "entry_source_sha256": "20b64b4359b0e82a3523fd536ad06de25e174cead734cffd3fa5f7c48f659247",
+          "outputs": [
+            {
+              "sha256": "17b60b33152ccda4b518d01c860bb359bfdd959e21aabec9742942d57399d41d",
+              "bytes": 817896,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d84db9b2a51b26a349b87a8a98c57931534c5ea38e135b1894e105f638cb9400",
+              "bytes": 809020,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "5ce60955e33c8d637d6d2f856bb4ee5851a2896eedd7059a4a66be373a0c8f8f": {
+          "package_input_sha256": "34941ab96ab22bc01a88ff213421ef63d66caf5cfad33062b18fbf0070024a16",
+          "manifest_sha256": "d93eb5890ed725266e757d38baa0ed701c3bb163e8e10377e85c78dd87426511",
+          "entry_source_sha256": "650ea08bc6e033e313440f3fa12dd7162f1c7a25610ebcde994ba43bdc0043a7",
+          "outputs": [
+            {
+              "sha256": "5e573dabcd281f6db2638655d80027fc0e851613be63daa43e7ae504aa853b09",
+              "bytes": 4905832,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "94c0828b60ca7363b35f4c995fe5e9634f857c17c695ed44813d4290556a99bf",
+              "bytes": 2217373,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "831fe91fceff2266aed397aa9266c118315fd0918d77ad6551f88c72ae6b25a8": {
+          "package_input_sha256": "be9404c7157f5d53ef2307363539bbe1aa3ec93cc43ad9389ad2d4f6568f9be5",
+          "manifest_sha256": "6883caefd46e86eb15d22d3a6d274ad304c5e7934ab70eb58d81b7c4a29ef9db",
+          "entry_source_sha256": "e2ea6a7a82f5404c3e28cb055883c737ee7903367a10206fbb47b75c009f0eb3",
+          "outputs": [
+            {
+              "sha256": "406fdd75a846d769d2409732315e064e4c7b962dc9e8024e1049e84643d505f1",
+              "bytes": 570368,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "60396d7332ad8133612fd833223998594f17685c0de6b49de4618981ef1def17": {
+          "package_input_sha256": "450b6105d3519df706aa2baff632c26862af2ad4f6de6f40efcb84ed5d460232",
+          "manifest_sha256": "00b920255c320a278bf25b962b491263a19d8c90e12e4a91c1d823db71eabb2f",
+          "entry_source_sha256": "a681e754be844c7dbef957f5d2d00b01f37c5dca160ef1055a8d8f975697a881",
+          "outputs": [
+            {
+              "sha256": "c2db78f0139bf535c6aab906a66c393bb19e74de0b3e1967287f2e73af03e600",
+              "bytes": 457080,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "ee44e3e9e5cb055153747f3efffadefa7c21f822d5aa6b8c7777c25c6ab89269": {
+          "package_input_sha256": "5d8b9f216be63954988a08d5df00eb187ebdfaddb085d16685710eb0952b3bb1",
+          "manifest_sha256": "d2581160ffa61baa386f882e08b0db20051dc3c782a82268d6473998b61c926e",
+          "entry_source_sha256": "9c8efaaaad77caa41178ca4316bff1ccbb7a864673d88639d258b7c5619a4ad4",
+          "outputs": [
+            {
+              "sha256": "fb3ee2386299c7d27b922c284329539e0e7cce9c5fce377321fcaffbd4df58bb",
+              "bytes": 3258040,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "0c2128affac2c782cd057c6e9f5c5a9bfcd2df833a3fa913379c37c4e983e9eb": {
+          "package_input_sha256": "ab3accfeaa7a5acddd5274fc304dd012a21cf966a7517435dc185a3652a2f2f2",
+          "manifest_sha256": "b31420c7a806fae5b9ea2438dd4cbb99dcb3a22da67697fdf2776cc44a69527e",
+          "entry_source_sha256": "0bdb8cd6a8835af08b5ca60956df283732f1b5aa940c750b1ec5dc78bf245b61",
+          "outputs": [
+            {
+              "sha256": "45845394aa01f70f332f89b2725b9200e4259248befa370b384bec7c15cf619d",
+              "bytes": 575600,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d66001c4f7d794a4b5d3b2d5e8c348299ec7c2a145ef0fbd31f2c5cfb611339f",
+              "bytes": 421108,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "87536447e95b630bbfb810aa03b48e0ae260c17a281f343537741bae7cb1c4be": {
+          "package_input_sha256": "14c0471446510513fa111510ad023670d835171b30b4c1824f4efb9a6aebeaee",
+          "manifest_sha256": "894c215e4e7e973b556b0e9627bf9b6a719a043fac9b5af9838660816392a09f",
+          "entry_source_sha256": "e962338e1886873aa7c3399ec89aa5378ccbfed712b9690f043628079390a34f",
+          "outputs": [
+            {
+              "sha256": "1abf3e5e0630ef0161ea00fb22ad50fec8be3bc1a51be1d42453528baa35e2a0",
+              "bytes": 144600,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "bb98f287a9eed510d13f0151687ec064064c04427f5bb5bacdaeb9925becdbbd",
+              "bytes": 60163,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9c223b2dc17a6838d9d42c983ae61daa1423f2ef902c3804ebba54edbbc438da": {
+          "package_input_sha256": "4ae4f47cd16cdb9eb7c9c2f5d1466e3c70d7ef141279190f9923c3c75e8f1e71",
+          "manifest_sha256": "5d410962aefee7ac5916c9cdd915a717228576dbe3c8a09460fd58c4ec751e2c",
+          "entry_source_sha256": "feede9bdbbcf70c6409faef8fb2f2c065e942107eb6596677bb36dce6c5075fb",
+          "outputs": [
+            {
+              "sha256": "e8e6d9bce4a622f72448375323315554e17c5f618fe609bc004993ed61c6bf7b",
+              "bytes": 641744,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "da580377cce50e09008a5d4c8126d133b1b914f9d256abc318d91870d987f58f": {
+          "package_input_sha256": "802ca98729a25dd334d4f36ffb09e4d875d80363fa502c77fad956e0e415bd6a",
+          "manifest_sha256": "d646663ec1bd4e8e795bd6a386cff9c374880d6237bbfa36bbac08b7f26ce65c",
+          "entry_source_sha256": "2fe40504f7a897ac6b742a85bdf8c4b5b2c6de87cdd72d0cf49fa50585ac9955",
+          "outputs": [
+            {
+              "sha256": "184e0f5d8d1ef162449b9d93ca326e3826adf58c2940bbb9a58890fdad2e91b8",
+              "bytes": 7136,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "1fa6a7e72377f95e60830666604212b23e6c4990ee6f0f47f24706121593aa1e",
+              "bytes": 5855,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "863ddbeba3a4e856868e278dfaf7523bc7838bca2982283b413f6938ff85bfe5": {
+          "package_input_sha256": "2f7d58ed597579ee5ef80792ccc1a0e8512fa2db1ced00c5b33926c246173800",
+          "manifest_sha256": "a14f68b8fa55f15fd03b15dced37bcf66a0a628f568eedc82817cdb7f9281951",
+          "entry_source_sha256": "614f778a41e88a29ea0ceb8e92c839dbb6b5a61c967f8bfd962975e18f932c71",
+          "outputs": [
+            {
+              "sha256": "b72603091fa40d0ede02b32c4b2a5f87e050711bf1887ec4acf7dbe0493dffb6",
+              "bytes": 2112584,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "c634b1ce4bdffae5cf1fa8f980a40eb875cc28039635eaee38fe4c7c38d13aeb",
+              "bytes": 1289240,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "093d17241b09937fea72374dccee27eccf4008f5bfad97cb1322d476274c8b33": {
+          "package_input_sha256": "450b6105d3519df706aa2baff632c26862af2ad4f6de6f40efcb84ed5d460232",
+          "manifest_sha256": "00b920255c320a278bf25b962b491263a19d8c90e12e4a91c1d823db71eabb2f",
+          "entry_source_sha256": "34a1ddabdcf4759d9a6c64a2e851372546d635d1a578ad902d962fef3c45de58",
+          "outputs": [
+            {
+              "sha256": "ba9a9dcbbe84c7617cce4d2600eff9c2977f727e539f1d7b22a0712b6611d86e",
+              "bytes": 3407328,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "976c03414288f8e5ba1ef47aec785f58405cb5ee14a5d5aff070e0fd62f39edf",
+              "bytes": 1424816,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "7b43ca439ee08be34e83183ff67728b38a1479a385ae43f80304cff7b4d8ab4c": {
+          "package_input_sha256": "be9404c7157f5d53ef2307363539bbe1aa3ec93cc43ad9389ad2d4f6568f9be5",
+          "manifest_sha256": "6883caefd46e86eb15d22d3a6d274ad304c5e7934ab70eb58d81b7c4a29ef9db",
+          "entry_source_sha256": "9fcd921cee5dc64077f4027a3b42347253fdc3f3d9b88660e8c872c316db3620",
+          "outputs": [
+            {
+              "sha256": "d95bf9c7a6acd5378c75ec155b9660436a0323520d3562cf6bc54eb539020064",
+              "bytes": 1042192,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d58ab30ffc5b48735630e66462f0bd709512f562d8114083bd04c5561c662403",
+              "bytes": 825825,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9d525f90caa18d9da03aa072a98d70dbca2a2e3da3fd3959df836730caa285f1": {
+          "package_input_sha256": "e60894718ba628de068bd2827254360cace108f9217be2ed6fdb9775cc5453ba",
+          "manifest_sha256": "c76e4bd298cd6223882238449e31939d75613e82757ca87e249df843decf5f9a",
+          "entry_source_sha256": "b437252d389042d894b1ef17859b043e827d2bd2a1bca4b5311c67dff565274d",
+          "outputs": [
+            {
+              "sha256": "08d5836d8346fe8e36c166230ec6033b611865674d5ac5902c36dd9b950fd9e2",
+              "bytes": 55256,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "182781b1d25e90cc7bf80e159cb6b8eb790dfdc8c409eb1aa4916e3007be4ba1",
+              "bytes": 50409,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9ea6a5dc6bf743535dd1f8f7d2026d44fc4e2f9fe26bc073c8961041280686f5": {
+          "package_input_sha256": "0321dbbd3f0a1150232bed2891bc05ca66b14e9899ba0ef17dd00243c33986ee",
+          "manifest_sha256": "303682a6a66fdc98de8a011ac275e18c523f1535ed8de2a291a4fcad91de8348",
+          "entry_source_sha256": "5dd00d7ea362d1e4fc06141aae07a0f15166a0b8836ac8e8713f7d7f31d26a1e",
+          "outputs": [
+            {
+              "sha256": "149f21540eed35ec38822b9721def0c15b578313b051abda4097c708aacfe1c0",
+              "bytes": 32696,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "8b2ab189da9d3ef976c80506e8709cf59c84ba40b2a1c0e59679f07f19976930",
+              "bytes": 27769,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "ec412d79b0834026a587c4c00dc8f0742bc9142e6897752023b90ab52e7d693a": {
+          "package_input_sha256": "d82c7172ef0c5bceef893eff98921b2652f0324eea79d26da9f3495d347aceaa",
+          "manifest_sha256": "f0cc2fc18c6e7f3533658b9e59d71b55e641e7d8226e5d1b915a5e7c0a1d3f36",
+          "entry_source_sha256": "5128199102bf0f7638fba0bbcf42b23822e31065841fb0c4304b64f681fde961",
+          "outputs": [
+            {
+              "sha256": "aa6d63bc2243627ce9cd122aae1716288103fa1928ec421535e816f5eb38090b",
+              "bytes": 176864,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "23d5ee51658a160e3968d47a4a1eb85e3e6a2ed81c6405be6ead1d96a2e192e8",
+              "bytes": 169942,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "e388559692d72394fe8522c28834aab02272e70630e891cdded1a5823472db1b": {
+          "package_input_sha256": "4ae4f47cd16cdb9eb7c9c2f5d1466e3c70d7ef141279190f9923c3c75e8f1e71",
+          "manifest_sha256": "5d410962aefee7ac5916c9cdd915a717228576dbe3c8a09460fd58c4ec751e2c",
+          "entry_source_sha256": "cafe1fc6498cc4c972cabc7a6efb4e244d7d68e002eda108cfd5ae045f33331c",
+          "outputs": [
+            {
+              "sha256": "98a8211108779e8de9ce5e5e475537f6bfa63f788ef04d931de59edea1a1f3c0",
+              "bytes": 3769000,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "8cf71972ead910d1d18ef7f592669eeffc92285732656ae2dcbf3b59ed2cf703",
+              "bytes": 3455729,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "7ddd56a8fa884f16b3de5c520dffb282191078973283d3a43d4c0dd1a19cd448": {
+          "package_input_sha256": "1dbb3c720b80b4c6ee4dfb58354ca138f7393a6d659504f957771743ae711d39",
+          "manifest_sha256": "714317efebb5635660abe816709d2a7e5831cd9496bc169d2f898c4bbcf470c1",
+          "entry_source_sha256": "fdec633aa893dc52e6aa6e9ff6738e828c18aae0bc8499c1288273cdd62c99f7",
+          "outputs": [
+            {
+              "sha256": "e180135630a1c678ecee25412cf56d37d1ba2cd5961dfa11eca5eb03f57ecba9",
+              "bytes": 18824,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "b26a2f15218c3d2eba568536ca8740ea8f4c46420d2f81b3c21503293f3fcfff",
+              "bytes": 17994,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "e9700d6c98364afe14ae84bf7e56d870a6ffc0097a26e4c3842253f7efc0e020": {
+          "package_input_sha256": "1d0cc9333b5ae5ea36437ca0247d874f227b4df2a3787765f809a645601f538b",
+          "manifest_sha256": "25160ea4dfa195721d352d42827b882a41f18f4c55fff58e5c3878ecae84ca44",
+          "entry_source_sha256": "3d633614ff24afdba603e4f2d3e36bdb7b190fff9e7f0d2b385c1f9d5d8144d1",
+          "outputs": [
+            {
+              "sha256": "002d0599930e13358e13979f2461ee0b148e767a7e4f978b44ca82ff2d3fc3a0",
+              "bytes": 40616,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "1f0d140f173c9eb98e50e1f283f3210d3cb6e2d37de1f9084197cbd3db9e8e4d",
+              "bytes": 39320,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "f69ee5937f08092dff418897a1942801433096d96d8393c918dd87c9a93580db": {
+          "package_input_sha256": "a52620b5231dd7e544b7909701b9c7dd87381b2cbde37cefcd6054d5a8681561",
+          "manifest_sha256": "30a3d3032dda335327557f9b1fca7bccf70c8f46b024221fe842f8a707b6f6cf",
+          "entry_source_sha256": "7e47b7c39f11b745b4eb3d30560be80247ebaba1342c9ac62c4a8bfdd463e977",
+          "outputs": [
+            {
+              "sha256": "9bb00033554f5b34ea11e21cc2935eaa5b96dd44aefe5dabeb8ebf4fd51c1605",
+              "bytes": 572632,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "0ec7faf900e1f4f18f6eb88d0b45440f1fa7914828eb94e1cd8ce793fd9c3a30": {
+          "package_input_sha256": "3fe2142c6c17da7c9a260b794a7f03f4b8ddcab235f1850eff341cd0014f0803",
+          "manifest_sha256": "f5b86209df69360114aaee67a66c3fcd31d8c840b8f34b9ad383aacd63cd15da",
+          "entry_source_sha256": "b519427535b1855bbe8c3d0517b2f3d04a607cf0cb4327cc716cd5d90da5dbf1",
+          "outputs": [
+            {
+              "sha256": "d79e2d2ed980d12e8dab9f6d58a05baa2dd301b65a2995107ae7b08b0a3c5bf1",
+              "bytes": 1010688,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "ac66138ca0614cfb50efa8d67924edbcdd212fa3f7f8746f488fad34e9c1a18f",
+              "bytes": 653593,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "256358bf6232530523dbd215e77f9647f748504dc268cf4808e5750a5500f94e": {
+          "package_input_sha256": "d57679b744b15a4ba79a584df73d1c0649d1bc09a437bb5247dfecf5c37c6bff",
+          "manifest_sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34",
+          "entry_source_sha256": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+          "outputs": [
+            {
+              "sha256": "1adc4cfdfad2b4c01369684442e75edef0f35c4134c3f4dbdff63f24edfcba80",
+              "bytes": 6532448,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "f94c2a5e2222d3117234ce8c558fe84057054c9a1222f399409664a82f15110d",
+              "bytes": 563266,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "e56a26f4e23290743f7bfdb0ea6bdbf9bafb21067b358c2779413e4667f7ec3b": {
+          "package_input_sha256": "7736d75ab736bcf452feaa93acd77b10598e8a4ddd8858b3a50706e1e979db28",
+          "manifest_sha256": "562e660adbb084de042fc9ecc5ac7ba32b5f565d53188823bab9159a027b2b44",
+          "entry_source_sha256": "f8d141a1ba6b1996b33eb34669786ef389d4d5226edad46cec22a561588c324b",
+          "outputs": [
+            {
+              "sha256": "716e8b4fa61d5c030864be54218f769f1c7965dc6b01e9a24618b97187c51ece",
+              "bytes": 386880,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "8ebb36913d583687c4acdaf0f520d8262ff2cc9e9609503d9338cf77946c83aa",
+              "bytes": 221882,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "93c4ec7e47ffb8e3e8358061c1339b4abbb58fd68d5062d84e662c4958e277df": {
+          "package_input_sha256": "b0b13a4a0d5627b6af6cc2ec5c185c197e7f155234895236db56a6f704ac7a10",
+          "manifest_sha256": "f57824af546c008210d8d6d63bc0fe866a3887d06100469448de3432ffa108ec",
+          "entry_source_sha256": "f7609b919173e7121493266d0f89db724a1e47bb105ebd05397f869639603eec",
+          "outputs": [
+            {
+              "sha256": "d85bff96bdbaa495748bc6e281bafb53dcb38e8b3580e7e8e06ccfed5540c894",
+              "bytes": 595376,
+              "mode": 493,
+              "kind": "file"
+            }
+          ]
+        },
+        "f15fe882082968044d2a7c46ddc1acdaf92309546a650ca7555fe1ecabe3671d": {
+          "package_input_sha256": "76c89c4dbd0e19bea82bd7afe779e7545d00ad9aa7cb0583001065f1ce32fc86",
+          "manifest_sha256": "d8dd853a40180e5437d873871c49f0b8e48dece23370cc11ac58ad997a2db0ec",
+          "entry_source_sha256": "9c5560beb60e820077f5171d5704ec633c61096159497756b9b540b5281e555b",
+          "outputs": [
+            {
+              "sha256": "921b64fb725b27430da4a1e6ace303ca3175fa57c1f282bc9680301f650178a6",
+              "bytes": 15009872,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "00319d73010fbeceaabd9eec1ae7fc5cfacef74fac880b4109c5002a963399f7",
+              "bytes": 6169538,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "7b1e1fd1e6678c0b1bdb0d9598f0f86fe983755011ce646c13ee173d0a677f78": {
+          "package_input_sha256": "ba8c0bdc08669708ca42729fcc497d08e6a0e8314a554190a10d8193fb2ae40d",
+          "manifest_sha256": "a25f16ccaa127602fc0cc9d1c80186619a0b8f42331a27b6f04b6bfa4aa29de2",
+          "entry_source_sha256": "abcf06f19da51626d557d8f53955b3361a3f2a86a89227600d01f2d5c2f5562f",
+          "outputs": [
+            {
+              "sha256": "8706590170f20f0b89447d6e5d8331f08ae8127fd08dbe2476e7f4ad932d5763",
+              "bytes": 62576,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "b596de6aeede451d9f3f35c64b0da9b0cc4306737c8be31d843179e72153be22",
+              "bytes": 16112,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "0bbca5c01c1683f02bb4bdc7ea603c99088b4e87328d75579cebdb986737811f": {
+          "package_input_sha256": "a52620b5231dd7e544b7909701b9c7dd87381b2cbde37cefcd6054d5a8681561",
+          "manifest_sha256": "30a3d3032dda335327557f9b1fca7bccf70c8f46b024221fe842f8a707b6f6cf",
+          "entry_source_sha256": "c9bc3d8a2c1b067b15988ee7c0c40a5e62762da910d4f0174f06ed1bc262fe06",
+          "outputs": [
+            {
+              "sha256": "320e573aae1aa6aa12c6921382a717dcb354359e42a7bb53d65b80dedb8d81f4",
+              "bytes": 1440296,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "502b3d18e95ef1348f803e9eb5e0024445fb0ee01cd647ffd533dab9bdc371bc",
+              "bytes": 791560,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "392a57405725280dc2b9990080c84129e283753538aa27303e1a031f6a30458b": {
+          "package_input_sha256": "b0b13a4a0d5627b6af6cc2ec5c185c197e7f155234895236db56a6f704ac7a10",
+          "manifest_sha256": "f57824af546c008210d8d6d63bc0fe866a3887d06100469448de3432ffa108ec",
+          "entry_source_sha256": "7c1bae7844fd63bfdab112e8b3bfa443f7bc7e6b78e59c33b0a162509c855d65",
+          "outputs": [
+            {
+              "sha256": "88765d2398a21e1fc8729f686d427fc33d4d575d37ed711691da05f4c861e339",
+              "bytes": 7399264,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d5eca7d84ad52e26fe63ffca2a1e9a54805ffd7e82515d22ea2bc6259765f3bb",
+              "bytes": 4682891,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "9b589157ccae51ced6f1ad9367c1e63f4b935715b79aadd6adee25f3acce96ce": {
+          "package_input_sha256": "ccec92286fdb20454fb3214b05abb95c36bfec7174e45570229cf9e562239dc2",
+          "manifest_sha256": "08a35c14efa4b083210613451d339b9c9921b3b6fd7464a998b246a1980e0690",
+          "entry_source_sha256": "0c9e28215cbbf11ebf1267b7f37eb59cc2f25a397f2f722a3dba2f83f125d701",
+          "outputs": [
+            {
+              "sha256": "987f7a594cca22873ffa1af0c5d56c113418814d97da718111e915c2ca183987",
+              "bytes": 6818696,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "b80c1dfe3c6b0289f8b09f8b684f643f017db6ded4f1c83757af2acab93d465e",
+              "bytes": 6434195,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "d5468922259d617f48b7372905863181e33a0efc96d97e4f0d283c1ba5d495fa": {
+          "package_input_sha256": "58c16540f914018d93b25aa884f7505cca82ffc400114a35734ae32160b8248a",
+          "manifest_sha256": "6e9983ce84d6352b1975a76229c7e16c9e75142445ed56c386f369df06146d54",
+          "entry_source_sha256": "7b947b9c8e5f9748ff6458b882f5f780c8c9008c7000a55b872359112ed82b2f",
+          "outputs": [
+            {
+              "sha256": "487221b324cdc4ff3f5d312be7306b0c800c147d9bb430aa0c86ed4f130f5170",
+              "bytes": 1439504,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "6deb898bfddf677d3489d560422b5d48296cb428c094be07791c9a72cfe3e8fc",
+              "bytes": 74319,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "3b0a616bc794411298639db60d612ac71e89d69ba7faeecf17dfcbc866a2ba2b": {
+          "package_input_sha256": "38f83034a8abe013e0d89d58d0ebc21fb2c2531102274efda45407baabb8adeb",
+          "manifest_sha256": "01a2d6191ac67e2f07fd6d67b4dfdc7796c6e80b186138d84b5cfe0ad91c21c6",
+          "entry_source_sha256": "e9f5fed013969fbd59d32fcc44d3742338b13ca903eff49d0d446439cf2cde8a",
+          "outputs": [
+            {
+              "sha256": "ea60b645033b99d107829253b69906536a66ca352643c87298decbb64e60e418",
+              "bytes": 1904208,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "d0b788de6dff7f7e58b99ca7cbe799f1b5658c149370a9bde81c28b8bf3bd61a",
+              "bytes": 294323,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "228d74009cebfcc3130802ca78e9ce82a33e04460ca2b9164136d99695f57dae": {
+          "package_input_sha256": "863d4299d363e6a2546cfa7881f3e5afd6414d8472827ef548fc73a517955440",
+          "manifest_sha256": "d2ee7a3c1db7ac89ab020b99e2d7ec95c3ee31f2de57cfe69b74fcc5e3abfa44",
+          "entry_source_sha256": "9c87316d1358df4d45c47f32a283eacef45b5331d99e7337d4ff80ad5d809888",
+          "outputs": [
+            {
+              "sha256": "9e051079b757c7e06f6cc9d5def51f7bde271dce0615828c27908f8f341b4ea5",
+              "bytes": 4511056,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "97c660ee245f2e91d211f72cd4d69ebad904b303c4f7d051e72f22f137b65d61",
+              "bytes": 239590,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        },
+        "bfe4efa1f0e2662e428e35b45b7c67c63e701e360f6648e63da289d7ac59ca37": {
+          "package_input_sha256": "c216d76687c41e03aa060e380f1089758e2bf09712afe34745baeb52b5f5fb00",
+          "manifest_sha256": "ec4874833178228f469757f2a652bb9f16408cd2bcdfa0552e75c94e216d76d4",
+          "entry_source_sha256": "5f375e273e59c81368b0874cffb188b45b8880b8484e0d56ed3c9d454780bb84",
+          "outputs": [
+            {
+              "sha256": "25f4536bcb736805e002482f416b283e9c63a12e005b083d93ce2006cd40fce5",
+              "bytes": 958232,
+              "mode": 420,
+              "kind": "file"
+            },
+            {
+              "sha256": "51433d64071f566891ed485639f33acfbffc16e672f890c4ced3b644f5d8776c",
+              "bytes": 514226,
+              "mode": 420,
+              "kind": "file"
+            }
+          ]
+        }
+      },
+      "variant": "candidate",
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "compiled_cases": [
+        "body::tests::a_base_found_far_from_home_is_taken_hold_of_where_it_lies_only_with_limp",
+        "body::tests::a_base_held_gently_by_a_hand_is_not_sent_back_into_it",
+        "body::tests::a_base_still_pushed_a_second_after_it_stopped_makes_the_lamp_slump_as_v1",
+        "body::tests::a_base_that_meets_a_hand_is_not_swayed_on_by_expression",
+        "body::tests::a_base_that_sticks_34_behind_a_slow_goal_is_led_round_and_settles",
+        "body::tests::a_base_turned_300_counts_comes_home_without_moving_away_or_faster_than_waking",
+        "body::tests::a_base_turning_to_a_face_that_meets_a_hand_is_left_where_it_is",
+        "body::tests::a_body_with_eyes_says_why_it_does_not_look",
+        "body::tests::a_call_is_glanced_for_over_a_shift_at_rest",
+        "body::tests::a_conversation_nod_playing_when_a_conversation_begins_plays_on",
+        "body::tests::a_cool_joint_glitching_at_random_one_read_in_27_runs_ten_minutes",
+        "body::tests::a_cool_joint_glitching_one_read_in_27_runs_on_for_a_minute",
+        "body::tests::a_cool_joint_glitching_within_the_flap_window_runs_ten_minutes",
+        "body::tests::a_failed_read_again_after_a_hot_first_read_is_refused_and_let_go",
+        "body::tests::a_fast_rise_after_a_low_first_read_still_stops_near_the_limit",
+        "body::tests::a_fault_while_lowering_the_shoulder_stands_whatever_its_hold",
+        "body::tests::a_first_read_at_the_limit_then_one_below_starts_as_usual",
+        "body::tests::a_flag_that_stays_or_a_missing_home_keeps_it_folded_and_it_runs_as_before",
+        "body::tests::a_flag_while_a_standing_lamp_folds_writes_that_joint_nothing_more",
+        "body::tests::a_folded_elbow_lifted_and_held_by_a_hand_goes_back_down_once_let_go",
+        "body::tests::a_folded_lamp_listens_thinks_speaks_and_comes_home",
+        "body::tests::a_folded_lamp_whose_elbow_temperature_is_unreadable_lets_go",
+        "body::tests::a_folded_lamps_warm_shoulder_is_not_read_again",
+        "body::tests::a_force_limit_is_written_to_the_joints_that_carry_the_lamp_and_read_back",
+        "body::tests::a_force_limit_that_is_not_kept_ends_the_run_before_anything_moves",
+        "body::tests::a_force_limited_arm_lets_go_at_80_percent_of_its_limit",
+        "body::tests::a_gesture_asked_as_the_lamp_would_fold_keeps_it_up_until_it_ends",
+        "body::tests::a_gesture_asked_as_the_reading_lean_eases_in_holds_it_where_it_was",
+        "body::tests::a_gesture_asked_higher_ends_the_one_playing_and_one_asked_no_higher_is_dropped",
+        "body::tests::a_gesture_asked_of_a_folded_lamp_stands_it_up_and_then_plays",
+        "body::tests::a_gesture_asked_while_the_lamp_rises_for_a_turn_plays",
+        "body::tests::a_gesture_dropped_or_ended_is_told_whose_it_was_and_who_holds_the_body",
+        "body::tests::a_gesture_ended_for_a_higher_ask_says_dropped_not_over",
+        "body::tests::a_gesture_past_v1s_tip_over_line_is_refused_whole_and_one_inside_it_plays",
+        "body::tests::a_gesture_the_anti_tip_rule_refuses_says_dropped_on_body_gesture",
+        "body::tests::a_gesture_the_lamp_never_stands_up_for_goes_stale_and_is_said",
+        "body::tests::a_gesture_waiting_when_the_lamp_is_put_to_sleep_is_dropped",
+        "body::tests::a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not",
+        "body::tests::a_glitch_of_32_between_47_and_48_is_dropped",
+        "body::tests::a_goal_register_far_from_the_arm_is_not_taken_as_its_goal",
+        "body::tests::a_hand_from_the_test_input_is_said_as_a_push",
+        "body::tests::a_hand_gone_does_not_keep_the_next_answer_from_leaning",
+        "body::tests::a_hand_holding_a_joint_off_where_it_gave_says_a_hand_until_it_lets_go",
+        "body::tests::a_hand_letting_go_mid_ease_out_leaves_no_jump",
+        "body::tests::a_hand_on_the_elbow_does_not_take_the_fold_past_its_pose",
+        "body::tests::a_hand_slump_then_an_overload_rests_and_comes_back_instead_of_ending_the_run",
+        "body::tests::a_hand_that_presses_the_base_while_the_shoulder_comes_down_lets_go_again",
+        "body::tests::a_hand_that_stops_the_shoulder_coming_down_lets_go_again_and_the_arm_stays",
+        "body::tests::a_hand_that_turns_the_base_while_the_shoulder_comes_down_lets_go_again",
+        "body::tests::a_head_creeping_back_from_a_glance_with_pauses_keeps_its_lead",
+        "body::tests::a_head_dipped_before_its_rest_has_lasted_is_led_back_up",
+        "body::tests::a_head_found_pressed_on_the_base_rises_out_of_it_slowly_and_then_runs",
+        "body::tests::a_head_found_without_torque_and_unreadable_is_left_while_the_arm_folds",
+        "body::tests::a_head_goal_past_the_servos_range_never_reaches_the_wire",
+        "body::tests::a_head_held_off_its_goal_by_a_hand_at_a_low_load_is_in_the_hand",
+        "body::tests::a_head_held_part_way_back_from_a_glance_is_not_led_into_the_hand",
+        "body::tests::a_head_held_while_it_waits_is_judged_by_the_runs_load_and_heat",
+        "body::tests::a_head_lifting_itself_after_a_slump_does_not_make_the_lamp_slump_again",
+        "body::tests::a_head_moved_and_held_or_pressed_past_its_bound_stays_held_while_the_hand_does",
+        "body::tests::a_head_resting_still_at_its_own_load_over_100_is_let_go_after_its_ease",
+        "body::tests::a_head_rising_slowly_back_from_a_glance_stays_led_until_it_arrives",
+        "body::tests::a_head_slumped_on_the_base_lifts_before_the_base_turns",
+        "body::tests::a_head_that_cannot_lift_ends_the_wake_held_where_it_is_and_says_how_far_it_got",
+        "body::tests::a_head_that_drooped_in_a_power_cut_is_lifted_home_with_lamp_52e6s_options",
+        "body::tests::a_head_that_never_moves_pressed_briefly_past_its_bound_is_let_go_after_its_ease",
+        "body::tests::a_head_that_never_moves_while_its_goal_wanders_off_is_let_go_after_its_ease",
+        "body::tests::a_head_that_settles_32_short_of_home_wakes_there_and_runs_from_where_it_is",
+        "body::tests::a_held_lean_folds_with_the_arm_without_a_jump",
+        "body::tests::a_held_shoulder_eases_out_as_an_elbow_does",
+        "body::tests::a_hold_at_a_reading_that_just_jumped_is_not_written_and_the_fault_stands",
+        "body::tests::a_hold_from_before_the_answer_does_not_keep_it_from_leaning",
+        "body::tests::a_hold_let_go_by_the_fold_eases_and_does_not_stop_the_lamp",
+        "body::tests::a_hold_let_go_by_the_rise_eases_and_does_not_stop_the_lamp",
+        "body::tests::a_home_it_is_given_is_reached_slowly_from_where_it_is_found",
+        "body::tests::a_hot_first_read_that_does_not_repeat_starts_as_usual",
+        "body::tests::a_hot_first_read_that_repeats_is_refused_as_before",
+        "body::tests::a_hot_first_read_with_one_low_glitch_read_again_is_still_refused",
+        "body::tests::a_hot_joint_whose_reads_never_settle_stops_as_unreadable",
+        "body::tests::a_joint_at_800_for_a_second_and_a_half_lets_go_of_all_five_and_is_taken_up_again_slowly",
+        "body::tests::a_joint_beyond_what_waking_brings_back_is_refused",
+        "body::tests::a_joint_flapping_between_60_and_64_stops_on_heat",
+        "body::tests::a_joint_found_without_torque_is_given_it_goal_first_and_does_not_move",
+        "body::tests::a_joint_pushing_without_moving_is_told_to_stop_after_a_second_and_a_half",
+        "body::tests::a_joint_really_at_70_after_a_first_read_of_40_still_stops_on_heat",
+        "body::tests::a_joint_still_loaded_after_it_stopped_pushing_ends_the_run",
+        "body::tests::a_joint_that_cannot_keep_up_ends_the_gesture_and_not_the_run",
+        "body::tests::a_joint_that_does_not_answer_its_first_writes_is_taken_hold_of_a_little_later",
+        "body::tests::a_joint_that_has_arrived_is_not_pushed_at_and_a_small_change_does_not_move_it",
+        "body::tests::a_joint_that_meets_resistance_stops_pushing_for_two_seconds_and_then_goes_on",
+        "body::tests::a_joint_that_moves_when_its_torque_comes_on_ends_the_run",
+        "body::tests::a_joint_that_really_warms_still_stops_after_its_hot_steps",
+        "body::tests::a_joint_warming_behind_bad_reads_stops_as_unreadable_within_a_second",
+        "body::tests::a_jump_that_stays_becomes_the_reading_and_stops_on_heat",
+        "body::tests::a_lamp_found_standing_whose_start_is_refused_folds_then_lets_go",
+        "body::tests::a_lamp_found_standing_with_a_warm_or_unreadable_elbow_folds_then_lets_go",
+        "body::tests::a_lamp_held_by_a_hand_drops_a_gesture_and_says_so",
+        "body::tests::a_lamp_is_not_stood_up_farther_back_than_v1s_line",
+        "body::tests::a_lamp_put_to_sleep_drops_a_gesture_and_says_so",
+        "body::tests::a_lamp_s_own_pitch_window_holds_the_head_and_must_fit_its_servo",
+        "body::tests::a_lean_eases_out_from_a_hand_still_there_after_the_answer",
+        "body::tests::a_lean_eases_out_from_where_a_hand_held_it",
+        "body::tests::a_let_go_run_outside_the_window_standing_or_without_folded_counts_is_refused",
+        "body::tests::a_let_go_run_outside_the_window_with_its_arm_folded_writes_torque_off_only",
+        "body::tests::a_light_head_lifted_by_hand_stays_when_told_to_and_comes_back_when_not",
+        "body::tests::a_listening_lamp_dips_its_head_for_expression_and_comes_back",
+        "body::tests::a_load_of_800_for_less_than_a_second_and_a_half_changes_nothing",
+        "body::tests::a_load_that_rises_stops_it_where_it_is_and_lets_the_whole_lamp_go",
+        "body::tests::a_lowering_that_fails_after_an_overload_ends_the_run_and_lets_the_whole_lamp_go",
+        "body::tests::a_mood_that_stops_arriving_is_rest",
+        "body::tests::a_new_flag_a_moved_elbow_or_a_hot_joint_stops_it",
+        "body::tests::a_nod_right_after_a_hand_lets_go_of_the_arm_does_not_stop_the_lamp",
+        "body::tests::a_nod_says_began_and_then_over_on_body_gesture",
+        "body::tests::a_pause_after_a_gesture_was_taken_drops_it_and_the_lamp_folds",
+        "body::tests::a_pause_during_a_second_gesture_after_the_first_ended_still_folds",
+        "body::tests::a_pause_during_the_rise_says_dropped_on_body_gesture",
+        "body::tests::a_pause_while_the_gesture_it_stood_up_for_plays_lets_it_end_and_folds",
+        "body::tests::a_paused_lamp_drops_a_gesture_and_says_so",
+        "body::tests::a_paused_skill_or_idle_gesture_ends_when_the_lamp_answers_and_eases_out",
+        "body::tests::a_pinned_pitch_held_thirteen_counts_away_still_says_a_hand_before_slump",
+        "body::tests::a_pitch_contact_during_glance_cooling_is_said_as_a_hand_before_it_slumps",
+        "body::tests::a_press_on_a_held_joint_while_the_shoulder_comes_down_is_in_the_peaks",
+        "body::tests::a_press_that_stops_the_lowering_while_a_joint_reads_off_never_holds_the_misread",
+        "body::tests::a_reading_lamp_keeps_its_lean_through_a_gesture",
+        "body::tests::a_reading_lamp_looks_down_at_the_desk_holds_it_and_comes_back",
+        "body::tests::a_reading_lamp_makes_the_whole_of_a_gestures_pitch",
+        "body::tests::a_reading_lamp_turns_toward_the_place_it_is_asked_and_back",
+        "body::tests::a_resting_arm_goal_more_than_a_step_away_is_refused_not_eased_toward",
+        "body::tests::a_resting_head_back_within_its_way_after_a_glance_is_not_led",
+        "body::tests::a_resting_head_dipped_by_a_glance_is_led_back_up_where_it_stops_short_lifting",
+        "body::tests::a_resting_joint_jittering_inside_its_band_never_says_a_hand",
+        "body::tests::a_resting_lamp_glances_with_the_switch_and_comes_back_to_rest",
+        "body::tests::a_run_that_is_not_only_a_let_go_outside_the_window_is_still_refused",
+        "body::tests::a_search_does_not_turn_toward_the_side_a_face_is_seen_on",
+        "body::tests::a_seated_lamp_at_1755_with_home_1760_wakes_home_and_without_waking_is_refused",
+        "body::tests::a_second_gesture_asked_while_the_lamp_rises_for_the_first_plays",
+        "body::tests::a_shift_starts_and_ends_at_expressions_rest_offset",
+        "body::tests::a_short_push_a_contact_floor_and_the_arm_under_a_hand",
+        "body::tests::a_shoulder_already_pushed_when_the_lamp_stands_learns_no_load_and_still_stops",
+        "body::tests::a_shoulder_flapping_between_55_and_61_runs_20_minutes_judged_at_61",
+        "body::tests::a_shoulder_left_up_by_a_power_cut_is_lowered_first_and_the_lamp_may_then_stand",
+        "body::tests::a_shoulder_lowered_in_a_start_after_a_wait_is_watched_each_step",
+        "body::tests::a_shoulder_reading_150_degrees_once_is_counted_and_never_a_peak",
+        "body::tests::a_shoulder_resting_short_at_the_same_place_is_counted_once",
+        "body::tests::a_shoulder_that_stops_short_while_lowered_is_let_go_and_waited_for",
+        "body::tests::a_shoulder_that_will_not_come_down_ends_the_run_and_lets_the_whole_lamp_go",
+        "body::tests::a_skill_asked_while_a_conversation_gesture_waits_is_dropped",
+        "body::tests::a_skill_gesture_eases_out_on_the_very_step_the_listening_mood_is_read",
+        "body::tests::a_skill_gesture_paused_for_a_line_left_alone_goes_on_where_it_was",
+        "body::tests::a_skill_gesture_paused_three_seconds_or_more_ends",
+        "body::tests::a_skill_gesture_pauses_on_the_very_step_the_listening_mood_is_read",
+        "body::tests::a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out",
+        "body::tests::a_skill_gesture_playing_ends_when_a_hand_comes_on_the_lamp",
+        "body::tests::a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input",
+        "body::tests::a_skill_gesture_still_waiting_is_dropped_when_a_hand_comes_on_the_lamp",
+        "body::tests::a_skill_move_asked_while_a_hand_holds_the_lamp_is_dropped_by_the_hand",
+        "body::tests::a_skill_move_ended_for_a_conversation_gesture_eases_out_and_then_it_plays",
+        "body::tests::a_skill_or_idle_gesture_playing_ends_when_a_conversation_begins_and_eases_out",
+        "body::tests::a_skills_move_plays_as_a_kept_move_does_and_one_past_v1s_line_is_refused",
+        "body::tests::a_slump_during_an_ease_back_leaves_no_offset_after_the_take_up",
+        "body::tests::a_slumped_lamp_is_not_stood_up_by_a_gesture",
+        "body::tests::a_small_glitch_near_the_limit_then_a_flicker_down_is_not_heat",
+        "body::tests::a_speaking_lamp_leans_in_and_back_and_its_base_sways_for_expression",
+        "body::tests::a_speaking_lamp_still_lets_its_lean_go_for_a_gesture",
+        "body::tests::a_speaking_lean_and_an_arbitration_ease_out_never_step_past_the_arm",
+        "body::tests::a_standing_arm_carrying_its_own_weight_counts_no_stall_and_a_push_well_over_it_counts_one",
+        "body::tests::a_standing_lamp_nods_and_is_left_exactly_where_it_was",
+        "body::tests::a_standing_lamp_put_to_sleep_drops_a_gesture_as_it_folds",
+        "body::tests::a_standing_lamp_whose_elbow_temperature_is_unreadable_folds_then_lets_go",
+        "body::tests::a_standing_pose_is_taken_only_inside_its_caps",
+        "body::tests::a_standing_session_never_moves_an_arm_goal_more_than_a_step_a_write",
+        "body::tests::a_standing_shoulder_pushing_short_of_its_goal_is_told_to_stop_and_keeps_its_torque",
+        "body::tests::a_steady_wrong_elbow_reading_as_the_arm_comes_to_rest_is_not_its_resting_goal",
+        "body::tests::a_steady_wrong_elbow_reading_before_cancelled_is_not_written_at_the_exit",
+        "body::tests::a_steady_wrong_elbow_reading_under_load_as_the_arm_comes_to_rest_is_not_its_resting_goal",
+        "body::tests::a_step_says_a_hand_while_a_joint_is_held_where_it_gave_way_and_never_without_one",
+        "body::tests::a_surprise_while_a_standing_lamp_folds_keeps_it_folding_then_lets_go",
+        "body::tests::a_sustained_gentle_push_is_said_until_the_hand_lets_go",
+        "body::tests::a_true_value_settles_through_glitches_after_a_low_first_read",
+        "body::tests::a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps",
+        "body::tests::a_wire_failing_mid_lean_keeps_the_lean_as_it_stands",
+        "body::tests::a_wire_that_fails_for_a_moment_is_ridden_out",
+        "body::tests::a_wire_that_goes_silent_stops_it_after_half_a_second",
+        "body::tests::after_a_wait_its_run_is_watched_without_a_gap",
+        "body::tests::an_arm_found_off_its_way_is_not_lowered_and_the_lamp_runs_folded",
+        "body::tests::an_arm_goal_farther_than_a_hold_release_is_refused_not_eased_toward",
+        "body::tests::an_arm_goal_is_never_more_than_a_step_from_the_last_unless_it_holds_where_the_arm_is",
+        "body::tests::an_arm_goal_outside_its_window_is_not_eased_toward",
+        "body::tests::an_arm_goal_outside_its_window_never_reaches_the_wire",
+        "body::tests::an_arm_goal_refused_in_a_step_ends_the_run_at_that_step",
+        "body::tests::an_arm_held_while_it_speaks_is_not_leaned_into_again",
+        "body::tests::an_arm_joint_taken_hold_of_outside_its_window_is_not_given_that_goal",
+        "body::tests::an_arm_pose_whose_window_would_reach_the_seam_is_refused",
+        "body::tests::an_arm_resting_short_of_its_fold_and_pushing_is_left_where_it_lies",
+        "body::tests::an_arm_still_strained_two_seconds_on_ends_the_run_where_it_is",
+        "body::tests::an_arm_that_strains_goes_back_down_and_stays_down_for_a_while",
+        "body::tests::an_arm_that_sways_7_counts_as_the_base_wakes_is_let_and_one_that_moves_20_is_not",
+        "body::tests::an_ask_dropped_as_busy_says_dropped",
+        "body::tests::an_ask_dropped_as_held_by_a_hand_says_dropped",
+        "body::tests::an_elbow_goal_register_past_its_range_is_never_written_as_a_goal",
+        "body::tests::an_elbow_pushing_under_an_old_overload_is_told_to_stop_and_then_carries_the_lamp",
+        "body::tests::an_elbow_read_far_off_in_the_last_step_is_not_written_back_at_the_exit",
+        "body::tests::an_elbow_read_past_its_range_just_before_cancelled_is_never_written_as_a_goal",
+        "body::tests::asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop",
+        "body::tests::asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop",
+        "body::tests::asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop",
+        "body::tests::asleep_a_gesture_asked_higher_does_not_end_the_one_playing",
+        "body::tests::at_rest_a_joint_that_stopped_short_is_no_longer_pushed",
+        "body::tests::bad_temperatures_in_a_row_do_not_stop_the_run",
+        "body::tests::called_with_a_face_in_view_it_does_not_glance_and_speaking_it_takes_no_call",
+        "body::tests::called_with_nobody_in_view_it_rises_and_glances_once",
+        "body::tests::every_step_can_be_watched_with_the_mood_it_acted_on",
+        "body::tests::expression_is_held_to_its_own_reach_and_the_joints_and_does_not_stir_a_resting_lamp",
+        "body::tests::found_standing_it_is_taken_as_it_is_and_folds_down_when_asked_to_stop",
+        "body::tests::found_standing_out_of_range_it_is_refused_as_before_and_not_let_go",
+        "body::tests::garbage_with_one_good_read_in_50_still_stops_within_seconds",
+        "body::tests::held_reads_after_a_hot_streak_do_not_add_to_the_arm_heat_streak",
+        "body::tests::held_reads_after_a_hot_streak_do_not_add_to_the_head_heat_streak",
+        "body::tests::it_does_not_shift_while_talked_to_folded_or_held",
+        "body::tests::it_does_not_start_on_a_lamp_that_is_not_as_expected",
+        "body::tests::it_shifts_over_expressions_rest_stream_and_not_while_held_still_or_paused",
+        "body::tests::it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there",
+        "body::tests::let_go_standing_with_the_arm_still_up_nothing_is_lowered_and_it_stands_from_there",
+        "body::tests::let_go_standing_with_the_elbow_fallen_it_is_folded_and_stands_again_when_spoken_to",
+        "body::tests::lone_flaps_around_a_good_value_that_returns_still_stop",
+        "body::tests::no_shift_starts_within_thirty_seconds_of_a_drift",
+        "body::tests::nobody_setting_it_straight_it_stops_asking_and_reads_less",
+        "body::tests::off_is_the_body_before_give_way_was_on_by_default",
+        "body::tests::one_bad_read_of_a_joint_is_counted_and_skipped",
+        "body::tests::one_hot_reading_while_it_moves_is_not_heat",
+        "body::tests::one_reading_off_while_the_shoulder_comes_down_is_not_a_hand",
+        "body::tests::paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds",
+        "body::tests::put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_now",
+        "body::tests::reads_within_the_flap_window_of_a_stale_good_one_still_stop",
+        "body::tests::refused_for_its_pose_it_lets_go_says_so_and_stays_let_go_while_out_of_range",
+        "body::tests::refused_with_its_head_tipped_up_it_keeps_holding_the_head",
+        "body::tests::resistance_for_the_fourth_time_in_a_minute_ends_the_run",
+        "body::tests::set_back_in_range_it_takes_hold_where_it_is_and_starts_by_itself",
+        "body::tests::shifts_at_rest_and_the_call_are_not_from_outside",
+        "body::tests::spoken_to_in_the_middle_of_a_shift_it_lets_it_go_at_once",
+        "body::tests::spoken_to_it_stands_up_and_left_alone_it_folds_down_again",
+        "body::tests::standing_with_nothing_to_do_it_shifts_rarely_and_irregularly",
+        "body::tests::stationary_pressure_clears_within_one_tick_after_load_and_displacement_clear",
+        "body::tests::stationary_pressure_remains_a_hand_when_it_eases_above_half_the_bound",
+        "body::tests::stood_up_the_head_may_look_down_as_far_as_up_and_folded_it_may_not",
+        "body::tests::stood_up_the_head_tilts_to_listen_and_folded_it_does_not",
+        "body::tests::the_arm_is_taken_hold_of_only_on_a_lamp_that_may_stand",
+        "body::tests::the_eyes_take_the_head_further_round_than_any_pose_does",
+        "body::tests::the_fold_line_counts_a_sit_down_for_a_strain_on_the_way_up_or_standing",
+        "body::tests::the_gesture_pause_is_on_for_on_only",
+        "body::tests::the_head_keeps_its_folded_pose_until_the_arm_has_lifted_it_clear",
+        "body::tests::the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up",
+        "body::tests::the_heads_pitch_never_passes_its_window_however_it_is_found",
+        "body::tests::the_hold_after_a_surprise_writes_the_arm_where_it_was_last_read",
+        "body::tests::the_ranges_waited_for_are_the_starts_own_bounds",
+        "body::tests::the_three_writes_are_exactly_these_bytes",
+        "body::tests::the_two_writes_of_a_lamp_that_stands_are_exactly_these_bytes",
+        "body::tests::three_bad_reads_of_a_joint_in_a_row_stop_the_body_naming_it",
+        "body::tests::three_bad_reads_while_let_go_stop_the_body_on_the_third",
+        "body::tests::three_bad_reads_while_lowering_the_shoulder_stop_the_body_on_the_third",
+        "body::tests::three_bad_reads_while_waking_stop_the_body_on_the_third",
+        "body::tests::three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run",
+        "body::tests::told_to_return_a_base_turned_by_hand_under_its_load_gives_way_and_comes_back",
+        "body::tests::told_to_return_a_head_tilted_and_held_by_hand_gives_way_again_and_comes_back",
+        "body::tests::told_to_stay_a_head_moved_by_hand_stays_and_the_next_mood_is_relative_to_it",
+        "body::tests::told_to_stay_a_head_pushed_past_its_reach_is_kept_at_the_edge",
+        "body::tests::told_to_stay_a_short_push_still_gives_way_and_comes_back",
+        "body::tests::two_fates_in_one_step_are_both_kept",
+        "body::tests::two_first_reads_of_150_then_45_start_as_usual_standing",
+        "body::tests::unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off",
+        "body::tests::unplug_brings_a_base_looking_aside_home_before_it_attests",
+        "body::tests::unplug_during_hand_recovery_wake_stops_before_it_finishes",
+        "body::tests::unplug_during_startup_wake_stops_automatic_motion",
+        "body::tests::unplug_during_take_hold_retry_never_turns_torque_back_on",
+        "body::tests::unplug_folds_now_and_latches_over_later_inputs",
+        "body::tests::unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold",
+        "body::tests::unplug_never_attests_an_arm_stuck_away_from_its_fold",
+        "body::tests::unplug_ready_stays_ready_through_a_second_turn",
+        "body::tests::unplug_ready_survives_a_bad_read",
+        "body::tests::unplug_released_stands_through_the_ordinary_rise_unless_paused",
+        "body::tests::waking_on_a_lamp_found_as_expected_writes_exactly_what_it_did_without",
+        "body::tests::with_eyes_the_head_turns_to_the_face_while_it_listens_and_not_beyond_its_reach",
+        "body::tests::with_waking_a_head_held_35_short_at_rest_rests_where_it_is",
+        "body::tests::without_a_face_or_without_eyes_nothing_is_added_to_what_the_mood_wants",
+        "body::tests::without_a_window_of_its_own_the_lamp_runs_exactly_as_before",
+        "body::tests::without_the_switch_a_called_lamp_writes_exactly_as_one_never_called",
+        "body::tests::without_the_switch_a_resting_lamp_writes_exactly_as_when_nothing_is_asked",
+        "body::tests::woken_after_a_hands_sleep_it_stands_at_once",
+        "bus_out::tests::a_body_let_go_for_its_pose_says_what_it_asks",
+        "bus_out::tests::a_body_let_go_reports_once_per_change_and_slowly_again",
+        "bus_out::tests::a_drop_says_whose_it_was_why_and_who_holds_the_body_only_when_telling",
+        "bus_out::tests::a_fold_is_said_once_when_it_ends_with_its_time_and_the_joints",
+        "bus_out::tests::a_fold_that_rises_again_is_not_said_and_a_retreat_on_the_way_is",
+        "bus_out::tests::a_gesture_that_replaces_another_says_the_first_over_and_a_stop_ends_the_last",
+        "bus_out::tests::a_hand_after_a_slow_joints_write_is_aged_by_it",
+        "bus_out::tests::a_hand_that_waited_in_the_queue_is_not_said_as_fresh",
+        "bus_out::tests::a_paused_body_says_paused_and_nothing_else_changes",
+        "bus_out::tests::a_thread_with_no_room_costs_the_loop_a_step_and_never_a_wait",
+        "bus_out::tests::how_fast_each_joint_turns_is_worked_out_from_the_step_before",
+        "bus_out::tests::only_a_let_go_bodys_ask_is_an_ask",
+        "bus_out::tests::steps_offered_reach_the_bus_and_the_last_word_is_why_it_stopped",
+        "bus_out::tests::tell_says_the_journal_lines_and_publishes_every_piece",
+        "bus_out::tests::the_bad_reads_are_said_at_the_first_step_and_every_five_minutes",
+        "bus_out::tests::the_body_is_well_unless_a_joint_is_warm_or_one_lately_met_resistance",
+        "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+        "bus_out::tests::the_joints_are_named_in_servo_order_in_radians_from_the_middle_of_the_turn",
+        "bus_out::tests::what_became_of_each_gesture_is_said_on_body_gesture_whatever_the_step",
+        "bus_out::tests::why_the_body_stopped_is_said_in_words_and_only_being_asked_is_not_a_fault",
+        "clips::tests::a_clip_is_read_between_its_frames_and_is_over_at_its_end",
+        "clips::tests::every_clip_begins_and_ends_at_nothing_and_stays_inside_its_speed_and_size",
+        "clips::tests::the_small_moves_at_rest_move_the_head_alone_inside_a_glance_at_rest",
+        "cog::tests::a_count_outside_the_servos_range_is_refused_not_clamped",
+        "cog::tests::a_step_that_would_lean_back_past_the_ceiling_is_cut_short_as_v1_cut_it",
+        "cog::tests::every_built_in_clip_passes_v1s_rule",
+        "cog::tests::the_centre_of_gravity_is_v1s_on_the_motor_readings_v1_was_checked_on",
+        "exit_report::tests::a_body_older_than_the_temperature_fields_still_reads",
+        "exit_report::tests::a_truncated_newest_report_is_said_not_replaced_by_an_older_one",
+        "exit_report::tests::lamp_4ace_1525_reads_as_plain_lines",
+        "exit_report::tests::the_last_report_wins_and_none_is_none",
+        "expression_in::tests::a_request_that_is_stale_out_of_order_or_not_of_this_machine_is_not_taken",
+        "expression_in::tests::stillness_adds_nothing_and_a_request_is_not_applied_before_its_time",
+        "expression_in::tests::what_is_asked_counts_until_it_runs_out_and_is_given_in_counts",
+        "first_stand::tests::a_body_that_never_ends_is_killed_past_its_bound",
+        "first_stand::tests::a_brush_is_not_the_yes_and_an_unknown_state_breaks_a_hold",
+        "first_stand::tests::a_busy_rooms_ask_names_the_touch_alone",
+        "first_stand::tests::a_put_off_is_no_yes",
+        "first_stand::tests::a_short_yes_is_a_yes_and_anything_that_takes_it_back_is_not",
+        "first_stand::tests::a_spoken_yes_is_taken_only_after_the_ask_alone_and_with_someone_near",
+        "first_stand::tests::a_stopped_body_is_waited_for_while_it_folds",
+        "first_stand::tests::a_touch_held_a_second_after_a_release_is_the_yes",
+        "first_stand::tests::an_armed_stop_takes_the_first_touch",
+        "first_stand::tests::controls_not_ready_are_not_known",
+        "first_stand::tests::controls_unknown_for_a_second_while_it_moves_stop_it",
+        "first_stand::tests::near_is_a_fresh_face_big_enough",
+        "first_stand::tests::no_tail_of_the_ask_is_a_yes",
+        "first_stand::tests::the_confirmed_file_has_this_arms_stand_and_says_so",
+        "first_stand::tests::the_joined_line_is_judged_not_each_piece",
+        "first_stand::tests::the_lamp_asks_twice_at_most_ten_minutes_apart_and_never_after_a_stand",
+        "first_stand::tests::the_lamps_own_words_are_never_its_yes",
+        "first_stand::tests::the_record_says_its_outcome_in_words",
+        "first_stand::tests::the_spoken_yes_is_turned_off_only_by_off",
+        "first_stand::tests::the_stand_is_read_from_the_last_full_stand_line",
+        "first_stand::tests::the_stop_is_any_new_touch_after_the_yes_is_let_go",
+        "first_stand::tests::what_the_voice_hears_is_subscribed_by_this_name",
+        "gaze::stray::a_turn_toward_a_place_is_the_turn_to_a_face_seen_there",
+        "gaze::stray::one_stray_sight_among_three_moves_nothing",
+        "gaze::tests::a_gain_set_too_high_still_settles_and_the_reach_is_never_passed",
+        "gaze::tests::it_does_not_correct_from_a_moving_picture_or_while_it_thinks_or_rests",
+        "gaze::tests::it_turns_to_a_face_in_a_few_corrections_and_then_keeps_still",
+        "gaze::tests::the_datagram_is_the_one_the_eyes_send_and_a_gaze_is_taken_only_inside_its_caps",
+        "gaze::tests::with_nobody_there_it_does_nothing_and_after_a_while_lets_go",
+        "gesture::tests::every_pose_stays_within_a_few_degrees_of_where_the_head_was_found",
+        "gesture::tests::listening_lifts_and_tilts_and_the_side_alternates_between_exchanges",
+        "gesture::tests::rest_is_exactly_where_it_was_found",
+        "gesture::tests::speaking_nods_on_the_voice_and_settles_when_it_is_steady",
+        "gesture::tests::the_look_away_is_a_glance_that_deepens_only_while_the_thinking_goes_on",
+        "hold_in::tests::only_held_as_the_first_word_holds_the_head",
+        "hold_in::tests::the_file_is_read_at_most_every_tenth_of_a_second_and_none_is_free",
+        "idle::tests::a_move_is_seldom_the_one_before_and_all_of_them_come",
+        "idle::tests::two_moves_do_not_take_strict_turns",
+        "idle::tests::waits_are_irregular_and_inside_their_bounds",
+        "inspection::tests::a_latched_status_flag_ends_the_plan_at_that_joint_unless_faults_are_reported",
+        "inspection::tests::all_partial_write_and_read_sizes_preserve_exact_requests",
+        "inspection::tests::bytes_returned_after_deadline_are_counted_but_never_decoded",
+        "inspection::tests::cancellation_before_and_during_transaction_stops_all_future_requests",
+        "inspection::tests::cancellation_observed_after_write_keeps_accepted_count_but_discards_reply",
+        "inspection::tests::checksum_noise_and_missing_joint_are_explicit_failures",
+        "inspection::tests::clock_regression_and_failed_cancellation_source_cannot_admit_another_operation",
+        "inspection::tests::continuous_initial_traffic_never_reaches_a_request",
+        "inspection::tests::duplicate_reply_faults_instead_of_starting_another_request",
+        "inspection::tests::finite_plan_sends_only_ten_read_only_requests_and_decodes_30_replies",
+        "inspection::tests::initial_stale_bytes_are_counted_not_accepted_as_replies",
+        "inspection::tests::operation_budget_terminates_even_if_clock_and_poll_never_advance",
+        "inspection::tests::partial_write_cannot_accept_an_early_stale_response",
+        "inspection::tests::read_only_profile_window_reports_all_raw_bytes_without_scale_or_write",
+        "inspection::tests::telemetry_target_reports_measured_delay_separately_from_fault_deadline",
+        "inspection::tests::timed_out_request_is_not_retried_and_late_reply_is_not_reused",
+        "inspection::tests::truncated_reply_deadline_keeps_partial_count_and_never_returns_a_snapshot",
+        "inspection::tests::unknown_model_stops_before_using_sts_specific_register_decoders",
+        "inspection::tests::write_zero_and_busy_writer_are_bounded_not_retried_as_new_transactions",
+        "moves::tests::a_folder_of_moves_is_read_in_file_order_and_each_plays_as_a_gesture",
+        "moves::tests::a_folder_that_cannot_be_read_is_an_error_and_an_oversized_one_is_refused_whole",
+        "moves::tests::a_move_sent_whole_is_checked_as_a_file_is_and_kept_once",
+        "moves::tests::a_move_the_body_cannot_play_is_refused_with_why_and_the_rest_are_taken",
+        "moves::tests::a_source_is_kept_whole_up_to_64_printable_bytes_or_not_at_all",
+        "moves::tests::the_documented_example_is_a_move_this_body_takes",
+        "moves::tests::the_promise_is_the_built_in_clips_own",
+        "name_in::tests::only_a_sound_and_recent_hearing_is_a_call",
+        "pause_in::tests::it_is_paused_only_while_the_kept_value_says_so",
+        "poses::tests::a_home_pitch_far_outside_the_body_s_range_is_refused",
+        "poses::tests::a_home_pitch_inside_the_body_s_range_is_kept_as_read",
+        "poses::tests::a_home_pitch_just_outside_the_body_s_range_is_brought_to_its_edge",
+        "poses::tests::a_rest_read_becomes_the_lamps_own_poses",
+        "poses::tests::a_seated_read_holds_only_the_head_and_its_window",
+        "poses::tests::only_a_complete_read_with_torque_off_is_taken",
+        "poses::tests::poses_the_body_would_refuse_are_refused_with_why",
+        "runtime::supervisor::tests::abrupt_parent_channel_loss_expires_authority_in_real_child",
+        "runtime::supervisor::tests::actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement",
+        "runtime::supervisor::tests::audit_crashed_child_does_not_leak_owned_ipc_directory",
+        "runtime::supervisor::tests::audit_failed_privacy_send_inhibits_supervisor_immediately",
+        "runtime::supervisor::tests::crashed_child_is_reaped_without_a_successful_shutdown_claim",
+        "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "runtime::supervisor::tests::failed_control_before_connection_revokes_admission_and_retains_owned_child",
+        "runtime::supervisor::tests::hung_owned_child_is_killed_and_reaped_after_missing_inhibit",
+        "runtime::supervisor::tests::identity_and_cleanup_receipts_fail_closed",
+        "runtime::supervisor::tests::inert_child",
+        "runtime::supervisor::tests::inert_child_stop_timing_samples_are_host_ipc_only",
+        "runtime::supervisor::tests::inhibition_measurement_must_be_between_spawn_and_publication",
+        "runtime::supervisor::tests::malformed_peer_cannot_bypass_expired_watch_or_keep_child_alive",
+        "runtime::supervisor::tests::no_peer_cleanup_before_observed_reap_even_after_owned_kill",
+        "runtime::supervisor::tests::partial_child_bind_is_cleaned_after_reap_without_waiting_for_second_socket",
+        "runtime::supervisor::tests::qualification_rejects_wrong_supervisor_before_any_channel_dispatch",
+        "runtime::supervisor::tests::real_core_fault_receipts_are_accepted_by_supervisor_without_restamping_stop",
+        "runtime::supervisor::tests::replacing_directory_does_not_remove_original_or_replacement_contents",
+        "runtime::supervisor::tests::serial_cleanup_failure_and_stalled_teardown_never_become_clean_exit",
+        "runtime::supervisor::tests::socket_mode_transition_waits_without_accepting_nonprivate_or_wrong_type_peer",
+        "runtime::supervisor::tests::socket_replacement_is_retained_and_cleanup_failure_blocks_replacement",
+        "sleep_in::tests::a_sleep_another_part_says_is_not_taken",
+        "sleep_in::tests::an_old_sleep_is_not_asleep",
+        "sleep_in::tests::it_is_asleep_only_while_the_voice_says_a_mute_for_sleep",
+        "sleep_in::tests::only_on_turns_it_on",
+        "unplug::tests::a_cancel_while_folding_finishes_the_fold_first",
+        "unplug::tests::a_failed_preparation_is_never_cancelled",
+        "unplug::tests::a_gap_after_the_time_limit_is_not_a_timeout_once_ready",
+        "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "unplug::tests::a_hand_after_the_cancel_delays_the_stand_and_never_fails_it",
+        "unplug::tests::a_matching_cancel_at_ready_stands_only_after_the_spoken_line",
+        "unplug::tests::a_new_request_within_the_three_seconds_keeps_the_latch",
+        "unplug::tests::an_invalid_read_between_polls_resets_proof",
+        "unplug::tests::disabling_live_unplug_does_not_treat_a_filesystem_error_as_an_absent_latch",
+        "unplug::tests::disabling_live_unplug_never_bypasses_a_kept_startup_latch",
+        "unplug::tests::foreign_other_request_or_malformed_cancels_are_not_cancels",
+        "unplug::tests::kept_request_vetoes_restart_without_hardware",
+        "unplug::tests::live_foreign_source_cannot_start_a_fold_even_with_a_malformed_payload",
+        "unplug::tests::malformed_skills_request_keeps_live_fail_closed_behavior",
+        "unplug::tests::pause_or_a_commanded_fold_supplies_no_physical_proof",
+        "unplug::tests::readiness_requires_half_a_second_of_fresh_safe_evidence",
+        "unplug::tests::restart_with_a_request_and_its_cancel_starts_normally",
+        "unplug::tests::stale_body_evidence_never_stands_after_a_cancel",
+        "unplug::tests::the_running_adapter_unlatches_on_a_matching_cancel",
+        "unplug::tests::with_no_proof_after_the_cancel_it_fails_at_sixty_seconds"
+      ],
+      "units": 44
+    }
+  ],
+  "planned": 2,
+  "completed": 2,
+  "unrun": 0,
+  "all_ordinary_results_retained": true,
+  "source_restored": true,
+  "complete": true,
+  "all_cases_passed": true,
+  "restoration": [
+    {
+      "path": "lampOS/crates/body/src/bus_out.rs",
+      "before": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "mtime_ns": 1792891100159073841,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "mtime_ns": 1792891357611292419,
+        "kind": "file"
+      }
+    },
+    {
+      "path": "lampOS/docs/body.md",
+      "before": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "mtime_ns": 1792891100161168000,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "mtime_ns": 1792891358373242761,
+        "kind": "file"
+      }
+    }
+  ],
+  "source_metadata_limit": "Original candidate bytes/fullmodes restored; two owned mtimes are new and disclosed, not restored."
+}

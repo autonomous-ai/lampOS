@@ -1,0 +1,28 @@
+{
+  "native": 54768,
+  "terminal_exit_code": 0,
+  "tool_final_chunk": "30aa23",
+  "scope": "Authorized source/import/version preflight only; no Cargo metadata/build/test/target access and no WT/source/Git mutation",
+  "actual_stdout_from_tool_response": {
+    "module_imports_ok": true,
+    "source_guard_ok": true,
+    "versions": {
+      "cargo": {
+        "stdout": "cargo 1.96.0 (30a34c682 2026-05-25)\n",
+        "stderr": ""
+      },
+      "rustc": {
+        "stdout": "rustc 1.96.0 (ac68faa20 2026-05-25)\n",
+        "stderr": ""
+      },
+      "rustfmt": {
+        "stdout": "rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\n",
+        "stderr": ""
+      }
+    },
+    "no_metadata_build_test_target_access": true
+  },
+  "controller_sha256": "8b0c25bcc2bd9c8e58d5385549002ec468a307bd14f6b9a179b42dccd3704595",
+  "plan_sha256_at_preflight": "715df92632ae1e9402165f67a48cadad8021616ef634b293fc6aefa727aee03c",
+  "no_execution_grant_or_compiler_allocation": true
+}

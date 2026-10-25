@@ -1,0 +1,8 @@
+{
+  "source": "Version-only native exec closed0; toolchunk8fa62c; stdout copied from its response",
+  "cargo": "cargo1.96.0(30a34c682 2026-05-25)",
+  "rustc": "rustc1.96.0(ac68faa20 2026-05-25)",
+  "rustfmt": "rustfmt1.9.0-stable(ac68faa20c 2026-05-25)",
+  "PATH_prefix": "/Users/autonomous/.cargo/bin",
+  "no_metadata_build_test_target_operation": true
+}

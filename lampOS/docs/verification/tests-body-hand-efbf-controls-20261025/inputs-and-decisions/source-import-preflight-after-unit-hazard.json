@@ -1,0 +1,28 @@
+{
+  "scope": "ROOT-authorized source/module/version preflight only after unit-hazard guards; no experiment execution grant",
+  "controller_sha256": "ba496fcef1c38e91db10c3be4d8fa48bcb2cae61c16c0c7e345774934a3344a3",
+  "plan_sha256": "5c6f80b3d8760f53151007e7f2c64e447ebd76d42de692ee22c04234ad621465",
+  "source_guard_sha256": "571749f64bd81e53ba46b49211bb8aeb28807956ec789375ee1c98df06318825",
+  "module_import_complete": true,
+  "main_not_called_during_import": true,
+  "prepare_only_command": [
+    "/usr/local/opt/python@3.14/bin/python3.14",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/run-controls.py",
+    "--prepare-only"
+  ],
+  "started_at": "2026-10-25T00:38:35.855560+00:00",
+  "finished_at": "2026-10-25T00:38:40.418571+00:00",
+  "exit_code": 0,
+  "stdout": "{\"module_imports_ok\": true, \"source_guard_ok\": true, \"versions\": {\"cargo\": {\"stdout\": \"cargo 1.96.0 (30a34c682 2026-05-25)\\n\", \"stderr\": \"\"}, \"rustc\": {\"stdout\": \"rustc 1.96.0 (ac68faa20 2026-05-25)\\n\", \"stderr\": \"\"}, \"rustfmt\": {\"stdout\": \"rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)\\n\", \"stderr\": \"\"}}, \"no_metadata_build_test_target_access\": true}\n",
+  "stderr": "",
+  "stdout_sha256": "285a55a71106163aa0b13c327fbf797585e05443b8407d8d5920ef51db88f017",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "planned_target_exists_before": false,
+  "planned_target_exists_after": false,
+  "only_target_existence_metadata_checked_no_contents_opened": true,
+  "execution_consumed_absent": true,
+  "experiment_run_directory_absent": true,
+  "source_scope": "efbf42a02974ff130cb979abc0499ba699c1b34d unchanged; later162 is separate",
+  "no_metadata_build_tests_source_or_target_writes": true,
+  "compiler_allocation_granted": false
+}
