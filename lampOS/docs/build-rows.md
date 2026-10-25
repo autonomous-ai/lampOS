@@ -1,6 +1,6 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-25 20:04 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-25 21:30 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
 **Build 93.1% over 70 rows. Quality 67.2% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
@@ -97,7 +97,7 @@ Written by the first builder from the team's review page at 2026-10-25 20:04 (+0
 | Not spoken to | 0.60 | 0.90 | 25 Oct 14:4x, unchanged: in a busy played round on lamp-4ace 4 of 6 desk lines were left alone; |
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
-| Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
+| Speaking up on its own | 0.80 | 0.85 | 25 Oct 21:3x, unchanged: two reminder rounds on lamp-4ace (the ship build 6819 and #3477’s build, product unit, played lines, a conversation over the due minutes): each one set was said 6 to 13 s after it was due, at a p… |
 | Remembers you: your name and what you told it | 0.50 | 0.90 | 25 Oct 20:0x, up from 0.45: on the ship build (6819) with the exact product unit, the memory round went 6 of 6: a room fact kept, recalled in the same session and in a fresh one, forgotten on request, and a personal line… |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
