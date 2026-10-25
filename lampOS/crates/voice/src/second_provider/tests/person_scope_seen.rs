@@ -29,6 +29,26 @@ fn known_file(what: &str, eyes: &SpeakingFaces) -> std::path::PathBuf {
 /// The eyes' boot the known file was written under.
 const BOOT: &str = "eyes";
 
+/// The worker's own setup (`worker::see_who_speaks`) with
+/// `LAMP_SECOND_SPEAKING_FACE` on and `LAMP_PERSON_SCOPE_SEEN` as `seen`,
+/// whose eyes' reader fails to start: a relative bus root, which
+/// `lamp_bus::Bus::new` refuses (reviewer-two's P2, Second's P3 on #3437).
+fn failed_reader(engine: Engine, known: &std::path::Path, seen: bool) -> Engine {
+    assert!(engine.scopes_context());
+    let (engine, eyes, reader) = super::super::worker::see_who_speaks(
+        engine,
+        Some(&known.to_path_buf()),
+        Some(std::path::Path::new("relative-bus-root")),
+        true,
+        seen,
+    );
+    assert!(
+        eyes.is_none() && reader.is_none(),
+        "the reader never started"
+    );
+    engine
+}
+
 fn clean(path: &std::path::Path) {
     let _ = std::fs::remove_file(known_face_of(path));
     let _ = std::fs::remove_file(path);
@@ -94,9 +114,9 @@ async fn one_line(
     one_line_eyes(what, words, chats, f1_speaks, boot, seen, true).await
 }
 
-/// [`one_line`], with `eyes_up` false as when the eyes' reader never
-/// started (`speaking_faces::read_from` gave None): the engine is not
-/// given them.
+/// [`one_line`], with `eyes_up` false set up by the worker with a reader
+/// that fails to start ([`failed_reader`]): the engine never gets the
+/// eyes.
 async fn one_line_eyes(
     what: &str,
     words: &str,
@@ -125,7 +145,7 @@ async fn one_line_eyes(
             .push(lease.scope().unwrap().person().map(str::to_owned));
         Box::pin(async { json!({"ok":true}) })
     });
-    let mut engine = engine.with_memory_scope(
+    let engine = engine.with_memory_scope(
         lamp_turn_owner::BootId::new([41; 16]).unwrap(),
         cache.clone(),
         runner,
@@ -133,11 +153,14 @@ async fn one_line_eyes(
             Told::from(format!("for {:?}", lease.scope().unwrap().person()))
         })),
     );
-    if eyes_up {
-        engine = engine.seeing_who_speaks(eyes.clone(), path.clone());
-    }
+    let engine = if eyes_up {
+        engine
+            .seeing_who_speaks(eyes.clone(), path.clone())
+            .scoping_by_sight(seen)
+    } else {
+        failed_reader(engine, &path, seen)
+    };
     let mut engine = engine
-        .scoping_by_sight(seen)
         .remembering(Arc::new(move |_, _, lease: Option<&ScopeLease>| {
             seen_leases.lock().unwrap().extend(lease.cloned());
             None
@@ -379,7 +402,7 @@ async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
                 json!({"ok":true})
             })
         });
-        let mut engine = engine.with_memory_scope(
+        let engine = engine.with_memory_scope(
             lamp_turn_owner::BootId::new([42; 16]).unwrap(),
             cache.clone(),
             runner,
@@ -387,10 +410,14 @@ async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
                 Told::from(format!("for {:?}", lease.scope().unwrap().person()))
             })),
         );
-        if eyes_up {
-            engine = engine.seeing_who_speaks(eyes.clone(), path.clone());
-        }
-        let mut engine = engine.scoping_by_sight(seen).announcing(false);
+        let engine = if eyes_up {
+            engine
+                .seeing_who_speaks(eyes.clone(), path.clone())
+                .scoping_by_sight(seen)
+        } else {
+            failed_reader(engine, &path, seen)
+        };
+        let mut engine = engine.announcing(false);
         engine.memory_camera(true, 1);
         // Cold: the voice restarted a second ago and nobody is named yet.
         cache.cold_since(Instant::now() - Duration::from_secs(1));
