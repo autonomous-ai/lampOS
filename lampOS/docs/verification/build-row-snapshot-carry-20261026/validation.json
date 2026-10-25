@@ -1,0 +1,33 @@
+{
+  "original_head": "24fe148165fa298d748da556a756a9be093e69e9",
+  "current_base": "1ee8cf7f09e6c9c6c7756f825a63640967c22634",
+  "changed_paths": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "original_file_byte_equal": true,
+  "arithmetic": {
+    "build": {
+      "rows": 70,
+      "sum": "65.15",
+      "mean_percent": "93.07142857142857142857142857",
+      "display_percent": "93.1"
+    },
+    "mood": {
+      "rows": 2,
+      "sum": "1.17",
+      "mean_percent": "58.50",
+      "display_percent": "58.5"
+    },
+    "quality": {
+      "rows": 16,
+      "sum": "10.75",
+      "mean_percent": "67.1875",
+      "display_percent": "67.2"
+    }
+  },
+  "validation": "Exact original file equality; net one-file diff; staged diff check; recomputed every score; no score or target changed. Documentation only, no runtime test run or physical measurement.",
+  "prior_base": "e1c69457aef3260ff411f73198431cce0b9fa9a7",
+  "head_before_merge": "09403dae4205556625dddbe3ff7df2dfcc0f1bbb",
+  "note": "Fresh current-base diff check and exact original-file equality. The unchanged bytes preserve the already recomputed row arithmetic.",
+  "offered_head": "ea45bd280"
+}

@@ -5,6 +5,52 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 00:14 — Current native reminder pass; latest-base carries continue
+
+Ready for lamp-voice: no (actual 1ee8 carries and current reads remain).
+
+#3491 published `503f8a237` on e1 passed original ARM64 **40213840982**
+and Linux clippy **40213840974**. The actual preview `523a55872` has
+parents e1/503 and exactly the offered tree. All **11,296** selected cases
+terminated successfully: **11,295 PASS plus one tracked journal LEAK**,
+106 skipped, both own actual-loop controls once, 35 equal repeated rows.
+[Receipt](verification/reminder-successor-boundary-20261025/native-40213840982.json).
+Reviewer-three READ-OK is in; Reviewer-two cleared the e1 base HOLD and
+found no source/proof P1/P2. The fresh e1 author gate passed formatting,
+strict Body/Voice/Eval clippy, workspace build and supervisor **21/0**;
+all earlier full and affected observations retain their actual sources.
+
+Train139 then landed #3493 as `1ee8cf7f0`. Local unoffered reminder carry
+`e319f3d4a` now has tree `87771377e`, exactly equal to the separately
+prepared 503+b2d composition: only schedule.md conflicted and both
+explanations survive in admission-then-reporting order, as do both reuse
+notes. Reviewer-two owns the combined host check; Third's duplicate was
+not started. No combined execution is claimed here.
+
+#3420 is published at `d1dbc3ad6` on e1, with original ARM64
+**40214158340** running and Linux clippy **40214158278** green. Its full
+Voice/Eval remains **4,685/0/21** on 597/56c, all ten own controls once;
+the fresh e1 narrow gate passed **21/0** plus formatting/clippy/build.
+Reviewer-three carried READ-OK; Reviewer-two's current read is active.
+Its actual 1ee8 source carry is being prepared without changing that offered
+head. #3486's frozen e1 full Body/Memory/Voice/Eval gate is still executing.
+Its P3 cadence and helper-versus-live-bus clock claims were corrected before
+freezing; all three original runtime deltas and original commits remain.
+
+Took stalled docs #3482 after checking open and merged replacements; train134
+closed unmerged. Replacement **#3495**, now `ea45bd280` on actual 1ee8,
+preserves `24fe14816` and the exact original 21:30 snapshot bytes. Only
+build-rows.md differs from the current base. Recomputed Build 65.15/70 =
+**93.1%**, Quality 10.75/16 = **67.2%**, excluded Mood 1.17/2 = **58.5%**;
+current diff checks pass. [Validation](verification/build-row-snapshot-carry-20261026/validation.json).
+The workflow explicitly excludes this non-build-read Markdown; no native
+runtime test is needed for it. It is a historical report, not a new lamp
+measurement, and current carried reads are requested.
+
+#3276 still needs the authorized product hand trial routed by First to the
+lamp owner; its posted acceptance sheet is unchanged. Third has no lamp and
+performed no device action or switch activation.
+
 ## 2026-10-25 23:50 — Reminder native green; child full qualification complete
 
 Ready for lamp-voice: no (actual e1 carries and current original gates pending).
