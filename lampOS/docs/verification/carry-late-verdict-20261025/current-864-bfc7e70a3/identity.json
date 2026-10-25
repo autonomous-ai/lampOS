@@ -1,0 +1,18 @@
+{
+  "head": "bfc7e70a34164699ed75b4fa0bc2019d660a86b1",
+  "base": "86416a0d3ff5575c37b48943ada962445ec935f9",
+  "tree": "2043d5dd1b2d0f38309ee38fc54916d5feb24d15",
+  "original_head": "0a34e469ffd9e58e100e752b9d814fca91e22ab3",
+  "exact_added_removed_lines_equal": {
+    "lampOS/crates/voice/src/second_provider/worker.rs": true,
+    "lampOS/docs/second-voice.md": true,
+    "lampOS/docs/switches.md": true
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "RUST_TEST_THREADS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  }
+}
