@@ -1,0 +1,1110 @@
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	﻿2026-10-25T00:59:41.7450256Z Current runner version: '2.338.0'
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7487267Z ##[group]Runner Image Provisioner
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7488740Z Hosted Compute Agent
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7489937Z Version: 20261021.618
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7491034Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7492422Z Build Date: 2026-10-21T00:45:21Z
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7493889Z Worker ID: {1a8edabd-09d5-48d4-81db-aefae655e845}
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7495339Z Region: eastus
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7496474Z Cloud: Azure
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7497370Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7499985Z ##[group]Operating System
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7501101Z Ubuntu
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7502149Z 22.04.5
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7503032Z LTS
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7504285Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7505430Z ##[group]Runner Image
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7506472Z Image: ubuntu-22.04
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7507491Z Version: 20261012.322.1
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7509444Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261012.322/images/ubuntu/Ubuntu2204-Readme.md
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7513824Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261012.322
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7515776Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7518104Z ##[group]GITHUB_TOKEN Permissions
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7521164Z Contents: read
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7522301Z Metadata: read
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7523580Z Packages: read
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7524725Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7528403Z Secret source: Actions
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7530126Z Cache mode: write
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.7531333Z Prepare workflow directory
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.8021038Z Prepare all required actions
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.8092621Z Getting action download info
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:41.9998036Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:42.1420372Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+lampOS — clippy, every crate and target (x86 Linux)	Set up job	2026-10-25T00:59:42.3922432Z Complete job name: lampOS — clippy, every crate and target (x86 Linux)
+lampOS — clippy, every crate and target (x86 Linux)	system packages	﻿2026-10-25T00:59:42.4728226Z ##[group]Run sudo apt-get update
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.4728933Z [36;1msudo apt-get update[0m
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.4729791Z [36;1msudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \[0m
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.4730977Z [36;1m  ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev[0m
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.5459992Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.5460939Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.7676838Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.8035707Z Get:6 https://packages.microsoft.com/ubuntu/22.04/prod jammy InRelease [3632 B]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.8291707Z Hit:2 http://azure.archive.ubuntu.com/ubuntu jammy InRelease
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.8309506Z Get:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.8376679Z Get:4 http://azure.archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.8403680Z Get:5 http://azure.archive.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.9334717Z Get:7 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main armhf Packages [23.5 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.9444682Z Get:8 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main amd64 Packages [949 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:42.9532993Z Get:9 https://packages.microsoft.com/ubuntu/22.04/prod jammy/main arm64 Packages [687 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.1746954Z Get:10 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [3909 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.1966901Z Get:11 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main Translation-en [576 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.2005162Z Get:12 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1289 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.2095510Z Get:13 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe Translation-en [326 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.3876578Z Get:14 http://azure.archive.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3643 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.4076971Z Get:15 http://azure.archive.ubuntu.com/ubuntu jammy-security/main Translation-en [510 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.4105714Z Get:16 http://azure.archive.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1055 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:43.4160893Z Get:17 http://azure.archive.ubuntu.com/ubuntu jammy-security/universe Translation-en [237 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:52.3512980Z Fetched 13.6 MB in 2s (7961 kB/s)
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:53.8822210Z Reading package lists...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:53.9560052Z Reading package lists...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.2569766Z Building dependency tree...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.2584279Z Reading state information...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.4574944Z build-essential is already the newest version (12.9ubuntu3).
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.4575837Z build-essential set to manually installed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.4576556Z git is already the newest version (1:2.55.0-0ppa1~ubuntu22.04.2).
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.4577236Z Suggested packages:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.4577692Z   libasound2-doc
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5000089Z The following packages will be REMOVED:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5002158Z   pkgconf r-base-dev
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5002798Z The following NEW packages will be installed:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5014926Z   clang libasound2-dev libclang-14-dev libclang-dev pkg-config
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5019431Z The following packages will be upgraded:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5028212Z   ca-certificates curl libcurl4
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5220941Z 3 upgraded, 5 newly installed, 2 to remove and 85 not upgraded.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5221643Z Need to get 26.0 MB of archives.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5222044Z After this operation, 246 MB of additional disk space will be used.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5222523Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5594157Z Get:2 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 pkg-config amd64 0.29.2-1ubuntu3 [48.2 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5762854Z Get:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 ca-certificates all 20260816ubuntu0.22.04.1 [140 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.5926438Z Get:4 http://azure.archive.ubuntu.com/ubuntu jammy/universe amd64 clang amd64 1:14.0-55~exp2 [3558 B]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.6076292Z Get:5 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 curl amd64 7.81.0-1ubuntu1.30 [194 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.6238051Z Get:6 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libcurl4 amd64 7.81.0-1ubuntu1.30 [293 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.6405855Z Get:7 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libasound2-dev amd64 1.2.6.1-1ubuntu1.2 [110 kB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.6562897Z Get:8 http://azure.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 libclang-14-dev amd64 1:14.0.0-1ubuntu1.1 [25.2 MB]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:54.8218677Z Get:9 http://azure.archive.ubuntu.com/ubuntu jammy/universe amd64 libclang-dev amd64 1:14.0-55~exp2 [3138 B]
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.1250882Z Preconfiguring packages ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.6892698Z Fetched 26.0 MB in 0s (83.0 MB/s)
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7838270Z (Reading database ... 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7838732Z (Reading database ... 5%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7839033Z (Reading database ... 10%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7839421Z (Reading database ... 15%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7839692Z (Reading database ... 20%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7839960Z (Reading database ... 25%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7840383Z (Reading database ... 30%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7840808Z (Reading database ... 35%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7841183Z (Reading database ... 40%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7841870Z (Reading database ... 45%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:55.7842137Z (Reading database ... 50%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:56.0897378Z (Reading database ... 55%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:56.5386535Z (Reading database ... 60%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:56.9071287Z (Reading database ... 65%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:57.1905637Z (Reading database ... 70%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:57.8931102Z (Reading database ... 75%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:58.6144654Z (Reading database ... 80%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T00:59:59.5455743Z (Reading database ... 85%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:00.3531667Z (Reading database ... 90%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:00.9915458Z (Reading database ... 95%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:00.9916141Z (Reading database ... 100%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:00.9917034Z (Reading database ... 261641 files and directories currently installed.)
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:00.9974285Z Removing r-base-dev (4.6.1-6.2204.0) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0781419Z dpkg: pkgconf: dependency problems, but removing anyway as you requested:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0782311Z  php8.1-dev depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0782908Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0784090Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0785013Z  mono-devel depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0785716Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0786570Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0787606Z  libmagickwand-6.q16-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0788561Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0789484Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0790669Z  libmagickcore-6.q16-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0791499Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0792143Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0792869Z  libglib2.0-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0793797Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0794480Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0795167Z  libfontconfig-dev:amd64 depends on pkg-config; however:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0795822Z   Package pkg-config is not installed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0796490Z   Package pkgconf which provides pkg-config is to be removed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0796969Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.0850921Z Removing pkgconf (1.8.0-1) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.2418028Z Removing 'diversion of /usr/bin/pkg-config to /usr/bin/pkg-config.real by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.2559016Z Removing 'diversion of /usr/share/aclocal/pkg.m4 to /usr/share/aclocal/pkg.real.m4 by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.2701333Z Removing 'diversion of /usr/share/man/man1/pkg-config.1.gz to /usr/share/man/man1/pkg-config.real.1.gz by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.2849551Z Removing 'diversion of /usr/share/pkg-config-crosswrapper to /usr/share/pkg-config-crosswrapper.real by pkgconf'
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3540469Z Selecting previously unselected package pkg-config.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3622813Z (Reading database ... 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3623494Z (Reading database ... 5%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3623902Z (Reading database ... 10%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3624490Z (Reading database ... 15%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3625101Z (Reading database ... 20%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3625435Z (Reading database ... 25%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3625727Z (Reading database ... 30%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3626718Z (Reading database ... 35%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3627034Z (Reading database ... 40%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3627341Z (Reading database ... 45%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3627656Z (Reading database ... 50%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3659825Z (Reading database ... 55%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3690588Z (Reading database ... 60%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3726218Z (Reading database ... 65%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3765968Z (Reading database ... 70%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.3933627Z (Reading database ... 75%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4102716Z (Reading database ... 80%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4341360Z (Reading database ... 85%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4612124Z (Reading database ... 90%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4708329Z (Reading database ... 95%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4708913Z (Reading database ... 100%
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4709701Z (Reading database ... 261619 files and directories currently installed.)
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4763470Z Preparing to unpack .../0-pkg-config_0.29.2-1ubuntu3_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.4773056Z Unpacking pkg-config (0.29.2-1ubuntu3) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.5294080Z Preparing to unpack .../1-ca-certificates_20260816ubuntu0.22.04.1_all.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.5372468Z Unpacking ca-certificates (20260816ubuntu0.22.04.1) over (20260601~22.04.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.6212768Z Selecting previously unselected package clang.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.6425647Z Preparing to unpack .../2-clang_1%3a14.0-55~exp2_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.6433864Z Unpacking clang (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.6968819Z Preparing to unpack .../3-curl_7.81.0-1ubuntu1.30_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.6993719Z Unpacking curl (7.81.0-1ubuntu1.30) over (7.81.0-1ubuntu1.29) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.7613090Z Preparing to unpack .../4-libcurl4_7.81.0-1ubuntu1.30_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.7844858Z Unpacking libcurl4:amd64 (7.81.0-1ubuntu1.30) over (7.81.0-1ubuntu1.29) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.8171118Z Selecting previously unselected package libasound2-dev:amd64.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.8388971Z Preparing to unpack .../5-libasound2-dev_1.2.6.1-1ubuntu1.2_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.8430781Z Unpacking libasound2-dev:amd64 (1.2.6.1-1ubuntu1.2) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.8899854Z Selecting previously unselected package libclang-14-dev.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.9110974Z Preparing to unpack .../6-libclang-14-dev_1%3a14.0.0-1ubuntu1.1_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:01.9120961Z Unpacking libclang-14-dev (1:14.0.0-1ubuntu1.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:02.8313772Z Selecting previously unselected package libclang-dev.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:02.8527646Z Preparing to unpack .../7-libclang-dev_1%3a14.0-55~exp2_amd64.deb ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:02.8536526Z Unpacking libclang-dev (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:02.9109251Z Setting up ca-certificates (20260816ubuntu0.22.04.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:04.7276411Z Updating certificates in /etc/ssl/certs...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.5795978Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.5937617Z 4 added, 5 removed; done.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.6216593Z Setting up clang (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.6592262Z Setting up pkg-config (0.29.2-1ubuntu3) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.6955267Z Setting up libclang-14-dev (1:14.0.0-1ubuntu1.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.6977690Z Setting up libcurl4:amd64 (7.81.0-1ubuntu1.30) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.7003533Z Setting up curl (7.81.0-1ubuntu1.30) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.7026335Z Setting up libasound2-dev:amd64 (1.2.6.1-1ubuntu1.2) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.7048088Z Setting up libclang-dev (1:14.0-55~exp2) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.7077614Z Processing triggers for man-db (2.10.2-1) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.7101645Z Not building database; man-db/auto-update is not 'true'.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.7114350Z Processing triggers for libc-bin (2.35-0ubuntu3.15) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.8200369Z Processing triggers for ca-certificates (20260816ubuntu0.22.04.1) ...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:05.8248712Z Updating certificates in /etc/ssl/certs...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.3721427Z 0 added, 0 removed; done.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.3721820Z Running hooks in /etc/ca-certificates/update.d...
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.5020953Z /etc/ssl/certs/adoptium/cacerts successfully populated.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.5050400Z Updating Mono key store
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.5372325Z Mono Certificate Store Sync - version 6.12.0.200
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.5373407Z Populate Mono certificate store from a concatenated list of certificates.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.5374012Z Copyright 2002, 2003 Motus Technologies. Copyright 2004-2008 Novell. BSD licensed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.5374349Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.5922302Z Importing into legacy system store:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.7968528Z I already trust 121, your new list has 120
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.8038130Z Certificate added: C=JP, O="SECOM Trust Systems Co., Ltd.", CN=SECOM TLS RSA Root CA 2024
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.8042351Z Certificate added: C=SE, O=Telia Company AB, CN=Telia EC TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.8045215Z Certificate added: C=SE, O=Telia Company AB, CN=Telia RSA TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.8045970Z 3 new root certificates were added to your trust store.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.8046698Z Import process completed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.8062248Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.8062512Z Importing into BTLS system store:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:06.9984170Z I already trust 121, your new list has 120
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:07.3774446Z Certificate added: C=JP, O="SECOM Trust Systems Co., Ltd.", CN=SECOM TLS RSA Root CA 2024
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:07.3779695Z Certificate added: C=SE, O=Telia Company AB, CN=Telia EC TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:07.3792229Z Certificate added: C=SE, O=Telia Company AB, CN=Telia RSA TLS Root CA v3
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:07.3792805Z 3 new root certificates were added to your trust store.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:07.3793507Z Import process completed.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:07.3929974Z Done
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:07.3932602Z done.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5214316Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5215318Z Running kernel seems to be up-to-date.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5215696Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5215852Z Services to be restarted:
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5268055Z  systemctl restart php8.1-fpm.service
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5268442Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5270188Z No containers need to be restarted.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5270552Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5270911Z No user sessions are running outdated binaries.
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5271398Z 
+lampOS — clippy, every crate and target (x86 Linux)	system packages	2026-10-25T01:00:08.5271850Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	﻿2026-10-25T01:00:10.2602711Z ##[group]Run actions/checkout@v4
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2603015Z with:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2603584Z   repository: autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2606038Z   token: ***
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2606257Z   ssh-strict: true
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2606456Z   ssh-user: git
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2606666Z   persist-credentials: true
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2606894Z   clean: true
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2607100Z   sparse-checkout-cone-mode: true
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2607347Z   fetch-depth: 1
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2607540Z   fetch-tags: false
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2607740Z   show-progress: true
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2607952Z   lfs: false
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2608137Z   submodules: false
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2608341Z   set-safe-directory: true
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2608587Z   allow-unsafe-pr-checkout: false
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.2608835Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.3731726Z Syncing repository: autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.3733736Z ##[group]Getting Git version info
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.3734150Z Working directory is '/home/runner/work/lampOS/lampOS'
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.3734781Z [command]/usr/bin/git version
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4769257Z git version 2.55.0
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4791919Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4808067Z Temporarily overriding HOME='/home/runner/work/_temp/5ec35291-1dfb-4a4a-a408-5be5fed95557' before making global git config changes
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4809286Z Adding repository directory to the temporary git global config as a safe directory
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4815251Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lampOS/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4859947Z Deleting the contents of '/home/runner/work/lampOS/lampOS'
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4865330Z ##[group]Initializing the repository
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.4869158Z [command]/usr/bin/git init /home/runner/work/lampOS/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5790847Z hint: Using 'master' as the name for the initial branch. This default branch name
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5792335Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5793772Z hint: to use in all of your new repositories, which will suppress this warning,
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5794728Z hint: call:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5795295Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5795993Z hint: 	git config --global init.defaultBranch <name>
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5796793Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5797384Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5798866Z hint: 'development'. The just-created branch can be renamed via this command:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5799528Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5799819Z hint: 	git branch -m <name>
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5800203Z hint:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5800684Z hint: Disable this message with "git config set advice.defaultBranchName false"
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5801464Z Initialized empty Git repository in /home/runner/work/lampOS/lampOS/.git/
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5806359Z [command]/usr/bin/git remote add origin https://github.com/autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5938763Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5939350Z ##[group]Disabling automatic garbage collection
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5942978Z [command]/usr/bin/git config --local gc.auto 0
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5981804Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5982459Z ##[group]Setting up auth
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.5990086Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:10.6028296Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.0568024Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.0609141Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.0884031Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.0927159Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.1196429Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.1245836Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.1246272Z ##[group]Fetching the repository
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:11.1255856Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +13e55a4340220c680b20140c4601de011e8bd8a9:refs/remotes/origin/third/carry-held-constraints
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.1996154Z From https://github.com/autonomous-ai/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.1996889Z  * [new ref]         13e55a4340220c680b20140c4601de011e8bd8a9 -> origin/third/carry-held-constraints
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.2005354Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.2006034Z ##[group]Determining the checkout info
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.2006722Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.2014056Z [command]/usr/bin/git sparse-checkout disable
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.2131788Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.2155432Z ##[group]Checking out the ref
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:15.2160224Z [command]/usr/bin/git checkout --progress --force -B third/carry-held-constraints refs/remotes/origin/third/carry-held-constraints
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.2423642Z Updating files:  75% (7910/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.2559330Z Updating files:  76% (7951/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.2671758Z Updating files:  77% (8055/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.2775718Z Updating files:  78% (8160/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.2876889Z Updating files:  79% (8265/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.2956857Z Updating files:  80% (8369/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.3051571Z Updating files:  81% (8474/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:16.3146316Z Updating files:  82% (8579/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.6220397Z Updating files:  83% (8683/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.6225447Z Updating files:  83% (8786/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.6960411Z Updating files:  84% (8788/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7055733Z Updating files:  85% (8892/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7122617Z Updating files:  86% (8997/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7182861Z Updating files:  87% (9102/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7241189Z Updating files:  88% (9206/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7318325Z Updating files:  89% (9311/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7398051Z Updating files:  90% (9415/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7473234Z Updating files:  91% (9520/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7534290Z Updating files:  92% (9625/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7600113Z Updating files:  93% (9729/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7667496Z Updating files:  94% (9834/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7731979Z Updating files:  95% (9938/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7794696Z Updating files:  96% (10043/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7858750Z Updating files:  97% (10148/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.7941040Z Updating files:  98% (10252/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.8011523Z Updating files:  99% (10357/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.8012028Z Updating files: 100% (10461/10461)
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.8012504Z Updating files: 100% (10461/10461), done.
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.8152066Z Switched to a new branch 'third/carry-held-constraints'
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.8156411Z branch 'third/carry-held-constraints' set up to track 'origin/third/carry-held-constraints'.
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.9321494Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.9369107Z [command]/usr/bin/git log -1 --format=%H
+lampOS — clippy, every crate and target (x86 Linux)	Run actions/checkout@v4	2026-10-25T01:00:17.9401081Z 13e55a4340220c680b20140c4601de011e8bd8a9
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	﻿2026-10-25T01:00:17.9549995Z ##[group]Run curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:17.9551180Z [36;1mcurl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt[0m
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:17.9551805Z [36;1mecho "$HOME/.cargo/bin" >> "$GITHUB_PATH"[0m
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:17.9625659Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:17.9625942Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.0480556Z info: downloading installer
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.2695455Z warn: it looks like you have an existing rustup settings file at:
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.2696186Z warn: /home/runner/.rustup/settings.toml
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.3094495Z info: profile set to minimal
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.3094990Z info: default host tuple is x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.3185366Z info: syncing channel updates for 1.96.0-x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.4209038Z info: latest update on 2026-05-28 for version 1.96.0 (ac68faa20 2026-05-25)
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:18.4210133Z info: downloading 5 components
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8552277Z info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8552688Z 
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8653665Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8654346Z 
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8654743Z 
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8654923Z Rust is installed now. Great!
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8655214Z 
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8655573Z To get started you may need to restart your current shell.
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8656261Z This would reload your PATH environment variable to include
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8656923Z Cargo's bin directory ($HOME/.cargo/bin).
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8657265Z 
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8657414Z To configure your current shell, you need to source the
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8657776Z corresponding env file under $HOME/.cargo.
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8657979Z 
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8658173Z Consider running the right command for your shell (note the leading DOT):
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8658721Z . "$HOME/.cargo/env"     # For sh/ash/dash/pdksh/bash
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8659075Z . "$HOME/.cargo/env.ps1" # For pwsh
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8659385Z cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8659708Z CC_x86_64-unknown-linux-gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8660014Z cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8660325Z CC_x86_64_unknown_linux_gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8660636Z cargo:rerun-if-env-changed=HOST_CC
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8661071Z HOST_CC = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8661432Z cargo:rerun-if-env-changed=CC
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8661700Z CC = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:26.8662181Z cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1841939Z cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1842615Z CRATE_CC_NO_DEFAULTS = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1843426Z cargo:rerun-if-env-changed=CFLAGS
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1843905Z CFLAGS = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1844257Z cargo:rerun-if-env-changed=HOST_CFLAGS
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1844749Z HOST_CFLAGS = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1845204Z cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1845778Z CFLAGS_x86_64_unknown_linux_gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1846387Z cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+lampOS — clippy, every crate and target (x86 Linux)	Rust 1.96.0	2026-10-25T01:00:27.1848844Z CFLAGS_x86_64-unknown-linux-gnu = None
+lampOS — clippy, every crate and target (x86 Linux)	formatting (whole workspace, pinned Rust)	﻿2026-10-25T01:00:27.2105794Z ##[group]Run cargo +1.96.0 fmt --all --check
+lampOS — clippy, every crate and target (x86 Linux)	formatting (whole workspace, pinned Rust)	2026-10-25T01:00:27.2106188Z [36;1mcargo +1.96.0 fmt --all --check[0m
+lampOS — clippy, every crate and target (x86 Linux)	formatting (whole workspace, pinned Rust)	2026-10-25T01:00:27.2183566Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	formatting (whole workspace, pinned Rust)	2026-10-25T01:00:27.2183841Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	﻿2026-10-25T01:00:38.0940046Z ##[group]Run actions/cache/restore@v4
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0940377Z with:
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0940640Z   path: ~/.cargo/registry
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	~/.cargo/git
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	lampOS/target
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0941192Z   key: lampos-clippy-u2204-f9bfc350c121d9eb0325c2f09ae44f74e7af15c72cdc61bc5f76462535ff6dae
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0941723Z   restore-keys: lampos-clippy-u2204-
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0942017Z   enableCrossOsArchive: false
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0942280Z   fail-on-cache-miss: false
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0942519Z   lookup-only: false
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.0942735Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.2057178Z (node:8449) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.2058402Z (Use `node --trace-deprecation ...` to show where the warning was created)
+lampOS — clippy, every crate and target (x86 Linux)	restore the cache	2026-10-25T01:00:38.3042045Z Cache not found for input keys: lampos-clippy-u2204-f9bfc350c121d9eb0325c2f09ae44f74e7af15c72cdc61bc5f76462535ff6dae, lampos-clippy-u2204-
+lampOS — clippy, every crate and target (x86 Linux)	unchanged source files get the cached build's times back	﻿2026-10-25T01:00:38.3166121Z ##[group]Run python3 -I .github/scripts/lampos-source-times.py
+lampOS — clippy, every crate and target (x86 Linux)	unchanged source files get the cached build's times back	2026-10-25T01:00:38.3166625Z [36;1mpython3 -I .github/scripts/lampos-source-times.py[0m
+lampOS — clippy, every crate and target (x86 Linux)	unchanged source files get the cached build's times back	2026-10-25T01:00:38.3239060Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	unchanged source files get the cached build's times back	2026-10-25T01:00:38.3239348Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	unchanged source files get the cached build's times back	2026-10-25T01:00:39.0881730Z No record in the cache: all 7042 source files keep the checkout's time.
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	﻿2026-10-25T01:00:39.0983899Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:39.0984512Z [36;1mcargo clippy --locked --workspace --all-targets -- -D warnings[0m
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:39.1057497Z shell: /usr/bin/bash -e {0}
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:39.1057764Z ##[endgroup]
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:39.2266251Z     Updating crates.io index
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:39.2276587Z     Updating git repository `https://github.com/RustAudio/cpal.git`
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.2562183Z  Downloading crates ...
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3141058Z   Downloaded anymap3 v1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3164596Z   Downloaded block-buffer v0.10.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3187410Z   Downloaded displaydoc v0.2.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3223756Z   Downloaded http-body v1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3249349Z   Downloaded getrandom v0.2.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3304401Z   Downloaded hex v0.4.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3327908Z   Downloaded borsh-derive v1.8.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3371645Z   Downloaded jiff-static v0.2.38
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3389076Z   Downloaded http-body-util v0.1.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3419570Z   Downloaded ipnet v2.12.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3448112Z   Downloaded mime v0.3.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3476200Z   Downloaded potential_utf v0.1.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3492770Z   Downloaded percent-encoding v2.3.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3506758Z   Downloaded pem v3.0.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3526634Z   Downloaded memo-map v0.3.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3549858Z   Downloaded proc-macro2 v1.0.107
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3596877Z   Downloaded proc-macro-crate v3.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3616477Z   Downloaded openssl-probe v0.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3637653Z   Downloaded nom-language v0.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3651375Z   Downloaded icu_locale_core v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3743251Z   Downloaded rand_core v0.6.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3786155Z   Downloaded olpc-cjson v0.1.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3814319Z   Downloaded scopeguard v1.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3843193Z   Downloaded signature v2.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3875060Z   Downloaded rustc_version v0.4.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3912297Z   Downloaded snafu-derive v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3966970Z   Downloaded sync_wrapper v1.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.3997016Z   Downloaded spidev v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4029661Z   Downloaded num-rational v0.4.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4054558Z   Downloaded thread-priority v3.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4109372Z   Downloaded transpose v0.2.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4159381Z   Downloaded yoke v0.8.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4212193Z   Downloaded zerovec-derive v0.11.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4254531Z   Downloaded zerofrom v0.1.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4285664Z   Downloaded zmij v1.0.23
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4326188Z   Downloaded zerofrom-derive v0.1.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4357541Z   Downloaded zune-core v0.4.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4391929Z   Downloaded typenum v1.20.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4445582Z   Downloaded zune-jpeg v0.4.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4492539Z   Downloaded unicode-normalization v0.1.25
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4539198Z   Downloaded tower-http v0.6.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4655232Z   Downloaded zerovec v0.11.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4740192Z   Downloaded winnow v1.0.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4857435Z   Downloaded webpki-roots v1.0.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.4902525Z   Downloaded rustls v0.23.45
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.5046678Z   Downloaded tract-core v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.5191443Z   Downloaded rustix v1.1.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.5505760Z   Downloaded syn v2.0.119
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.5629764Z   Downloaded nix v0.28.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.5759508Z   Downloaded nix v0.26.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.5874788Z   Downloaded regex-syntax v0.8.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.5952910Z   Downloaded zerocopy v0.8.62
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.6260345Z   Downloaded tracing v0.1.44
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.6450924Z   Downloaded rustfft v6.4.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.6567204Z   Downloaded vcpkg v0.2.15
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7204408Z   Downloaded icu_normalizer v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7316379Z   Downloaded ndarray v0.17.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7425513Z   Downloaded nix v0.29.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7552085Z   Downloaded curve25519-dalek v4.1.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7646893Z   Downloaded syn v3.0.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7770954Z   Downloaded minijinja v2.24.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7836196Z   Downloaded hyper v1.12.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.7916748Z   Downloaded tokio-util v0.7.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.8007392Z   Downloaded regex-automata v0.4.18
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.8166161Z   Downloaded ort v2.0.0-rc.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.8253580Z   Downloaded jiff v0.2.38
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.8425801Z   Downloaded bstr v1.13.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.8516072Z   Downloaded zerotrie v0.2.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.8561182Z   Downloaded glam v0.33.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.8872568Z   Downloaded zerocopy-derive v0.8.62
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9015768Z   Downloaded reqwest v0.13.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9076665Z   Downloaded regex v1.13.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9137332Z   Downloaded bindgen v0.72.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9212444Z   Downloaded aws-lc-rs v1.18.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9335366Z   Downloaded libc v0.2.190
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9880550Z   Downloaded tract-onnx v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9961967Z   Downloaded tract-data v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:41.9997159Z   Downloaded tower v0.5.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.0112523Z   Downloaded sonora-aec3 v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.0174063Z   Downloaded zeroize v1.9.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.0192117Z   Downloaded v4l2r v0.0.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.0255256Z   Downloaded url v2.5.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.0285056Z   Downloaded tokio v1.53.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.0792683Z   Downloaded toml v1.1.8+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.0840889Z   Downloaded rustls-webpki v0.102.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1084339Z   Downloaded rand v0.10.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1126919Z   Downloaded nom v8.0.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1187483Z   Downloaded tract-linalg v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1655940Z   Downloaded nom v7.1.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1714102Z   Downloaded memchr v2.8.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1777228Z   Downloaded libm v0.2.16
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1899302Z   Downloaded itertools v0.15.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.1980485Z   Downloaded icu_properties_data v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2100078Z   Downloaded hyper-util v0.1.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2172759Z   Downloaded unicode-ident v1.0.26
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2204018Z   Downloaded typed-path v0.9.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2280334Z   Downloaded tungstenite v0.30.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2319739Z   Downloaded tract-hir v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2380092Z   Downloaded tokio-stream v0.1.19
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2438357Z   Downloaded tar v0.4.46
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2471101Z   Downloaded spin v0.9.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2496841Z   Downloaded snafu v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2570250Z   Downloaded mio v1.2.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2639742Z   Downloaded itertools v0.13.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2716283Z   Downloaded idna v1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2755394Z   Downloaded futures-util v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2905724Z   Downloaded tract-extra v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2919592Z   Downloaded tower-service v0.3.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.2930621Z   Downloaded thiserror v2.0.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3004784Z   Downloaded ring v0.17.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3482216Z   Downloaded rusqlite v0.40.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3558016Z   Downloaded num-bigint v0.4.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3611853Z   Downloaded minimal-lexical v0.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3664527Z   Downloaded icu_properties v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3700673Z   Downloaded axum v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3791748Z   Downloaded xattr v1.6.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3813892Z   Downloaded want v0.3.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3825318Z   Downloaded walkdir v2.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3847051Z   Downloaded utf8_iter v1.0.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3859362Z   Downloaded untrusted v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3872076Z   Downloaded unicode-xid v0.2.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3888507Z   Downloaded typeid v1.0.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3903305Z   Downloaded tract-nnef v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3960405Z   Downloaded toml_writer v1.1.3+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3976538Z   Downloaded tokio-rustls v0.26.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.3995543Z   Downloaded thiserror-impl v2.0.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4012742Z   Downloaded thiserror-impl v1.0.69
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4028921Z   Downloaded thiserror v1.0.69
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4092298Z   Downloaded tempfile v3.27.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4121924Z   Downloaded smallvec v1.16.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4138120Z   Downloaded signal-hook v0.4.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4166794Z   Downloaded serde_json v1.0.151
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4251229Z   Downloaded rustls-platform-verifier v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4296947Z   Downloaded rand_distr v0.6.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4337830Z   Downloaded prettyplease v0.2.37
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4377946Z   Downloaded pin-project v1.1.13
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4531243Z   Downloaded jiff-tzdb v0.1.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4548841Z   Downloaded hashbrown v0.16.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4606694Z   Downloaded yoke-derive v0.8.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4632904Z   Downloaded writeable v0.6.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4657432Z   Downloaded webpki-roots v0.26.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4672144Z   Downloaded version_check v0.9.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4688032Z   Downloaded untrusted v0.9.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4720818Z   Downloaded try-lock v0.2.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4747418Z   Downloaded tower-layer v0.3.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4759303Z   Downloaded toml_edit v0.25.17+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4803502Z   Downloaded tokio-tungstenite v0.30.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4826849Z   Downloaded tokio-macros v2.7.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4839999Z   Downloaded synstructure v0.14.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4851614Z   Downloaded string-interner v0.20.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4878524Z   Downloaded strength_reduce v0.2.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4894384Z   Downloaded spki v0.7.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4914733Z   Downloaded sonora-fft v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4930717Z   Downloaded socket2 v0.6.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4951379Z   Downloaded simd-adler32 v0.3.10
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4972679Z   Downloaded signal-hook-registry v1.4.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.4987563Z   Downloaded matrixmultiply v0.3.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5023240Z   Downloaded log v0.4.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5051795Z   Downloaded jiff-core v0.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5092394Z   Downloaded ed25519-dalek v2.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5127747Z   Downloaded derive_more-impl v2.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5187419Z   Downloaded derive_more v2.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5334310Z   Downloaded base64 v0.23.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5379740Z   Downloaded tract-onnx-opl v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5400347Z   Downloaded tracing-core v0.1.36
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5430644Z   Downloaded tracing-attributes v0.1.31
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5460850Z   Downloaded toml_parser v1.1.5+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5486600Z   Downloaded tinyvec v1.13.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5526047Z   Downloaded tinystr v0.8.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5549622Z   Downloaded subtle v2.6.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5563529Z   Downloaded sonora-common-audio v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5578379Z   Downloaded slab v0.4.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5593993Z   Downloaded serde_derive v1.0.229
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5628796Z   Downloaded serde_core v1.0.229
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5660535Z   Downloaded serde v1.0.229
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5705020Z   Downloaded rustls-webpki v0.103.15
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5739428Z   Downloaded rumqttc v0.25.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5808244Z   Downloaded ort-sys v2.0.0-rc.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5838411Z   Downloaded num-traits v0.2.19
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5868444Z   Downloaded indexmap v2.14.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5916384Z   Downloaded hashbrown v0.17.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.5975419Z   Downloaded half v2.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6006638Z   Downloaded gpiocdev v0.8.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6054504Z   Downloaded der v0.7.10
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6113633Z   Downloaded defmt v1.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6169190Z   Downloaded cc v1.7.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6209783Z   Downloaded bytemuck v1.25.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6245150Z   Downloaded toml_datetime v1.1.2+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6259781Z   Downloaded stable_deref_trait v1.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6271240Z   Downloaded getrandom v0.4.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6313633Z   Downloaded futures v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6370140Z   Downloaded const-oid v0.10.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.6397156Z   Downloaded linux-raw-sys v0.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7095414Z   Downloaded semver v1.0.28
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7122105Z   Downloaded rustls-pki-types v1.15.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7156128Z   Downloaded hyper-rustls v0.27.10
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7172715Z   Downloaded http v1.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7214614Z   Downloaded hybrid-array v0.4.15
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7238981Z   Downloaded hashlink v0.12.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7261392Z   Downloaded futures-channel v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7282851Z   Downloaded sonora-simd v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7296056Z   Downloaded sonora-ns v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7315886Z   Downloaded shlex v2.0.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7330978Z   Downloaded shlex v1.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7345192Z   Downloaded sha2 v0.10.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7374762Z   Downloaded serde_path_to_error v0.1.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7392630Z   Downloaded parking_lot v0.12.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7421703Z   Downloaded num-complex v0.4.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7438114Z   Downloaded matchit v0.8.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7462716Z   Downloaded jpeg-encoder v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7486593Z   Downloaded httparse v1.10.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7515507Z   Downloaded gpiocdev-uapi v0.7.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7546581Z   Downloaded glob v0.3.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7564172Z   Downloaded futures-executor v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7579889Z   Downloaded fs_extra v1.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7598631Z   Downloaded foldhash v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7613111Z   Downloaded fallible-iterator v0.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7627446Z   Downloaded erased-serde v0.4.10
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7655291Z   Downloaded defmt-macros v1.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7696182Z   Downloaded const-oid v0.9.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7717274Z   Downloaded cexpr v0.6.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7738418Z   Downloaded base64ct v1.8.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7767511Z   Downloaded axum-core v0.5.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7792793Z   Downloaded autocfg v1.5.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7814205Z   Downloaded async-trait v0.1.92
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7857691Z   Downloaded async-recursion v1.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7901682Z   Downloaded aho-corasick v1.1.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7960930Z   Downloaded sha1 v0.11.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7981426Z   Downloaded serde_spanned v1.1.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.7994051Z   Downloaded serde_plain v1.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8010027Z   Downloaded rustversion v1.0.23
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8042514Z   Downloaded rustls-pemfile v2.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8070064Z   Downloaded rustls-native-certs v0.8.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8085099Z   Downloaded quote v1.0.47
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8116328Z   Downloaded prost v0.14.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8135689Z   Downloaded pin-project-lite v0.2.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8208077Z   Downloaded lock_api v0.4.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8222607Z   Downloaded i2cdev v0.6.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8245306Z   Downloaded globset v0.4.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8262781Z   Downloaded futures-task v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8276351Z   Downloaded futures-macro v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8312305Z   Downloaded futures-io v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8322106Z   Downloaded fixedbitset v0.5.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8343865Z   Downloaded find-msvc-tools v0.1.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8362545Z   Downloaded filetime v0.2.29
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8381605Z   Downloaded fastrand v2.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8397837Z   Downloaded fallible-streaming-iterator v0.1.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8408677Z   Downloaded either v1.19.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8425935Z   Downloaded ed25519 v2.2.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8445830Z   Downloaded dunce v1.0.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8456322Z   Downloaded downcast-rs v2.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8471511Z   Downloaded digest v0.10.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8492197Z   Downloaded data-encoding v2.11.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8503780Z   Downloaded crypto-common v0.1.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8514242Z   Downloaded cfg_aliases v0.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8525251Z   Downloaded base64 v0.22.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8568018Z   Downloaded num-integer v0.1.47
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8585791Z   Downloaded heck v0.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8600505Z   Downloaded generic-array v0.14.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8616162Z   Downloaded form_urlencoded v1.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8625891Z   Downloaded dyn-hash v1.0.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8642551Z   Downloaded curve25519-dalek-derive v0.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8654845Z   Downloaded pin-project-internal v1.1.13
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8672235Z   Downloaded maplit v1.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8683727Z   Downloaded jobserver v0.1.35
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8705145Z   Downloaded futures-core v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8720233Z   Downloaded enumn v0.1.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8738055Z   Downloaded derive-new v0.7.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8749152Z   Downloaded same-file v1.0.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8765420Z   Downloaded rawpointer v0.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8774995Z   Downloaded primal-check v0.3.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8785228Z   Downloaded pkg-config v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8802356Z   Downloaded once_cell v1.21.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8831038Z   Downloaded clang-sys v1.9.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8857061Z   Downloaded borsh v1.8.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8938908Z   Downloaded rustc-hash v2.1.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8954149Z   Downloaded rtrb v0.4.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8977893Z   Downloaded rand_core v0.10.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.8996172Z   Downloaded prost-derive v0.14.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9011288Z   Downloaded pkcs8 v0.10.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9043419Z   Downloaded pastey v0.2.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9058639Z   Downloaded parking_lot_core v0.9.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9082422Z   Downloaded lazy_static v1.5.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9102471Z   Downloaded atomic-waker v1.1.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9116142Z   Downloaded litemap v0.8.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9142081Z   Downloaded libloading v0.9.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9170010Z   Downloaded inventory v0.3.25
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9193696Z   Downloaded idna_adapter v1.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9204625Z   Downloaded icu_collections v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9274604Z   Downloaded httpdate v1.0.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9288242Z   Downloaded crypto-common v0.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9300941Z   Downloaded cfg-if v1.0.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9315933Z   Downloaded memmap2 v0.9.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9335364Z   Downloaded icu_normalizer_data v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9359713Z   Downloaded defmt-parser v1.0.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9370344Z   Downloaded cpufeatures v0.3.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9386831Z   Downloaded chacha20 v0.10.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9413059Z   Downloaded icu_provider v2.3.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9442368Z   Downloaded libloading v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9468458Z   Downloaded hound v3.5.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9502401Z   Downloaded itoa v1.0.18
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9518838Z   Downloaded ioctl-sys v0.8.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9530705Z   Downloaded futures-sink v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9540331Z   Downloaded equivalent v1.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9551541Z   Downloaded dyn-clone v1.0.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9570586Z   Downloaded digest v0.11.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9597069Z   Downloaded bytes v1.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9636414Z   Downloaded byteorder v1.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9654569Z   Downloaded bit-set v0.11.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9671119Z   Downloaded alsa v0.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9701279Z   Downloaded flume v0.11.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9741117Z   Downloaded cpufeatures v0.2.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9757170Z   Downloaded bitflags v2.13.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9807428Z   Downloaded anyhow v1.0.104
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9852418Z   Downloaded alsa-sys v0.6.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9872357Z   Downloaded errno v0.3.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9889478Z   Downloaded bytemuck_derive v1.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:42.9905443Z   Downloaded libsqlite3-sys v0.38.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.0563690Z   Downloaded bitflags v1.3.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.0600732Z   Downloaded bit-vec v0.10.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.0616541Z   Downloaded cmake v0.1.58
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.0631667Z   Downloaded cfg_aliases v0.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.0641215Z   Downloaded block-buffer v0.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.0701665Z   Downloaded sonora-agc2 v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.1328280Z   Downloaded aws-lc-sys v0.46.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.6558449Z    Compiling proc-macro2 v1.0.107
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.6559273Z    Compiling unicode-ident v1.0.26
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.6559924Z    Compiling quote v1.0.47
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.6628865Z     Checking cfg-if v1.0.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.7040597Z    Compiling libc v0.2.190
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.7342060Z    Compiling serde_core v1.0.229
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:43.9500489Z     Checking memchr v2.8.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:44.3604181Z     Checking itoa v1.0.18
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:44.6594163Z    Compiling syn v3.0.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:44.6904209Z    Compiling zmij v1.0.23
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:44.8954056Z    Compiling serde_json v1.0.151
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:45.3094417Z    Compiling serde v1.0.229
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:45.5584394Z     Checking bitflags v2.13.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:45.6762100Z    Compiling version_check v0.9.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:45.7284046Z    Compiling rustix v1.1.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:45.9484469Z    Compiling generic-array v0.14.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:46.0914263Z     Checking linux-raw-sys v0.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:46.1114321Z     Checking typenum v1.20.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:47.0114307Z     Checking cpufeatures v0.2.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:47.7274472Z     Checking crypto-common v0.1.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:47.7944429Z     Checking block-buffer v0.10.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:47.8724257Z     Checking digest v0.10.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:48.0151202Z     Checking sha2 v0.10.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:48.2674225Z    Compiling shlex v2.0.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:48.4114208Z    Compiling find-msvc-tools v0.1.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:48.6148175Z    Compiling jobserver v0.1.35
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:48.6369397Z    Compiling cfg_aliases v0.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:48.6901457Z    Compiling nix v0.29.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:48.9309470Z    Compiling cc v1.7.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:49.7344215Z     Checking once_cell v1.21.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:49.8794512Z     Checking smallvec v1.16.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:50.0374217Z    Compiling getrandom v0.4.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:50.2022075Z     Checking rand_core v0.10.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:50.3264440Z    Compiling syn v2.0.119
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:50.3586477Z    Compiling serde_derive v1.0.229
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:51.1384177Z     Checking errno v0.3.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:51.2224321Z     Checking signal-hook-registry v1.4.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:51.3564665Z     Checking zeroize v1.9.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:51.4686884Z     Checking rustls-pki-types v1.15.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:51.7584236Z    Compiling ring v0.17.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:52.3143667Z     Checking lamp-ipc v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/ipc)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:52.5304134Z     Checking jiff-tzdb v0.1.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:52.6017678Z     Checking jiff-core v0.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:53.3766887Z     Checking jiff v0.2.38
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:54.1774586Z     Checking lamp-bus v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/bus)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.0504720Z     Checking lamp-msgs v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/msgs)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.1474550Z     Checking getrandom v0.2.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.2404290Z     Checking untrusted v0.9.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.2953940Z     Checking subtle v2.6.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.3736764Z     Checking bytes v1.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.6871156Z     Checking base64 v0.22.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.6946765Z    Compiling rustls v0.23.45
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.7935597Z     Checking foldhash v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.8625828Z    Compiling httparse v1.10.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.8803836Z     Checking log v0.4.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:55.9530538Z     Checking webpki-roots v1.0.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.0073705Z     Checking lamp-local-time v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/local-time)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.1499225Z     Checking cpufeatures v0.3.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.1915407Z    Compiling pkg-config v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.2211299Z     Checking lamp-turn-owner v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/turn-owner)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.6984627Z    Compiling signal-hook v0.4.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.7998588Z     Checking chacha20 v0.10.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.9564611Z     Checking pin-project-lite v0.2.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.9825667Z     Checking rand v0.10.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:56.9934373Z     Checking byteorder v1.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:57.1788607Z    Compiling anyhow v1.0.104
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:57.4264201Z     Checking futures-core v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:57.4874387Z    Compiling pastey v0.2.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:57.6468856Z    Compiling either v1.19.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:57.8314429Z    Compiling itertools v0.13.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:57.9763956Z     Checking futures-sink v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:58.0364262Z    Compiling tokio-macros v2.7.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:58.6469626Z     Checking socket2 v0.6.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:58.9374997Z     Checking mio v1.2.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:59.2271277Z     Checking hound v3.5.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:59.2635224Z     Checking tokio v1.53.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:59.4112248Z     Checking futures-channel v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:00:59.5823578Z    Compiling futures-macro v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:00.2634336Z     Checking futures-io v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:00.3395146Z     Checking futures-task v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:00.4327201Z     Checking slab v0.4.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:00.5454502Z     Checking futures-util v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:01.4770009Z     Checking http v1.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:02.1729812Z    Compiling vcpkg v0.2.15
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:02.5434457Z     Checking hashbrown v0.17.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:02.8604156Z    Compiling libsqlite3-sys v0.38.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.0144582Z     Checking fallible-iterator v0.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.0887878Z     Checking hashlink v0.12.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.2264913Z     Checking rustls-webpki v0.103.15
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.3044713Z     Checking fallible-streaming-iterator v0.1.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.3535294Z    Compiling synstructure v0.14.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.3996634Z    Compiling thiserror v2.0.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.6314895Z    Compiling thiserror-impl v2.0.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:03.9444221Z    Compiling zerofrom-derive v0.1.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:04.9404388Z    Compiling tracing-attributes v0.1.31
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:05.1414282Z     Checking tracing-core v0.1.36
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:05.4574555Z     Checking zerofrom v0.1.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:05.5424335Z    Compiling yoke-derive v0.8.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:06.1734431Z     Checking tracing v0.1.44
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:06.3104716Z     Checking lamp-update v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/update)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:06.3264325Z     Checking stable_deref_trait v1.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:06.3617931Z    Compiling zerovec-derive v0.11.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:06.6018338Z     Checking yoke v0.8.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:06.7364373Z     Checking glam v0.33.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:07.4584693Z     Checking zerovec v0.11.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:07.9844481Z     Checking http-body v1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:08.0764654Z    Compiling displaydoc v0.2.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:08.4985686Z     Checking lamp-lean v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/lean)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:08.7324888Z     Checking percent-encoding v2.3.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:08.8404235Z     Checking tokio-rustls v0.26.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.0004382Z     Checking tower-service v0.3.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.0364206Z     Checking try-lock v0.2.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.0844220Z     Checking want v0.3.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.0903889Z     Checking tinystr v0.8.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.2134210Z     Checking sync_wrapper v1.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.2274487Z     Checking writeable v0.6.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.2684123Z     Checking httpdate v1.0.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.3677349Z     Checking tower-layer v0.3.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.4544443Z     Checking atomic-waker v1.1.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.4814500Z     Checking litemap v0.8.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.5334234Z     Checking hyper v1.12.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:09.6447902Z     Checking icu_locale_core v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:10.5684286Z     Checking zerotrie v0.2.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:10.6070705Z     Checking lamp-keeper v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/keeper)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:10.6324416Z     Checking potential_utf v0.1.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:10.7114205Z    Compiling icu_properties_data v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:10.7712597Z     Checking ipnet v2.12.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:10.8474432Z    Compiling icu_normalizer_data v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:10.9774379Z     Checking base64 v0.23.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:11.0044171Z     Checking utf8_iter v1.0.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:11.0884209Z     Checking icu_collections v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:11.1895376Z     Checking lamp-body v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/body)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:11.2394398Z     Checking hyper-util v0.1.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:11.4004107Z     Checking icu_provider v2.3.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:11.6014297Z     Checking tower v0.5.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:12.0384218Z     Checking http-body-util v0.1.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:12.2684215Z     Checking hybrid-array v0.4.15
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:12.2894383Z    Compiling glob v0.3.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:12.6224526Z    Compiling clang-sys v1.9.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:12.8944055Z    Compiling prettyplease v0.2.37
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:12.9297309Z     Checking rusqlite v0.40.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:13.0429630Z     Checking icu_properties v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:13.7148529Z     Checking icu_normalizer v2.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:14.0344434Z     Checking block-buffer v0.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:14.1994296Z     Checking crypto-common v0.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:14.4049103Z    Compiling minimal-lexical v0.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:14.6649687Z     Checking const-oid v0.10.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:14.8004266Z    Compiling regex-syntax v0.8.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:14.9633616Z     Checking digest v0.11.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:14.9714151Z    Compiling nom v7.1.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:15.0805890Z     Checking idna_adapter v1.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:15.1525063Z    Compiling libloading v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:15.3154388Z    Compiling rustversion v1.0.23
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:15.5664435Z    Compiling bindgen v0.72.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:16.6942627Z    Compiling regex-automata v0.4.18
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:16.7954347Z    Compiling cexpr v0.6.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:17.5624103Z     Checking idna v1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:17.7904586Z     Checking sha1 v0.11.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:18.0554874Z     Checking form_urlencoded v1.2.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:18.1484296Z     Checking winnow v1.0.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:18.4644853Z    Compiling regex v1.13.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:18.9074488Z    Compiling cfg_aliases v0.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:18.9509533Z    Compiling rustc-hash v2.1.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.0325623Z    Compiling autocfg v1.5.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.0644545Z     Checking openssl-probe v0.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.2626970Z    Compiling shlex v1.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.2920754Z     Checking data-encoding v2.11.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.3987265Z     Checking rustls-native-certs v0.8.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.4769932Z    Compiling nix v0.28.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.5714561Z     Checking tungstenite v0.30.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:19.7654243Z     Checking toml_parser v1.1.5+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.0685024Z     Checking url v2.5.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.2908017Z     Checking tokio-util v0.7.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.4804388Z     Checking webpki-roots v0.26.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.5184735Z     Checking lamp-turn-end-wire v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/turn-end-wire)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.6684455Z     Checking serde_spanned v1.1.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.7624351Z     Checking toml_datetime v1.1.2+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.7761289Z    Compiling thiserror v1.0.69
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:20.9287563Z     Checking toml v1.1.8+spec-1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:21.0524506Z     Checking thread-priority v3.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:21.2812973Z     Checking tokio-tungstenite v0.30.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:21.3394676Z    Compiling thiserror-impl v1.0.69
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:21.4604274Z     Checking xattr v1.6.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:21.5362859Z     Checking filetime v0.2.29
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:21.6474477Z     Checking tar v0.4.46
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:22.0794671Z    Compiling lamp-camera v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/camera)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:22.5354324Z     Checking tower-http v0.6.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:22.5452357Z     Checking rustls-platform-verifier v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:22.6344465Z     Checking lamp-schedule v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/schedule)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:22.8099126Z     Checking hyper-rustls v0.27.10
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:22.9532101Z    Compiling enumn v0.1.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:23.0259461Z     Checking tinyvec v1.13.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:23.2374251Z     Checking reqwest v0.13.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:23.3684364Z     Checking unicode-normalization v0.1.25
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:23.7954702Z     Checking lamp-gemini v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/gemini)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:24.0034117Z    Compiling alsa-sys v0.6.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:24.2104903Z     Checking lamp-voice-processes v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice-processes)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:24.3104379Z    Compiling libm v0.2.16
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.0894174Z     Checking ioctl-sys v0.8.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.1434328Z     Checking bitflags v1.3.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.1910337Z     Checking nix v0.26.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.4004303Z     Checking gpiocdev-uapi v0.7.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.6134291Z     Checking alsa v0.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.8314678Z    Compiling unicode-xid v0.2.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.9025020Z    Compiling derive_more-impl v2.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:25.9096572Z    Compiling v4l2r v0.0.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:26.2787137Z     Checking gpiocdev v0.8.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:26.5059387Z     Checking i2cdev v0.6.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:26.6217101Z     Checking sonora-simd v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:26.6934383Z     Checking spidev v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:26.7777055Z     Checking sonora-fft v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:26.8431356Z     Checking lamp-controls v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/controls)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:27.0842838Z    Compiling num-traits v0.2.19
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:27.1313705Z     Checking derive_more v2.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:27.1777278Z     Checking sonora-common-audio v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:27.1840203Z    Compiling bytemuck_derive v1.12.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:27.4055989Z     Checking lamp-ring v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/ring)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:28.2947520Z     Checking bytemuck v1.25.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:28.4604420Z     Checking scopeguard v1.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:28.5015229Z     Checking lock_api v0.4.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:28.6261080Z     Checking sonora-agc2 v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:28.9074344Z     Checking sonora-aec3 v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:29.1592026Z     Checking sonora-ns v0.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:29.3393899Z     Checking dyn-clone v1.0.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:29.3961346Z     Checking rtrb v0.4.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:29.5644039Z     Checking lamp-health v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/health)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:29.6644743Z     Checking sonora v0.2.0 (/home/runner/work/lampOS/lampOS/lampOS/third_party/sonora)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:30.0464622Z    Compiling zerocopy v0.8.62
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:30.1490608Z     Checking lamp-audio v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/audio)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:30.2585645Z     Checking num-integer v0.1.47
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:30.3471617Z    Compiling zerocopy-derive v0.8.62
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:30.4331139Z     Checking same-file v1.0.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:30.4842729Z     Checking walkdir v2.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:30.8761971Z     Checking lamp-near-call v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/near-call)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:32.7980489Z    Compiling matrixmultiply v0.3.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:32.9146743Z    Compiling parking_lot_core v0.9.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:33.6264612Z     Checking num-complex v0.4.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:33.9694215Z     Checking fastrand v2.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:34.0205704Z    Compiling memo-map v0.3.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:34.1024202Z     Checking rawpointer v0.2.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:34.1464485Z    Compiling minijinja v2.24.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:34.4083975Z     Checking tempfile v3.27.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:37.8736972Z    Compiling half v2.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:38.3564586Z     Checking hashbrown v0.16.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:38.9134110Z     Checking nom v8.0.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:39.1008090Z     Checking lamp-voice v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:39.2644326Z    Compiling typeid v1.0.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:39.6184245Z     Checking itertools v0.15.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:40.8964012Z    Compiling tract-linalg v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.4208622Z     Checking string-interner v0.20.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.5893824Z     Checking parking_lot v0.12.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.6066466Z     Checking ndarray v0.17.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.7004429Z     Checking nom-language v0.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.7551051Z     Checking inventory v0.3.25
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.8071143Z    Compiling erased-serde v0.4.10
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.8224360Z     Checking downcast-rs v2.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.8734163Z     Checking strength_reduce v0.2.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.9745041Z     Checking dyn-hash v1.0.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:41.9853987Z     Checking lazy_static v1.5.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:42.0174287Z     Checking maplit v1.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:42.0554401Z     Checking transpose v0.2.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:42.1695849Z     Checking primal-check v0.3.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:42.2324278Z    Compiling derive-new v0.7.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:42.6684864Z     Checking bit-vec v0.10.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:42.8274050Z     Checking bit-set v0.11.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:42.9373930Z     Checking rustfft v6.4.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:44.9344453Z     Checking tract-data v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:45.8434404Z     Checking anymap3 v1.1.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:45.9394309Z     Checking simd-adler32 v0.3.10
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:46.3529535Z    Compiling prost-derive v0.14.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:46.8894423Z     Checking num-bigint v0.4.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:47.8974343Z     Checking rand_distr v0.6.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:47.9754358Z     Checking num-rational v0.4.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:48.2784224Z     Checking prost v0.14.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:48.3476220Z     Checking memmap2 v0.9.11
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:48.4827186Z     Checking lamp-expression v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/expression)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:48.5544466Z     Checking tract-core v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:48.5934570Z     Checking zune-core v0.4.12
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:48.7504618Z     Checking zune-jpeg v0.4.21
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:49.2694418Z     Checking jpeg-encoder v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:49.5564506Z     Checking lamp-actions v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/actions)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:50.8744495Z     Checking lamp-policy v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/policy)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:51.4231572Z     Checking lamp-memory v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/memory)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:53.9284511Z     Checking lamp-tasks v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/tasks)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:54.3740089Z     Checking mime v0.3.17
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:54.5474370Z     Checking axum-core v0.5.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:55.8874258Z     Checking serde_path_to_error v0.1.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:56.1914385Z     Checking matchit v0.8.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:56.3738956Z    Compiling ort-sys v2.0.0-rc.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:56.6454149Z     Checking axum v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:58.0884395Z     Checking libloading v0.9.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:58.2074344Z     Checking ort v2.0.0-rc.14
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:59.4354411Z    Compiling cmake v0.1.58
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:59.8084435Z    Compiling dunce v1.0.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:59.8624130Z    Compiling fs_extra v1.3.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:01:59.9384509Z     Checking lamp-records v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/records)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:00.0944332Z    Compiling aws-lc-sys v0.46.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:01.4794721Z    Compiling pin-project-internal v1.1.13
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:01.5824435Z     Checking tract-nnef v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:02.3994366Z     Checking tract-hir v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:03.7364452Z     Checking tract-extra v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:03.8884386Z     Checking tract-onnx-opl v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:03.9954077Z     Checking aho-corasick v1.1.5
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:04.4934222Z     Checking tract-onnx v0.23.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:04.8573578Z    Compiling heck v0.5.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:05.0338464Z    Compiling semver v1.0.28
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:05.2962451Z    Compiling aws-lc-rs v1.18.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:07.4194345Z     Checking lamp-ears v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/ears)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:07.9194430Z     Checking lamp-turn-end v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/turn-end)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:07.9654416Z    Compiling rustc_version v0.4.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:08.2044528Z    Compiling snafu-derive v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:08.4331266Z     Checking pin-project v1.1.13
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:08.4797405Z     Checking futures-executor v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:08.5700862Z     Checking lamp-sound-fixtures v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/sound-fixtures)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:09.2811729Z     Checking bstr v1.13.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:09.6224845Z     Checking untrusted v0.7.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:09.6874378Z     Checking globset v0.4.20
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:09.9340545Z     Checking futures v0.3.34
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:09.9810091Z     Checking lamp-eyes v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/eyes)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:09.9994655Z     Checking snafu v0.8.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:10.2001426Z    Compiling curve25519-dalek v4.1.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:10.3494682Z     Checking lamp-observer v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/observer)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:10.8044195Z     Checking olpc-cjson v0.1.4
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:10.8917176Z     Checking pem v3.0.6
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:11.0174280Z     Checking serde_plain v1.0.2
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:11.1204453Z    Compiling async-recursion v1.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:11.6214280Z    Compiling async-trait v0.1.92
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:12.4615666Z     Checking hex v0.4.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:12.6544483Z     Checking typed-path v0.9.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:12.8567895Z     Checking lamp-same-voice v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/same-voice)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:13.0954549Z     Checking lamp-setup v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/setup)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:13.5694500Z     Checking spin v0.9.9
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:13.6994373Z    Compiling curve25519-dalek-derive v0.1.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:14.1819729Z     Checking signature v2.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:14.2474290Z     Checking ed25519 v2.2.3
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:14.7374372Z     Checking flume v0.11.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:14.9324246Z     Checking rustls-webpki v0.102.8
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:15.2114569Z     Checking tokio-stream v0.1.19
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:15.2939349Z     Checking rustls-pemfile v2.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:15.3847860Z     Checking fixedbitset v0.5.7
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:15.5524138Z     Checking ed25519-dalek v2.2.0
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:15.5702202Z     Checking rumqttc v0.25.1
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:15.6864506Z     Checking lamp-air v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/air)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:15.8944483Z     Checking lamp-name v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/name)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:16.3687345Z     Checking lamp-settings v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/settings)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:16.4543764Z     Checking lamp-skills v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/skills)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:16.7204744Z     Checking lamp-voice-eval v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/voice-eval)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:17.4608864Z     Checking lamp-mood v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/mood)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:18.3941003Z     Checking lamp-peek v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/peek)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:19.1334694Z     Checking lamp-addons v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/addons)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:19.4644617Z     Checking lamp-selftest v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/selftest)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:20.3092571Z     Checking lamp-station v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/station)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:21.7364908Z     Checking lamp-environment v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/environment)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:22.0636097Z     Checking lamp-cloud v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/cloud)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:47.6604358Z     Checking tough v0.24.0 (/home/runner/work/lampOS/lampOS/lampOS/vendor/tough)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:02:50.6164632Z     Checking lamp-surround v0.1.0 (/home/runner/work/lampOS/lampOS/lampOS/crates/surround)
+lampOS — clippy, every crate and target (x86 Linux)	clippy (every crate and target, warnings as errors)	2026-10-25T01:04:27.2354596Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 3m 48s
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	﻿2026-10-25T01:04:27.4850160Z Post job cleanup.
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.5763117Z [command]/usr/bin/git version
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.5794214Z git version 2.55.0
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.5837558Z Temporarily overriding HOME='/home/runner/work/_temp/6f66b5f0-5c33-40a9-819f-5346160a7859' before making global git config changes
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.5839055Z Adding repository directory to the temporary git global config as a safe directory
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.5844475Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/lampOS/lampOS
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.5889652Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.5929965Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.6254213Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.6283394Z http.https://github.com/.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.6301766Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.6333466Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.6700347Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+lampOS — clippy, every crate and target (x86 Linux)	Post Run actions/checkout@v4	2026-10-25T01:04:27.6746071Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+lampOS — clippy, every crate and target (x86 Linux)	Complete job	﻿2026-10-25T01:04:27.7202442Z Cleaning up orphan processes
+lampOS — clippy, every crate and target (x86 Linux)	Complete job	2026-10-25T01:04:27.7592264Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

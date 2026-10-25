@@ -1,0 +1,28 @@
+{
+  "base": "d7ca8b1b230119515161ca56d8982003362efe93",
+  "state": "source preparation, no current producer execution",
+  "qualification_recipe": "Focused library module selections second_provider,room_told,tools,process,switch_census,same_voice; all Voice bin/integration/doc targets; full Eval; strict all-target Voice/Eval Clippy and workspace build; full native gate before ready. Older producer fulls and active immutable reader34c fulls remain actual-source epochs, not relabelled.",
+  "parent": {
+    "head": "80aa0b0168d2fb6b5fbcb6e3117eb1b3f3ecb467",
+    "tree": "bc2ce4e3960e2aecea64d4fbd58a298638ea9c8a",
+    "parent": "d7ca8b1b230119515161ca56d8982003362efe93",
+    "old_qualified_head": "b259332013242b94aafdb9f8b3674a48ef19fc16",
+    "changed_paths_vs_parent": [
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  "child": {
+    "head": "7c20342b139e24449cb1f7504bdf439eb3f62ec1",
+    "tree": "5cdb179ef217f7e494858a2ecadc566d5e303a01",
+    "parent": "80aa0b0168d2fb6b5fbcb6e3117eb1b3f3ecb467",
+    "old_qualified_head": "13e55a4340220c680b20140c4601de011e8bd8a9",
+    "changed_paths_vs_parent": [
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ]
+  }
+}
