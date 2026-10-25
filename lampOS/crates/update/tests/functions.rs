@@ -29,15 +29,12 @@ const LEFT_OUT: &str = "left out: ";
 /// Each function a chat request of the product's voice route is given.
 const CHAT: &str = "chat: ";
 
-/// The lamp's own functions a product lamp's chat request offers now, on the
-/// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 15 (with
-/// onboarding's two since 25 Oct), the actions part's 17 and the skills' 2
-/// (Dance's, and the wellbeing nudges' one `wellbeing_nudges`), before the
-/// search and the look. A change to it is a change to what every session is
-/// told: say in its pull request what is left out past the bound, if
-/// anything.
-const PRODUCT_FUNCTIONS: usize = 34;
+/// What a product lamp declares now: the voice's own 13, the actions part's
+/// 17 and the skills' 2 (Dance's, and the wellbeing nudges' one
+/// `wellbeing_nudges` since they joined the product on 25 Oct), at the bound.
+/// A change to it is a change to what every session is told: say in its pull
+/// request what is left out past the bound, if anything.
+const PRODUCT_FUNCTIONS: usize = 32;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
@@ -107,6 +104,8 @@ struct Product {
     declared: Vec<String>,
     left_out: Vec<String>,
     chat: Vec<String>,
+    /// What the voice's side wrote on its error stream.
+    errors: String,
 }
 
 fn product_with(extra: &[(&str, &str)]) -> Product {
@@ -185,21 +184,19 @@ fn product_with(extra: &[(&str, &str)]) -> Product {
         declared: found(DECLARED),
         left_out: found(LEFT_OUT),
         chat: found(CHAT),
+        errors: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
 }
 
 /// Every function the actions part and the product skills offer reaches a
-/// product lamp's chat requests, on the product's route, none left out by
-/// order or by the link, and the lamp's own are [`PRODUCT_FUNCTIONS`],
-/// within that route's bound. Live's 32 (a per-lamp drop-in, not the
-/// product's route) no longer bounds them since #3430: there the cut takes
-/// the last past 32 and says so on the setup line.
+/// product lamp's sessions, none left out by order or by the link, and the
+/// count is [`PRODUCT_FUNCTIONS`], within `lamp_gemini::MAX_TOOLS`.
 #[test]
 fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
     let Product {
         executive,
         skill_tools,
-        chat,
+        declared,
         left_out,
         ..
     } = product_with(&[]);
@@ -210,33 +207,24 @@ fn a_product_lamp_declares_every_function_it_has_within_the_bound() {
         .chain(skill_tools.iter().map(String::as_str))
     {
         assert!(
-            chat.iter().any(|told| told == name),
-            "{name} is left out of a product lamp's chat requests, past {}: {chat:?}",
-            lamp_voice::second_provider::MAX_TOOLS
+            declared.iter().any(|told| told == name),
+            "{name} is left out of a product lamp's sessions, past {}: {declared:?}",
+            lamp_gemini::MAX_TOOLS
         );
     }
-    let routes_own = [
-        lamp_voice::second_provider::net::search::NAME,
-        lamp_voice::second_provider::net::search::FETCH,
-        lamp_voice::second_provider::LOOK_CALL,
-    ];
-    let lamps: Vec<&String> = chat
-        .iter()
-        .filter(|name| !routes_own.contains(&name.as_str()))
-        .collect();
     println!(
-        "A product lamp's chat request offers {} of the lamp's own functions (of at most {} in all): the voice's own {}, the actions part's {}, the skills' {} ({})",
-        lamps.len(),
-        lamp_voice::second_provider::MAX_TOOLS,
-        lamps.len() - executive.len() - skill_tools.len(),
+        "A product lamp declares {} functions of at most {}: the voice's own {}, the actions part's {}, the skills' {} ({})",
+        declared.len(),
+        lamp_gemini::MAX_TOOLS,
+        declared.len() - executive.len() - skill_tools.len(),
         executive.len(),
         skill_tools.len(),
         skill_tools.join(", ")
     );
-    assert!(chat.len() <= lamp_voice::second_provider::MAX_TOOLS);
-    assert_eq!(lamps.len(), PRODUCT_FUNCTIONS, "{chat:?}");
+    assert!(declared.len() <= lamp_gemini::MAX_TOOLS);
+    assert_eq!(declared.len(), PRODUCT_FUNCTIONS, "{declared:?}");
     assert!(
-        !chat
+        !declared
             .iter()
             .any(|name| name == lamp_voice::reports_stop::NAME
                 || name == lamp_voice::reports_stop::STATE_NAME)
@@ -280,11 +268,7 @@ fn a_product_chat_request_offers_dance_at_the_bound() {
             .any(|name| name == lamp_voice::second_provider::LOOK_CALL),
         "{chat:?}"
     );
-    // A Live session's functions are all in the chat request too; the chat
-    // request has the room Live's 32 doesn't (#3430).
-    for name in &declared {
-        assert!(chat.contains(name), "{name}: {chat:?}");
-    }
+    assert_eq!(chat[..declared.len()], declared[..]);
 }
 
 /// The reviewer's P3 on #1906: with `LAMP_REPORTS=on` the product voice
@@ -307,7 +291,7 @@ fn with_reports_on_dance_stays_at_the_bound() {
         declared,
         left_out,
         chat,
-        ..
+        errors,
     } = product_with(&[(lamp_voice::reports_stop::ENVIRONMENT, "on")]);
     assert_eq!(skill_tools, ["dance"]);
     assert!(
@@ -340,17 +324,15 @@ fn with_reports_on_dance_stays_at_the_bound() {
             .any(|told| told == lamp_voice::reports_stop::STATE_NAME),
         "{declared:?}"
     );
-    // On Live, a per-lamp drop-in, `reports_stop` and Dance's are never the
-    // ones cut. Past 32 the actions part's last are taken out before the cut
-    // there, and the error line names only what the cut took (here
-    // `reports_state`): a Live limit, not the product's. The product's route
-    // offers every one of them (above, #3430).
-    assert!(
-        declared
-            .iter()
-            .any(|told| told == lamp_voice::reports_stop::NAME),
-        "{declared:?}"
-    );
+    for name in std::iter::once(lamp_voice::reports_stop::NAME)
+        .chain(executive.iter().map(|function| function.name))
+    {
+        assert!(
+            declared.iter().any(|told| told == name),
+            "{name}: {declared:?}"
+        );
+    }
+    assert!(!errors.contains("alone are past the bound"), "{errors}");
 }
 
 /// Read the actual generic unit through the voice's flag parser and

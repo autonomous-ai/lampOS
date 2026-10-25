@@ -48,12 +48,8 @@ RuntimeDirectory=lampos-voice
 RuntimeDirectoryMode=0700
 RuntimeDirectoryPreserve=yes
 Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
+# Canonical private state only; this does not enable LAMP_ONBOARDING.
 Environment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json
-# The first five minutes (docs/onboarding.md): the privacy switch, where you sit, your name and face, how
-# you sound, a touch, the head, your preferences, led by the voice the first time a near face is seen after
-# setup. Row 10 passed whole on lamp-52e6 on 22 Oct (#2843). Its functions reach every chat request on the
-# second route since #3430.
-Environment=LAMP_ONBOARDING=on
 Environment=LAMP_BUS=on
 # The privacy route (docs/privacy-switch.md): Controls reads the lamp's privacy switch (chip 1 line 9, the pins file's
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
