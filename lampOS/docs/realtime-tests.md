@@ -1707,3 +1707,33 @@ replacement remain covered by
 failed-acknowledgement path. No runtime bound or cleanup policy changes.
 The recorded 2/3 fixed observations remain their original failed/passed
 outcomes; separating the fixture's contracts establishes no historical cause.
+
+## Unplug-gap phases share the worker's explicit timeline
+
+`a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails` drives the
+existing production `Shared::tick` and real kept-bus publication on one
+controlled monotonic timeline, as the existing worker tests do. Safe samples
+remain 20 ms apart; worker ticks use the actual `PERIOD` constant. Each bus
+result is read before the timeline advances in 10 ms steps. Both Ready
+proofs must still take at least `SETTLE_US` (500 ms), each phase has a 2 s
+logical limit and a separate 2 s host watchdog, a Failed phase is rejected
+early, and the unsafe sample must report the moved joint. The latch is asserted after
+every observed step. Diagnostic labels distinguish first proof from proof after
+the gap.
+
+The runtime Adapter, atomic sample encoding, worker thread and 100 ms
+freshness/500 ms settling rules are unchanged. This case tests functional
+temporal behavior through the existing worker seam and real bus; it does not
+measure host thread scheduling, physical settling or actuator latency. The
+original three failed observations remain failed and do not establish a
+cause. Slow worker-period, shortened-settling and gap-as-failure controls
+must remain negative before the candidate is qualified.
+
+The separate `the_enabled_adapter_publishes_its_latch_and_joins_after_stop`
+case retains enabled-thread integration coverage. It waits for the actual
+worker's Folding publication and latch, checks safe/unsafe encoding through
+`Adapter::sample`, observes its stopped Failed publication and checks the latch at both
+publication endpoints, then joins the worker and removes the bus root. Publication waits
+and the post-join check retain two-second host bounds; the outer test runner
+must still bound an actually stuck join. It needs no uninterrupted half-second
+of host-scheduled safe samples. No physical motion or latency is measured.
