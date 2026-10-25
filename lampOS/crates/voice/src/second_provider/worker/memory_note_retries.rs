@@ -1209,20 +1209,21 @@ fn a_follow_up_is_read_only_once_its_turn_is_answered() {
     assert_eq!(memory.opens(), 4, "the read ahead is the one taken");
 }
 
-/// A note not in by what is left of its 300 ms from the ask is late: the
-/// turn waits only that, is told none, and the read goes on. Its complete
-/// answer, 900 ms after the ask, is the next turn's, with no second read
-/// and no failure counted against the memory (the reviewer-lead's P3 on
-/// #3016); a read that ends refused is asked again on the next turn, not
-/// 30 s later.
+/// A note not in by what is left of its wait from the ask is late: the
+/// turn waits only that (a run's first line's note, asked as its turn is
+/// told, [`super::NOTE_TOLD_WITHIN`]), is told none, and the read goes on.
+/// Its complete answer, 1.5 s after the ask, is the next turn's, with no
+/// second read and no failure counted against the memory (the
+/// reviewer-lead's P3 on #3016); a read that ends refused is asked again on
+/// the next turn, not 30 s later.
 #[test]
 fn a_late_note_is_the_next_turns_and_a_failed_one_is_asked_again_on_the_next_turn() {
     for refused in [false, true] {
         let memory = Paced::new(
             if refused { "late-refused" } else { "late" },
             move |count| match count {
-                0 if refused => Reply::RefusedAfter(900),
-                0 => Reply::After(900),
+                0 if refused => Reply::RefusedAfter(1_500),
+                0 => Reply::After(1_500),
                 _ => Reply::After(0),
             },
         );
@@ -1238,16 +1239,17 @@ fn a_late_note_is_the_next_turns_and_a_failed_one_is_asked_again_on_the_next_tur
             let ended = Instant::now();
             let first = turns.answered(&first_line).await;
             let waited = ended.elapsed();
-            // The late read ends; the next line begins 1.2 s after the first.
-            tokio::time::sleep_until((start + Duration::from_millis(1_200)).into()).await;
+            // The late read ends; the next line begins 2 s after the first.
+            tokio::time::sleep_until((start + Duration::from_millis(2_000)).into()).await;
             turns.begins(&second_line);
             tokio::time::sleep(Duration::from_millis(200)).await;
             (first, waited, turns.answered(&second_line).await)
         });
         assert!(!first.contains("fact"), "refused={refused}: {first}");
         assert!(
-            waited < Duration::from_millis(350),
-            "refused={refused}: only 300 ms from the ask: {waited:?}"
+            waited >= Duration::from_millis(800)
+                && waited < super::NOTE_TOLD_WITHIN + Duration::from_millis(50),
+            "refused={refused}: the turn's own ask waits its 900 ms, no more: {waited:?}"
         );
         let sessions = turns.sessions.lock().unwrap();
         if refused {
