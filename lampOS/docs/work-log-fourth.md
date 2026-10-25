@@ -1,3 +1,15 @@
+## 2026-10-26 01:55 — Current onboarding gate and stricter Photo observations
+
+Ready for lamp-voice: no
+
+Onboarding #3472 is frozen on train142 abc79d609 in a new clean own worktree, with all 10,544 tracked inputs present and exactly ten owned files. Formatting passed, then strict workspace/all-target Clippy passed in 690.478 seconds; the workspace build is running. These are actual stage results, not a completed gate. The earlier failed run and bounded fixture recovery remain separate. The old checkout and unrelated transient HAL state were left untouched; no destructive retry was used. Twenty-eight identified disposable incremental directories were removed only after release, retaining all seven independent failure witnesses and executable artifacts.
+
+Common #3064 and its Callback, Name, Photo and claimed chat-hedge children are carried onto the same base. The held-colleague production changes compose without moving Common's private permission or deadline rules; ten of eleven reviewed whole files remain exact and worker.rs legitimately includes the upstream delta. A formal dependency audit expanded Common's next gate to fourteen packages: the thirteen touched/dependent crates plus Controls. Its original eight-package preparation remains unrun; no historical counts transfer to the new source.
+
+Photo #2988 now has a standalone observation query and twelve authored, unrun regression tests. It requires three distinct valid source frames, preserves missing/invalid observations in coverage, and refuses competitors, mixed valid boots, contradictory immediate or nonadjacent rereads, expiry and lost cache prefixes. Review caught and fixed the reread/identity cases before execution. Ordinary speaker and enrollment queries remain byte-identical. Formatting and diff checks pass; compilation, tests and consent integration are unrun. This read-time query is not trusted capture origin, accepted-audio coverage or camera-generation authority, and PhotoSpeaker remains off.
+
+Queue #3126 reached GitHub's comment limit. Its body had no successor, so the notice and current progress were posted on #3472 and retained by editing Fourth's own latest Queue comment without removing the earlier result; the Photo step is on #2988. First owns the continuation, the trusted capture producer handoff and assignment of the successful two-person onboarding trial. Software work continues without a lamp action.
+
 ## 2026-10-26 01:27 — Onboarding full result retained; recovered inputs checked
 
 Ready for lamp-voice: no (#3472)
