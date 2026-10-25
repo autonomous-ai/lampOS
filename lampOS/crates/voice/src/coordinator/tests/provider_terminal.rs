@@ -25,6 +25,40 @@ enum Case {
     RefusalAfterEnded,
     OpenInput,
     Holding { capture_gap: bool },
+    ReminderAdmission(ReminderBoundary),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ReminderBoundary {
+    Complete,
+    Failed,
+    NoTerminal,
+    Unretired,
+    ClockReset,
+    Privacy,
+}
+
+pub(super) struct ReminderAdmissionRun {
+    pub trace: SessionState,
+    pub settlement: crate::reminders::ToWorker,
+    pub answers: Vec<crate::say::Answer>,
+    pub starts: Vec<(u64, bool)>,
+    pub audio: Vec<(u64, i16)>,
+    pub onset_at_us: u64,
+    pub retirement_sent_at_us: u64,
+}
+
+pub(super) fn reminder_admission(case: ReminderBoundary) -> ReminderAdmissionRun {
+    let (trace, evidence) = run(Case::ReminderAdmission(case));
+    ReminderAdmissionRun {
+        trace,
+        settlement: evidence.reminder_probe.unwrap().settlement().unwrap(),
+        answers: evidence.reminder_answers.unwrap().try_iter().collect(),
+        starts: evidence.successor_starts,
+        audio: evidence.successor_audio,
+        onset_at_us: evidence.onset_at_us.unwrap(),
+        retirement_sent_at_us: evidence.retired_at_us.unwrap(),
+    }
 }
 
 struct Peer {
@@ -45,6 +79,11 @@ struct Evidence {
     retired_at_us: Option<u64>,
     capture_gap_at_us: Option<u64>,
     last_capture_us: Option<u64>,
+    reminder_probe: Option<crate::reminders::Probe>,
+    reminder_answers: Option<std::sync::mpsc::Receiver<crate::say::Answer>>,
+    successor_starts: Vec<(u64, bool)>,
+    successor_audio: Vec<(u64, i16)>,
+    onset_at_us: Option<u64>,
 }
 
 fn ended() -> ProviderOutput {
@@ -65,6 +104,10 @@ fn run_with_notice_policy(
     policy: TurnTaking,
 ) -> (SessionState, Evidence) {
     let holding = matches!(case, Case::Holding { .. });
+    let reminder_case = match case {
+        Case::ReminderAdmission(boundary) => Some(boundary),
+        _ => None,
+    };
     // The real loop reads this thread-local test switch, as it does for
     // the misheard hum. Restore it even if a fixture assertion panics.
     struct HoldingSwitch(bool);
@@ -147,6 +190,7 @@ fn run_with_notice_policy(
                 | Case::CompleteBuffered
                 | Case::FailedBuffered
                 | Case::Holding { .. }
+                | Case::ReminderAdmission(_)
         ) {
             owner
                 .playback_ended(now(), reply.playback.take().unwrap())
@@ -174,6 +218,18 @@ fn run_with_notice_policy(
         }
         (owner, Some(reply))
     };
+    let (reminder_probe, reminder_answers) = if reminder_case.is_some() {
+        let current = reply.as_mut().unwrap();
+        let snapshot = owner.snapshot(now()).unwrap();
+        let (receipt, probe) =
+            crate::reminders::receipt_for_test(current.owner, snapshot.microphone_generation(), 1);
+        current.reminder = Some(receipt);
+        let (ticket, answers) = crate::say::ticket_for_test("reminders");
+        begun_for(Some(ticket), &mut reply);
+        (Some(probe), Some(answers))
+    } else {
+        (None, None)
+    };
     let request = reply.as_ref().map_or(1, |r| r.owner.turn());
     let mut startup = StartupEvents::default();
     startup
@@ -190,6 +246,11 @@ fn run_with_notice_policy(
         retired_at_us: None,
         capture_gap_at_us: None,
         last_capture_us: None,
+        reminder_probe,
+        reminder_answers,
+        successor_starts: Vec::new(),
+        successor_audio: Vec::new(),
+        onset_at_us: None,
     }));
     {
         let shared = shared.clone();
@@ -242,6 +303,22 @@ fn run_with_notice_policy(
                     idle: true,
                 });
             }
+            Case::ReminderAdmission(boundary) => {
+                queued.push_back(provider_audio(1, vec![123; 480]));
+                queued.push_back(ProviderOutput::GenerationComplete { request });
+                match boundary {
+                    ReminderBoundary::NoTerminal => {}
+                    ReminderBoundary::Failed => queued.push_back(ProviderOutput::TurnFailed {
+                        request,
+                        stage: FailedStage::Responding,
+                        reason: Fault::Transport,
+                    }),
+                    _ => queued.push_back(ProviderOutput::TurnComplete {
+                        request,
+                        idle: true,
+                    }),
+                }
+            }
         }
         let started = crate::scenario_clock::instant();
         let mut guard_sent = false;
@@ -252,6 +329,8 @@ fn run_with_notice_policy(
         let mut next_capture = started;
         let mut next_privacy = started;
         let mut cursor = 0u64;
+        let mut held_retirement = None;
+        let mut privacy_closed = false;
         let pump = move |phase| -> io::Result<()> {
             // A real child's exit is not simulated: one deadline bounds the
             // children a step stops, and shutdown brings its own budget.
@@ -265,6 +344,62 @@ fn run_with_notice_policy(
                 elapsed < Duration::from_secs(4),
                 "synthetic terminal test bounded cleanup"
             );
+            // VadOnly deliberately permits onset during playback: this tests
+            // coordinator ordering, not duplex or acoustic classification.
+            // Deliver the real speaker receipt in the same pump as the last
+            // onset block. The coordinator must join the already complete
+            // reminder before that candidate can replace its Reply. Subsequent
+            // capture frames are quiet; no extra voiced block rescues admission.
+            if let Some(boundary) = reminder_case {
+                let onset = capture_started
+                    && crate::scenario_clock::instant() >= next_capture
+                    && capture_sequence + 1 == u64::from(crate::activity::START_BLOCKS);
+                let late = boundary == ReminderBoundary::Unretired
+                    && evidence.provider_starts > 0
+                    && held_retirement.is_some();
+                if onset {
+                    assert!(
+                        held_retirement.is_some(),
+                        "final PCM must be accepted first"
+                    );
+                    evidence.onset_at_us = Some(monotonic_us());
+                    privacy_closed = boundary == ReminderBoundary::Privacy;
+                    if privacy_closed {
+                        next_privacy = crate::scenario_clock::instant();
+                    }
+                }
+                if (onset && boundary != ReminderBoundary::Unretired) || late {
+                    let mut retirement = held_retirement.take().unwrap();
+                    let WorkerEvent::SpeechRetired { observed_at_us, .. } = &mut retirement else {
+                        unreachable!("only the final retirement is held");
+                    };
+                    *observed_at_us = monotonic_us();
+                    let speaker = evidence
+                        .peers
+                        .iter_mut()
+                        .find(|p| p.role == "speaker")
+                        .unwrap();
+                    speaker.channels.control.send(retirement).unwrap();
+                    // This is the synthetic final marker's actual send time,
+                    // not the earlier acceptance or held-message construction.
+                    evidence.retired_at_us.get_or_insert(monotonic_us());
+                    if boundary == ReminderBoundary::ClockReset {
+                        speaker
+                            .channels
+                            .control
+                            .send(WorkerEvent::PlaybackClockReset {
+                                previous: lamp_audio::ownership::QueuedRange {
+                                    epoch: 1,
+                                    retired_through: cursor,
+                                    accepted_through: cursor,
+                                },
+                                next_epoch: 2,
+                                observed_at_us: monotonic_us(),
+                            })
+                            .unwrap();
+                    }
+                }
+            }
             for peer in &mut evidence.peers {
                 if peer.stopped {
                     continue;
@@ -330,7 +465,7 @@ fn run_with_notice_policy(
                             .send(WorkerEvent::Privacy {
                                 receipt: None,
                                 acquired_at_us: monotonic_us(),
-                                muted: false,
+                                muted: privacy_closed,
                             })
                             .unwrap();
                         next_privacy = crate::scenario_clock::instant() + Duration::from_millis(5);
@@ -375,12 +510,16 @@ fn run_with_notice_policy(
                         evidence.capture_blocks += 1;
                         capture_sequence += 1;
                         evidence.last_capture_us = Some(at);
-                        let probability =
-                            if matches!(case, Case::OpenInput) && evidence.capture_blocks <= 16 {
-                                0.99
-                            } else {
-                                0.0
-                            };
+                        let probability = if (matches!(case, Case::OpenInput)
+                            && evidence.capture_blocks <= 16)
+                            || (reminder_case.is_some()
+                                && evidence.capture_blocks
+                                    <= u64::from(crate::activity::START_BLOCKS))
+                        {
+                            0.99
+                        } else {
+                            0.0
+                        };
                         peer.channels
                             .data
                             .send(MicrophoneFrame {
@@ -394,7 +533,14 @@ fn run_with_notice_policy(
                                 probability,
                                 echo: None,
                                 reference: Default::default(),
-                                samples: vec![7; 160],
+                                samples: vec![
+                                    if reminder_case.is_some() {
+                                        capture_sequence as i16
+                                    } else {
+                                        7
+                                    };
+                                    160
+                                ],
                                 timing: CaptureTiming {
                                     first_read_started_at_us: at,
                                     last_read_started_at_us: at,
@@ -418,17 +564,46 @@ fn run_with_notice_policy(
                     "provider" => {
                         for _ in 0..8 {
                             match peer.channels.data.receive::<ProviderInput>().unwrap() {
-                                Some(ProviderInput::Start { request, .. }) => {
+                                Some(ProviderInput::Start {
+                                    request,
+                                    over_the_lamp,
+                                    ..
+                                }) => {
                                     evidence.provider_starts += 1;
-                                    assert!(matches!(case, Case::OpenInput));
-                                    queued.push_back(ended());
-                                    queued.push_back(ProviderOutput::TurnFailed {
-                                        request,
-                                        stage: FailedStage::NotDelivered,
-                                        reason: Fault::Transport,
-                                    });
+                                    if reminder_case.is_some() {
+                                        evidence.successor_starts.push((request, over_the_lamp));
+                                        queued.push_back(ProviderOutput::Started {
+                                            request,
+                                            session: 1,
+                                            waiting_for_barrier: false,
+                                        });
+                                    } else {
+                                        assert!(matches!(case, Case::OpenInput));
+                                        queued.push_back(ended());
+                                        queued.push_back(ProviderOutput::TurnFailed {
+                                            request,
+                                            stage: FailedStage::NotDelivered,
+                                            reason: Fault::Transport,
+                                        });
+                                    }
                                 }
-                                Some(ProviderInput::End { .. }) => evidence.provider_ends += 1,
+                                Some(ProviderInput::End { request, .. }) => {
+                                    evidence.provider_ends += 1;
+                                    if reminder_case.is_some() {
+                                        queued.push_back(ProviderOutput::TurnComplete {
+                                            request,
+                                            idle: true,
+                                        });
+                                        queued.push_back(ended());
+                                    }
+                                }
+                                Some(ProviderInput::Audio {
+                                    sequence, samples, ..
+                                }) if reminder_case.is_some() => {
+                                    let first = *samples.first().unwrap();
+                                    assert!(samples.iter().all(|sample| *sample == first));
+                                    evidence.successor_audio.push((sequence, first));
+                                }
                                 Some(ProviderInput::Reminder { .. }) => {
                                     panic!("reminders are disabled in this fixture")
                                 }
@@ -469,7 +644,11 @@ fn run_with_notice_policy(
                         if holding_done && !terminal_sent {
                             queued.push_back(ended());
                         }
-                        if !terminal_sent && !queued.is_empty() && (!holding || holding_done) {
+                        if !terminal_sent
+                            && !queued.is_empty()
+                            && (!holding || holding_done)
+                            && (reminder_case.is_none() || evidence.provider_ends > 0)
+                        {
                             let mut link = ready_link(2, 1);
                             link.state = ProviderLinkState::Terminal {
                                 reason: LinkFailure::NoResumableContext,
@@ -531,16 +710,18 @@ fn run_with_notice_policy(
                                 })
                                 .unwrap();
                             if chunk.end_of_speech {
-                                evidence.retired_at_us.get_or_insert(at);
-                                peer.channels
-                                    .control
-                                    .send(WorkerEvent::SpeechRetired {
-                                        owner: chunk.permit.owner(),
-                                        sequence: chunk.chunk_sequence,
-                                        final_sample: end,
-                                        observed_at_us: at,
-                                    })
-                                    .unwrap();
+                                let retired = WorkerEvent::SpeechRetired {
+                                    owner: chunk.permit.owner(),
+                                    sequence: chunk.chunk_sequence,
+                                    final_sample: end,
+                                    observed_at_us: at,
+                                };
+                                if reminder_case.is_some() {
+                                    assert!(held_retirement.replace(retired).is_none());
+                                } else {
+                                    peer.channels.control.send(retired).unwrap();
+                                    evidence.retired_at_us.get_or_insert(at);
+                                }
                             }
                         }
                     }
@@ -594,13 +775,17 @@ fn run_with_notice_policy(
         .expect("the pump left with its scope")
         .into_inner();
     let error = result.unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("terminal provider output settled"),
-        "{case:?}: {error}"
-    );
-    assert!(error.downcast_ref::<PhysicalMute>().is_none());
+    if reminder_case == Some(ReminderBoundary::Privacy) {
+        assert!(error.downcast_ref::<PhysicalMute>().is_some(), "{error}");
+    } else {
+        assert!(
+            error
+                .to_string()
+                .contains("terminal provider output settled"),
+            "{case:?}: {error}"
+        );
+        assert!(error.downcast_ref::<PhysicalMute>().is_none());
+    }
     assert!(reply.is_none());
     assert!(evidence.peers.iter().all(|p| p.stopped));
     assert!(!trace.iter().any(|e| e["kind"] == "worker_forced_shutdown"));

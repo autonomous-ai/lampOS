@@ -588,6 +588,179 @@ fn whole_reminder_joins_two_real_retirements_and_successful_provider_terminal() 
     assert_eq!(proof.turn, first.permit.owner().turn());
 }
 
+/// Final retirement and the candidate's last onset block arrive together on
+/// real IPC. The production loop, not this test, decides which completes first.
+/// Time is the stepped scenario clock; this establishes no acoustic latency.
+#[test]
+fn a_settled_reminder_finishes_before_the_live_loop_admits_its_successor() {
+    use super::provider_terminal::{ReminderBoundary, reminder_admission};
+    use crate::say::{Answer, Outcome};
+
+    let run = reminder_admission(ReminderBoundary::Complete);
+    let ToWorker::Complete { proof, token } = run.settlement else {
+        panic!("the fully retired reminder was abandoned at successor admission");
+    };
+    assert_eq!(proof.correlation, token.correlation);
+    assert_eq!(proof.turn, 1);
+    assert_eq!(proof.retired_generations, 1);
+    assert_eq!((proof.final_epoch, proof.final_frame), (1, 480));
+    assert!(matches!(
+        run.answers.as_slice(),
+        [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+    ));
+    assert_eq!(
+        run.starts,
+        vec![(2, false)],
+        "a finished reply is no cut-in"
+    );
+
+    let old_finished: Vec<_> = run
+        .trace
+        .iter()
+        .filter(|event| event["kind"] == "turn_finished" && event["turn"] == 1)
+        .collect();
+    assert_eq!(old_finished.len(), 1);
+    assert_eq!(old_finished[0]["outcome"], "audio_written_unscored");
+    let finished_at = old_finished[0]["at_us"].as_u64().unwrap();
+    let candidates: Vec<_> = run
+        .trace
+        .iter()
+        .filter(|event| event["kind"] == "input_candidate")
+        .collect();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(
+        candidates[0]["candidate"]["trigger_sequence"],
+        u64::from(crate::activity::START_BLOCKS)
+    );
+    assert_eq!(
+        candidates[0]["candidate"]["trigger_read_at_us"],
+        run.onset_at_us
+    );
+    assert_eq!(run.retirement_sent_at_us, run.onset_at_us);
+    // A peer pump emits the receipts, then the clock advances one step before
+    // the coordinator runs. Compare coordinator events to each other rather
+    // than mistaking the synthetic capture's read time for processing time.
+    assert_eq!(
+        finished_at,
+        candidates[0]["at_us"].as_u64().unwrap(),
+        "same pass joins delivery"
+    );
+    let admitted: Vec<_> = run
+        .trace
+        .iter()
+        .filter(|event| event["kind"] == "input_admitted")
+        .collect();
+    assert_eq!(admitted.len(), 1);
+    assert_eq!(admitted[0]["turn"], 2);
+    let admitted_at = admitted[0]["at_us"].as_u64().unwrap();
+    let delay = admitted_at.checked_sub(run.onset_at_us).unwrap();
+    assert!(
+        (1..=12_000).contains(&delay),
+        "next quiet capture opportunity took {delay} us"
+    );
+    let completion_to_admission = admitted_at.checked_sub(finished_at).unwrap();
+    assert!((1..=10_000).contains(&completion_to_admission));
+    eprintln!(
+        "scenario capture onset read to successor admission: {delay} us; reminder completion to successor admission: {completion_to_admission} us"
+    );
+
+    // All first words survive, in order and once. Only six frames were voiced;
+    // the seventh is quiet, so progress cannot depend on more voiced input.
+    let onset = usize::from(crate::activity::START_BLOCKS);
+    assert!(run.audio.len() > onset);
+    assert_eq!(
+        &run.audio[..onset + 1],
+        &(1..=onset as u64 + 1)
+            .map(|n| (n, n as i16))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        run.audio
+            .windows(2)
+            .all(|frames| frames[0].0 + 1 == frames[1].0 && frames[0].1 + 1 == frames[1].1)
+    );
+    let ended = run
+        .trace
+        .iter()
+        .position(|event| event["kind"] == "turn_finished" && event["turn"] == 1)
+        .unwrap();
+    let began = run
+        .trace
+        .iter()
+        .position(|event| event["kind"] == "input_admitted")
+        .unwrap();
+    assert!(ended < began);
+}
+
+#[test]
+fn the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery_unacknowledged() {
+    use super::provider_terminal::{ReminderBoundary, reminder_admission};
+    use crate::say::{Answer, Outcome};
+
+    for boundary in [
+        ReminderBoundary::Failed,
+        ReminderBoundary::NoTerminal,
+        ReminderBoundary::Unretired,
+        ReminderBoundary::ClockReset,
+        ReminderBoundary::Privacy,
+    ] {
+        let run = reminder_admission(boundary);
+        assert!(
+            matches!(run.settlement, ToWorker::Abandon { .. }),
+            "{boundary:?}"
+        );
+        assert!(
+            matches!(
+                run.answers.as_slice(),
+                [Answer::Begun(_), Answer::Done(Outcome::Dropped(_))]
+            ),
+            "{boundary:?}"
+        );
+        let old_finished: Vec<_> = run
+            .trace
+            .iter()
+            .filter(|event| event["kind"] == "turn_finished" && event["turn"] == 1)
+            .collect();
+        assert_eq!(old_finished.len(), 1, "{boundary:?}");
+        if boundary == ReminderBoundary::Privacy {
+            assert!(run.starts.is_empty());
+            assert!(run.audio.is_empty());
+            assert!(
+                !run.trace
+                    .iter()
+                    .any(|event| event["kind"] == "input_admitted")
+            );
+        } else {
+            assert_eq!(run.starts.len(), 1, "{boundary:?}");
+            assert_eq!(run.starts[0].0, 2);
+            assert_eq!(run.audio[0], (1, 1), "{boundary:?}: no lost prefix");
+        }
+        if boundary == ReminderBoundary::Unretired {
+            // The fixture delivers the exact old retirement after it has seen
+            // the successor Start. It cannot revive the abandoned receipt or
+            // emit another completion for the old owner.
+            assert_eq!(old_finished[0]["outcome"], "user_interrupted");
+            let admitted_at = run
+                .trace
+                .iter()
+                .find(|event| event["kind"] == "input_admitted")
+                .unwrap()["at_us"]
+                .as_u64()
+                .unwrap();
+            assert!(
+                run.retirement_sent_at_us > admitted_at,
+                "the old marker really arrived after successor admission"
+            );
+            assert!(
+                !run.trace
+                    .iter()
+                    .any(|event| event["kind"] == "speech_final_sample_retired"
+                        && event["turn"] == 1)
+            );
+        }
+    }
+}
+
 /// Fourth on #1038: while a reminder is held for its skill, and is still
 /// the one offered, the say service, the hello and the news wait for it;
 /// one said or let go, or another due, holds nothing.

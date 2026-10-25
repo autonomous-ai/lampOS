@@ -1,0 +1,33 @@
+{
+  "head": "d7d20bfc076b772a2d11cf86c6e31a5491dfb2ae",
+  "changed_paths": [
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs",
+    "lampOS/crates/voice/src/reminders.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/schedule.md"
+  ],
+  "state": "Full current host gate passed; all tracked source hashes unchanged.",
+  "tracked_source_records": 7062,
+  "private_source_map_sha256": "e88b8138b80d7fe92f652fb0dae447dd87b173a008be48fcc420d3aa9e5eca1e",
+  "changed_source_sha256": {
+    "lampOS/crates/voice/src/coordinator.rs": "96e79f11444ab0a68b6e4c08c7aeb52992b931d14b8d1ffc024431316f6834ac",
+    "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs": "da4727312b6c5e209ef06cf2a0f7858a6f8ac01ac80f22b80aa447317192dbe1",
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs": "9c145d719a2cd1686c09eb55bf922beaea4c5c940970954c06d1098c55c3d242",
+    "lampOS/crates/voice/src/reminders.rs": "694070a64d4315a0c5e586556c8f50504a8ec34aaa4fdf36aa455356606647e5",
+    "lampOS/docs/reuse-decisions.md": "1beb6c8cdf24c0f210f969dcb31b950087c6f13521b90a50588cb1fb03192f46",
+    "lampOS/docs/schedule.md": "715d00013480c86bba43e97276e647e3a7dcf3a344ed8a1e529901694f669683"
+  },
+  "new_and_durable_control_counts": {
+    "a_settled_reminder_finishes_before_the_live_loop_admits_its_successor": 1,
+    "the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery_unacknowledged": 1,
+    "completed_real_reply_reopens_before_ack_and_recovers_lost_ack_without_re_speech": 1
+  },
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-voice-eval.log": "04dafd98f55eac4d7a24bb2b1c1a9628f8f7a5f185342022976728cb3b3f9ffe"
+  }
+}
