@@ -1,0 +1,49 @@
+{
+  "head": "4a186dc4425324af34b8c8d8ec84b961caca57be",
+  "tree": "fa548212c5ef0e20dc3946bbe13bafb1b16ab998",
+  "base": "ad9f1cb77d662c432d8003a8b0ffc248cc1873a1",
+  "previous_full_gate_commit": "ef1637d7d6b422fa1e375fea1d68a9421eb6d101",
+  "previous_full_gate_base": "d7d20bfc076b772a2d11cf86c6e31a5491dfb2ae",
+  "range_diff": "1:  ef1637d7d = 1:  4a186dc44 lampOS: complete retired reminders before admitting the next line",
+  "own_source_unchanged_after_rebase": true,
+  "base_changed_paths": [
+    "lampOS/crates/memory/src/days.rs",
+    "lampOS/crates/memory/tests/it/days_speakers.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/docs/memory-days.md",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-864-bfc7e70a3/README.md",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-864-bfc7e70a3/gate-results.json",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-864-bfc7e70a3/identity.json",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-864-bfc7e70a3/raw-log-hashes.json",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-864-bfc7e70a3/test-results.txt",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-bf39e4188/README.md",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-bf39e4188/gate-results.json",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-bf39e4188/identity.json",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-bf39e4188/raw-log-hashes.json",
+    "lampOS/docs/verification/carry-late-verdict-20261025/current-bf39e4188/test-results.txt",
+    "lampOS/docs/verification/room-forget-private-scope-fix-20261025/README.md"
+  ],
+  "source_sha256": {
+    "lampOS/crates/voice/src/coordinator.rs": "96e79f11444ab0a68b6e4c08c7aeb52992b931d14b8d1ffc024431316f6834ac",
+    "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs": "da4727312b6c5e209ef06cf2a0f7858a6f8ac01ac80f22b80aa447317192dbe1",
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs": "9c145d719a2cd1686c09eb55bf922beaea4c5c940970954c06d1098c55c3d242",
+    "lampOS/crates/voice/src/reminders.rs": "694070a64d4315a0c5e586556c8f50504a8ec34aaa4fdf36aa455356606647e5",
+    "lampOS/docs/reuse-decisions.md": "1beb6c8cdf24c0f210f969dcb31b950087c6f13521b90a50588cb1fb03192f46",
+    "lampOS/docs/schedule.md": "715d00013480c86bba43e97276e647e3a7dcf3a344ed8a1e529901694f669683"
+  },
+  "state": "Current affected-path gate passed; exact committed source remained clean.",
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-memory.log": "305ed5738e77324c8a8a15a8eec676cbeb945c7cd238b08018812dc88b2b88fd",
+    "test-provider-terminal.log": "9855920036a102092b59f3abbb8e41b362fe46eab88b6dab7dad76a00c0174c5",
+    "test-reminder-roundtrip.log": "15ebd1397ce3f6434bd87af430c2eae3f687e8dc367bf605574e724b729fc2dc",
+    "test-reminders.log": "d318e2c2a7740d1409610ec959387d57fe195d0368a278054ea2ae55b1fca378",
+    "test-second-worker.log": "dc4a61b23d43d52adf8e29d6ae3185029abf5d24f15d8d0891c91fe2ac59d63e",
+    "test-voice-eval.log": "6e4c83ccea13c727a4f855ea34893861777c4904b0d75f0bfcfa0083bb024574"
+  }
+}
