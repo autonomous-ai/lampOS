@@ -1,0 +1,16 @@
+{
+  "head": "6434c5af444c8330ca90a29a4e07349b5e96b0bd",
+  "files": {
+    "lampOS/crates/voice/src/second_provider.rs": {
+      "git_blob": "c219b639e4a2ef5565418f16b182165a174103df",
+      "sha256": "19d0b31e4a814fe03b06182c2bc331a0a473ed336b07b05d29edcb6d6b04553d"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/person_scope_seen.rs": {
+      "git_blob": "c8dc8d2f0ce0338e525bb1a0425e7851dcdbe6c9",
+      "sha256": "ea107e20709731b25f2d94211692aa65bb7bde11254012216a1ad4935b952571"
+    }
+  },
+  "source_closure_comment": 6393530713,
+  "scope": "Source P2 closed only: guard precedes memory/context/chat, synchronous call-time records preserve early/final distinction. No compiler/test by Second, no readiness/current-base/physical acceptance.",
+  "coverage_note": "Assert the final spoken reply exactly once to substantiate answer-delivery wording; independent reader acceptance remains separate."
+}

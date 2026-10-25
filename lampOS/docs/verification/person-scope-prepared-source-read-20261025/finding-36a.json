@@ -1,0 +1,39 @@
+{
+  "head": "36a324148ec11e7f3318036c6f6712221273cc62",
+  "files": {
+    "lampOS/crates/voice/src/second_provider.rs": {
+      "git_blob": "297800f04a961b05db3ea8853354f8d0f0584ec8",
+      "sha256": "5ca556387c54b7f09eeeeffec53427bb62eb41a567c50257b014bb0c7213dc0f"
+    },
+    "lampOS/crates/voice/src/second_provider/worker.rs": {
+      "git_blob": "0a3f2530a2de2b5e2fc715b3688825196c10a364",
+      "sha256": "bfac178cdcf6c78abe0c926e2e8bb3540e6bd2937a620469811ac02d59e55665"
+    },
+    "lampOS/crates/voice/src/second_provider/services.rs": {
+      "git_blob": "bbd2ff00c4732abaf79300c73714c010a7feea5c",
+      "sha256": "4591fdf3811f1a41faf75bd1c94bde33b7b02a80a7bdd33afb81926c0eb3c021"
+    },
+    "lampOS/deploy/product/lamp-voice.service": {
+      "git_blob": "9702e3b22c20969f4f46c03a6fef479138ccdd2f",
+      "sha256": "7db5a904f7e727a7b9f7173fa9529e2ce0f11fde6de57ea1d89bd9c98235421c"
+    }
+  },
+  "early_prepared_call_line": 4361,
+  "final_person_scope_narrow_line": 4540,
+  "source_preconditions": [
+    "LAMP_SECOND_SCOPED_CONTEXT=on",
+    "LAMP_SECOND_SPEAKING_FACE=on",
+    "LAMP_PERSON_SCOPE_SEEN=on",
+    "LAMP_SECOND_PREPARED=on",
+    "fresh initially personal lease; listener emits early words; no positive speaking proof"
+  ],
+  "product_default_prepared": "off (not set in the product unit)",
+  "source_chain": [
+    "prepared_on invokes person-scoped remembered callback",
+    "Prepared::begin builds told(shared,scope)",
+    "Prepared::begin spawns polling of chat_for",
+    "Net::chat_told sends messages before final proof can narrow/drop prepared work"
+  ],
+  "finding_comment": 6393223414,
+  "evidence_scope": "Exact-source P2 permitted dispatch ordering, no executed reproduction, real model, device or current PR readiness claim. Original boot and missing-reader source repairs remain valid."
+}

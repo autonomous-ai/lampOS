@@ -1,0 +1,9 @@
+# Positive speaker proof before speculative context
+
+Source finding 6393223414 reviewed exact #3437 head 36a324148ec11e7f3318036c6f6712221273cc62. With scoped context, positive speaker proof and early preparation configured, a fresh initially personal lease could reach prepared_on while speech was arriving. That function asked its memory callback, and Prepared::begin constructed person-scoped context and spawned real chat dispatch before final scope narrowing. Later dropping the prepared reply could not withdraw already dispatched context. The product leaves early preparation off; this source finding concerned the supported combined configuration, not an observed product disclosure.
+
+The finding receipt binds four public Git blobs/hashes and phase locations. No executed disclosure, real-model request or device test ran here. The existing boot and reader-failure repairs remain separate valid improvements.
+
+Source closure 6393530713 reviewed 6434c5af444c8330ca90a29a4e07349b5e96b0bd. The guard returns before the memory callback and context/chat construction when strict proof meets an initially personal lease. Final processing uses its ordinary classification; room preparation and off parity remain. New test records snapshot scope and words at callback time and chat context at call time, so later narrowing cannot conceal an earlier read. Silent-owner, owner-speaking and off rows cover the required call sequence. Source hashes are in closure-6434.json.
+
+This closes the exact-source P2 only. Producer-reported selective negatives and full gates remain separately reported, including earlier full failures. Second ran no compiler/tests for this read. Current-base qualification, independent reader gates, final answer-content assertions and author readiness remain separate. No memory activation or merge follows.
