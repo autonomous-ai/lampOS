@@ -3311,7 +3311,11 @@ after a take-over, but now for every turn:
   The switch is installed whether or not the eyes' reader starts; with no
   reader (the bus would not open) no face is seen, so every line is the
   room's and a late look gives no keeper: `no eyes read who spoke it
-  (LAMP_PERSON_SCOPE_SEEN)` (reviewer-two's P2 on #3437).
+  (LAMP_PERSON_SCOPE_SEEN)` (reviewer-two's P2 on #3437). With
+  `LAMP_SECOND_PREPARED`, a person-scoped line is not prepared on its early
+  words (`prepared_on`): no memory, context or chat for them before its end
+  is read; the final words are asked as ever, and a room's line still
+  prepares (Second's P2 on #3437).
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted
