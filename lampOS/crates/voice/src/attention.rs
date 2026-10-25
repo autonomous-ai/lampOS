@@ -1146,6 +1146,9 @@ pub struct Attention {
     /// request in hand was judged in, for [`Self::sign`].
     name_or_follow_up: bool,
     judged_room: Option<Room>,
+    /// A hearing of the name inside a line's sound counts for that line
+    /// only (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, [`Self::keep_the_name_in_its_line`]).
+    name_stays: bool,
 }
 
 /// The most text kept for one request.
@@ -1166,6 +1169,24 @@ impl Attention {
     /// sign ([`Self::weigh_the_name`]).
     pub fn ask_a_second_sign_of_the_name(&mut self, on: bool) {
         self.name_second_sign = on;
+    }
+
+    /// A hearing of the name that began inside the sound of the line before
+    /// (from its start to its end) counts for that line only, never for the
+    /// one begun after it within [`NAME_BEFORE_US`] ([`Self::began_at`]); a
+    /// call's goes on: a bare call by its own rule ([`AFTER_CALL_US`]), and a
+    /// line whose words call the lamp ([`Self::called_in_its_words`]). On lamp-4ace
+    /// on 2026-10-26 at 06:21 a hearing at 0.92 in "Can you pass me the
+    /// charger? The white one." counted for the line begun 0.7 s after it,
+    /// which was answered.
+    pub fn keep_the_name_in_its_line(&mut self, on: bool) {
+        self.name_stays = on;
+    }
+
+    /// Whether the words heard of the request in hand call the lamp by name
+    /// ("Lamp.", "Hey Lamp, …"), not someone else.
+    pub fn called_in_its_words(&self) -> bool {
+        called_by_name_on(&self.heard, self.stand_alone_ins)
     }
 
     /// From now on, in a busy room, a face turned to the lamp lets no line
@@ -1395,17 +1416,29 @@ impl Attention {
         {
             self.bare_call_us = Some((call, ended, Some(self.call_shown())));
         }
+        // The line before's sound, when a hearing in it stays with it: not
+        // a call, by its words or as a bare call.
+        let line_before = (self.name_stays
+            && self.request != request
+            && !self.called_in_its_words()
+            && self
+                .bare_call_us
+                .is_none_or(|(call, _, _)| call != self.request))
+        .then_some(self.began_us.zip(self.ended_us))
+        .flatten();
+        let counts = move |named: u64| {
+            named.saturating_add(NAME_BEFORE_US) >= now_us
+                && line_before.is_none_or(|(began, ended)| {
+                    named >= now_us || !(began..=ended).contains(&named)
+                })
+        };
         self.began(request, session);
         self.after_another = after_another;
         self.after_question = after_question;
         self.after_unanswered = after_unanswered;
         self.began_us = Some(now_us);
-        self.named = self
-            .named_us
-            .is_some_and(|named| named.saturating_add(NAME_BEFORE_US) >= now_us);
-        self.named_sure = self
-            .named_sure_us
-            .is_some_and(|named| named.saturating_add(NAME_BEFORE_US) >= now_us);
+        self.named = self.named_us.is_some_and(counts);
+        self.named_sure = self.named_sure_us.is_some_and(counts);
         self.named_at_start = self.named
             && self
                 .named_us
@@ -4515,6 +4548,35 @@ mod tests {
             after(talk, 0.999, true, false),
             Some(Verdict::Play(AFTER_CALL))
         );
+    }
+
+    /// `LAMP_NAME_STAYS_IN_ITS_LINE=on`: on lamp-4ace on 2026-10-26 at 06:21
+    /// (build 6919) a hearing at 0.92 near the end of "Can you pass me the
+    /// charger? The white one." counted for "Here you go. Is your phone dying
+    /// again?", begun 0.7 s after it. With the switch it stays with its own
+    /// line; a call's goes on, and a hearing after the line before ended,
+    /// as the next begins, is the next one's.
+    #[test]
+    fn a_name_heard_inside_a_line_stays_with_it() {
+        let second = 1_000_000u64;
+        let next_named = |stays: bool, words: &str, heard_at: u64| {
+            let mut attention = Attention::default();
+            attention.keep_the_name_in_its_line(stays);
+            attention.began_at(45, 7, 9 * second + 200_000);
+            attention.heard(words);
+            attention.name_heard_scored(heard_at, 0.92);
+            attention.ended(45, 11 * second + 700_000);
+            attention.began_at(46, 7, 12 * second + 400_000);
+            attention.named
+        };
+        let desk = "Can you pass me the charger? The white one.";
+        assert!(
+            next_named(false, desk, 11 * second),
+            "off: carried, as on 4ace"
+        );
+        assert!(!next_named(true, desk, 11 * second));
+        assert!(next_named(true, "Lamp.", 11 * second), "a call's goes on");
+        assert!(next_named(true, desk, 12 * second), "the next line's own");
     }
 
     /// The name is the first thing said, a little before the voice is

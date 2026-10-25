@@ -3051,6 +3051,30 @@ after a take-over, but now for every turn:
   is heard as the name counts as the second sign, as the rule's `TURNED`
   does today; the lamp run includes someone facing the lamp and not
   speaking. Not yet: the Live route and a bare call.
+- **A hearing of the name stays with its own line**
+  (`LAMP_NAME_STAYS_IN_ITS_LINE=on`, on in the product unit). On lamp-4ace on
+  2026-10-26 at 06:21 (build 6919, the busy scene played) `lamp-name` heard
+  the name at 0.92 near the end of "Can you pass me the charger? The white
+  one.", which has no name in it; that line played this ten times in 21. The
+  hearing counted for "Here you go. Is your phone dying again?", begun 0.7 s
+  later, which was answered, and the next desk line went out as the
+  conversation going on. A hearing counts for a line begun up to 1.5 s after
+  it (`attention::NAME_BEFORE_US`), and `lamp-name` tells one up to 0.8 s
+  after it began, so one from a line's last words can come after that line
+  is judged, among the next line's signs.
+  - With the switch, `Heeding::heed_signs` leaves out of a line's signs every
+    hearing that began inside the sound of the line judged last, before this
+    line began: it is not this line's name heard, its name's note, nor its
+    name said to a face. `Attention::began_at` keeps the same rule for a
+    hearing that came in time and counted for its own line.
+  - Kept as before: a line going on from the one before (`continues_from`),
+    the line after one whose words called the lamp by name ("Lamp.", "Hey
+    Lamp, …"; `Attention::called_in_its_words`) or after a bare call, and a
+    hearing in the line's own window ("Lamp, is my phone dying?").
+  - Tests: `attention::tests::a_name_heard_inside_a_line_stays_with_it` and
+    `worker::tests::a_name_heard_in_the_line_before_does_not_play_the_next`,
+    with 4ace's times, the hearing late or in time, the switch off as a
+    control.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
   (`worker::Heeding::telling_the_name`): a line the lamp's name began, heard
   by `lamp-name` at `called::LEAST_SCORE` or more no more than
