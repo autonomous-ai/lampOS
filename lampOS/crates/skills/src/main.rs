@@ -328,7 +328,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
     let mut out = PathBuf::from(".");
     // `asked`: the running program's `--state-dir`, for the app's off and on.
     let mut state = PathBuf::from(package::STATE_DIR);
-    // `asked`: the update channel's public key a Store package must be
+    // `asked`: the Store's public key a package must be
     // signed with. `pack`: the private key it is signed with, if any.
     let mut key_file: Option<PathBuf> = None;
     let mut named = Vec::new();
@@ -369,8 +369,8 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         // answer on the standard output, as systemd hands it a connection
         // to `lamp-skills-manage.socket`; the journal says what was done.
         // `install` fetches the package itself, over HTTPS within
-        // `package::FETCH_WITHIN`, and takes it only signed with the update
-        // channel's key (`--key-file`, `package::STORE_KEY` by default),
+        // `package::FETCH_WITHIN`, and takes it only signed with the Store
+        // key (`--key-file`, `package::STORE_KEY` by default),
         // and only with the Store's switch on in its own environment
         // (`package::STORE_SWITCH`): off, an install is refused as
         // `lamp-cloud` refuses it, whoever asked, and a remove still runs.
@@ -395,8 +395,11 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 );
                 return ExitCode::FAILURE;
             }
-            let store_on =
-                package::store_switched_on(std::env::var(package::STORE_SWITCH).ok().as_deref());
+            let key_file = key_file.unwrap_or_else(|| package::STORE_KEY.into());
+            let store_on = package::store_ready(
+                std::env::var(package::STORE_SWITCH).ok().as_deref(),
+                &key_file,
+            );
             let mut web = match store_on
                 .then(|| {
                     lamp_update::fetch::Web::within(
@@ -414,9 +417,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 }
             };
             let store = web.as_mut().map(|web| package::Store {
-                key_file: key_file
-                    .clone()
-                    .unwrap_or_else(|| package::STORE_KEY.into()),
+                key_file,
                 channel: web,
             });
             return match package::asked(

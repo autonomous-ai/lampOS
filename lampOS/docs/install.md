@@ -434,6 +434,32 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   be below it) and says so. The voice's turn-end model and ONNX
   Runtime library stay beside the voice, where the voice looks for them,
   and lamp-update carries them from build to build as it does now.
+- **The Store, prepared but off.** Install writes
+  `/etc/lampOS/skills/store.env` with `LAMP_SKILLS_STORE=off`, read by both
+  `lamp-cloud` and the skills manage helper. It also writes the helper's
+  `/etc/systemd/system/lamp-skills-manage@.service.d/store.conf`, which reads
+  that file and prepares IPv4 and IPv6 for fetching packages. These are
+  defaults: a lamp's edits are kept on another install. They are install's
+  `STORE_SETTINGS`, not files carried by an update round's settings manifest.
+  The product cloud unit keeps the Store off; both parts require a valid
+  separate Store key before accepting an install, and the helper creates
+  no HTTP client while off or without that key. Removing a skill, or turning it off or on, remains
+  available. The prepared helper sandbox has network permission even while
+  off; its switch and key checks prevent a fetch.
+
+  Factory step 3 places `/etc/lampOS/skills/store-key.pub` with
+  `--store-key FILE` (below); neither installing nor placing the key
+  enables the Store. After provisioning the key and qualifying the Store
+  on the lamp, root turns on the shared switch with one line:
+
+  ```sh
+  sed -i 's/^LAMP_SKILLS_STORE=off$/LAMP_SKILLS_STORE=on/' /etc/lampOS/skills/store.env && systemctl restart lamp-cloud
+  ```
+
+  The next helper connection reads the changed file itself; no helper
+  restart or unit edit is needed. Setting it back to `off` and restarting
+  `lamp-cloud` closes future install requests. The helper still reads its
+  key again before a fetch, and never falls back to the update key.
 - **A lamp's own values** in one file per part, `/etc/lampOS/<part>/lamp.env`,
   read with `EnvironmentFile=` and put into `ExecStart=` as `$NAME`
   (systemd splits an unquoted `$NAME` into words): today only the body's,
@@ -522,6 +548,10 @@ reads itself:
   board has them).
 - The update trust root, `/etc/lampOS/update/key.pub`, put there at the
   factory. Setup does not write it.
+- For the optional Skills Store, its separate trust root,
+  `/etc/lampOS/skills/store-key.pub`, provisioned by factory step 3 with
+  `--store-key FILE`. Its absence does not block the rest of installation;
+  the Store remains off and never borrows the update key.
 - No voice key: it is the user's (the owner on #806, 2026-10-16 16:13).
   Setup takes it from the account page or the app; on a lamp that ran V1,
   install copies V1's `llm_api_key` once (step 6). The factory writes none.
@@ -609,13 +639,21 @@ units stopped:
    "The base strip is off"); `deploy/factory/steps.sh` then skips it, reading
    the switch from `lamp-controls`' own environment, and finds the head pads
    as on any lamp. `install` keeps a pins file changed on the lamp.
-3. **The update key**, `/etc/lampOS/update/key.pub`: the public half of the
-   owner's signing key ([updates.md](updates.md)). `install` refuses to run
-   without it (step 1 below), and setup never writes it.
+3. **The public keys** (still named "the update key" in the step's output).
+   The update key, `/etc/lampOS/update/key.pub`, is the
+   public half of the owner's signing key ([updates.md](updates.md)).
+   `install` refuses to run without it (step 1 below), and setup never
+   writes it. The optional Store key has its own path,
+   `/etc/lampOS/skills/store-key.pub`: pass `--store-key FILE` to provision
+   it. Both are 32-byte Ed25519 public keys in base64, installed 0644 under
+   root's 0755 directory. A missing Store key is skipped, leaving Store
+   installs disabled; a supplied key that is malformed fails the step.
+   The same existing key is kept, and a different one is never replaced.
+   This step writes no Store switch and restarts no service.
 
 Then `lamp-selftest --occasion factory` ([selftest.md](selftest.md)).
 
-`deploy/factory/steps.sh --unit-id <this lamp> --update-key <key.pub>` runs
+`deploy/factory/steps.sh --unit-id <this lamp> --update-key <key.pub> [--store-key <store-key.pub>]` runs
 the four in this order, as root on the lamp. Without `--write` every step is
 dry: it reads the body at rest into `/tmp`, says what it would write, and
 writes nothing to `/etc`. With `--write`, step 1 also takes this arm's own

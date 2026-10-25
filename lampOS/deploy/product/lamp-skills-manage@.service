@@ -4,7 +4,7 @@
 # {"remove": NAME} (a skill's name, never a core skill), lamp-skills' own remove under the folder's
 # lock; or {"install": {"url", "sha256", "name", "version"}}, a Skills Store package it fetches
 # itself over HTTPS (at most 18 MB within 25 s, redirects only to https) and installs only when it
-# is signed with the update channel's key (--key-file), never a core skill or a core skill's name,
+# is signed with the Store's key (--key-file), never a core skill or a core skill's name,
 # and never older than the version installed.
 # Or {"off": NAME} / {"on": NAME}, the app's off and on (#2815): kept in lamp-skills' state
 # folder, its `off` and `on`. That folder is lampos's, 0700 (the daily journal requires it), so
@@ -12,27 +12,20 @@
 # the folder's mode. ProtectSystem=strict still limits its writes to the two paths below.
 # It answers one line and exits. Only the skills folder and that state folder are writable; /etc
 # is read-only, the key with it.
-# The Store is off unless set, as lamp-cloud's LAMP_SKILLS_STORE is: off, the helper refuses every
-# install itself ("not on this lamp: skills.install"), whoever connected, removes still run, and
-# it has no network. A drop-in turns it on, with the network for the fetch (lamp-cloud passes the
-# URL and fetches nothing), at /etc/systemd/system/lamp-skills-manage@.service.d/store.conf:
-#   [Service]
-#   Environment=LAMP_SKILLS_STORE=on
-#   PrivateNetwork=no
-#   RestrictAddressFamilies=
-#   RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-# systemd can't open the network for one request and not another in one template: with the
-# Store on, a remove runs with the network too. Network for installs alone would be a unit and
-# socket of their own.
+# Install writes store.conf, which reads the same default-off store.env as lamp-cloud and
+# prepares network access for a later install. Off, or with no valid Store key, the helper
+# creates no HTTPS client and refuses installs; remove/on/off still work. Network permissions
+# in the installed drop-in apply to all requests, including removes; no service starts here.
 [Unit]
 Description=lampOS skills' manage helper (lamp-skills asked)
 CollectMode=inactive-or-failed
 
 [Service]
 Type=simple
+Environment=LAMP_SKILLS_STORE=off
 User=root
 Group=root
-ExecStart=/opt/lampOS/skills/current/lamp-skills asked --dir /var/lib/lampOS/skills --key-file /etc/lampOS/update/key.pub
+ExecStart=/opt/lampOS/skills/current/lamp-skills asked --dir /var/lib/lampOS/skills --key-file /etc/lampOS/skills/store-key.pub
 StandardInput=socket
 StandardOutput=socket
 StandardError=journal
