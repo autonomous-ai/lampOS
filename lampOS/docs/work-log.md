@@ -1,4 +1,18 @@
-Own-keys failure qualification active; music trace boundary regression taken.
+Own-keys current carry published as draft; music trace full gate active.
+
+## Current checkpoint: 2026-10-26 04:40 +07, own-keys draft #3510 and current local qualification
+
+[Draft #3510](https://github.com/autonomous-ai/lampOS/pull/3510) at `d71a423ca` is based on current `3d9722f38`. It preserves the original authored proposal as `9dd71279d`, tested repair `4c2ecaeea`, and a separate proof-only commit. The final rebase keeps both source patches equal. [Published proof](https://github.com/autonomous-ai/lampOS/tree/d71a423ca0437524dcafb1cb3556a37169da3032/lampOS/docs/verification/own-keys-product-carry-20261026) separates source inventories, retained failures, exact replay observations and the current-base continuation. Only the exact historical regular-file drop-in is retired; local edits and off overrides remain. Activation stays HOLD for #2094 and fresh current-base lamp acceptance, including the app key calls opened by settings already being on.
+
+Current Mac formatting and strict selected nine-crate Clippy pass. Full Voice is **4,065 passed / 0 failed / 21 ignored**; full Controls **516/0/3**; focused own-keys integration **7/0**, directory matcher **1/0**, the compiled installer-doc reader **1/0**, and CI-path scanner/sample tests **2/0**. This targeted continuation plus the original eight completed passing suites and unchanged-input checks is not a second full nine-crate run. The original **6,667/1/44**, exit 101, remains retained. Its preserved Voice executable and a separately compiled clean unchanged Main each pass the exact replay **1/0**; the initial cause remains unproven. No assertion or runtime expiry policy was weakened.
+
+The freshly compiled unsafe existence-only deletion control fails the intended preservation assertion **0/1**, exit 101, and the original/restored exact controls each pass **1/0** with complete source restoration. The historical directory-fixture failure remains separate. The proof publisher first refused the rename-aware path inventory; its corrected accounting verifies both the deleted historical source and identical pinned destination, retaining all 17 changed paths. This was an evidence-manifest correction, not another test run. Current original PR ARM64/Linux checks and reader results are pending. Third retains the separate whole-installer FIFO preflight repair.
+
+Music emitted-record coverage on `second/music-refusal-trace`, base `3d9722f38`, passes formatting, strict all-target Voice Clippy, fresh test compilation and all three focused cases **3/0**. The complete serial Voice suite is active on frozen source in the one compiler slot. The three deliberate-fault controls are prepared and unrun; no full-suite result is claimed yet. The shared private handler preserves production admission and recording semantics; tests assert safe fixed refusal text, present null on acceptance, exact keys excluding private offer fields and stale/unavailable precedence. #2793's physical/provider acceptance remains separate.
+
+All previous verification blobs and modes are unchanged. No lamp, provider, real-key or release action ran; no owner input is needed.
+
+---
 
 ## Current checkpoint: 2026-10-26 04:08 +07, frozen own-keys result; emitted music trace regression
 
