@@ -5,6 +5,24 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 22:43 — Two-face original Linux qualification passed
+
+Ready for lamp-voice: no (#3486 needs its current-base carry and remaining read).
+
+#3486 `d9fa4c79c` on `bf39e4188` passed original ARM64
+**40206954233** and Linux clippy **40206954264**. ARM reconciles
+**11,291 passed (one tracked journal fixture leak), 106 skipped**,
+all three new controls passing once, 35 repeated equal terminal log rows.
+Preview `c00ff42cb` has parents bf39/d9fa and exactly the offered tree
+`2bdc75429`. [Audited receipt](verification/two-faces-held-carry-20261025/native-40206954233.json).
+Reviewer-three carried its READ-OK; Reviewer-two's read is active. The
+later d7 merge is source preparation only. The original failures and
+physical limitations remain unchanged.
+
+The reminder full gate on frozen d7 has passed fmt, strict clippy and
+workspace build; the complete tests are running in the one compiler lane.
+Train136 remains active for #3408; #3420 retargets after its actual landing.
+
 ## 2026-10-25 22:34 — Reminder admission regression reproduced and fixed locally
 
 Ready for lamp-voice: no (full current gate, commit, PR and Linux gates pending).

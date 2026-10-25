@@ -1,0 +1,26 @@
+{
+  "head": "d9fa4c79ca2ae9ca0ed9fa4d44f03976291b337c",
+  "arm64_run": 40206954233,
+  "clippy_run": 40206954264,
+  "summary_lines": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T15:40:26.7633405Z      Summary [ 211.083s] 11291 tests run: 11291 passed (1 leaky), 106 skipped"
+  ],
+  "unique_terminal_cases": 11291,
+  "repeated_equal_rows": 35,
+  "tracked_leak_count": 1,
+  "controls": {
+    "with_two_faces_held_two_faces_must_stay": 1,
+    "with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room": 1,
+    "with_two_faces_held_looks_between_lines_make_the_first_line_busy": 1
+  },
+  "raw_log_sha256": "b77e809c647b39bd1c62cd7a4b354cc838f7d745671f7ad89677d659fc57e242",
+  "preview": "c00ff42cb81d53ca896ea2af30ebb814a36e1979",
+  "preview_tree": "2bdc75429dc59cb6238fa4ce6b3bd666f13a66ae",
+  "preview_parents": [
+    "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+    "d9fa4c79ca2ae9ca0ed9fa4d44f03976291b337c"
+  ],
+  "preview_tree_matches_offered": true,
+  "base": "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+  "limits": "Original CI on this head and bf39 base. The tracked journal fixture leak remains. Later d7 source carry is untested. No lamp, acoustic latency or activation result."
+}
