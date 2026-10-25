@@ -1,0 +1,61 @@
+{
+  "checked_at_utc": "2026-10-25T20:53:55.364229+00:00",
+  "run_id": 40229684238,
+  "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40229684238",
+  "head": "74dafff29ee70cd30f66b91802627c1379d09d29",
+  "preview_commit": "b37ad00673163288fa92c34cf51a341fb58faff3",
+  "published_and_preview_tree": "250b88ad5af2d19a6fbf5dee887a26e56679727e",
+  "preview_parents": [
+    "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+    "74dafff29ee70cd30f66b91802627c1379d09d29"
+  ],
+  "run_conclusion": "success",
+  "artifact_id": 12613750226,
+  "artifact_name": "lampos-arm64-74dafff29ee70cd30f66b91802627c1379d09d29",
+  "artifact_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40229684238/artifacts/12613750226",
+  "artifact_API_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/12613750226",
+  "artifact_zip_download_API": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/12613750226/zip",
+  "artifact_expired_at_metadata_read": false,
+  "artifact_expires_at_utc": "2026-11-01T20:28:05Z",
+  "archive_bytes": 116061977,
+  "archive_sha256": "6eaa5b29d113fca72979c1a2d6cbb66616887e0828732f433ce3d17788925ef2",
+  "archive_matches_API_digest": true,
+  "sha256sums_bytes": 3924,
+  "sha256sums_sha256": "1c49caa722a4b6dea5a68e83adb0378291e28015019412fddd1128b15fb3a79c",
+  "manifest_entries": 49,
+  "archive_file_count": 50,
+  "all_manifest_names_match_archive_inventory": true,
+  "individually_hashed_binary_count": 2,
+  "selected": {
+    "lamp-voice": {
+      "filename": "lamp-voice",
+      "sha256_manifest": "0b26a477e9b6ff37b1bd4ce494bbb76f777b72d5cd82b0ddab77f6dfe98f6c5c",
+      "sha256_verified_archive_member": "0b26a477e9b6ff37b1bd4ce494bbb76f777b72d5cd82b0ddab77f6dfe98f6c5c",
+      "bytes": 28632520,
+      "zip_crc_checked_on_read": true,
+      "elf_class": "ELF64",
+      "endianness": "little",
+      "machine": 183,
+      "architecture": "AArch64",
+      "elf_type": 3,
+      "payload_executed": false,
+      "binary_extracted": false
+    },
+    "lamp-eyes": {
+      "filename": "lamp-eyes",
+      "sha256_manifest": "bf1654ecc2ff649c836e185fa859adebaddff9bf8637c115f602840024af9b4f",
+      "sha256_verified_archive_member": "bf1654ecc2ff649c836e185fa859adebaddff9bf8637c115f602840024af9b4f",
+      "bytes": 26407600,
+      "zip_crc_checked_on_read": true,
+      "elf_class": "ELF64",
+      "endianness": "little",
+      "machine": 183,
+      "architecture": "AArch64",
+      "elf_type": 3,
+      "payload_executed": false,
+      "binary_extracted": false
+    }
+  },
+  "no_signed_attestation_verified": true,
+  "no_install_execution_or_gate_transfer": true
+}
