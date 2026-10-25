@@ -1,0 +1,13 @@
+{
+  "files": {
+    "README.md": {
+      "sha256": "a2c04210978aab24b986a73a5ff746afc4c196c38b393ab07a893e297cf196ff",
+      "bytes": 4227
+    },
+    "summary.json": {
+      "sha256": "1bdca64fe0a6e48cfa578f23a665e73285af0eca3b470bcf251a15c994a26e0f",
+      "bytes": 3625
+    }
+  },
+  "content_scope": "Selected counts/source hashes/declared profile/closure booleans only; no private raw/controller/environment/binary payload"
+}

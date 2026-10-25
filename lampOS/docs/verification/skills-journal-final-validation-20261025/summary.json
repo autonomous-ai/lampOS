@@ -1,0 +1,113 @@
+{
+  "scope": "FINAL_FROZEN_FIXTURE_VALIDATION_ONLY",
+  "producer_commit": "cf762f38eb1d53b56456764368608e70c8b02536",
+  "base": "34c8b517c41c8d2a4099b87fe550d4eb25611ea2",
+  "semantic_source_tree": "bcbf05c3d05d315914a06ea56af18376a658a2d0",
+  "addon_sha256": "15db11e18468504635db4019862d1d5c4d35ecdacb60529c204aa28233b819c9",
+  "docs_sha256": "80f211e5ca968a7ee8a67833d5633d79dd261317eeb42a06972df42c90f5e473",
+  "reviewed_seal_sha256": "86aaaa4d47bb8a90d0826d5bda768d4b38c164874b418718e76a91721abf2cc1",
+  "actual_Root_grant_sha256": "254c4bae4350c33cb9f2cb853fb27ba335e34867918cc89d7118f9036c3901b3",
+  "terminal_sha256": "0e4634f2a1ec3a20e48dcb310a6e008ca457bbd8cc92e128a28dd54719bfbdf0",
+  "terminal_exit": 0,
+  "stages": [
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "fmt",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "clippy",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "no-run",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "counts": {
+        "failed": 0,
+        "ignored": 9,
+        "passed": 519
+      },
+      "exit": 0,
+      "primary": true,
+      "stage": "full",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      },
+      "exit": 0,
+      "primary": true,
+      "stage": "exact",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "workspace-build",
+      "variant": "candidate"
+    }
+  ],
+  "primary_attempts": 2,
+  "qualified_primary_observations": 2,
+  "extra_baseline_or_retry": false,
+  "source_stable": true,
+  "owned_cleanup_release": true,
+  "cache_deletion_authorized": false,
+  "overall_wallclock_watchdog_installed": false,
+  "no_current_PR_ARM_hardware_latency_or_causal_qualification": true,
+  "raw_environment_helpers_and_binaries_remain_private": true,
+  "native_profile": {
+    "os": "Linux",
+    "architecture": "x86_64/AMD64",
+    "target": "x86_64-unknown-linux-gnu",
+    "rust_cargo": "1.96.0, direct same-directory executables without rustup selector",
+    "cached_image_sha256": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+    "debug": 0,
+    "compiler_jobs": 2,
+    "incremental": false,
+    "test_parallelism": "default, no RUST_TEST_THREADS override",
+    "inherited_LAMP_controls": false
+  },
+  "actual_census": {
+    "targets": 5,
+    "cases_including_ignored": 528,
+    "metadata_workspace_packages": 46
+  },
+  "pre_observation_ELF_witnesses": 116,
+  "later_workspace_build_may_replace_test_time_CLI": true,
+  "test_time_CLI_not_claimed_identical_to_final_workspace_CLI": true,
+  "stage_caps_seconds": {
+    "fmt": 300,
+    "clippy": 2400,
+    "no-run": 2400,
+    "full": 3600,
+    "exact": 120,
+    "workspace-build": 3600
+  },
+  "existing_VM_start_cap_seconds": 180,
+  "raw_record_retention": "All raw streams, actual environment values, helper implementations and executable witnesses remain private.",
+  "independent_final_report_sha256": "b87f20b36753e674ad12cb099be12acdd2067c7863a867feec08c426a0cb816b",
+  "independent_final_checks": 196,
+  "source_files": 10460,
+  "all46_local_fresh_compilation_union": true,
+  "all_owned_command_groups_and_container_absence_verified": true,
+  "workspace_artifact_source_bindings_verified_separately": true,
+  "initial_overstrong_audit_assumption_failure_preserved": true,
+  "earlier_failed_epochs_unchanged": true
+}

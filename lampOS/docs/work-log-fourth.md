@@ -8716,3 +8716,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 25 October, 11:00 ICT — memory plan checkpoint
 
 Updated [the 0.35-to-0.90 plan](verification/memory-quality-plan-20261024/README.md) against Main a176e66d9: historical green heads, the later failed Mac carry, the reviewer-cleared but unrun callback correction, current Common carry and fixture validation are distinct. Name/callback remain parent-first; Photo remains off. No score, default, lamp or new runtime qualification is claimed. Final journal validation is active after fmt/strict Skills Clippy/no-run passed; full and direct exact outcomes will be recorded separately.
+
+## 25 October, 11:22 ICT — final journal fixture validated
+
+[Selected final journal receipt](verification/skills-journal-final-validation-20261025/README.md) binds producer cf762f38e on frozen34c/treebcbf: six stages exit0, fullSkills519/0/9 and directexact1/0/0 once each. Source, actual metadata/compiler/context and owned cleanup verified,116 saved pre-observation witnesses retained; later workspaceCLI is distinct. Two jobs returned to Tests on actual terminal. Old failures remain failed; no currentPR/ARM/lamp/privacy/latency/cause waiver. Per-stage caps exist, separate totalwatchdog does not. Raw/controllers/env/binaries stay private; no cache deletion.
