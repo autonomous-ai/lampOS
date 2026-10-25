@@ -8720,3 +8720,7 @@ Updated [the 0.35-to-0.90 plan](verification/memory-quality-plan-20261024/README
 ## 25 October, 11:22 ICT — final journal fixture validated
 
 [Selected final journal receipt](verification/skills-journal-final-validation-20261025/README.md) binds producer cf762f38e on frozen34c/treebcbf: six stages exit0, fullSkills519/0/9 and directexact1/0/0 once each. Source, actual metadata/compiler/context and owned cleanup verified,116 saved pre-observation witnesses retained; later workspaceCLI is distinct. Two jobs returned to Tests on actual terminal. Old failures remain failed; no currentPR/ARM/lamp/privacy/latency/cause waiver. Per-stage caps exist, separate totalwatchdog does not. Raw/controllers/env/binaries stay private; no cache deletion.
+
+## 25 October, 12:32 ICT — taken: room forget scope boundary
+
+Taken on the forget/memory quality row: constrain forget_said replacement traversal to room entries after a replacement is adopted into a private scope. Main119 source and the published request contract demonstrate the gap; no runtime reproduction yet. Open and merged checks distinguish this from the already-landed forget_person speaker deletion. Preserve adoption links and ordinary forget behavior; add focused regression and English docs, then canonical gates before code push. Branch: fourth/room-forget-private-scope-20261025. No new switch or compiler allocation.
