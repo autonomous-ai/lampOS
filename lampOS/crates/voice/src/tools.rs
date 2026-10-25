@@ -44,6 +44,9 @@ use std::{
 #[path = "tools/schedule_integration_tests.rs"]
 mod schedule_integration_tests;
 
+#[path = "tools/schedule_asked.rs"]
+pub mod schedule_asked;
+
 /// Where the coordinator reads whether the model may say a thing was not
 /// for it. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_TOOLS";

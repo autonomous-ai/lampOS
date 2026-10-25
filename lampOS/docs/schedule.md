@@ -687,6 +687,21 @@ tool despite its descriptions. Host catalog assertions cannot establish that
 choice or acoustic delivery timing. Third has no lamp or live-provider result
 for this follow-up.
 
+### A plain ask must set it (`LAMP_SCHEDULE_ASKED`)
+
+On lamp-4ace on 25 Oct, on the ship build 6819 and its product unit, "Lamp,
+remind me in three minutes to call my sister." was answered "Three minutes,
+call your sister." with no call: nothing was set, and nothing was said three
+minutes later. The two asks before it had called `set_timer`. With
+`LAMP_SCHEDULE_ASKED=on` (the second route; on in the product unit), a line
+that plainly asks for a timer or a reminder at a sentence's start
+(`tools::schedule_asked::asks_to_set`) makes its first chat round call the
+function that sets it (`tool_choice`): `set_timer` for a duration from now,
+`set_reminder` for a clock time, as their descriptions ask. A line that says
+neither or both, a question of what is set, a cancel and a line that takes the
+ask back are asked as before, and the round after the call is asked with its
+result, so the lamp says what the schedule did.
+
 ## First's Voice integration contract
 
 Exactly one logical consumer must own delivery. There is no claim/lease API to

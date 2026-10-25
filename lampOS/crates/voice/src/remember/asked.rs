@@ -84,7 +84,7 @@ const NOT_FORGET: &[&str] = &["don't", "dont", "not", "never"];
 /// that." content (reviewer-two's P2 on `aa533296e`). It errs toward taken
 /// back: then nothing is forced, and the model answers as without the
 /// switch.
-fn withdrawn(said: &str) -> bool {
+pub(crate) fn withdrawn(said: &str) -> bool {
     said.replace('\u{2019}', "'")
         .split(['.', '!', '?', ';', ',', ':', '\u{2014}', '\u{2013}'])
         .any(|clause| clause_withdraws(&lower_words(clause)))

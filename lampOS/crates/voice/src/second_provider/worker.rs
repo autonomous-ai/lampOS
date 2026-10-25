@@ -2031,7 +2031,18 @@ pub fn serve(
         );
         crate::remember::asked::force()
     });
-    let net = match first_force(named, first_force(remember, keep)) {
+    // A line that plainly asks for a timer or a reminder must call the
+    // function that sets it (`LAMP_SCHEDULE_ASKED`).
+    let set = crate::tools::schedule_asked::on().then(|| {
+        eprintln!(
+            "lamp-voice second: a line that plainly asks for a timer or a reminder must call {} or {} in its first round ({})",
+            crate::tools::schedule_asked::TIMER,
+            crate::tools::schedule_asked::REMINDER,
+            crate::tools::schedule_asked::ENVIRONMENT
+        );
+        crate::tools::schedule_asked::force()
+    });
+    let net = match first_force(named, first_force(remember, first_force(keep, set))) {
         Some(force) => net.forcing(force),
         None => net,
     };
