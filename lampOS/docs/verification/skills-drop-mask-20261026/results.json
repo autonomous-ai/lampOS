@@ -1,0 +1,549 @@
+{
+  "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+  "build_jobs": 1,
+  "candidate_fixture_sha256": "fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192",
+  "candidate_source_inventory_sha256": "7ca1d181b5b7412b371f896f32f7936352a4a599f05fc2c54f69d9c6fc01c8e2",
+  "compiled_artifacts_before_positive_run": [
+    {
+      "sha256": "93e19f819abb8dc440df55634ab4e8e7c012804ec2c107dc3f3ec41f6a17cf4b",
+      "target": "lamp-skills"
+    },
+    {
+      "sha256": "1eef3f5097991f43cc7f7173371793b9f78bb5f405dff12569cb9ed61b27ca51",
+      "target": "requested_audio"
+    },
+    {
+      "sha256": "13a0102650538f47e35fed347884a7a14fcffaf51891225e8409d33c26c0657c",
+      "target": "it"
+    },
+    {
+      "sha256": "8ef12a5b56cc59d7ceaa919c5f6cbd62871a23fe1c01a47e467da2c435adcdf3",
+      "target": "release_pair"
+    },
+    {
+      "sha256": "3b265e3f903dca3df1923070aeb1b5488116992b1fa092a2a8c9c7378c2497fb",
+      "target": "lamp_skills"
+    }
+  ],
+  "controls": {
+    "baseline-focused": {
+      "command": [
+        "<qualified-it>",
+        "welcome_stuck::",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": {
+        "failed": 0,
+        "filtered": 306,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 7,
+        "status": "ok"
+      },
+      "elapsed_seconds": 1.02,
+      "error": null,
+      "executed_artifact_sha256": "13a0102650538f47e35fed347884a7a14fcffaf51891225e8409d33c26c0657c",
+      "exit_code": 0,
+      "log_sha256": "ee388f3b0e6a6d3f0ab58fda95d5e47bb4df57ee3dfe8864d5f4393340b00247",
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "missing-suffix": {
+      "command": [
+        "<qualified-it>",
+        "welcome_stuck::drop_mask_hides_arbitrary_text",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": {
+        "failed": 1,
+        "filtered": 312,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 0,
+        "status": "FAILED"
+      },
+      "elapsed_seconds": 1.046,
+      "error": null,
+      "executed_artifact_sha256": "7afb5042bc63f9cdccf2226e6bcd4b32e45f2de8923f599fc5889dd36789c032",
+      "exit_code": 101,
+      "log_sha256": "32f0e1eb58b695ee5b8bdd033ac462e769bcf21f021fdb5a702b8067417a5666",
+      "qualification": {
+        "artifact_sha256": "7afb5042bc63f9cdccf2226e6bcd4b32e45f2de8923f599fc5889dd36789c032",
+        "assertion_location": "welcome_stuck.rs:190:",
+        "counts": {
+          "failed": 1,
+          "filtered": 312,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "status": "FAILED"
+        },
+        "exit_code": 101,
+        "qualified": true
+      },
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "missing-suffix-compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 11.257,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "400069891333214d736bcf39a5fc830f680f37cb1d33b3d0b94738ecbe939acd",
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "raw-text": {
+      "command": [
+        "<qualified-it>",
+        "welcome_stuck::drop_mask_hides_arbitrary_text",
+        "--exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": {
+        "failed": 1,
+        "filtered": 312,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 0,
+        "status": "FAILED"
+      },
+      "elapsed_seconds": 1.044,
+      "error": null,
+      "executed_artifact_sha256": "21d64c8ec07aa5de0063d8616637e5c4dbdfaa672dd6f25a77fce66485bc4faa",
+      "exit_code": 101,
+      "log_sha256": "7ab4def34449d3bd2467bde91bdc477331e2e0fe2169339feae28c4b8780c907",
+      "qualification": {
+        "artifact_sha256": "21d64c8ec07aa5de0063d8616637e5c4dbdfaa672dd6f25a77fce66485bc4faa",
+        "assertion_location": "welcome_stuck.rs:190:",
+        "counts": {
+          "failed": 1,
+          "filtered": 312,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "status": "FAILED"
+        },
+        "exit_code": 101,
+        "qualified": true
+      },
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "raw-text-compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 11.211,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "54275a0de28a083c2973aae5528201ac3af05ae35850ec8b12b34a71345e4377",
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "restored-compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 11.198,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "8fe9471c9a665bf16c751db4ce3f578bf752a532dd71be62f5669d06f455e0a8",
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "restored-focused": {
+      "command": [
+        "<qualified-it>",
+        "welcome_stuck::",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "counts": {
+        "failed": 0,
+        "filtered": 306,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 7,
+        "status": "ok"
+      },
+      "elapsed_seconds": 1.027,
+      "error": null,
+      "executed_artifact_sha256": "13a0102650538f47e35fed347884a7a14fcffaf51891225e8409d33c26c0657c",
+      "exit_code": 0,
+      "log_sha256": "ee388f3b0e6a6d3f0ab58fda95d5e47bb4df57ee3dfe8864d5f4393340b00247",
+      "source_entries": 7122,
+      "source_unchanged": true
+    }
+  },
+  "full_harness_summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 157,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 20,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 1,
+      "measured": 0,
+      "passed": 312,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 8,
+      "measured": 0,
+      "passed": 2,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 31,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "ignored": 0,
+      "measured": 0,
+      "passed": 0,
+      "status": "ok"
+    }
+  ],
+  "host": "aarch64-apple-darwin",
+  "incremental": false,
+  "positive_gate": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 1.93,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 0.47,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "2c07f82a8b2cd18494ba38fe4e1dfa845e0d41543823e22f55c71b34f85eb1bc",
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.802,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7122,
+      "source_unchanged": true
+    },
+    "full-skills": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 186.786,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "d01bc4688cd174b31f19fa24102ab7b79467323e8042b8fb98b24e4a93bd319b",
+      "source_entries": 7122,
+      "source_unchanged": true
+    }
+  },
+  "retained_earlier_observations": {
+    "corrected_focused": {
+      "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+      "fixture_sha256": "fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192",
+      "receipt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-skills",
+          "--test",
+          "it",
+          "welcome_stuck::",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 5.274,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "16bb1a3df8d5e0f6938a8af04b32a25dd374f86de8bb2715bfc5d15c2df5dc83",
+        "source_entries": 7122,
+        "source_unchanged": true
+      },
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 306,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        }
+      ]
+    },
+    "first_focused": {
+      "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+      "fixture_sha256": "61aab95f7bc19fecf86459e702f6d94824b0be3948b3b39fd77fe18bc9ea5ac6",
+      "reason": "The face fixture used unsupported present=false; six cases passed.",
+      "receipt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-skills",
+          "--test",
+          "it",
+          "welcome_stuck::",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 5.439,
+        "error": null,
+        "exit_code": 101,
+        "log_sha256": "edbfe9bbc0f2d828276967b58e08a8487b95e67ff06ca2032935ea014ca35a82",
+        "source_entries": 7122,
+        "source_unchanged": true
+      },
+      "summaries": [
+        {
+          "failed": 1,
+          "filtered": 306,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 6,
+          "status": "FAILED"
+        }
+      ]
+    },
+    "initial_full_gate": {
+      "base": "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+      "fixture_sha256": "b8ad110006564991020dbffc611b9b7aa6f7c3095813c3eca9d5e0d4f770ee6a",
+      "reason": "All five new fixtures lacked the required policy declaration; 517 existing cases passed.",
+      "receipt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-skills",
+          "--no-fail-fast",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 192.826,
+        "error": null,
+        "exit_code": 101,
+        "log_sha256": "7b039649a3441e6d63606fb625ee8b55a0f389aa2892854519b5b1d4d6c5cd7e",
+        "source_entries": 7122,
+        "source_unchanged": true
+      },
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 157,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 20,
+          "status": "ok"
+        },
+        {
+          "failed": 5,
+          "filtered": 0,
+          "ignored": 1,
+          "measured": 0,
+          "passed": 307,
+          "status": "FAILED"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 8,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 31,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    "timed_face_focused": {
+      "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+      "fixture_sha256": "fdde8d54ae63204693fa15b8ca99117ccbcf11aca02580efad36620474f08816",
+      "reason": "The valid timed-face fixture reached the drop event; its expected suffix needed the elapsed and required duration.",
+      "receipt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-skills",
+          "--test",
+          "it",
+          "welcome_stuck::",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 5.148,
+        "error": null,
+        "exit_code": 101,
+        "log_sha256": "166da1ff7eda5a1cf232ee4330329a89738a5b4f7f8adaa5e0e5b2852dc14588",
+        "source_entries": 7122,
+        "source_unchanged": true
+      },
+      "summaries": [
+        {
+          "failed": 1,
+          "filtered": 306,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 6,
+          "status": "FAILED"
+        }
+      ]
+    }
+  },
+  "rust": "1.96.0",
+  "source_entries_before_proof_addition": 7122,
+  "verdict": {
+    "errors": [],
+    "qualified_controls": [
+      "raw-text",
+      "missing-suffix"
+    ],
+    "source_restored": true,
+    "success": true
+  }
+}
