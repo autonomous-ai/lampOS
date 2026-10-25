@@ -153,6 +153,15 @@ struct Progress {
     live: bool,
     settlement: Option<ToWorker>,
 }
+impl Progress {
+    fn eligible_completion_cursor(&self) -> Option<(u64, u64, u64)> {
+        if self.qualified && self.had_audio && self.retired > 0 && self.settlement.is_none() {
+            self.final_cursor
+        } else {
+            None
+        }
+    }
+}
 
 /// Lives on the actual coordinator Reply. The owning consumer keeps only the
 /// shared, bounded settlement slot, so a dropped Reply cannot silently become
@@ -170,17 +179,20 @@ impl Receipt {
         state.retired = state.retired.saturating_add(1);
         state.final_cursor = Some((sequence, epoch, frame));
     }
+    /// Whether this receipt has its own completion proof. The coordinator
+    /// must still perform the successful whole-reply join; this changes nothing.
+    pub fn eligible_for_completion(&self) -> bool {
+        self.0.borrow().eligible_completion_cursor().is_some()
+    }
     /// Called only after the real successful whole-reply join, never directly
     /// from SpeechRetired (which retires only one PCM generation).
     pub fn completed(&mut self) {
         let mut state = self.0.borrow_mut();
-        let Some((playback_sequence, final_epoch, final_frame)) = state.final_cursor else {
+        let Some((playback_sequence, final_epoch, final_frame)) =
+            state.eligible_completion_cursor()
+        else {
             return;
         };
-        if !state.qualified || !state.had_audio || state.retired == 0 || state.settlement.is_some()
-        {
-            return;
-        }
         let proof = QualifiedCompletion {
             correlation: state.token.correlation.clone(),
             owner_boot: state.owner.boot().bytes(),

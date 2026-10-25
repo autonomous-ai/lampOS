@@ -1483,9 +1483,22 @@ revision guards, exact mutation receipts and private SQLite DELETE/FULL store.
 Add a separate bounded delivery ledger, without reminder text, that records
 preparation before admission and qualified whole-turn completion before Ack.
 The existing one retained mutation receipt may be overwritten: reconcile it
-with the exact current item, never treat absence as a newly proved Ack. An
-unknown prepared attempt is not automatically spoken again after a crash.
-Explicitly snooze/cancel it after listing the current store.
+with the exact current item, never treat absence as a newly proved Ack. The
+later restart policy (16 October) allows a new exclusive Voice claim to retire
+an earlier process's uncompleted attempt and offer it again. This deliberately
+prefers a possible repeat to a permanently lost reminder; a recorded completion
+still reconciles without replay. The successor-admission repair does not change
+that policy: it records an already qualified completion before its Reply can
+be discarded by a new line.
+
+Rechecked against V1 main `1b5f7a78b` on 25 October:
+`system/schedule/runner.go` defines successful `RunReport` as handoff, not
+completed or heard speech, and `fire` advances a successful occurrence. Keep
+Rust's stronger provider-terminal/final-cursor join instead of substituting
+that handoff success. Reuse the existing coordinator completion path and
+retained-input ownership update; add no second acknowledgement path, wait,
+worker or storage operation to admission. The V1 source was inspected, not
+executed for this comparison.
 
 Reuse Voice's actual Controller, input admission, provider session/privacy
 checks, output permits and speaker `SpeechRetired` handling. One generation's

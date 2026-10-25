@@ -955,6 +955,20 @@ audio, cancelled tails and late callbacks cannot acknowledge. The receipt is
 the speaker's ALSA cursor evidence, not proof of acoustic fidelity or that a
 person heard it. A failed reminder does not play a local failure recording.
 
+When a new line reaches admission after that whole-output proof is already
+available, the reminder first takes the ordinary completion path. The pending
+line and its audio prefix stay in admission; completion updates their expected
+owner, and the next capture opportunity can admit the same line, including on
+a quiet frame. Only a currently owned, microphone-permitted reminder with
+qualified final-retirement evidence takes this path. Partial, failed, reset or
+otherwise unqualified delivery keeps the interruption path. No completion is
+inferred from the successor, first audio, or accepted-but-unretired PCM.
+This adds no timer, provider wait or ledger work to the coordinator. The
+target is one additional capture opportunity (normally a 10 ms frame), not a
+hardware or acoustic deadline. Privacy, lease and authority checks still run
+before completion; without fresh capture, the pending input retains its normal
+expiry rather than receiving new readiness evidence.
+
 A skill's `from: schedule` say reads that same local completion record after
 Voice tries the whole-reply join. It reports `spoken` only when the record is
 `Complete` and the existing whole-playback checks still pass. A playback-clock
@@ -1223,8 +1237,10 @@ the Schedule switches/path settings above, raw logs and actual timing boundaries
 4. Interrupt a multi-generation reminder after its first audio has retired,
    and mute during the last generation. It must remain pending without Ack
    or automatic re-speech. Explicitly list and snooze/cancel to resolve it.
-5. Restart Voice with an unknown prepared attempt; it stays pending. Restart
-   after a recorded completion but before Ack; it reconciles without sound.
+5. Restart Voice with an unknown prepared attempt; the new exclusive voice
+   claim permits another attempt under the existing restart policy, so it may
+   be heard again. Restart after a recorded completion but before Ack; it
+   reconciles without sound.
    Lose an Ack reply and change another reminder before recovery; an old
    receipt must not consume the next recurring occurrence.
 6. Stop Schedule or make its ledger unavailable. New requests must report
@@ -1237,6 +1253,13 @@ the Schedule switches/path settings above, raw logs and actual timing boundaries
    follow-up must get its turn first; the reminder stays pending without
    Ack and becomes eligible again only after the follow-up and ordinary
    readiness checks allow it.
+8. Begin a new line immediately after a reminder's last sound. When successful
+   provider completion and every final speaker cursor were already received,
+   verify one completed delivery, the complete next-line prefix, and no replay
+   after a Voice restart. Compare a partial reminder and a reset before final
+   completion: neither may gain an acknowledgement from the next line. Keep
+   capture-read, final-retirement, completion and successor-admission times
+   separate; host scenario time does not establish audible latency on the lamp.
 
 Most likely wrong there: Gemini's supported schema subset and faithful
 spoken wording, timely local-silence admission in a busy office,
