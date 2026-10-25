@@ -5,7 +5,27 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
-## 2026-10-26 01:53 — Held native proof complete; factory coverage tests continue
+## 2026-10-26 01:59 — Scheduling reread confirms remaining constrained asks
+
+Ready for lamp-voice: no (#3477 source HOLD remains with its author;
+Third's Controls and two-face gates continue).
+
+On exact #3477 head 8e797acfe, the six earlier counterexamples now defer,
+and the two plain positive controls still choose the right function.
+A standalone native Rust 1.96 probe of the unchanged production detector,
+tokenizer and withdrawal helper reproduced three remaining wrong selections:
+a weekly Monday reminder becomes one occurrence, and conditional or tomorrow
+starts select the from-now timer. [Eleven observed detector outputs](verification/schedule-asked-read-20261026/detector-8e797acfe.json).
+This executed no force closure, Chat wire, provider or schedule write.
+The assertions record actual outputs, not passing behavioral regressions.
+
+HOLD was posted on #3477 in 6401766010, with detector and wire regressions
+requested. Reviewer-lead and Reviewer-three independently confirmed it;
+Reviewer-three additionally identified an `if` condition, not executed in
+this Third probe. First owns the correction. Controls' full serial gate is
+still progressing; no final full pass is claimed. No device action.
+
+## 2026-10-26 01:51 — Held native proof complete; factory coverage tests continue
 
 Ready for lamp-voice: no (#3486 and the factory correction remain in qualification).
 
