@@ -1,0 +1,102 @@
+{
+  "source_base": "abc79d609126e7c1b83dedb220b7be00b7e7ab6a",
+  "frozen_source_count": 7117,
+  "frozen_source_manifest_sha256": "c36c2bcd12c1c394393a62af82265a20815afeb314f92de18e481b41232d3d06",
+  "all_source_hashes_unchanged": true,
+  "source_patch_sha256": "999fc321cc7df6d2a4a63134ce98d9215c2e91fedc72955b75c8e4770efe8a18",
+  "changed_file_sha256": {
+    "lampOS/crates/controls/src/head_discovery.rs": "50741a44f69369e71e7bd19ea22bc748ad2bd096e84c9787b58ad8f9d446a5e4",
+    "lampOS/crates/controls/tests/it/head_discovery.rs": "fba76e1084879775e0fa76b7a87e3f9fec660892960df27f2fa0a59434d98e67",
+    "lampOS/docs/controls.md": "8ea2c7ea10c25840137c3269e966bcc1d832cbc54d1c30fcd4e01c4c28bfa713",
+    "lampOS/docs/install.md": "0f88c841e663130d4e6dbf00f1c6b5a70e11f59a76522e59fb2e4fa3c58d32f8",
+    "lampOS/docs/reuse-decisions.md": "ac22583eaf687a2c1db255236508b91fd7064a4ada74c887aaf58e803943c6bc"
+  },
+  "reverse_dependent_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-controls",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-selftest",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T18:31:01Z",
+      "finished": "2026-10-25T18:31:13Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy-final": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-body -p lamp-cloud -p lamp-controls -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-selftest -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-25T18:31:13Z",
+      "finished": "2026-10-25T18:34:30Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --locked --workspace",
+      "started": "2026-10-25T18:34:30Z",
+      "finished": "2026-10-25T18:37:35Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-all": {
+      "command": "cargo +1.96.0 test --locked --no-fail-fast -p lamp-body -p lamp-cloud -p lamp-controls -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-selftest -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval -- --test-threads=1",
+      "started": "2026-10-25T18:37:35Z",
+      "finished": "2026-10-25T19:45:06Z",
+      "exit": 0,
+      "harnesses": 88,
+      "passed": 7971,
+      "failed": 0,
+      "ignored": 55,
+      "disk_error_lines": []
+    }
+  },
+  "six_new_controls_pass_counts": {
+    "a_gap_over_the_hands_away_phase_cannot_qualify_head_pads": 1,
+    "a_first_read_after_the_hands_away_phase_cannot_qualify_head_pads": 1,
+    "missing_rest_coverage_uses_the_existing_freshness_boundary": 1,
+    "first_rest_sample_and_last_rest_sample_must_cover_the_phase_edges": 1,
+    "a_short_rest_needs_a_sample_inside_it_not_only_at_its_end": 1,
+    "gaps_outside_rest_do_not_prevent_a_fresh_baseline_and_held_pads": 1
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-all": "ec86f63410ab448d3f3819757d58ff88db9710a7f4782618acde1869b393ec49"
+  },
+  "factory_stand_ins": {
+    "command": "bash deploy/factory/steps-test.sh",
+    "exit": 0,
+    "failed": 0,
+    "raw_log_sha256": "f8d3b65382ea298478de84fa0b5b354ff7b10afcb4de497fd2671ee644c1b0f4",
+    "scope": "Existing local stand-ins; no hardware. Generic discovery-error restoration and unchanged pins are asserted."
+  },
+  "limits": "Frozen abc source and final proposed patch. No later-base execution, native ARM64, physical calibration or acoustic measurement is claimed by this receipt.",
+  "qualified_head": "20c1d9c6d039ccdf04ca1b4b4338951cfded197b",
+  "qualified_tree": "ad7b5c2a994ed096a0337bcb79e3f4b90969dec8",
+  "qualified_source_commit": "20c1d9c6d039ccdf04ca1b4b4338951cfded197b",
+  "qualified_source_tree": "ad7b5c2a994ed096a0337bcb79e3f4b90969dec8"
+}
