@@ -1,0 +1,39 @@
+{
+  "head": "82358489b9e2c131c2a737dfa1404393635c2604",
+  "tree": "92feb6e956bbbdc521736730b504d58f25d27913",
+  "base": "56cacbdddd84c85b49af564cb83d95c805c27958",
+  "previous_qualified_head": "18f301710155f565b25eff32f66a632b96379bca",
+  "range_diff": "1:  4a186dc44 = 1:  b9bbfed71 lampOS: complete retired reminders before admitting the next line\n2:  18f301710 = 2:  82358489b lampOS: record reminder qualification on the landed release base",
+  "changed_base_paths": [
+    ".github/tools/lampos-promote/Cargo.lock",
+    ".github/tools/lampos-promote/Cargo.toml",
+    ".github/tools/lampos-promote/src/github.rs",
+    ".github/tools/lampos-promote/src/lib.rs",
+    ".github/tools/lampos-promote/src/main.rs",
+    ".github/tools/lampos-promote/tests/promotion.rs",
+    ".github/tools/lampos-promote/tests/workflow.rs",
+    ".github/workflows/lampos-arm64.yml",
+    ".github/workflows/lampos-clippy.yml",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/verification/stable-promotion-20261025/README.md"
+  ],
+  "identical_runtime_input_paths": [
+    "lampOS/crates",
+    "lampOS/Cargo.toml",
+    "lampOS/Cargo.lock",
+    "lampOS/.cargo",
+    "lampOS/rust-toolchain.toml",
+    "lampOS/third_party",
+    "lampOS/models",
+    "lampOS/deploy"
+  ],
+  "new_workflow_reader": "lampOS/crates/update/tests/it/ci_paths.rs",
+  "state": "Final current carry gates passed; exact source stayed clean.",
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-workflow-readers.log": "290250547d0e8e0b002dd55dfc05fbe83c1b398fd1d12ed918cc5bd2cbc2b168"
+  }
+}
