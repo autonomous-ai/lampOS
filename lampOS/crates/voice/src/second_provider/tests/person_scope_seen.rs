@@ -6,7 +6,16 @@ use crate::memory_scope::{FaceCache, KEEPER_WAIT, ScopeLease};
 use crate::speaking_faces::{SpeakingFaces, known_face_of};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-fn known_file(what: &str) -> std::path::PathBuf {
+/// The eyes' known file naming A with face `f1`, written by the eyes of
+/// boot [`BOOT`] after their first frame (as `lamp-eyes` writes it), so
+/// `known_with_boot` pairs it with that boot.
+fn known_file(what: &str, eyes: &SpeakingFaces) -> std::path::PathBuf {
+    eyes.look(
+        Instant::now(),
+        Some(((BOOT, 0), &lamp_msgs::Faces { faces: vec![] })),
+    );
+    // No tolerance at the boot's first frame (Fourth's P2 on #3038).
+    std::thread::sleep(Duration::from_millis(5));
     let path = std::env::temp_dir().join(format!(
         "scope-seen-{what}-{}-{:?}",
         std::process::id(),
@@ -17,16 +26,21 @@ fn known_file(what: &str) -> std::path::PathBuf {
     path
 }
 
+/// The eyes' boot the known file was written under.
+const BOOT: &str = "eyes";
+
 fn clean(path: &std::path::Path) {
     let _ = std::fs::remove_file(known_face_of(path));
     let _ = std::fs::remove_file(path);
 }
 
-/// The eyes while a line is said: the owner's face `f1` in view, speaking
-/// it or silent, until `done`.
+/// The eyes of boot `boot` while a line is said: a face `f1` in view,
+/// speaking it or silent, until `done`. Under another boot than [`BOOT`]
+/// the eyes started again and their `f1` is a different face.
 fn feed(
     eyes: Arc<SpeakingFaces>,
     f1_speaks: bool,
+    boot: &'static str,
     done: Arc<AtomicBool>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
@@ -54,7 +68,7 @@ fn feed(
                 }],
             };
             frame += 1;
-            eyes.look(Instant::now(), Some((("eyes", frame), &faces)));
+            eyes.look(Instant::now(), Some(((boot, frame), &faces)));
             std::thread::sleep(Duration::from_millis(2));
         }
     })
@@ -74,9 +88,11 @@ async fn one_line(
     words: &str,
     chats: Vec<Vec<net::Result<ChatEvent>>>,
     f1_speaks: bool,
+    boot: &'static str,
     seen: bool,
 ) -> Outcome {
-    let path = known_file(what);
+    let eyes = Arc::new(SpeakingFaces::default());
+    let path = known_file(what, &eyes);
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(words.to_owned())].into()),
         chats: Mutex::new(chats.into()),
@@ -94,7 +110,6 @@ async fn one_line(
             .push(lease.scope().unwrap().person().map(str::to_owned));
         Box::pin(async { json!({"ok":true}) })
     });
-    let eyes = Arc::new(SpeakingFaces::default());
     let mut engine = engine
         .with_memory_scope(
             lamp_turn_owner::BootId::new([41; 16]).unwrap(),
@@ -117,7 +132,7 @@ async fn one_line(
         crate::known_faces::FaceObservation::read(&path),
     );
     let done = Arc::new(AtomicBool::new(false));
-    let feeder = feed(eyes, f1_speaks, done.clone());
+    let feeder = feed(eyes, f1_speaks, boot, done.clone());
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     tokio::time::sleep(Duration::from_millis(40)).await;
@@ -161,7 +176,7 @@ const FORGET_ME: &str = "Lamp, forget everything about me.";
 /// in the owner's: their memory is untouched (reviewer-three's P1).
 #[tokio::test]
 async fn an_off_camera_forget_everything_never_reaches_the_silent_owners_memory() {
-    let got = one_line("forget", FORGET_ME, forget_everything(), false, true).await;
+    let got = one_line("forget", FORGET_ME, forget_everything(), false, BOOT, true).await;
     assert_eq!(got.calls, [None], "the forget runs as the room's");
     assert_eq!(got.told, Message::system("for None"));
 }
@@ -178,6 +193,7 @@ async fn an_off_camera_line_is_not_observed_or_kept_as_the_silent_owners() {
         "I'm flying to Tokyo next week.",
         chats,
         false,
+        BOOT,
         true,
     )
     .await;
@@ -189,7 +205,7 @@ async fn an_off_camera_line_is_not_observed_or_kept_as_the_silent_owners() {
 #[tokio::test]
 async fn the_owners_own_face_seen_speaking_keeps_their_scope() {
     let a = crate::remember::person_id("A");
-    let got = one_line("owner", FORGET_ME, forget_everything(), true, true).await;
+    let got = one_line("owner", FORGET_ME, forget_everything(), true, BOOT, true).await;
     assert_eq!(got.calls, [Some(a.clone())]);
     assert_eq!(got.lease, Some(a.clone()));
     assert_eq!(
@@ -198,15 +214,54 @@ async fn the_owners_own_face_seen_speaking_keeps_their_scope() {
     );
 }
 
+/// Second's P1 on #3437: A's fresh files name `f1` from before the eyes
+/// started again, and the new eyes' `f1`, a different face, says "forget
+/// everything about me". The bare id matches, the boot does not: the line
+/// is the room's. Off, it stays A's, as before.
+#[tokio::test]
+async fn a_reused_id_after_the_eyes_restart_is_not_the_known_persons_face() {
+    let a = crate::remember::person_id("A");
+    let got = one_line(
+        "restart",
+        FORGET_ME,
+        forget_everything(),
+        true,
+        "restarted",
+        true,
+    )
+    .await;
+    assert_eq!(got.calls, [None], "the forget runs as the room's");
+    assert_eq!(got.lease, None);
+    assert_eq!(got.told, Message::system("for None"));
+    let got = one_line(
+        "restart-off",
+        FORGET_ME,
+        forget_everything(),
+        true,
+        "restarted",
+        false,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a)]);
+}
+
 /// Off, nothing changes: the silent owner's line stays theirs, as on
 /// lamp-voice before the switch.
 #[tokio::test]
 async fn without_the_switch_an_off_camera_line_stays_the_silent_owners() {
     let a = crate::remember::person_id("A");
-    let got = one_line("off", FORGET_ME, forget_everything(), false, false).await;
+    let got = one_line("off", FORGET_ME, forget_everything(), false, BOOT, false).await;
     assert_eq!(got.calls, [Some(a.clone())]);
     assert_eq!(got.lease, Some(a.clone()));
-    let got = one_line("owner-off", FORGET_ME, forget_everything(), true, false).await;
+    let got = one_line(
+        "owner-off",
+        FORGET_ME,
+        forget_everything(),
+        true,
+        BOOT,
+        false,
+    )
+    .await;
     assert_eq!(got.calls, [Some(a)]);
 }
 
@@ -218,12 +273,17 @@ async fn without_the_switch_an_off_camera_line_stays_the_silent_owners() {
 #[tokio::test]
 async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
     let a = crate::remember::person_id("A");
-    for (what, f1_speaks, seen, expected) in [
-        ("silent, on", false, true, None),
-        ("silent, off", false, false, Some(a.clone())),
-        ("speaking, on", true, true, Some(a.clone())),
+    for (what, f1_speaks, boot, seen, expected) in [
+        ("silent, on", false, BOOT, true, None),
+        ("silent, off", false, BOOT, false, Some(a.clone())),
+        ("speaking, on", true, BOOT, true, Some(a.clone())),
+        // Second's P1 on #3437: the eyes started again and their new `f1`,
+        // a different face, says it.
+        ("restarted, on", true, "restarted", true, None),
+        ("restarted, off", true, "restarted", false, Some(a.clone())),
     ] {
-        let path = known_file("late");
+        let eyes = Arc::new(SpeakingFaces::default());
+        let path = known_file("late", &eyes);
         let script = Arc::new(Script {
             heard: Mutex::new(
                 [Ok(
@@ -261,7 +321,6 @@ async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
                 json!({"ok":true})
             })
         });
-        let eyes = Arc::new(SpeakingFaces::default());
         let mut engine = engine
             .with_memory_scope(
                 lamp_turn_owner::BootId::new([42; 16]).unwrap(),
@@ -279,7 +338,7 @@ async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
         cache.cold_since(Instant::now() - Duration::from_secs(1));
         assert!(cache.is_cold(Instant::now()), "{what}: cold");
         let done = Arc::new(AtomicBool::new(false));
-        let feeder = feed(eyes, f1_speaks, done.clone());
+        let feeder = feed(eyes, f1_speaks, boot, done.clone());
         engine.submit(start(1));
         let lease = engine
             .turn
