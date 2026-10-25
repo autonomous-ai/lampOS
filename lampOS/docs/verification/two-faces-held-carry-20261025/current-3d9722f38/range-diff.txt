@@ -1,0 +1,7 @@
+1:  ffe8e63ac = 1:  5043af38d lampOS: with LAMP_TWO_FACES_HELD, two faces make the room busy only when the eyes' looks hold them 1.5 s
+2:  51494367f = 2:  7a0444670 lampOS: record current held-face carry qualification
+3:  4daa6a6a0 = 3:  3944a22c2 lampOS: record the full two-face carry qualification
+4:  c0ef005d4 = 4:  3120a4abf lampOS: record current-base two-face carry checks
+5:  be6952ff7 = 5:  a7795e59d lampOS: retain two-face qualification on train141
+6:  275b77824 = 6:  983319c73 lampOS: record current two-face composition qualification
+7:  4dd54c013 = 7:  1b6100a29 lampOS: record current two-face carry qualification

@@ -1,0 +1,61 @@
+{
+  "previous_offered_head": "d4db9378a6892d1d6b17005b3476bc358cfee0be",
+  "current_base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "qualified_authored_head": "1b6100a29c79f6144e8be5d8c335444490765d8d",
+  "qualified_tree": "03b0cfcb346d03ad40e2fcede5bb5fc60fb70b5e",
+  "public_composition": "d4db9378a plus 3d9722f38",
+  "public_composition_matches_authored_tree": true,
+  "final_patch_equals_d4_over_409": true,
+  "final_patch_sha256": "c4c162c16aba425d7f77ab4f2380786f49dee19ed612ce6084e27ede7939c6d4",
+  "linear_range_diff_equal_commits": 7,
+  "history": "Original authored change retained by rebase, including previously accepted documentation corrections; six evidence commits retained. Earlier merge history remains in the previous public head, not as ancestry of this linear replacement.",
+  "independent_gate": {
+    "receipt": "https://github.com/autonomous-ai/lampOS/pull/3486#issuecomment-6403471579",
+    "published_log": "https://github.com/autonomous-ai/lampOS/blob/29c81b3f74a6f17cf9f4407b283f723550ce5043/lampOS/docs/work-log-reviewer.md",
+    "host": "Mac, Rust 1.96.0",
+    "source_entries_unchanged": 10588,
+    "fmt": "pass",
+    "strict_fourteen_crate_all_target_clippy": "pass",
+    "workspace_build": "pass",
+    "both_test_compilation_stages": "pass",
+    "full_controls_skills": {
+      "passed": 1038,
+      "failed": 0,
+      "ignored": 12,
+      "filtered": 0,
+      "summaries": 12,
+      "unique_terminal_cases": 1050,
+      "controls": [
+        516,
+        0,
+        3
+      ],
+      "skills": [
+        522,
+        0,
+        9
+      ],
+      "command_seconds": 266.176
+    },
+    "separate_install": [
+      92,
+      0,
+      0
+    ],
+    "separate_discovery": [
+      16,
+      0,
+      0
+    ],
+    "separate_masking": [
+      7,
+      0,
+      0
+    ],
+    "new_control_pass_counts": "All eleven once per applicable execution; focused overlap is not added to full total",
+    "executed_binaries_preserved": 12,
+    "full_raw_log_sha256": "b841bd7951e0fee3898aaa3bf98385e34ea36e0b3ad43aaddd95b981e03a16a6",
+    "audit_note": "Initial audit rejected focused Controls binary as absent from combined compiler JSON; corrected binding uses its actual single-package Cargo command and Running target. No test rerun or product failure. Earlier premature launch ran zero Cargo commands."
+  },
+  "limits": "Independent execution on identical public composition. Author verified Git tree and patch; no author rerun or private reader-binary/log inspection. Older full Voice and native runs retain older source identities. Fresh published-head native gates pending; no lamp or activation."
+}
