@@ -5,6 +5,39 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 22:02 — Current parent pushed; two-face current gate active
+
+Ready for lamp-voice: no (current native gates and reads are pending).
+
+#3408 is pushed at `c609cdb9c` on `bf39e4188`, with equal carried patches
+and five new evidence files. Full native Mac Voice/Eval on `8b9debb80` /
+`0ddd07377` passed **4,675/0/21**, including all three own controls, plus
+fmt, strict clippy and workspace build. The sole later base change was the
+Actions schedule clock implementation and its integration fixture. Current
+`2aca8150f` / `bf39e4188` passed fresh fmt, strict Actions/Voice/Eval clippy,
+workspace build, Actions schedule **19/0**, Voice tools **82/0/1 ignored**,
+and Eval census **2/0**. The full run retains its original source; these
+selected current tests cover the changed Actions dev dependency.
+[Separate execution records](https://github.com/autonomous-ai/lampOS/tree/c609cdb9c/lampOS/docs/verification/carry-late-verdict-20261025/current-bf39e4188).
+Original ARM64 **40204721470** and Linux clippy **40204721574** are active.
+Current reads were requested on the PR and Queue; it stays draft until qualified.
+
+The two-face carry retains original `031990a89` through tested merge
+`66cab67e8` (old-base full **4,662/0/21**). Its resolved latest-base tree
+`52dbd9ebe` on `bf39e4188` keeps every authored line; fmt, strict clippy and
+workspace build pass, full Voice/Eval tests are active in the one compiler
+lane. The prior untested 0ddd preparation is saved separately, not a test result.
+
+Child #3420 source preparation `953d784d5` now follows the published parent
+with equal own patches. Its full/native successes remain on offered `9a5cbf6fd`
+containing 864, and parent landing/current-base qualification still gate it.
+The reminder-edge regression is prepared on bf39 through the actual coordinator
+loop; production remains unchanged for its first negative execution. A private
+patch preserves the sole finalizer and defers only fully qualified reminders.
+The separate ordinary-reset skill-result source finding is handed to the say
+owners on [the Queue](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6399138458).
+No new regression execution, device, acoustic timing or activation claim.
+
 ## 2026-10-25 21:38 — Child original ARM64 gate green
 
 Ready for lamp-voice: no (#3420 remains parent-first and behind the new base).
