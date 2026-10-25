@@ -1,0 +1,27 @@
+{
+  "stage": "candidate-full",
+  "pid": 27940,
+  "pgid": 27566,
+  "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body",
+  "argv": [
+    "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/it-fefd294d58a8ff86"
+  ],
+  "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/it-fefd294d58a8ff86",
+  "sha256_before_exec": "814ebf97b9479280834bfe855ab06737c618ca984dd6a209034da1af3aa51112",
+  "private_witness": "/private/tmp/second-body-successor-audit-20261025/carry-2f48/launches/candidate-full-27940.binary",
+  "identity": {
+    "device": 16777229,
+    "inode": 225145991,
+    "size": 6813904,
+    "mtime_ns": 1792895285788573524
+  },
+  "observed_at_unix": 1792898072.215582,
+  "environment_subset": {
+    "CARGO_MANIFEST_DIR": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body",
+    "CARGO_PKG_NAME": "lamp-body",
+    "CARGO_PKG_VERSION": "0.1.0",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_TARGET_DIR": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target"
+  },
+  "scope": "Private pre-exec byte witness; same executable path/arguments/cwd and inherited environment; wrapper-only variables recorded by outer controller, not a physical measurement."
+}

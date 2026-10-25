@@ -1,3 +1,15 @@
+## Current checkpoint: 2026-10-25 10:16 +07, #3427 train-114 carry pushed and job returned
+
+Ready for lamp-voice: no (#3427 awaits new original CI and current reader carries).
+
+Public `66d923cf6` directly contains latest `2f48b0edd`, with equal patch and owned blobs. [Current Mac proof](verification/body-successor-socket-source-20261025/current-2f48/README.md) passes fmt, strict Body Clippy and full Body 608/0/0. All 7,041 source records bind to Git; seven compiler/pre-exec/private-byte relationships verify, with six qualified reused executables and one fresh compilation. Sources unchanged and groups closed. The borrowed single job was returned at 6392847153; no Second compiler remains active.
+
+New original ARM 40157508771 and Linux 40157508781 are watched through native completion handles. Old 1e3 green native evidence and reader dispositions retain their scopes. A prepared guarded readiness helper consumes the new original receipt, checks current head/readers/findings/Main, and can mark ready before supplemental proof export; it has not run.
+
+Sixth published boot-aware repair `6d579422c` for the source P1. Next is exact-source review of both call sites and regression evidence; no clearance is inferred from the producer post. The separately found reader-failure P2 and original scope limits remain with its readers. Unplug qualification remains UNRUN and unallocated behind the current carries and Skills repair. No device or manual merge.
+
+---
+
 ## Current checkpoint: 2026-10-25 10:00 +07, latest-base carry queued and scope boot finding posted
 
 Ready for lamp-voice: no (#3427 remains draft).
