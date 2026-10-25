@@ -1265,6 +1265,40 @@ fn with_backchannel_holds_and_heard_always_a_backchannel_resumes_the_reply() {
     }
 }
 
+/// lamp-52e6 on 25 Oct (#2939): "Hmm, interesting.", an aside said over a
+/// story, committed and stopped it 4 of 4 times. With `LAMP_ASIDES_HOLD=on`
+/// as well as backchannel holds it resumes the reply on both rules; without
+/// it, it commits as before; a longer line still cuts in.
+#[test]
+fn with_asides_hold_an_aside_resumes_the_reply() {
+    let heard = |words: &'static str, word: Word, asides: bool| {
+        let stop_words = crate::stop_words::StopWords::always_counted(
+            Box::new(AlwaysEars {
+                words: Some(words),
+                flushed: false,
+            }),
+            None,
+        )
+        .with_backchannel_holds(true)
+        .with_asides(asides);
+        a_short_word_heard_by(stop_words, "", word, true)
+    };
+    for words in ["Hmm, interesting.", "Interesting.", "Wow.", "Oh, nice."] {
+        let (at, committed, event) = heard(words, Word::Plain, true);
+        assert_eq!((at, committed), (71, false), "{words} plain");
+        assert_eq!(event["backchannel"], true, "{words} plain");
+        let (at, committed, event) = heard(words, Word::Speech, true);
+        assert_eq!((at, committed), (2 + 29 + 25 + 40, false), "{words} speech");
+        assert_eq!(event["backchannel"], true, "{words} speech");
+        // The switch off: committed as on the lamp.
+        let (_, committed, event) = heard(words, Word::Plain, false);
+        assert!(committed, "{words} off");
+        assert_eq!(event["backchannel"], false, "{words} off");
+    }
+    let (_, committed, _) = heard("Interesting, tell me more.", Word::Plain, true);
+    assert!(committed);
+}
+
 /// #2939, lamp-52e6 at 09:44 on 23 Oct, with `heard` and the switch on:
 /// "Yeah" and "Okay" were held, but "Right" came as two words, and it,
 /// "I see" and "Sure" each committed and were let out as "someone is

@@ -316,6 +316,18 @@ pub fn holds_backchannels() -> bool {
     std::env::var(BACKCHANNEL_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+/// Where the voice reads whether an aside said while the lamp speaks is
+/// held as a backchannel is (#2939, 25 Oct): `on`. Off unless set, and inert
+/// without [`BACKCHANNEL_ENVIRONMENT`]: with it, [`ASIDES`] count as
+/// backchannel words and "hm" or "hmm" alone is one ("Hmm, interesting."
+/// stopped the lamp's story 4 of 4 times on lamp-52e6 on 25 Oct).
+pub const ASIDES_ENVIRONMENT: &str = "LAMP_ASIDES_HOLD";
+
+/// Whether the environment asks for asides to be held as backchannels.
+pub fn holds_asides() -> bool {
+    std::env::var(ASIDES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Where the voice reads whether a yield's decision is journaled with its
 /// words (#2939): `on`. Off unless set, for debugging only, and only with
 /// backchannel holds; at most two words of a person's speech are written
@@ -351,7 +363,7 @@ fn dashes_joined(heard: &str) -> String {
 /// The journal line for a yield's words with
 /// [`BACKCHANNEL_DEBUG_ENVIRONMENT`]: at most two words, lower case and
 /// without punctuation, and why they were decided so; none for more.
-fn debug_line(heard: &str, lamp_asked: bool, vietnamese: bool) -> Option<String> {
+fn debug_line(heard: &str, lamp_asked: bool, vietnamese: bool, asides: bool) -> Option<String> {
     let said = words(&dashes_joined(heard));
     if said.len() > 2 {
         return None;
@@ -360,7 +372,7 @@ fn debug_line(heard: &str, lamp_asked: bool, vietnamese: bool) -> Option<String>
         "no words"
     } else if stop_phrase(heard) {
         "a stop phrase"
-    } else if backchannel(heard, vietnamese) {
+    } else if backchannel(heard, vietnamese, asides) {
         if lamp_asked {
             "on the list, but the lamp asked a question"
         } else {
@@ -397,6 +409,11 @@ const BACKCHANNELS: &[&str] = &[
 /// 23 Oct a "So." and an "Ahem." said over the lamp each came as one word
 /// taken for a backchannel and held.
 const LEADS_ONLY: &[&str] = &["oh", "ah", "hm", "hmm"];
+/// With `LAMP_ASIDES_HOLD=on` (#2939, 25 Oct): remarks a person makes to
+/// themselves or the room while the lamp tells something, not meant to stop
+/// it ("Hmm, interesting.", "Wow.", "Oh, nice."), counted as backchannel
+/// words; "hm" and "hmm" then stand alone too.
+const ASIDES: &[&str] = &["interesting", "wow", "nice"];
 /// The same, when the speech-to-text is told Vietnamese (`stt_language`).
 /// "Rồi" and "đúng" are left out: as often a reply ("done", "that's right")
 /// as an acknowledgment (the reviewer-lead on #2959).
@@ -426,8 +443,9 @@ pub fn lamp_asked(said: &str) -> bool {
 /// Whether what was heard is a backchannel (#2939): one or two words, all
 /// on the list for the language, a pair of [`BACKCHANNEL_PAIRS`] counting
 /// as one ("Oh, I see.", "Okay, sure."), no question mark and no stop
-/// phrase.
-pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
+/// phrase. With `asides` ([`ASIDES_ENVIRONMENT`]), [`ASIDES`] are on the
+/// English list and only "oh" and "ah" lead only.
+pub fn backchannel(heard: &str, vietnamese: bool, asides: bool) -> bool {
     // Any hyphen or dash: "uh\u{2011}huh", "mm\u{2013}hm".
     let heard = dashes_joined(heard);
     let list = if vietnamese {
@@ -442,13 +460,19 @@ pub fn backchannel(heard: &str, vietnamese: bool) -> bool {
             && said.get(at + 1).is_some_and(|next| {
                 BACKCHANNEL_PAIRS.contains(&(said[at].as_str(), next.as_str()))
             });
-        if !pair && !list.contains(&said[at].as_str()) {
+        let word = said[at].as_str();
+        let aside = asides && !vietnamese && ASIDES.contains(&word);
+        if !(pair || aside || list.contains(&word)) {
             return false;
         }
         at += if pair { 2 } else { 1 };
         units += 1;
     }
-    let leads_only = !vietnamese && said.iter().all(|word| LEADS_ONLY.contains(&word.as_str()));
+    let leads_only = !vietnamese
+        && said.iter().all(|word| {
+            LEADS_ONLY.contains(&word.as_str())
+                && !(asides && matches!(word.as_str(), "hm" | "hmm"))
+        });
     !heard.contains('?') && (1..=2).contains(&units) && !leads_only && !stop_phrase(&heard)
 }
 
@@ -603,6 +627,8 @@ pub struct StopWords {
     /// The speech-to-text is told Vietnamese: its backchannels are
     /// Vietnamese ([`Self::with_language`]).
     vietnamese: bool,
+    /// Asides count as backchannels ([`Self::with_asides`]).
+    asides: bool,
     /// The lamp's last finished sentence before the yield in force was a
     /// question: its words answer it, and are no backchannel.
     lamp_asked: bool,
@@ -664,6 +690,7 @@ impl StopWords {
             ahead_at: 0,
             holds: Vec::new(),
             vietnamese: false,
+            asides: false,
             lamp_asked: false,
             tells_yields: false,
             yield_words: String::new(),
@@ -686,6 +713,13 @@ impl StopWords {
         self
     }
 
+    /// With `on`, [`ASIDES`] are backchannels too: `LAMP_ASIDES_HOLD=on`,
+    /// which acts only through backchannel holds (#2939, 25 Oct).
+    pub fn with_asides(mut self, on: bool) -> Self {
+        self.asides = on;
+        self
+    }
+
     /// With `on`, a yield's words, at most two, are journaled with why
     /// they were decided so: `LAMP_BACKCHANNEL_DEBUG=on`, taken only with
     /// backchannel holds (#2939). Off, nothing more is journaled.
@@ -698,7 +732,7 @@ impl StopWords {
     /// ([`Self::with_backchannel_debug`]).
     fn debug_words(&self, heard: &str) -> Option<String> {
         self.debug
-            .then(|| debug_line(heard, self.lamp_asked, self.vietnamese))
+            .then(|| debug_line(heard, self.lamp_asked, self.vietnamese, self.asides))
             .flatten()
     }
 
@@ -911,7 +945,8 @@ impl StopWords {
                     self.yield_words.push(' ');
                 }
                 self.yield_words.push_str(&heard);
-                let held = !self.lamp_asked && backchannel(&self.yield_words, self.vietnamese);
+                let held = !self.lamp_asked
+                    && backchannel(&self.yield_words, self.vietnamese, self.asides);
                 if let Some(line) = self.debug_words(&self.yield_words) {
                     eprintln!("{line}");
                 }
@@ -1214,7 +1249,7 @@ impl StopWords {
             tell = Tell::Words {
                 stop: stop_phrase(&words),
                 count: word_count(&words),
-                backchannel: !self.lamp_asked && backchannel(&words, self.vietnamese),
+                backchannel: !self.lamp_asked && backchannel(&words, self.vietnamese, self.asides),
             };
         }
         tell
@@ -2234,8 +2269,51 @@ mod tests {
             ("Rồi.", true, false),
             ("Đúng.", true, false),
         ] {
-            assert_eq!(backchannel(heard, vietnamese), is, "{heard:?}");
+            assert_eq!(backchannel(heard, vietnamese, false), is, "{heard:?}");
         }
+    }
+
+    /// #2939, 25 Oct: with `LAMP_ASIDES_HOLD=on`, a short aside is a backchannel,
+    /// alone or two together; a question, a stop, "wait", "hold on" or a
+    /// longer line is not. Off, the asides are not.
+    #[test]
+    fn asides_are_backchannels_only_with_the_switch() {
+        for heard in [
+            "Hmm, interesting.",
+            "Interesting.",
+            "Hmm.",
+            "Wow.",
+            "Oh, nice.",
+            "Nice.",
+            "Wow, okay.",
+            "Uh-huh.",
+            "Yeah, right.",
+        ] {
+            assert!(backchannel(heard, false, true), "{heard:?} on");
+        }
+        for heard in [
+            "Hmm, interesting.",
+            "Interesting.",
+            "Hmm.",
+            "Wow.",
+            "Oh, nice.",
+        ] {
+            assert!(!backchannel(heard, false, false), "{heard:?} off");
+        }
+        for heard in [
+            "Interesting?",
+            "Wow, stop.",
+            "Wait.",
+            "Hold on.",
+            "Hmm, wait.",
+            "That's interesting, tell me more.",
+            "Wow, wow, wow.",
+            "Oh.",
+        ] {
+            assert!(!backchannel(heard, false, true), "{heard:?} on");
+        }
+        // Vietnamese keeps its own list.
+        assert!(!backchannel("Wow.", true, true));
     }
 
     /// #2959: whether the lamp's last finished sentence was a question.
