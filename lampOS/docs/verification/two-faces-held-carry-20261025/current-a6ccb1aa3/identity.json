@@ -1,0 +1,27 @@
+{
+  "head_before_merge": "5bbb749c9fd1f171529aef879fd90b8a066d5a31",
+  "merge_parent": "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+  "prepared_index_tree": "afa2d798141bc50fc0db1ef69e1628c5c4b899b2",
+  "public_composition_tree": "b065415c4f3e481f7a7a32be88fec54a4292e490",
+  "public_composition_parents": [
+    "a5f10fb09b959dff5b9cbcbca6c4a047e8462749",
+    "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb"
+  ],
+  "extra_proof_paths_only": [
+    "lampOS/docs/verification/two-faces-held-carry-20261025/current-14c64a8db/README.md",
+    "lampOS/docs/verification/two-faces-held-carry-20261025/current-14c64a8db/gate-results.json",
+    "lampOS/docs/verification/two-faces-held-carry-20261025/current-14c64a8db/identity.json",
+    "lampOS/docs/verification/two-faces-held-carry-20261025/current-14c64a8db/test-results.txt"
+  ],
+  "qualified_head": "b9580d597e30c68d183646830416494fa0255f96",
+  "qualified_tree": "afa2d798141bc50fc0db1ef69e1628c5c4b899b2",
+  "tracked_source_records": 7139,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "54aa0635bcc28bde38d87ce32fbcaebbf7040976bbe6d4c113c221c94f3a0c9c",
+  "pr_delta_diff_check_exit": 0,
+  "whole_incoming_merge_diff_check": {
+    "exit": 2,
+    "finding": "lampOS/docs/verification/reminder-successor-boundary-20261025/current-ad9f1cb77/test-results.txt:39 new blank line at EOF",
+    "disposition": "Byte-identical to current release base; preserved inherited upstream evidence. Actual PR delta passes git diff --check."
+  }
+}
