@@ -3471,6 +3471,24 @@ fn run_on<P: PortIo, R: Runtime>(
     mut watch: impl FnMut(&Glimpse),
     from_step: u64,
 ) -> BodyReport {
+    // One copy of the loop per port/runtime, not one per caller's closures.
+    run_on_dyn(
+        bus, limits, home, standing, looking, &mut news, &mut asked, &mut watch, from_step,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_on_dyn<P: PortIo, R: Runtime>(
+    bus: &mut Bus<'_, P, R>,
+    limits: Limits,
+    home: Option<[u16; 3]>,
+    standing: Option<Standing>,
+    looking: Option<Looking>,
+    mut news: &mut dyn FnMut() -> Option<(Mood, u8)>,
+    asked: &mut dyn FnMut() -> (Asked, Priority, Option<Source>),
+    mut watch: &mut dyn FnMut(&Glimpse),
+    from_step: u64,
+) -> BodyReport {
     // Steps were watched before this run began (#2602): it is a start
     // again after a wait, and the lamp has said it is ready.
     let watched = from_step > 0;
