@@ -2479,6 +2479,19 @@ pub fn serve(
     // when this worker returns. Its faces are kept for a held forget's
     // sight below, so one thread reads the topic.
     let mut speaking_eyes = None;
+    // A line is a known person's only when their own face was seen
+    // speaking it (`LAMP_PERSON_SCOPE_SEEN=on`), installed whether or not
+    // the reader below starts: without it no face is seen speaking, so the
+    // line is the room's (reviewer-two's P2 on #3437).
+    let seen = crate::speaking_faces::from_environment()
+        && std::env::var(crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT)
+            .is_ok_and(|value| value == "on");
+    if seen {
+        eprintln!(
+            "lamp-voice second: a line is a known person's only when their own face was seen speaking it, else the room's (LAMP_PERSON_SCOPE_SEEN)"
+        );
+    }
+    engine = engine.scoping_by_sight(seen);
     let _speaking_reader = match (&scope_file, files.bus_root.as_deref()) {
         (Some(known), Some(root))
             if crate::speaking_faces::from_environment() && engine.scopes_context() =>
@@ -2486,18 +2499,7 @@ pub fn serve(
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
             let reader = crate::speaking_faces::read_from(eyes.clone(), root);
             if reader.is_some() {
-                // A line is a known person's only when their own face was
-                // seen speaking it (`LAMP_PERSON_SCOPE_SEEN=on`).
-                let seen = std::env::var(crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT)
-                    .is_ok_and(|value| value == "on");
-                if seen {
-                    eprintln!(
-                        "lamp-voice second: a line is a known person's only when their own face was seen speaking it, else the room's (LAMP_PERSON_SCOPE_SEEN)"
-                    );
-                }
-                engine = engine
-                    .seeing_who_speaks(eyes.clone(), known.clone())
-                    .scoping_by_sight(seen);
+                engine = engine.seeing_who_speaks(eyes.clone(), known.clone());
                 speaking_eyes = Some(eyes);
             }
             reader
