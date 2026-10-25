@@ -1,0 +1,111 @@
+{
+  "head": "37f823a1ace89cd39d1cfa1f12d3e8922944b366",
+  "tree": "23e2dcb8928c53ef7dc15b43de86de6fbd87c2fc",
+  "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+  "previous_qualified_head": "20c1d9c6d039ccdf04ca1b4b4338951cfded197b",
+  "range_diff_equal": true,
+  "state": "Completed current calibration qualification. Full 7,971/0/55 remains at 20c1/abc; current fmt, strict clippy, build and 41 focused tests pass.",
+  "frozen_source_count": 7122,
+  "all_source_hashes_unchanged": true,
+  "frozen_source_manifest_sha256": "d2ad5ab4fad8b1c12d02836fb9f3e7e3d54e8d002a7ac66a70879b467bb869fb",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T19:55:07Z",
+      "finished": "2026-10-25T19:55:19Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy-final": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-body -p lamp-cloud -p lamp-controls -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-selftest -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-25T19:55:19Z",
+      "finished": "2026-10-25T19:57:58Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --locked --workspace",
+      "started": "2026-10-25T19:57:58Z",
+      "finished": "2026-10-25T19:59:33Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-discovery": {
+      "command": "cargo +1.96.0 test --locked -p lamp-controls --test it head_discovery:: -- --test-threads=1",
+      "started": "2026-10-25T19:59:33Z",
+      "finished": "2026-10-25T19:59:53Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-same-voice": {
+      "command": "cargo +1.96.0 test --locked -p lamp-voice --lib same_voice:: -- --test-threads=1",
+      "started": "2026-10-25T19:59:53Z",
+      "finished": "2026-10-25T20:02:53Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-prints-consumer": {
+      "command": "cargo +1.96.0 test --locked -p lamp-voice --lib provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker -- --exact --test-threads=1",
+      "started": "2026-10-25T20:02:53Z",
+      "finished": "2026-10-25T20:02:55Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-install-doc": {
+      "command": "cargo +1.96.0 test --locked -p lamp-update --test install every_part_of_the_lamp_waits_for_setups_marker_itself -- --exact --test-threads=1",
+      "started": "2026-10-25T20:02:55Z",
+      "finished": "2026-10-25T20:04:40Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-ci-paths": {
+      "command": "cargo +1.96.0 test --locked -p lamp-update --test it ci_paths:: -- --test-threads=1",
+      "started": "2026-10-25T20:04:40Z",
+      "finished": "2026-10-25T20:04:43Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-discovery": "3adc9be582e7369fafee7f35c27a5a0985a2c4ba620ad769df2b69d45a8d4bb0",
+    "test-same-voice": "4d98145ab44543c7e2a65c8d8abf4490f93b8d8a45ac0c4aaba3cf2501a37c10",
+    "test-prints-consumer": "addb07b9c9cc8a359bade312999ff91e351907780aa03d9e926d4cdd6aa620a3",
+    "test-install-doc": "32b5b33841b8d693da68ec5bd1c3842bc300b3bc6435395092315e1c887eb201",
+    "test-ci-paths": "dddec348161744162cfa91399aa5d09d7a65577033a4ab710b7045ff1b51ffa3"
+  }
+}

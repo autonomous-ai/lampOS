@@ -1,0 +1,12 @@
+{
+  "scope": "Earlier fixed discovery suite, before adding the independent latch and nonzero-epoch assertions. Final complete suite is recorded separately.",
+  "command": "cargo +1.96.0 test --locked -p lamp-controls --test it head_discovery::",
+  "started": "2026-10-25T18:27:12Z",
+  "finished": "2026-10-25T18:27:29Z",
+  "exit": 0,
+  "passed": 16,
+  "failed": 0,
+  "ignored": 0,
+  "filtered": 455,
+  "raw_log_sha256": "2e554a28a8d934f746227c1e80c659a3f065336ca27aeea5933bce96e4f3c41e"
+}
