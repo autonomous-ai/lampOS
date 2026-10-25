@@ -1,0 +1,16 @@
+{
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "source_only": true,
+  "runtime_and_all_other_existing_tests_unchanged": true,
+  "rewritten_test": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+  "added_live_test": "unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop",
+  "candidate_unplug_sha256": "e82d160ea17c64c49c55ac34774a6007c4d90c5052d2b4e6be5a6e941d6c79e7",
+  "fmt": "pass after correcting two initial new-line wraps",
+  "whitespace": "pass",
+  "clippy_and_tests": "UNRUN",
+  "compiler_allocation": "none; Supervisor fresh qualification first after Cloud",
+  "dispositions": {
+    "P2": "R1 removed only enabled Adapter coverage; corrected in this revision before any execution",
+    "P3": "latch is now asserted after every controlled observation; docs match that scope"
+  }
+}
