@@ -6,6 +6,28 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 17:37 — Explicit-memory release hold verified
+
+Ready for lamp-voice: no (Body carry gates continue; #3463 is First's repair).
+
+The same-turn withdrawal P2 on #3463 is confirmed by reviewer-two and
+reviewer-three. Third's source trace is
+[on the PR](https://github.com/autonomous-ai/lampOS/pull/3463#issuecomment-6396271302).
+Directly checked original [ARM64 40182570284](https://github.com/autonomous-ai/lampOS/actions/runs/40182570284)
+at `ad577a8b3`: failure, **8,160 passed / 1 failed**, 106 skipped,
+**8,161 of 11,269** selected tests executed before stopping. The failure
+is `process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else`
+at `process.rs:2414`; the new second-worker switch is absent from the
+fixture's expected environment. This is the original CI result, not a
+Third local execution or evidence for the unrun remainder. First owns
+the detector and census repairs.
+
+Body's original one-job dependent-crate command is still active on the
+frozen `640198b2c` source. Its prior fmt, strict clippy, workspace build and
+full Body 608/0/0 remain passed; no terminal dependent result is claimed.
+The long stage was checked once: active Skills integration tests, no
+stalled compiler. Next is its terminal result and current-base carry.
+
 ## 2026-10-25 17:10 — Store delivered through train 125
 
 Ready for lamp-voice: yes (#3459 delivered by #3462, source PR closed).
