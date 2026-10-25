@@ -1,5 +1,31 @@
 # Tests work log
 
+## 2026-10-26 01:49 — Journal fixture landed; next qualification prepared
+
+Ready for lamp-voice: yes (#3488, landed)
+
+[Train #3500](https://github.com/autonomous-ai/lampOS/pull/3500) landed the
+journal cleanup on 491371354, retaining the commits. Final own head e3ce97d7e
+on abc79d609 passed fresh formatting, strict twelve-crate all-target Clippy,
+workspace build and diff checks. Train Linux Clippy 40220991843 and Linux
+ARM64 40220991841 succeeded: affected subset 7,450 passed, zero leaks,
+53 skipped, 166.043 s test phase. Earlier matched 11,288-case ARM64 before/after
+and 3,763/0/15 x86 library results retain their recorded source scopes; no
+control was repeated and no new count is inferred from the train status.
+
+Skills addon journal completion is committed locally as 71ad69f4a on 9e9,
+with the full twelve-crate cold-target gate prepared but not started. Storage
+is insufficient for a conservative fresh build. The released cache was fully
+archived and verified, but automatic approval review rejected deletion without
+explicit owner approval; no deletion ran. That approval is pending. A later
+build changed the cache, so a fresh verified delta archive is required before
+any approved cleanup. NoPause source-only current carry proceeds meanwhile.
+
+Queue #3126 reached its 2,500-comment limit and currently has no successor
+link. Results are recorded on the task PR and this log while watching for the
+new route. #3466 still needs an authorized product-lamp owner for its actual
+GOOD/BAD trial; no device action has run.
+
 ## 2026-10-26 00:42 — Whole-workspace journal cleanup verified; Skills qualification next
 
 Ready for lamp-voice: no
