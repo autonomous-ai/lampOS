@@ -1,3 +1,42 @@
+## Current checkpoint: 2026-10-25 08:16 +07, #3427 green on old head and current carry queued
+
+Own PR #3427 is public at 6620b73f3/162, draft. Its [qualified fresh Mac gate](verification/body-successor-socket-source-20261025/fresh-162/README.md)
+passes exact 1/0 and full Body 608/0/0, with all 7,041 source records Git-bound
+and eight compiler/pre-exec witness relationships verified. The read-only
+cwd-auditor correction repeats no test; the old unqualified epoch remains
+unqualified. [Original native proof](verification/body-successor-socket-source-20261025/original-native/README.md)
+records ARM 7,407 PASS plus one LEAK / 53 skipped, all 7,408 selected terminal,
+all 21 supervisor cases PASS, green Linux, authored/tested whole-tree equality.
+Reviewer-two READ-OK is 6391648830. Tests' independent source/evidence read
+6391624091 has no P1/P2 but explicitly is not an execution READ-OK.
+
+Main advanced through Cloud/train 110 to 0ee5ebd2a before author readiness.
+The local one-commit carry is 56f968fa3 on that new base; range-diff is equal,
+both owned blobs unchanged, and only upstream Cloud settings.rs/cloud.md
+changed. Public head remains 662/draft until the required current-base
+fmt/strict Body Clippy/full Body gate is allocated and passes, then the own
+branch push/current native checks and reads. Earlier executions keep their
+heads; no current-head qualification is inferred. Private prepared
+current-carry controller is unrun. Its existing exclusive target has prior
+candidate provenance; mixed reuse and fresh pre-exec witnesses are explicit.
+
+The second claimed unplug-gap [corrected source candidate](verification/body-unplug-gap-source-20261025/candidate-with-live-worker/README.md)
+retains enabled Adapter sample/worker/stop/join coverage and per-observation
+latch assertions. Reviewer-two closed its source P2/P3 at 6391376065; all
+gates and five declared negatives remain UNRUN. Its own source branch is
+current 0ee with two uncommitted files, separate from #3427. Generated
+control sources parse with pinned rustfmt; no Rust compiler/test was started.
+
+Third released its pair's lane to Tests' Hand controls; storage/allocation
+coordination remains explicit. Second's current own-PR carry is queued ahead
+of its unplug qualification. No active Second compiler or CI watcher remains;
+the bounded Queue/own-PR watch continues. #2810/#1812 physical/key acceptance
+remains with the named holders. No device, deadline, old-failure waiver or
+manual merge action. Never stop at this checkpoint: take findings/current
+carry first, then queued source/gates/read work and bounded watches.
+
+---
+
 ## Current checkpoint: 2026-10-25 06:51 +07, successor-socket fixture qualification open
 
 Taken on Queue 6390840447: the unowned Body supervisor successor-socket
