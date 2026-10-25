@@ -1,0 +1,36 @@
+{
+  "tree": "a5a0e59dde96e7689a0b734baeb878bee434c068",
+  "base": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "equal_prepared_composition": [
+    "503f8a237a50595d7665a9991bf55faaba6c2a2b",
+    "b2d24fc0317813b9e5544ed552eb38617ffc8591"
+  ],
+  "resolution": "Both schedule explanations retained in admission-then-reporting order. Both reuse notes retained. All other merges clean.",
+  "head": "2f1c88a192fd5827a71d12193f58840c048aec1f",
+  "source_before_docs_carry": "e319f3d4abf3544d9e1890462292c1d680b4c909",
+  "docs_only_base_delta": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "reader_frozen_tree": "87771377eff1f5025704fa23089841f268f26e10",
+  "qualified_head": "2f1c88a192fd5827a71d12193f58840c048aec1f",
+  "state": "Author workspace build passed on the latest source; independent full gate passed on identical runtime inputs with only a non-build-read Markdown difference.",
+  "tracked_source_records": 7091,
+  "source_map_sha256": "d27bbfdde7986143ea0d9e38837ab15837dcf19ffbaedce582ce41f2bb0655a0",
+  "author_build_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reader_report_url": "https://github.com/autonomous-ai/lampOS/pull/3491#issuecomment-6400850678",
+  "reader_reported_gate": {
+    "source_tree": "87771377eff1f5025704fa23089841f268f26e10",
+    "formatting": "passed",
+    "strict_all_target_clippy_reverse_dependent_crates": 12,
+    "full_voice_eval_passed": 4678,
+    "failed": 0,
+    "ignored": 21,
+    "filtered": 0,
+    "literal_terminal_cases": 4699,
+    "summaries": 11,
+    "seconds": 747.174,
+    "fixed_source_entries": 10517,
+    "executed_binaries_preserved_by_reader": 9,
+    "evidence_scope": "Independent public reader report; not a local rerun or a claim of inspecting the reader private binaries."
+  }
+}
