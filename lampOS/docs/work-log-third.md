@@ -6,6 +6,35 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 19:16 — Body runtime gate passed; latest integration started
+
+Ready for lamp-voice: no (latest integration and original new Linux runs remain).
+
+The frozen `05b29451f` / `a786e0454` gate is complete, all stages exit 0:
+fmt, strict all-target clippy across 12 crates, workspace build, Body
+**608/0/0** and all five runtime dependants **5,706/0/34**. Combined
+**6,314 passed / 0 failed / 34 ignored**, 35 harness summaries. Logs have
+no disk-space error marker. This is separate from the earlier full
+12-crate **7,337/0/52** gate on `640198b2c` / `8e2405736`.
+
+The authored carry is now `f2ddbc5f4` on `22d93d199`, clean and still equal
+by range-diff; Body bytes remain identical to the original offered head.
+Only Voice code and docs changed in the intervening base. The next gate
+runs fmt, strict clippy across 12 crates, workspace build and full Voice
+plus VoiceEval tests. It is active; no new terminal result is claimed.
+
+Recorded 265 executable hashes and retained all original logs/results,
+then cleaned the entire owned Cargo target: 153,899 files, 42.4 GiB.
+The fresh gate uses one compiler job, serial tests, incremental off and
+zero development/test debug info to keep the cache bounded. No other
+builder's cache or lamp was touched; no failed control binary was discarded.
+
+Third's resolved source holds on #3463 are cleared with READ-OK on
+`544437c1c`, both carried patches equal. Its original ARM64 run 40190173176
+was audited: 11,274 passed (one recorded leak), 106 skipped; Linux clippy
+green. This is CI evidence and a source read, not a Third local execution.
+[Clearance](https://github.com/autonomous-ai/lampOS/pull/3463#issuecomment-6397450983).
+
 ## 2026-10-25 19:03 — Aside source read completed
 
 Ready for lamp-voice: no (Body's current dependent command remains active).
