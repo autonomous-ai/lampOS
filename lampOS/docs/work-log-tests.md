@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-25 09:02 — Current Skills source frozen; Body canonical gates active
+
+Ready for lamp-voice: no
+
+[Frozen uncompiled Skills source](verification/tests-skills-journal-source-34c-20261025/) is publicbase34c plus the exacttwo-file patch e78a535c1cb2; locally computedtree bcbf05c3d identifies the overlay, not an authored/pushedcodecommit. Whole addon source15db11e184 anddocs80f211e5ca verify; the temporaryindex is private/excluded and the real workingindex unstaged. Oldfailed producerWT isunchanged. Pinnedformatcheck0/diffcheck0 only; no newSkills compile/test. Docs narrow observedprefix/pendingread limits asFourthrequested. Proposed nativevalidation is exactlyonechangedfullSkills andonechangedexact case, withnew34cmetadata/inventory/profiles/CLI/source/context/cleanup binding; no oldsample repeat or slotgrant. Canonicalreverse/native gates remain separate.
+
+Body’s exacttwo-file patch carried from0ee to34c with unchangedbytes/modes. Closed0ee metadata-only allocation is archived separately. New actual34cquery21335passed451/48, raw9e2937a526 (byteequaloldqueriesbutnewexecution/sourceguard), source884c6f1c55; all12reverse/doctest/custom2 bindings andprior2witnesses validate. Rootcanonical allocation47816 isactive on34c: workspacefmt0, supported48localclean0, strict12Clippyactive; full12tests/workspacebuild/diffpending. CompilerboundRoot2+Reviewer-two2, no global/isolation claim. Actualoldcontrolsbothpassonce remain originalefbf and do notreproducefc310/3; no speed/cause waiver.
+
+
 ## 2026-10-25 08:39 — Fixed Hand proof published; current-source metadata bound
 
 Ready for lamp-voice: no

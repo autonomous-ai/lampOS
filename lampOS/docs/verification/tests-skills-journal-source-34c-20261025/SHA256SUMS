@@ -1,0 +1,5 @@
+82b87ddf8a340c635924d11c508fae311de7058201c46bbb2e3500ecc6b9885c  README.md
+15db11e18468504635db4019862d1d5c4d35ecdacb60529c204aa28233b819c9  source/lampOS/crates/skills/tests/it/addon.rs
+80f211e5ca968a7ee8a67833d5633d79dd261317eeb42a06972df42c90f5e473  source/lampOS/docs/skills.md
+51a5bfa168a2c9794c48f2a2b1dc403620cd50adb48d0efb672f06a9c5c625db  source-identity.json
+e78a535c1cb2c555afb42887f33af6dd9dab1486cb5d0d1ef439e1c8d5af9c97  two-file.patch

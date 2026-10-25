@@ -1,0 +1,28 @@
+{
+  "base": "34c8b517c41c8d2a4099b87fe550d4eb25611ea2",
+  "base_tree": "30b36c881ebf907092a6dc6482154cd86c0b2767",
+  "local_source_tree": "bcbf05c3d05d315914a06ea56af18376a658a2d0",
+  "tree_is_not_an_authored_or_pushed_commit": true,
+  "source_reconstruction": "Immutable public base plus exact two-file.patch; temporary index only, actual working index remained unstaged.",
+  "branch": "tests/1806-addon-journal-events",
+  "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/skills-addon-journal",
+  "patch_sha256": "e78a535c1cb2c555afb42887f33af6dd9dab1486cb5d0d1ef439e1c8d5af9c97",
+  "files": [
+    {
+      "path": "lampOS/crates/skills/tests/it/addon.rs",
+      "sha256": "15db11e18468504635db4019862d1d5c4d35ecdacb60529c204aa28233b819c9",
+      "bytes": 31131,
+      "mode": 420,
+      "mtime_ns": 1792892811670331771
+    },
+    {
+      "path": "lampOS/docs/skills.md",
+      "sha256": "80f211e5ca968a7ee8a67833d5633d79dd261317eeb42a06972df42c90f5e473",
+      "bytes": 201988,
+      "mode": 420,
+      "mtime_ns": 1792892811744693661
+    }
+  ],
+  "verification": "Pinned1.96 exact-file rustfmt check0 and diff-check0; no compile/test. All prior four outcomes retained under original source.",
+  "metadata_and_census": "Producer must query this new34c source and inventory its actual compiled artifacts; old0ee/42 Skillscensus is not current coverage."
+}
