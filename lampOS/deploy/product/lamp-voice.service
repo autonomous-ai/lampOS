@@ -259,6 +259,20 @@ Environment=LAMP_MEMORY_KEEP_ASKED=on
 # And a line that plainly asks for a timer or a reminder calls the function that sets it (lamp-4ace, 25 Oct:
 # "remind me in three minutes to call my sister" got "Three minutes, call your sister." and no call).
 Environment=LAMP_SCHEDULE_ASKED=on
+# A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
+# P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
+# the person who said it.
+Environment=LAMP_PERSON_SCOPE_SEEN=on
+# The memory a friend has (#1693): at each conversation's end the second route's model proposes the few things
+# worth keeping, each checked by the store and linked to the words it came from (OBSERVE); a dated one keeps its
+# day (EVENTS); the next session with that person asks after one open thread, once, at most one a day (THREADS);
+# and "forget everything about me" reaches what was kept without being asked too, the named thing only for a named
+# forget (FORGET_ALL, #3113's fix #3127). The dry run on the 20 written conversations kept 10 of 10 rightly, none
+# wrongly, none intrusive, health and money said in passing not kept (21 Oct); end to end on lamp-c0a4 on 23 Oct.
+Environment=LAMP_MEMORY_OBSERVE=on
+Environment=LAMP_MEMORY_EVENTS=on
+Environment=LAMP_MEMORY_THREADS=on
+Environment=LAMP_MEMORY_FORGET_ALL=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
