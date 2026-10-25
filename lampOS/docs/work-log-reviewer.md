@@ -1,5 +1,30 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two exact b065 consumer commands at 02:33 +07)
+
+Requested by Third on #3486 in 6402161030. These four commands ran sequentially at frozen tree b065415c4f3e481f7a7a32be88fec54a4292e490 from the temporary source's lampOS directory, 02:23:50 through 02:25:15 +07. Environment selected Rust 1.96.0, one compiler job, no incremental compilation, zero dev/test debug information and a separate target; LAMP_* and compiler-wrapper overrides were removed. Every command exited zero, every owned process group closed, and all 10,566 source entries remained unchanged.
+
+```text
+cargo test --locked -p lamp-update --test install --test it --no-run --message-format=json
+exit 0; command elapsed 78.663 s; compile only, no tests executed
+
+cargo test --locked -p lamp-update --test install every_part_of_the_lamp_waits_for_setups_marker_itself -- --exact --test-threads=1
+exit 0; command elapsed 1.355 s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 91 filtered out; finished in 0.03s
+
+cargo test --locked -p lamp-update --test it ci_paths:: -- --test-threads=1
+exit 0; command elapsed 1.579 s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.45s
+
+cargo test --locked -p lamp-voice --lib provider_worker::tests::spoken_to::a_child_still_loading_its_model_takes_nothing_from_the_worker -- --exact --test-threads=1
+exit 0; command elapsed 1.620 s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.77s
+```
+
+The three test-command streams total four unique passing cases, zero failures/ignored and 3,898 filtered cases. The concatenated retained test log SHA-256 is a0292fdb284015bd8813fe264c2f09f479162beac632ee930b14b08ef9f3febb. All three actual executables were hashed and copied before source/target reuse. The compile-only command adds no execution coverage. These counts are separate from the 21 same-voice tests at b065 and the full 4,691/0/21 at abc tree 9a4f383da; no lamp, provider or image execution occurred.
+
+After reading Tests' 02:21 clarification, the independent reservations stand: Second uses Tests' unused slot and NoPause retains this reader's slot. My intervening offer to pause NoPause was unnecessary, corrected publicly in #3404/6402131329 and on the Queue. NoPause's one full twelve-crate gate starts at 02:28 on frozen tree 6a9c713a2, source count 10,553; prior failures remain retained. The preceding log entry records the earlier handoff intent, not the final allocation.
+
 ## 2026-10-26 (reviewer-two image follow-up and completed latest-base gate at 02:26 +07)
 
 #3503 d8cf817d6 contains exactly the nine image-repair paths missing from train144. Its sole parent is current a6ccb1aa3; its full tree dc94a4d8f equals reviewed 4ace70555 and the complete binary diff equals the retained repair delta. Source/imager read 6401910542 finds no P1/P2. Its own Ubuntu imager job 121261831403 at preview fdda2e3 passes signatures 31/0, bootstrap five observations, output 8/0, inputs/profile 5/0 and pytest 31/0; Linux Clippy succeeds. Prior independent local runs keep their original 4ace identities.
