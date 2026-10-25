@@ -1,0 +1,18 @@
+
+running 1 test
+test unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails ... FAILED
+
+failures:
+
+---- unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails stdout ----
+
+thread 'unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails' (8225391) panicked at crates/body/src/unplug.rs:1005:17:
+no Ready in 2 s: Some((Folding, ""))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 439 filtered out; finished in 3.57s
+

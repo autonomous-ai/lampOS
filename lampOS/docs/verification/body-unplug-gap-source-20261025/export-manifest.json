@@ -1,0 +1,62 @@
+[
+  {
+    "file": "009-exact.stderr.txt",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "007-exact.stderr.txt",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "009-exact.json",
+    "original_sha256": "e88072e1e01767259d527b4cbeccaf49e662817e23ac5db19e15fb1074c0af45",
+    "published_sha256": "e88072e1e01767259d527b4cbeccaf49e662817e23ac5db19e15fb1074c0af45"
+  },
+  {
+    "file": "008-exact.stderr.txt",
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "README.md",
+    "original_sha256": "06e75d34cd32de5d7886ce19c5eb9030fa8ed3b1019035a07b549c340463a899",
+    "published_sha256": "3dd26ee453622cb5260c57587abdbe7b0933a80ae558ecb5a464777dc4b974fa"
+  },
+  {
+    "file": "raw-manifest.json",
+    "original_sha256": "071fb960995d898c4d5399fbecc9584f33787e96e53e4c7e8fea9d3c772133f1",
+    "published_sha256": "071fb960995d898c4d5399fbecc9584f33787e96e53e4c7e8fea9d3c772133f1"
+  },
+  {
+    "file": "007-exact.json",
+    "original_sha256": "ceb25f2ebfc76bb9af2924b280b4cb95fd840fd3933f2f236b3f1a53ca9767a2",
+    "published_sha256": "ceb25f2ebfc76bb9af2924b280b4cb95fd840fd3933f2f236b3f1a53ca9767a2"
+  },
+  {
+    "file": "009-exact.stdout.txt",
+    "original_sha256": "4b5f971bd75ae22b3bd57e4763b4a5736c2a23efb1248e646686e7cdd8e2f0b0",
+    "published_sha256": "4b5f971bd75ae22b3bd57e4763b4a5736c2a23efb1248e646686e7cdd8e2f0b0"
+  },
+  {
+    "file": "008-exact.json",
+    "original_sha256": "8ea07d5d25ae1dd20132295d97ddec5367e0e9f3bfaddff3f894b1ce0a0936f4",
+    "published_sha256": "8ea07d5d25ae1dd20132295d97ddec5367e0e9f3bfaddff3f894b1ce0a0936f4"
+  },
+  {
+    "file": "007-exact.stdout.txt",
+    "original_sha256": "ad782a2ef37b3eaaadd92cf6c7f8d20cd2b707fc912e03a302c25b453298c2d2",
+    "published_sha256": "ad782a2ef37b3eaaadd92cf6c7f8d20cd2b707fc912e03a302c25b453298c2d2"
+  },
+  {
+    "file": "008-exact.stdout.txt",
+    "original_sha256": "09714be613d726b59d090861e197f6b4616736695f45262c0e62108a18d95e38",
+    "published_sha256": "09714be613d726b59d090861e197f6b4616736695f45262c0e62108a18d95e38"
+  },
+  {
+    "file": "open-pr-census.json",
+    "original_sha256": "3cc1bcec05939d1f5ecb867b9aecde7a8a2c152e6b3092a1c53bf51c197ca83f",
+    "published_sha256": "3cc1bcec05939d1f5ecb867b9aecde7a8a2c152e6b3092a1c53bf51c197ca83f"
+  }
+]
