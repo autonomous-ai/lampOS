@@ -1415,7 +1415,11 @@ order is kept. A written turn is the same from the chat on.
     someone who hears their name ("Yes?"). A lone name often comes back
     with no words; such a line is asked as `Lamp.`, the name the
     coordinator heard, rather than left as a sound. Without `Called`, no
-    words are still no line.
+    words are still no line. A line already whole (`whole_already`: a
+    question, a stop, or a sentence past its first word) is never a bare
+    call: it is asked as it is, without the note (lamp-4ace, 25 Oct: the
+    name heard in "Nice. And what was my sister's name again?" was told
+    as a call, and the model answered "May.").
   - The journal says each: "it began over the lamp's answer, and the
     model is told so", "the model is told it may follow on from what the
     lamp said" (or "… in a busy room; the model is not told …"), "only

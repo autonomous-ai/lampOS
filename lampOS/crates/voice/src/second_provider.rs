@@ -4754,6 +4754,12 @@ async fn spoken(
         }
         false => (text, called),
     };
+    // A line already whole ([`whole_already`]: a question, a stop, or a
+    // sentence past its first word) is never only the name: it is asked as
+    // it is, not told it was a call and answered with "Yes?" (lamp-4ace,
+    // 25 Oct: the name heard in "Nice. And what was my sister's name
+    // again?" was told as a call, and the model answered "May.").
+    let called = called && !whole_already(&text);
     // Its words end before a name: answered no sooner than
     // [`OPEN_NAME_WITHIN`] after the line's end, so the name said next goes
     // on from it (`LAMP_SECOND_OPEN_NAME`). A newer line drops this request,
