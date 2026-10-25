@@ -167,6 +167,9 @@ With `COMPRESS=0`, only the newly built raw image is reported. A compressed
 image left by an earlier build stays under its old name. A compressed build
 requires its compressed output and renames it for a nonstandard variant;
 a missing selected output fails instead of reporting the other format.
+`OUT_IMG_SIZE` is forwarded to the build container; unset keeps the script's
+8G default. Standard images remove an inherited hardware-profile marker, as
+V1 does; nonstandard images write the selected variant.
 
 The source-level checks run without Docker, mounts, network access or a lamp:
 
@@ -174,6 +177,7 @@ The source-level checks run without Docker, mounts, network access or a lamp:
 bash scripts/imager/tests/test_lampos_envelope.sh
 bash scripts/imager/tests/test_lampos_image_bootstrap.sh
 bash scripts/imager/tests/test_v2_image_output.sh
+bash scripts/imager/tests/test_v2_image_inputs.sh
 ```
 
 These use ephemeral signing keys and mocked platform commands. They do not

@@ -406,6 +406,8 @@ done
 if [ "$VARIANT" != standard ]; then
   mkdir -p "${MNT}/etc/autonomous"
   printf '%s\n' "$VARIANT" > "${MNT}/etc/autonomous/hardware-profile"
+else
+  rm -f "${MNT}/etc/autonomous/hardware-profile"
 fi
 
 # Phase 4: lampOS, from one signed build, by its own installer (docs/install.md, "The install command").

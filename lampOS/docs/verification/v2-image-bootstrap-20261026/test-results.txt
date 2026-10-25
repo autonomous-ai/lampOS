@@ -64,3 +64,27 @@ PASS baseline/wrong-record: exit=0, installs=1
 PASS baseline/tampered: exit=1, installs=0
 PASS baseline/local: exit=0, installs=1
 10 behavioral observations passed; evidence retained locally
+
+Size/profile follow-up, affected checks only:
+PASS: explicit_size_is_forwarded
+PASS: empty_size_keeps_8G_default
+PASS: stale-standard
+PASS: fresh-standard
+PASS: selected-pro
+5 passed; 0 failed
+PASS: raw_pro_preserves_compressed_outputs
+PASS: compressed_pro_renames_current_output
+PASS: compressed_standard_keeps_same_path
+PASS: default_compression_keeps_same_path
+PASS: missing_raw_rejects_previous_compressed
+PASS: missing_compressed_rejects_previous_outputs
+PASS: empty_raw_is_rejected
+PASS: empty_compressed_is_rejected
+8 passed; 0 failed
+PASS current/attacker: exit=1, installs=0
+PASS current/mutable-retry: exit=0, installs=2
+PASS current/wrong-record: exit=1, installs=1
+PASS current/tampered: exit=1, installs=0
+PASS current/local: exit=0, installs=1
+5 behavioral observations passed; evidence retained locally
+Workflow YAML: valid

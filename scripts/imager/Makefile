@@ -192,6 +192,7 @@ build-v2:
 	-e VARIANT=$(VARIANT) \
 	-e COMPRESS=$(COMPRESS) \
 	-e LAMPOS_CHANNEL_URL=$(LAMPOS_CHANNEL_URL) \
+	-e OUT_IMG_SIZE=$(OUT_IMG_SIZE) \
 	-e AP_BAND=$(AP_BAND) \
 	-e COUNTRY_CODE=$(COUNTRY_CODE) \
 	pi-builder /work/build-orangepi-v2.sh
