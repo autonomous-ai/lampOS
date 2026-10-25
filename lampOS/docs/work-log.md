@@ -1,6 +1,16 @@
-Ready for lamp-voice: Skills masking controls ready; own-keys carry in its Mac gate.
+Ready for lamp-voice: Skills landed; own-keys current-base qualification running.
 
-## Current checkpoint: 2026-10-26 03:25 +07, Skills ready; own-keys carry repaired
+## Current checkpoint: 2026-10-26 03:30 +07, Skills landed; own-keys fixture boundary corrected
+
+[#3506](https://github.com/autonomous-ai/lampOS/pull/3506) landed through train [#3508](https://github.com/autonomous-ai/lampOS/pull/3508) as `0a40aa50b`. The [train packet](verification/skills-drop-mask-20261026/native-train146/README.md) proves that landing, train and tested preview all equal the full reviewed `3ab42b21e` tree, with all five paths and modes preserved. Original train ARM64 **40230140682**, attempt 1, reports **11,313 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**; all five new controls pass once. Original Linux Clippy **40230140630** passes. The original and amended constituent packets remain separate, and the short-word disclosure finding remains unresolved.
+
+The own-keys carry is rebased onto `0a40aa50b`: authored carry `4674cd4ba` is patch-identical to `2236e5447`, and all nine uncommitted repair-file hashes survive unchanged. The first focused run's **6 passed / 1 failed**, fixture, executable, source inventory and logs are retained. The directory fixture incorrectly expected successful installation: existing head-touch preflight refuses an unreadable `.conf` before cleanup. Its corrected integration control requires refusal with unchanged contents, state and host calls. Private matcher controls separately cover a directory and Linux FIFO; they do not claim whole-install FIFO handling. No runtime behavior was changed to make that fixture pass.
+
+The unchanged preflight reader's potential FIFO stall is [reported separately](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6402784878), as a source finding, not an executed FIFO-install result. It is byte-identical to Main. The corrected changed/consumer-crate gate has started on frozen current source, using one compiler job; prior failure is not overwritten. Activation remains HOLD for #2094 and fresh current-base acceptance. No lamp, key, provider or release action ran.
+
+---
+
+## Current checkpoint: 2026-10-26 03:22 +07, Skills ready; own-keys carry repaired
 
 [#3506](https://github.com/autonomous-ai/lampOS/pull/3506) is ready at `3ab42b21e` on current `409bf7268`, with Reviewer-three READ-OK and Reviewer-two's current-head no-P1/P2 source/proof clearance. [Original 9a6 native evidence](verification/skills-drop-mask-20261026/native-original/README.md) and [amended 3ab native evidence](verification/skills-drop-mask-20261026/native-amended/README.md) each reconcile **11,313 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**, all five added cases included. Matching original Linux Clippy runs pass. The amended source differs only in verification wording and its checksum; all compiled inputs remain identical. The short-word disclosure finding remains unresolved and these controls describe current permissive behavior, not an agreed privacy rule.
 

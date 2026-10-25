@@ -1,0 +1,11 @@
+# Skills dropped-chance masking: train 146 landing
+
+PR #3506 landed through [train #3508](https://github.com/autonomous-ai/lampOS/pull/3508) at `0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5`, 26 October 2026 at 03:25:50 +07. The reviewed constituent `3ab42b21e4f9d00a014caf5c71acc20387892685`, train head `7b59b68c1865edb2631429911be6bbd8a8d74a17`, actual tested checkout `e453df9cb290f5cd3fa6f4da98e867581560ccc7`, and landing all have tree `e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3`. All five reviewed paths, blobs and modes survive. [identities.json](identities.json) records their exact identities and the reconciliation.
+
+[Official ARM64 run 40230140682, original attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40230140682/attempts/1) succeeds: **11,313 unique PASS; zero LEAK, FAIL or TIMEOUT; 106 skipped; zero selected unrun**, in 207.847 seconds. Ordinals 1–11,313 reconcile exactly once. Thirty-five identical post-summary PASS echoes are excluded. All five new `welcome_stuck::drop_mask_` cases pass at ordinals 5,472–5,476; [selected-results.json](selected-results.json) records each case.
+
+Separate later steps report four passing workspace doctests across 46 summaries, successful relay signals and 12 passing process tests. The stable-promotion workspace separately reports 22 passes. These controls are not added to the nextest count. [Linux Clippy run 40230140630, original attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40230140630/attempts/1) also succeeds, including pinned workspace formatting, strict workspace/all-target Clippy and separate stable-promotion formatting/Clippy.
+
+[census.json](census.json) binds both private raw job logs by byte length and SHA-256. The [original constituent](../native-original/README.md) and [amended constituent](../native-amended/README.md) receipts remain distinct; these are the train's own original runs. No retry, cancellation or local compiler/test run was requested for this audit. The public lamp-voice ref equalled the recorded landing when checked.
+
+These Engine and native CPU controls do not establish typed-bus, physical lamp, hardware or latency acceptance. Short ASCII word descriptions remain existing permissive behavior, not an agreed privacy policy; the separate privacy finding remains unresolved.

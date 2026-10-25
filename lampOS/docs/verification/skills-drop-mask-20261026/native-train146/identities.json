@@ -1,0 +1,78 @@
+{
+  "train_pr": 3508,
+  "constituent_pr": 3506,
+  "constituent": {
+    "sha": "3ab42b21e4f9d00a014caf5c71acc20387892685",
+    "tree": "e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3"
+  },
+  "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+  "train_head": {
+    "sha": "7b59b68c1865edb2631429911be6bbd8a8d74a17",
+    "tree": "e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3",
+    "parents": [
+      "409bf72685ec1046ffc2fbfd51654cb2693e1297"
+    ]
+  },
+  "checkout": {
+    "sha": "e453df9cb290f5cd3fa6f4da98e867581560ccc7",
+    "tree": "e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3",
+    "parents": [
+      "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+      "7b59b68c1865edb2631429911be6bbd8a8d74a17"
+    ]
+  },
+  "landing": {
+    "sha": "0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5",
+    "tree": "e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3",
+    "parents": [
+      "409bf72685ec1046ffc2fbfd51654cb2693e1297"
+    ],
+    "merged_at": "2026-10-25T20:25:50Z"
+  },
+  "public_lamp_voice_at_check": "0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5",
+  "all_four_trees_equal_reviewed_constituent": true,
+  "source_reconciliation": {
+    "all_five_changed_blobs_and_modes_preserved": true,
+    "files": [
+      {
+        "path": "lampOS/crates/skills/tests/it/welcome_stuck.rs",
+        "blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+        "mode": "100644"
+      },
+      {
+        "path": "lampOS/docs/verification/skills-drop-mask-20261026/README.md",
+        "blob": "dd146f781f67defe8e3b1f4d1e6d37783926b72b",
+        "mode": "100644"
+      },
+      {
+        "path": "lampOS/docs/verification/skills-drop-mask-20261026/SHA256SUMS",
+        "blob": "3c2613ba4a963eeb49e3279e85f014e2d1c5647e",
+        "mode": "100644"
+      },
+      {
+        "path": "lampOS/docs/verification/skills-drop-mask-20261026/inputs.sha256",
+        "blob": "a9294a102a4eedaea4c3153336a4b6d9c87bea4e",
+        "mode": "100644"
+      },
+      {
+        "path": "lampOS/docs/verification/skills-drop-mask-20261026/results.json",
+        "blob": "519621236f000642237ac81e31bfdcc77c1ffa63",
+        "mode": "100644"
+      }
+    ],
+    "evidence": "The train changed-path set and all five blob IDs match the immutable reviewed constituent. Mode preservation follows from complete immutable tree equality; constituent modes were read with git ls-tree."
+  },
+  "tree_evidence": "Both job logs record the checkout SHA. Checkout, train and landing trees and parents are resolved from immutable public Git objects; no runtime before/after source map is asserted.",
+  "arm64": {
+    "run_id": 40230140682,
+    "attempt": 1,
+    "conclusion": "success",
+    "job_id": 121279896365
+  },
+  "clippy": {
+    "run_id": 40230140630,
+    "attempt": 1,
+    "conclusion": "success",
+    "job_id": 121279895915
+  }
+}
