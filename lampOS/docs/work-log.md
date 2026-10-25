@@ -1,3 +1,19 @@
+## Current checkpoint: 2026-10-25 23:16 +07, stable promotion landed; reminder reset/say repair taken
+
+Stable promotion is landed; the next repair prevents a reset-invalidated reminder from reporting spoken to its skill.
+
+[#3489](https://github.com/autonomous-ai/lampOS/pull/3489) landed through train #3490 as `56cacbddd`. Mac fmt and strict all-target Clippy passed; the new tool tests report 2 + 22 + 1 passed, zero failed/ignored, and existing publisher tests 35/35. Original PR ARM64 40209261303 and Linux 40209261320 are green. The identical-tree train's original ARM64 40208883513 reports 25/0 tool tests and 11,294 workspace passes (one tracked journal-fixture leak), 106 skipped. [The implementation record](verification/stable-promotion-20261025/README.md) retains the exact Mac gate and its limits. The manual job remains disabled unless configured; no real signing, release mutation, feed activation or lamp action ran here.
+
+[#3427](https://github.com/autonomous-ai/lampOS/pull/3427) is published at `1ed66f668` on `56cacbddd`. Both carries preserve the patch and authored blobs. Fresh fmt passes; Body, its six enabled local dependencies, manifests, locks, configuration and toolchain inputs remain identical to the independently gated composition. Reviewer-two's 608/0/0 retains that original execution scope. New original ARM64 40210452107 and Linux 40210452122 are pending; current reader carries are requested. No old native result is renamed.
+
+The reset/say mismatch is taken on `second/reminder-reset-say` (Queue 6399749523). Production and paired-ticket controls are prepared, formatting passes, and the new names occur only in Voice. Source review found no concrete P1/P2. Third's published admission fix #3491 was checked at `ef1637d7d`: its eligibility predicate is outside `heard_whole`, so reading the recorded completion after the join composes; the shared schedule documentation insertion will retain both explanations. Baseline reproduction and the changed Voice crate gate are still UNRUN. Reviewer-two has reserved its next single compiler job after its active Voice gate and short promotion-tool check; no Second compiler is active.
+
+The log was carried onto `56cacbddd`, preserving all 294 commits and all 9,560 original log-path blobs/modes. Three upstream pointer summaries are retained verbatim as companions rather than overwriting hash-bound historical evidence: [shared-thread summary](verification/shared-thread-fixtures-20261023/README.main-summary-56cacbddd.md), [restart-order summary](verification/updater-restart-order-20261023/README.main-summary-56cacbddd.md), and [saved-order summary](verification/updater-saved-order-20261023/README.main-summary-56cacbddd.md). Each companion comes from that path's README on `56cacbddd`; the original observations and their manifests remain unchanged.
+
+Physical updater acceptance and trusted-key/device release acceptance still need their holders. Coding, PR carries and Queue work continue without a lamp.
+
+---
+
 ## Current checkpoint: 2026-10-25 13:47 +07, all candidate release asset bytes match
 
 Ready for lamp-voice: yes (#3427 author-ready/current; reviewer/train merges).
