@@ -1,3 +1,9 @@
+## 2026-10-25 18:08 — Update failure and closed-stage space recovery
+
+Ready for lamp-voice: no
+
+The continuation's Update command exited 101 after 1,479.0 s. Six completed targets passed 228/0/4, including all 90 installation cases. Its final 167-case round target emitted 29 passes and 20 failures before ending without a summary or assertion details; those failures are not hidden by the completed-target count and their cause is not established. The controller paused before Skills with no active Cargo command when free space measured 592,113,664 bytes. The executed round binary has an independent private copy. Recovery is limited to 31 identified Voice incremental directories, preserving binaries, libraries, fingerprints, external cache entries and failure evidence. The remaining eleven suites, current-base composition and native/played gates remain open. The corrected onboarding 125/0/0, second-provider 790/0/1 and three individual 1/0/0 controls retain their exact earlier scope.
+
 ## 2026-10-25 17:48 — Corrected onboarding and second-route checks passed
 
 Ready for lamp-voice: no
