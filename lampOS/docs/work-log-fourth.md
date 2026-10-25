@@ -1,3 +1,9 @@
+## 2026-10-25 17:48 — Corrected onboarding and second-route checks passed
+
+Ready for lamp-voice: no
+
+On the fixed ten-file source at 0ce7b6789 over 83509fd04, formatting, strict workspace/all-target Clippy and the prerequisite workspace build passed. The corrected onboarding group passed 125/0/0; the second-provider group passed 790/0/1; each of the two search/push controls and the privacy-reader control passed once, 1/0/0. These selected checks overlap the earlier failed full Voice run and do not replace its 4,017/25/21 result. Full Update is compiling before the other eleven package suites and final build. Source and index remain unchanged. The prerequisite #3437 has green native gates on 59e55af16 and awaits its train; Store is the pending final base composition. The two-person played check remains with First to assign.
+
 ## 2026-10-25 17:31 — Corrected source passed strict Clippy
 
 Ready for lamp-voice: no
