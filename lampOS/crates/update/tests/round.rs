@@ -41,6 +41,8 @@ pub(crate) mod process_cuts;
 #[path = "round/head_touch.rs"]
 mod head_touch;
 
+#[path = "round/product_carrier.rs"]
+mod product_carrier;
 #[path = "round/restart_order.rs"]
 mod restart_order;
 #[path = "round/restart_quiet.rs"]
@@ -484,6 +486,7 @@ impl Lamp {
             updater: manifest::UPDATER,
             models: false,
             settings: false,
+            product_settings: false,
             image: false,
         };
         Self {
@@ -2732,8 +2735,10 @@ impl Lamp {
     /// The new lamp-update confirming itself, as the build `running` from:
     /// only after a dry round has read and checked the channel's manifest.
     fn confirm(&mut self, running: &str) -> own::Confirm {
-        // Its dry round can start `lamp-skills list` too.
-        let _rounding = rounding();
+        // Confirmation takes the records lock again after its dry round.
+        // Keep that complete operation isolated from other fixture launches,
+        // including rounds that may start a process themselves.
+        let _forking = forking();
         let clock = FakeClock(Rc::clone(&self.now));
         let mut ears = FakeEars {
             now: Rc::clone(&self.now),

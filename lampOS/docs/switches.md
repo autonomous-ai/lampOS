@@ -558,3 +558,14 @@ Gaps between the docs, the units and the code, for whoever owns each:
   they hold 2 s late or do nothing; `LAMP_LOOK_FULL` needs the eyes'
   `--full-look` and its file (both in the product since #2791's product half); `LAMP_RESTORED_MUTE` needs `--controls-mute`.
   `LAMP_MARK_WEIRD` is left out because a reset doesn't wipe its marks.
+
+### Product update settings
+
+The existing `LAMP_UPDATE_APPLY` switch is explicitly `on` in the product
+updater unit. Explicit `off` still prevents settings writes. When it is
+absent on an older product install, automatic settings apply requires an
+authenticated level-6 product carrier, `LAMP_UPDATE_SELF=on`, and a regular
+base updater service using its managed `update/current` link. Other
+installations and older non-product manifests keep the off default. The
+settings allowlist, signed helper request and three-way local-edit policy
+are unchanged; see [updates](updates.md#product-service-units-and-settings-over-the-air).

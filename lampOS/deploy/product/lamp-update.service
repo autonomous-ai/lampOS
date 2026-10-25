@@ -41,6 +41,9 @@ Environment=LAMP_BUS_ROOT=/run/lampos-bus
 # lamp-4ace 20 Oct). Without it this unit's updater can change only by running install again on the lamp,
 # which a customer's lamp never has: so a later build could never carry units or settings to it (25 Oct).
 Environment=LAMP_UPDATE_SELF=on
+# The signed product carrier writes only the existing allowlisted settings;
+# explicit off keeps a lamp's settings untouched (docs/updates.md).
+Environment=LAMP_UPDATE_APPLY=on
 
 [Install]
 WantedBy=multi-user.target

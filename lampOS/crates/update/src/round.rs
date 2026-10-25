@@ -104,6 +104,10 @@ pub struct Config {
     /// `LAMP_UPDATE_APPLY=on`: the settings and tmpfiles a build carries
     /// are written at the switch by `lamp-update-apply` (crate::apply).
     pub settings: bool,
+    /// With no explicit settings switch, a self-updating product installation
+    /// accepts settings from a signed level-6 product carrier. Explicit off
+    /// leaves this false; dry confirmation rounds use the same validation.
+    pub product_settings: bool,
     /// `LAMP_UPDATE_IMAGE=on`: the image's own files a build carries are
     /// written the same way (crate::image, #1369).
     pub image: bool,
@@ -978,6 +982,29 @@ impl Run<'_, '_> {
         Ok(taken)
     }
 
+    /// Product auto-apply is scoped to the managed updater's current link;
+    /// it neither rewrites its unit nor changes the fixed fallback contract.
+    fn product_settings_of(&self, manifest: &Manifest) -> bool {
+        if !self.config.product_settings
+            || !self.config.self_switch
+            || manifest.min_updater.unwrap_or(1) < manifest::PRODUCT_UNITS_UPDATER
+            || !manifest
+                .units
+                .iter()
+                .any(|unit| unit.lamp == manifest::PRODUCT_LAMP)
+        {
+            return false;
+        }
+        let path = self.config.on(&self.config.units).join(OWN_UNIT);
+        if !fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.file_type().is_file()) {
+            return false;
+        }
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|text| unit::linked_program(&text, &self.config.root))
+            .is_some_and(|program| program.builds == own::FOLDER && program.binary == "lamp-update")
+    }
+
     /// The settings the build writes on this lamp ([`Run::setting_writes`]):
     /// each still the build's before, or never there. One the lamp changed
     /// is kept, and said. With the switch off none is written, and that is
@@ -992,6 +1019,7 @@ impl Run<'_, '_> {
         self.setting_writes.clear();
         self.image_writes.clear();
         let mut writes = Vec::new();
+        let settings = self.config.settings || self.product_settings_of(manifest);
         if !manifest.settings.is_empty() || manifest.reset_plan.is_some() {
             let mut steps = apply::plan(
                 &self.config.root,
@@ -1001,7 +1029,7 @@ impl Run<'_, '_> {
                 &BTreeMap::new(),
             )
             .map_err(|error| Outcome::Failed(format!("the settings cannot be read: {error}")))?;
-            if self.config.settings {
+            if settings {
                 crate::head_touch::project(
                     &self.config.root,
                     &self.config.on(&self.config.units),
@@ -1015,7 +1043,7 @@ impl Run<'_, '_> {
                 &self.config.root,
                 &self.config.on(&self.config.units),
                 future_units,
-                if self.config.settings { &steps } else { &[] },
+                if settings { &steps } else { &[] },
             )
             .map_err(Outcome::Refused)?;
             // Setup's reset plan, over any plan the lamp has (#806).
@@ -1027,7 +1055,7 @@ impl Run<'_, '_> {
                 );
             }
             let these = apply::writes(&steps);
-            if !self.config.settings {
+            if !settings {
                 if !these.is_empty() {
                     self.say(&format!(
                         "build {}'s settings are not written ({}): {}=on is not set",
@@ -1234,8 +1262,23 @@ impl Run<'_, '_> {
     ) -> Result<BTreeMap<String, String>, Outcome> {
         let mut carried = BTreeMap::new();
         for unit in &manifest.units {
-            if unit.lamp != self.config.lamp || !installed.iter().any(|part| part.unit == unit.unit)
-            {
+            let Some(part) = installed.iter().find(|part| part.unit == unit.unit) else {
+                continue;
+            };
+            let product = unit.lamp == manifest::PRODUCT_LAMP;
+            if product {
+                // A lamp-specific template always wins, regardless of order.
+                // Pinned installations never acquire a product current link.
+                if !part.program.linked
+                    || manifest.units.iter().any(|other| {
+                        other.unit == unit.unit
+                            && other.lamp == self.config.lamp
+                            && other.lamp != manifest::PRODUCT_LAMP
+                    })
+                {
+                    continue;
+                }
+            } else if unit.lamp != self.config.lamp {
                 continue;
             }
             let url = format!("{}{}", manifest.files_url, unit.file_name());
@@ -1255,6 +1298,15 @@ impl Run<'_, '_> {
             }
             let text = String::from_utf8(bytes)
                 .map_err(|_| Outcome::Refused(format!("{} is not text", unit.file_name())))?;
+            if product
+                && unit::linked(&text)
+                    != Some((part.program.builds.clone(), part.program.binary.clone()))
+            {
+                return Err(Outcome::Refused(format!(
+                    "the product's {} does not start {} through {}current",
+                    unit.unit, part.program.binary, part.program.builds
+                )));
+            }
             carried.insert(unit.unit.clone(), text);
         }
         Ok(carried)
