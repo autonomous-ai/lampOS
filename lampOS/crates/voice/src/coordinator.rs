@@ -5959,6 +5959,7 @@ fn conversation_with_gate_inner(
                             .with_language(language.as_deref())
                             .with_backchannel_holds(crate::stop_words::holds_backchannels())
                             .with_backchannel_debug(crate::stop_words::debugs_backchannels())
+                            .with_asides(crate::stop_words::holds_asides())
                     } else {
                         // Heard in a yield the source stays the default
                         // (`Processed`), so the gain is passed only when the
@@ -5970,6 +5971,7 @@ fn conversation_with_gate_inner(
                             ))
                             .with_language(language.as_deref())
                             .with_backchannel_debug(crate::stop_words::debugs_backchannels())
+                            .with_asides(crate::stop_words::holds_asides())
                     }
                 })
                 .map_err(|error| eprintln!("lamp-voice: stop words are not heard: {error}"))
@@ -6038,6 +6040,11 @@ fn conversation_with_gate_inner(
                 "lamp-voice: backchannel holds: a yield's commit waits for its words, up to {} ms after they are asked for, and a backchannel resumes the answer",
                 u16::from(lamp_audio::duplex::BACKCHANNEL_WORDS_WAIT_BLOCKS) * 10
             );
+            if crate::stop_words::holds_asides() {
+                eprintln!(
+                    "lamp-voice: asides hold: \"hmm\", \"interesting\", \"wow\" and \"nice\", alone or two together, are held as backchannels"
+                );
+            }
             true
         } else {
             eprintln!(

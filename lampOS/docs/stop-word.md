@@ -1045,6 +1045,20 @@ once that backchannels aren't held, and nothing changes. On lamp-52e6 on 22 Octo
   writes up to two words of a person's speech to the journal: not for a
   home lamp (lamp-52e6 on 23 October: "Right." committed as "1 word, not a
   stop phrase", and the journal could not say what was heard).
+- **Asides** (`LAMP_ASIDES_HOLD=on`, off unless set, and only with the
+  holds on): a remark a person makes to themselves or the room while the
+  lamp tells something is held as a backchannel. "interesting", "wow" and
+  "nice" join the English list (`ASIDES` in `voice/src/stop_words.rs`), and
+  "hm" or "hmm" alone counts too: "Hmm, interesting.", "Wow.", "Oh, nice.",
+  "Hmm." resume the story; "Hmm, wait.", "Interesting?" and "That's
+  interesting, tell me more." still commit. On lamp-52e6 on 25 October,
+  with the product unit's set (no `LAMP_STOP_WORDS`, no holds), a played
+  "Hmm, interesting." over a story yielded about 0.6 s after it began and
+  committed about 0.75 s later, before any words were known (`duplex_commit`
+  with `backchannel` null and `held_ms` 0), 4 of 4; the second route then
+  heard "Interesting." alone, held it as "a cut-in heard with no English
+  word in it" and asked again. The commit is where the story stops, so the
+  hold has to be the duplex one, which needs the yield's words.
 
 ### Privacy: what goes where
 
