@@ -24,9 +24,12 @@ records. A test shows it
 file under the lamp's root byte for byte the same, and systemd not asked).
 It publishes nothing on the bus at any setting, and with `--apply off` it
 does not even subscribe. The product unit already passes `--apply on`.
-The separate `LAMP_UPDATE_SELF`, `LAMP_UPDATE_MODELS`, `LAMP_UPDATE_APPLY`
-and `LAMP_UPDATE_IMAGE` switches remain off unless set to `on`; the product
-unit sets `LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` since 25 Oct (below); models and image files remain separate. The lamp trials below do not enable them elsewhere.
+The separate `LAMP_UPDATE_SELF`, `LAMP_UPDATE_MODELS` and `LAMP_UPDATE_IMAGE`
+switches remain off unless set to `on`. Explicit `LAMP_UPDATE_APPLY=off`
+also stays off; an absent apply switch can inherit the authenticated
+managed-product default described below. The product unit sets
+`LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` since 25 Oct; models and image
+files remain separate. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
@@ -375,11 +378,12 @@ replacement or guaranteed recovery from a lost runner. The old bytes are
 retained and no automatic deletion follows.
 
 `min_updater` remains a signed level, not the build sequence:
-`manifest::UPDATER` is 5 (2 reads models, 3 settings, 4 image, 5 reset plans).
-This workflow uses ordinary part/skill manifests, without model, settings,
-image or reset-plan inputs, and does not enable any lamp extension switch. The existing
-manifest CLI can specify `--min-updater N`; it refuses a level above the
-carried updater or a build without `lamp-update`.
+`manifest::UPDATER` is 6 (2 reads models, 3 settings, 4 image, 5 reset plans,
+6 product service units). With its product deploy tree, this workflow now
+carries ordinary service templates, allowlisted settings and the reset plan
+by default. Models and image inputs remain separate; publication does not
+enable their lamp switches. The manifest CLI can specify `--min-updater N`;
+it refuses a level above the carried updater or a build without `lamp-update`.
 
 ### Verification and ownership
 
