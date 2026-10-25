@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/usr/local/bin/podman",
+    "exec",
+    "fe2153c8018706aab0ba88acde0e913c88c560e93137ccd37e63fdadd601db85",
+    "sh",
+    "-ec",
+    "cd /worktree/lampOS; cargo metadata --offline --locked --format-version 1"
+  ],
+  "exit": 0,
+  "elapsed_s": 4.178618859004928,
+  "stop_reason": null
+}

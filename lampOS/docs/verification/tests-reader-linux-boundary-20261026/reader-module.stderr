@@ -1,0 +1,10 @@
+lamp-voice serve: session reader unavailable; metadata remains private
+lamp-voice serve: session reader unavailable; metadata remains private
+lamp-voice serve: session reader unavailable; metadata remains private
+early private reader refusal: FailureObservation { injected_grant_hit: false, injected_rollback_hit: true, apply_error: Some("untrusted session record (kind=PermissionDenied, os=None)") }; bounded=Report { acknowledged: true, finish_attempted: true, degraded: true, writer_failed: false, initialization_failed: false, dropped_events: 0, oversized_events: 0, written_events: 1, unconfirmed_events: 0, rotations: 0 }
+early private reader completion: Report { acknowledged: true, finish_attempted: true, degraded: true, writer_failed: false, initialization_failed: false, dropped_events: 0, oversized_events: 0, written_events: 1, unconfirmed_events: 0, rotations: 0 }; bounded=Report { acknowledged: true, finish_attempted: true, degraded: true, writer_failed: false, initialization_failed: false, dropped_events: 0, oversized_events: 0, written_events: 1, unconfirmed_events: 0, rotations: 0 }
+lamp-voice serve: metadata unavailable at startup; recording health degraded
+private rollback fixture: grant_hit=true rollback_hit=true apply_error=Some("injected reader grant failure (kind=Other, os=None)"); report=Report { acknowledged: false, finish_attempted: true, degraded: true, writer_failed: true, initialization_failed: true, dropped_events: 1, oversized_events: 0, written_events: 0, unconfirmed_events: 0, rotations: 0 }
+session reader setup iteration=0 elapsed_us=566 target_us=50000
+session reader setup iteration=1 elapsed_us=509 target_us=50000
+shared metadata enqueue: events=56 total_us=3521 per_event_us=62 target_per_event_us=1000; host only, no device claim

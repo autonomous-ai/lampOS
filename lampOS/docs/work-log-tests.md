@@ -1,5 +1,32 @@
 # Tests work log
 
+## 2026-10-26 06:45 — NoPause ready; Linux rollback boundary proven
+
+Ready for lamp-voice: yes (#3404); no (rollback fixture)
+
+[Current NoPause carry](verification/tests-no-pause-current-3d-20261026/) is
+pushed as d33523336 on current 3d9722f38, with equal range-diff and Mac
+fmt/strict twelve-crate Clippy/workspace build passing. Native ARM64
+40236466428 passed 7,455/0 with 53 skips and no leaks; Linux Clippy passed.
+Actual preview and authored trees are equal. Requested the final current-head
+read and marked the PR ready. The prior full serial 7,378/0/52 keeps its a6
+source; older failures remain recorded.
+
+[Linux rollback qualification](verification/tests-reader-linux-boundary-20261026/)
+passed 14/0/1 once, with both late checkpoints observed and early-refusal
+private writer completion retained. Formatting, strict twelve-crate Clippy
+and workspace build passed. An independent source/receipt read found no P1/P2.
+The required full twelve-package test gate is now active on the same source,
+one compiler, serial tests, UID 1000 AMD64 container, debug information zero.
+No privileged DAC, full-suite or ARM64 result is claimed for this fixture yet.
+
+Preservation and reviewed cleanup completed: archived generated cache verified
+member-by-member; all 22 private worktree source/index states and six protected
+witnesses unchanged. Evidence and frozen executables moved outside target.
+Cargo clean removed only 18,265 generated files (13.1 GiB); old controllers
+pointing into that cache are retired. Current gates use new targets. #3466
+still needs a product-installed GOOD/BAD lamp owner; no device action ran.
+
 ## 2026-10-26 02:50 — NoPause reader gate reserved; rollback fixture source prepared
 
 Ready for lamp-voice: no

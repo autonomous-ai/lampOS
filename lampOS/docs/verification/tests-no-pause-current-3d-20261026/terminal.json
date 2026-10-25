@@ -1,0 +1,11 @@
+{
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "clippy": "PASS",
+  "current_checks": "fmt/clippy/workspace build passed; full test receipt stays on reader frozen a6 tree",
+  "fmt": "PASS",
+  "head": "d335233367cd33c12af414767bd41b1dfebef937",
+  "runtime_tests": "UNRUN",
+  "selected_runtime_fresh": true,
+  "test_cases_allocated": 0,
+  "workspace_build": "PASS"
+}

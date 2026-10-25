@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "source": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "affected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "selected_reader_cases": 15,
+  "module_observations": 1,
+  "architecture": "Linux AMD64 container",
+  "debug_info": 0,
+  "source_unchanged": true,
+  "full_voice_suite": "UNRUN",
+  "ARM64": "UNRUN"
+}

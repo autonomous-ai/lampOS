@@ -1,0 +1,8 @@
+uid=1000(1000) gid=1000(1000) groups=1000(1000)
+x86_64
+cargo 1.96.0 (30a34c682 2026-05-25)
+rustc 1.96.0 (ac68faa20 2026-05-25)
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda4        40G   26G   14G  66% /target
+tmpfs           3.9G     0  3.9G   0% /tmp
+drwxr-xr-x. 2 1000 1000 6 Oct 25 21:40 /target

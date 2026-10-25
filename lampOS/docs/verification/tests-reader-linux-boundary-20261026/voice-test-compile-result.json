@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/usr/local/bin/podman",
+    "exec",
+    "fe2153c8018706aab0ba88acde0e913c88c560e93137ccd37e63fdadd601db85",
+    "sh",
+    "-ec",
+    "cd /worktree/lampOS; exec cargo test --offline --locked -p lamp-voice --lib --no-run --jobs 1 --message-format=json"
+  ],
+  "exit": 0,
+  "elapsed_s": 337.40285982299247,
+  "stop_reason": null
+}

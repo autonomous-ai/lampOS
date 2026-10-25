@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/usr/local/bin/podman",
+    "exec",
+    "fe2153c8018706aab0ba88acde0e913c88c560e93137ccd37e63fdadd601db85",
+    "sh",
+    "-ec",
+    "cd /worktree/lampOS; cargo fmt --all --check"
+  ],
+  "exit": 0,
+  "elapsed_s": 14.09726559201954,
+  "stop_reason": null
+}

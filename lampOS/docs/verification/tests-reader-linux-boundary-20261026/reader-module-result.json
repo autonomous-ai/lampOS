@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "/usr/local/bin/podman",
+    "exec",
+    "fe2153c8018706aab0ba88acde0e913c88c560e93137ccd37e63fdadd601db85",
+    "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-a9031edb52550e8e",
+    "session_reader::tests::",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "exit": 0,
+  "elapsed_s": 2.0622434209799394,
+  "stop_reason": null
+}

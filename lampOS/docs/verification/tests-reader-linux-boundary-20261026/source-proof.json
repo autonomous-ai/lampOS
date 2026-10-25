@@ -1,0 +1,25 @@
+{
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "status": " M lampOS/crates/voice/src/session_reader.rs\n M lampOS/crates/voice/src/session_reader/tests.rs\n M lampOS/docs/realtime-tests.md\n",
+  "source_entries": 10564,
+  "source_manifest_sha256": "d5fa2dac0be291ae4b2eab5065a46224e13097dcb3a291b8bd9a152b2d0dfe19",
+  "source_before_equals_after": true,
+  "changed_files": {
+    "lampOS/crates/voice/src/session_reader.rs": {
+      "sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c",
+      "mode": 33188,
+      "mtime_ns": 1792961978868064503
+    },
+    "lampOS/crates/voice/src/session_reader/tests.rs": {
+      "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+      "mode": 33188,
+      "mtime_ns": 1792961978868709506
+    },
+    "lampOS/docs/realtime-tests.md": {
+      "sha256": "58e22a21096070a2bd5a0cc73d413a903c7da8820c10e3e976cb03bf2eeef467",
+      "mode": 33188,
+      "mtime_ns": 1792961978869411729
+    }
+  },
+  "frozen_elf_sha256": "4cebc314ef007405a3f08368670db7643058fdfdf1d3598f1a7e91e33b0c1047"
+}
