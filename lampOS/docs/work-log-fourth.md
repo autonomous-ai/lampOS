@@ -1,3 +1,13 @@
+## 2026-10-25 21:02 — Memory privacy repair entering runtime gates
+
+Ready for lamp-voice: no
+
+The room-only forget repair on 86416a0d3 passed `cargo fmt --all --check` and strict `cargo clippy -p lamp-memory -p lamp-voice-eval --all-targets -- -D warnings` with Rust 1.96.0, ordinary profiles and one job. Both selected crates compiled freshly after supported invalidation of the 46 local workspace package names. The frozen source, index and preserved failed Voice driver stayed unchanged; both commands exited zero and their groups closed. The workspace build is now running. Full Memory, VoiceEval and the first/repeated fixed-binary protocol check remain unrun; the old deletion failure remains recorded.
+
+Onboarding #3472's current Mac full Voice finished 4,045 passed, 2 failed and 21 ignored; all 125 onboarding cases passed. The failures are `ring_unplug::tests::actual_resting_and_speaking_frames_show_asleep_before_receipt` and `ring_unplug::tests::explicit_light_off_cannot_prepare_or_acknowledge_asleep`, in unchanged base source. Formatting, strict workspace Clippy and the prerequisite workspace build passed, but thirteen later stages were not run. The complete ring group from the original executed driver subsequently passed once, 4/0/0 in 0.259 s, without a rebuild or source change. This diagnostic does not replace the failed full suite or establish its cause. The separately audited native ARM64 and Linux Clippy results remain green. Parent #3437's landing and First's assigned two-person trial still hold activation.
+
+Common #3064, Callback #3391, Name #3014 and Photo #2988 now have separate source carries onto 86416a0d3, with formatting and diff checks but no new compiler/runtime qualification. Photo preserves the current product function census; its new comparison checks installed and consent-off/on lists without assuming an old count. Common's next source composition is being prepared against the pending train, separately from Main. All published held heads and their original failures remain traceable; no lamp was touched.
+
 ## 2026-10-25 20:28 — Current onboarding native gates passed
 
 Ready for lamp-voice: no
