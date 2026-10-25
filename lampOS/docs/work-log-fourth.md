@@ -1,3 +1,11 @@
+## 2026-10-25 22:46 — Room-only forget privacy repair landed
+
+Ready for lamp-voice: yes (#3484, landed through #3487)
+
+The existing room-only forget operator now stops at private ownership in either replacement direction. [#3484](https://github.com/autonomous-ai/lampOS/pull/3484) landed through train 136 on ad9f1cb77. The rebase from 6bfbfe096 to 1dfa60f18 was equal, with no authored change; its fresh formatting passed. Current-head ARM64 40207492531 and Linux Clippy 40207492661 are green, as are train ARM64 40207134196 and Clippy 40207134190. Exact native counts are being audited separately from the preceding head's 11,290 PASS and one existing journal LEAK. Reviewer-three carried READ-OK; reviewer-two's independent full Memory/VoiceEval gate passed 950/0/8 with no P1/P2. Local socket checks, scope limits and original failure evidence remain in the verification note. No lamp result is claimed.
+
+Onboarding's earlier current-base formatting and strict workspace/all-target Clippy completed zero, with all owned groups closed. Its ten-file activation-only source now moves onto actual train 136 before the workspace build and thirteen affected/dependent suites. Second used the released compiler job for the stable-promotion helper and returned it after its successful narrow gate; Fourth has reclaimed that one job. First still assigns the successful consenting two-person enrollment/cancellation trial. Common, Callback, Name and Photo have separate prepared source carries, with their runtime and acceptance holds unchanged.
+
 ## 2026-10-25 22:25 — Private memories survive room-only forget
 
 Ready for lamp-voice: no
