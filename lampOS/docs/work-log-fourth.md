@@ -1,3 +1,9 @@
+## 2026-10-25 14:31 — Onboarding guard implemented on current release source
+
+Ready for lamp-voice: no
+
+The nine-file product change enables the existing speaking-face guard in both peers and asks for consent plus the person's direct self-introduction in one line. It carries #3437/#3450 onto train 120; all six prerequisite commits compare equal by range-diff. The independent source read found no new P1/P2. Actual workspace formatting passed; strict workspace Clippy and full affected/reverse-dependency gates are in progress on one compiler job. The first launcher attempt failed before any compiler or test operation and remains recorded; its interface error is corrected. Native CI and the two-person lamp trial remain pending. The prepared activation stays unqualified until those results; no lamp was touched.
+
 ## 2026-10-25 14:13 — Taken: onboarding face guard for release
 
 Ready for lamp-voice: no
