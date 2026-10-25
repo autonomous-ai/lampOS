@@ -1,3 +1,13 @@
+## 2026-10-25 23:32 — Onboarding compile passed; recovering test-build disk space
+
+Ready for lamp-voice: no (#3472)
+
+On frozen ad9f1cb77, `cargo fmt --all --check`, strict workspace/all-target Clippy and `cargo build --workspace` passed, with unchanged ten-file source and all owned groups closed. The following thirteen-package nextest discovery failed while Cargo wrote Keeper's incremental cache: the shared disk was full. No runtime case, custom-harness case or doctest ran. The original failed attempt and four independent executable witnesses are retained; a separate closure check confirms its session is empty. Only Fourth's disposable incremental caches are being reclaimed before continuing the unrun test build with ordinary profiles and zero retries. The two-person onboarding trial still needs First to assign its lamp owner.
+
+Memory #3484 is landed through train 136. The audited current PR native result is 11,290 PASS plus one tracked journal LEAK, zero failed and 106 skipped; the train result is 11,293 PASS plus that LEAK, zero failed and 106 skipped. Both Linux Clippy gates passed. A previous carry note overstated unchanged test inputs: VoiceEval embeds `docs/switches.md`, which changed. The public note and PR body now say so; the two actual switch-census cases passed in the current native run. Earlier local full-suite counts retain their original source identity.
+
+Fourth's clean root branch is now fast-forwarded to 56cacbddd and its builder rules match origin. Common and its children retain their separate prepared source; current execution evidence is not transferred to them.
+
 ## 2026-10-25 22:46 — Room-only forget privacy repair landed
 
 Ready for lamp-voice: yes (#3484, landed through #3487)
