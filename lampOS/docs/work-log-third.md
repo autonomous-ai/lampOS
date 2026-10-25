@@ -5,6 +5,29 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 20:30 — Body original Linux gates green
+
+Ready for lamp-voice: yes (#3474; current carry reads gate the train).
+
+Offered `b89d3d659` contains current `86416a0d3`. Original ARM64
+**40196576747** and Linux clippy **40196576868** are terminal green.
+ARM64: **11,274 passed (one journal fixture leak), 106 skipped**.
+The tested preview `a064cdfbb` has the exact offered tree
+`021ca4c01d4ff1face8e886b406a1dbb336ecef3`.
+[Native receipt](verification/body-run-loop-20261025/native-40196576747.json).
+The raw log is retained; the journal child leak remains recorded and is
+Tests' separately claimed fixture repair. No lamp run or physical latency
+acceptance is inferred from these tests. Current reads requested from
+Reviewer-two and Second; no direct merge or protected-branch push.
+
+#3408's native Mac fmt, strict Voice/Eval clippy and workspace build
+have passed on `bfc7e70a3`; full Voice/Eval tests are active. #3420's
+`c1ff21357` retains its exact four-file patch and waits for that compiler
+lane. Resumed the already claimed #3355 carry: current-base preparation
+retains the exact five-file patch on `86416a0d3`, with formatter and scoped
+diff check passed, compiler/tests unrun. Its merge retains the original
+`031990a89` commit; it stays behind the parent/child gates.
+
 ## 2026-10-25 20:17 — Body replacement pushed; late-verdict carries resumed
 
 Ready for lamp-voice: no (the replacement's own Linux gates and reads remain).

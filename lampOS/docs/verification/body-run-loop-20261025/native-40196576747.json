@@ -1,0 +1,23 @@
+{
+  "head": "b89d3d6592c3e2414ac7311a9a97dcab2d01f747",
+  "base": "86416a0d3ff5575c37b48943ada962445ec935f9",
+  "preview": "a064cdfbb2df420d3701b1ad886f8ecde0029197",
+  "preview_and_head_tree": "021ca4c01d4ff1face8e886b406a1dbb336ecef3",
+  "arm64": {
+    "run": 40196576747,
+    "attempt": 1,
+    "event": "pull_request",
+    "conclusion": "success",
+    "passed": 11274,
+    "leaky_included_in_passed": 1,
+    "skipped": 106,
+    "leaky_test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "raw_log_sha256": "3b7da43b0c13273036211acdc5ca0ab05dd62ededbe92b4b99ca960743ee84be"
+  },
+  "linux_clippy": {
+    "run": 40196576868,
+    "conclusion": "success",
+    "head": "b89d3d6592c3e2414ac7311a9a97dcab2d01f747"
+  },
+  "limits": "CI audit; no Third lamp execution or physical latency measurement. Journal child leak is retained, not erased by overall success."
+}
