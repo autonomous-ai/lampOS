@@ -1,0 +1,123 @@
+{
+  "audited_at": "2026-10-26T02:18:32+07:00",
+  "failure_analysis": {
+    "assertion": "report.initialization_failed && report.degraded && report.dropped_events == 1",
+    "assertion_source": "lampOS/crates/voice/src/session_reader/tests.rs:531",
+    "classification": "Missing fixture precondition: the test does not witness reaching grant step 12; the observed verified-private fallback differs from intended incomplete rollback.",
+    "early_refusal": "Fallible parent/path/ACL checks and syscalls precede grant step 12. An earlier failure while the outer session is private can return verified-private Ok(false) after rollback.",
+    "exact_early_cause": "Unknown: the original apply error is discarded and injection stage/report values are not printed.",
+    "intended_injection": {
+      "grant_failure_step": 12,
+      "outer_gate_open_step": 11,
+      "skipped_rollback_chmod_step": 0
+    },
+    "observed_stderr": "lamp-voice serve: session reader unavailable; metadata remains private",
+    "possible_mechanism_not_proven": "no_acl compares ancestor ctime before and after ACL inspection. Concurrent changes to a shared ancestor can trigger safe refusal; this log does not prove that happened.",
+    "printed_report_field_values": null,
+    "prior_source_report": "https://github.com/autonomous-ai/lampOS/pull/3394#issuecomment-6386376127",
+    "production_effect": "Verified private fallback keeps logging with degraded reader health. Unverified rollback still returns Err and disables metadata; no caller/privacy regression is demonstrated by this failure.",
+    "writer_branch": "The observed warning and Ok(reader) test input identify grant Ok(false). The active writer report hardcodes initialization_failed=false; this is not explained solely by a finish-counter race."
+  },
+  "full_log_bytes": 2364533,
+  "full_log_sha256": "1e5573d867451cb7edbaf7910e3e85cb76b7568bf5611f9d950c0b1e3ee73e75",
+  "nextest": {
+    "announced_binaries": 179,
+    "excluded_post_summary_echoes": {
+      "FAIL": 1,
+      "PASS": 23,
+      "all_already_counted": true
+    },
+    "executed_tests": 10004,
+    "failure": {
+      "binary": "lamp-voice",
+      "case": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "denominator": 11308,
+      "duration": "0.008s",
+      "ordinal": 10001,
+      "status": "FAIL"
+    },
+    "ordinals": {
+      "each_exactly_once": true,
+      "maximum": 10004,
+      "minimum": 1
+    },
+    "running_cases_completed_after_cancellation": 3,
+    "selected_tests": 11308,
+    "selected_tests_unrun_after_failure": 1304,
+    "skipped_binaries": 2,
+    "skipped_tests": 106,
+    "summary": "2026-10-25T19:09:11.7196675Z      Summary [ 193.639s] 10004/11308 tests run: 10003 passed, 1 failed, 106 skipped",
+    "terminal_counts": {
+      "FAIL": 1,
+      "LEAK": 0,
+      "PASS": 10003,
+      "TIMEOUT": 0
+    },
+    "unique_binary_test_pairs": 10004
+  },
+  "run": {
+    "attempt": 1,
+    "conclusion": "failure",
+    "databaseId": 40224140937,
+    "headSha": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+    "job": {
+      "completedAt": "2026-10-25T19:09:14Z",
+      "conclusion": "failure",
+      "databaseId": 121261831451,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "startedAt": "2026-10-25T19:03:00Z",
+      "status": "completed",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140937/job/121261831451"
+    },
+    "later_steps": [
+      {
+        "conclusion": "skipped",
+        "name": "doc tests and the own-harness tests (nextest runs neither)"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "export only current Cargo targets and their SHA-256"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140937/attempts/1"
+  },
+  "schema": 1,
+  "scope": "Retained failed attempt 1 of follow-up PR #3503. No rerun for this audit; later attempts are separate evidence.",
+  "separate_success": {
+    "actual_checkout": "000f71af11cbf7fe5357c42001f599fea5dddfd5",
+    "attempt": 1,
+    "head": "4ace70555becb72bb6ddfa9624474e921c0f2a7c",
+    "log_sha256": "19e21b1fc1faa23f07ca965aa0ae3a249ad770ee9f76d839862f648496c012dd",
+    "result": {
+      "failed": 0,
+      "leaky": 0,
+      "passed": 11308,
+      "skipped": 106
+    },
+    "run": 40222685198,
+    "same_case_literal_pass": "2026-10-25T18:58:07.6734096Z         PASS [   0.006s] (10000/11308) lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+    "scope": "Separate earlier execution on equal source. It does not establish why attempt 1 failed or turn the failed attempt into success.",
+    "whole_tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2"
+  },
+  "source": {
+    "actual_checkout": "fdda2e3eecfa647460696759afa505c29e0c686c",
+    "checkout_base": "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+    "checkout_tree_source": "https://api.github.com/repos/autonomous-ai/lampOS/commits/fdda2e3eecfa647460696759afa505c29e0c686c",
+    "event_head": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+    "event_head_and_checkout_tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "identical_blobs": {
+      ".github/workflows/lampos-arm64.yml": "70afefeaec5a28c8e5aff539dd1d8d537d098560",
+      "lampOS/.config/nextest.toml": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+      "lampOS/crates/voice/src/service_trace.rs": "a752cd988686fc724bca573f76f03edf90f24a82",
+      "lampOS/crates/voice/src/session_reader.rs": "66e7f75a9640560271b439a9bbabad02d966bc29",
+      "lampOS/crates/voice/src/session_reader/tests.rs": "4cbeab4bc7300d3d880b91fac31748f292f7582f",
+      "lampOS/crates/voice/src/session_state.rs": "9071bfc0ea47b3317c9120baaaaa9a9057d1b609"
+    },
+    "unchanged_comparison_heads": [
+      "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+      "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+      "4ace70555becb72bb6ddfa9624474e921c0f2a7c"
+    ]
+  }
+}

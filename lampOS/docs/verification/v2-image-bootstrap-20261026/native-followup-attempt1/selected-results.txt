@@ -1,0 +1,11 @@
+2026-10-25T19:03:38.0880619Z fdda2e3eecfa647460696759afa505c29e0c686c
+2026-10-25T19:05:58.0809292Z     Starting 11308 tests across 179 binaries (106 tests and 2 binaries skipped)
+2026-10-25T19:09:09.5627597Z         FAIL [   0.008s] (10001/11308) lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata
+2026-10-25T19:09:09.5637831Z     lamp-voice serve: session reader unavailable; metadata remains private
+2026-10-25T19:09:09.5639351Z     assertion failed: report.initialization_failed && report.degraded && report.dropped_events == 1
+2026-10-25T19:09:09.5640335Z   Cancelling due to test failure: 3 tests still running
+2026-10-25T19:09:09.5706094Z         PASS [   0.009s] (10002/11308) lamp-voice session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup
+2026-10-25T19:09:10.3972583Z         PASS [   3.843s] (10003/11308) lamp-voice second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room
+2026-10-25T19:09:11.7174681Z         PASS [   3.623s] (10004/11308) lamp-voice second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short
+2026-10-25T19:09:11.7196675Z      Summary [ 193.639s] 10004/11308 tests run: 10003 passed, 1 failed, 106 skipped
+2026-10-25T19:09:11.7304603Z warning: 1304/11308 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)
