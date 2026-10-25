@@ -31,7 +31,12 @@ pub const SCHEMA: u32 = 1;
 /// it is refused whole, before anything is fetched or written. 2: the
 /// build's `models` (#1680). 3: its `settings` (#1680). 4: the image's
 /// own files, `image` (#1369). 5: the reset plan, `reset_plan` (#806).
-pub const UPDATER: u64 = 5;
+/// 6: ordinary product service units carried under [`PRODUCT_LAMP`].
+pub const UPDATER: u64 = 6;
+/// Reserved lamp marker for the product's ordinary service templates.
+pub const PRODUCT_LAMP: &str = "product";
+/// Older updaters do not select product-marked units.
+pub const PRODUCT_UNITS_UPDATER: u64 = 6;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
@@ -116,8 +121,8 @@ pub struct File {
     pub size: u64,
 }
 
-/// One unit of one lamp's own folder (`deploy/<lamp>/<unit>`), as the build
-/// carries it. In the channel's folder it is `<lamp>.<unit>`.
+/// One unit of a lamp's own folder, or an ordinary product service under
+/// [`PRODUCT_LAMP`]. In the channel's folder it is `<lamp>.<unit>`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Unit {
@@ -763,6 +768,11 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
     }
     let mut units = std::collections::BTreeSet::new();
     for unit in &manifest.units {
+        if unit.lamp == PRODUCT_LAMP && manifest.min_updater.unwrap_or(1) < PRODUCT_UNITS_UPDATER {
+            return Err(refused(format!(
+                "a build with product units needs min_updater {PRODUCT_UNITS_UPDATER} or more"
+            )));
+        }
         if !is_token(&unit.lamp) || !is_unit_name(&unit.unit) {
             return Err(refused(format!(
                 "{:?} of {:?} is not a unit of a lamp",
@@ -1032,6 +1042,53 @@ mod tests {
         let (opened, kept) = open(&envelope, &public(&key)).unwrap();
         assert_eq!(opened, manifest());
         assert_eq!(kept, bytes);
+    }
+
+    #[test]
+    fn product_units_require_the_signed_updater_level_before_older_readers_select_them() {
+        let key = throwaway();
+        let original = manifest();
+        let original_bytes = serde_json::to_vec(&original).unwrap();
+        assert_eq!(parse(&original_bytes).unwrap(), original);
+        assert!(
+            !String::from_utf8(original_bytes)
+                .unwrap()
+                .contains("min_updater")
+        );
+
+        let mut product = original;
+        product.units[0].lamp = PRODUCT_LAMP.into();
+        for level in [None, Some(PRODUCT_UNITS_UPDATER - 1)] {
+            product.min_updater = level;
+            let why = parse(&serde_json::to_vec(&product).unwrap()).unwrap_err().0;
+            assert!(why.contains("product units needs min_updater 6"), "{why}");
+        }
+        product.min_updater = Some(PRODUCT_UNITS_UPDATER);
+        let bytes = serde_json::to_vec(&product).unwrap();
+        let envelope = seal(&bytes, &key).unwrap();
+        let why = open_as(&envelope, &public(&key), PRODUCT_UNITS_UPDATER - 1)
+            .unwrap_err()
+            .0;
+        assert!(why.contains("needs updater 6"), "{why}");
+        assert_eq!(open(&envelope, &public(&key)).unwrap(), (product, bytes));
+
+        let mut changed: serde_json::Value = serde_json::from_slice(&envelope).unwrap();
+        let mut payload: serde_json::Value = serde_json::from_slice(
+            &STANDARD
+                .decode(changed["manifest"].as_str().unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        payload["min_updater"] = 5.into();
+        changed["manifest"] = STANDARD
+            .encode(serde_json::to_vec(&payload).unwrap())
+            .into();
+        assert_eq!(
+            open_as(&serde_json::to_vec(&changed).unwrap(), &public(&key), 5)
+                .unwrap_err()
+                .0,
+            "the signature does not match the manifest"
+        );
     }
 
     #[test]

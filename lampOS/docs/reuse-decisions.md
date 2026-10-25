@@ -160,6 +160,19 @@ keeps GitHub credentials and promotion commands out of the lamp runtime.
 The default feed and product units remain unchanged until their owner
 activates the stable feed. Offline failure tests are not a lamp trial.
 
+## Carry product services through the existing update transaction (2026-10-25)
+
+V1's `system/bootstrap/recovery.go` recovers an unfinished update before
+version detection. `scripts/provision/software-update` records absent files
+as well as backups and checks signed OTA metadata before installation.
+Keep those safeguards through the existing Rust signed manifest, journal,
+exact unit/link fallback and settings helper rather than adding another
+installer. The service carrier adds a reserved product entry and updater
+level 6; the helper's signed settings and recovery records stay compatible.
+Local tests cover selection, corruption and fallback, not a played device
+update. The fixed updater fallback restores links only, so this carrier
+does not replace its own service or auxiliary systemd units.
+
 ## Bind the requested name to the speaker's own declaration (2026-10-24)
 
 The V1 self-enrollment camera flow assumes the requester is the subject and

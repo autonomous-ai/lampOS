@@ -101,6 +101,8 @@ manifest  writes DIR/manifest.json for the binaries in --binaries, the units of
           carried, and N is then at least 2.
           --settings on: the product's settings and tmpfiles are carried, and N is
           then at least 3; with them setup's reset plan, and N is then at least 5.
+          With --deploy/product present this is the default; --settings off
+          explicitly leaves them out. Ordinary product services require N >= 6.
           --image DIR: the image's own files of DIR (robots/lamp: its rootfs and each
           variant's override), each listed in --deploy's image/shipped.json, are
           carried, and N is then at least 4.
@@ -232,6 +234,24 @@ fn wanted<'a>(options: &'a BTreeMap<String, String>, name: &str) -> Result<&'a s
         .ok_or_else(|| format!("--{name} is needed"))
 }
 
+fn manifest_settings_on(deploy: &Path, choice: Option<&str>) -> Result<bool, String> {
+    match choice {
+        None => Ok(deploy.join(manifest::PRODUCT_LAMP).is_dir()),
+        Some("on") => Ok(true),
+        Some("off") => Ok(false),
+        Some(_) => Err("--settings is on or off".into()),
+    }
+}
+
+/// Only an absent switch may inherit the authenticated product default.
+/// An explicit off, invalid value, or non-UTF8 value never enables it.
+fn settings_switches(choice: Option<&std::ffi::OsStr>, self_switch: bool) -> (bool, bool) {
+    (
+        lamp_update::apply::on(choice.and_then(std::ffi::OsStr::to_str)),
+        choice.is_none() && self_switch,
+    )
+}
+
 fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(
         options,
@@ -262,13 +282,16 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
         }
     };
     // With the settings, setup's reset plan, in its own field (#806).
-    let (settings, reset_plan) = match options.get("settings").map(String::as_str) {
-        None | Some("off") => (Vec::new(), None),
-        Some("on") => (
+    let (settings, reset_plan) = if manifest_settings_on(
+        Path::new(wanted(options, "deploy")?),
+        options.get("settings").map(String::as_str),
+    )? {
+        (
             install::product_settings(),
             Some(install::reset_plan_setting()),
-        ),
-        Some(_) => return Err("--settings is on or off".into()),
+        )
+    } else {
+        (Vec::new(), None)
     };
     let models = match options.get("models") {
         None => Vec::new(),
@@ -586,6 +609,9 @@ fn config(
         .or_else(|| std::env::var(lamp_bus::ROOT_VARIABLE).ok())
         .unwrap_or_else(|| lamp_bus::DEFAULT_ROOT.to_owned());
     let running = running_folder(&root);
+    let self_switch = own::on(std::env::var(own::SWITCH).ok().as_deref());
+    let settings_env = std::env::var_os(lamp_update::apply::SWITCH);
+    let (settings, product_settings) = settings_switches(settings_env.as_deref(), self_switch);
     let config = Config {
         root,
         units: "/etc/systemd/system/".into(),
@@ -598,11 +624,12 @@ fn config(
         quiet_wait: seconds(options, "quiet-wait-s", 3600)?,
         watch: seconds(options, "watch-s", 60)?,
         keep_free: keep_free_mb * 1_000_000,
-        self_switch: own::on(std::env::var(own::SWITCH).ok().as_deref()),
+        self_switch,
         running,
         updater: manifest::UPDATER,
         models: lamp_update::models::on(std::env::var(lamp_update::models::SWITCH).ok().as_deref()),
-        settings: lamp_update::apply::on(std::env::var(lamp_update::apply::SWITCH).ok().as_deref()),
+        settings,
+        product_settings,
         image: lamp_update::image::on(std::env::var(lamp_update::image::SWITCH).ok().as_deref()),
     };
     Ok((
@@ -788,5 +815,51 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets.
         let _ = ears.listen(every);
+    }
+}
+
+#[cfg(test)]
+mod product_settings_tests {
+    use super::*;
+    use std::ffi::OsStr;
+
+    #[test]
+    fn manifest_defaults_follow_the_product_tree_but_explicit_choices_win() {
+        let folder = tempfile::tempdir().unwrap();
+        assert!(!manifest_settings_on(folder.path(), None).unwrap());
+        assert!(manifest_settings_on(folder.path(), Some("on")).unwrap());
+        std::fs::create_dir(folder.path().join(manifest::PRODUCT_LAMP)).unwrap();
+        assert!(manifest_settings_on(folder.path(), None).unwrap());
+        assert!(!manifest_settings_on(folder.path(), Some("off")).unwrap());
+        assert!(manifest_settings_on(folder.path(), Some("on")).unwrap());
+        assert!(manifest_settings_on(folder.path(), Some("auto")).is_err());
+    }
+
+    #[test]
+    fn only_an_absent_apply_switch_and_self_switch_allow_the_product_default() {
+        assert_eq!(settings_switches(None, true), (false, true));
+        assert_eq!(settings_switches(None, false), (false, false));
+        for self_switch in [false, true] {
+            assert_eq!(
+                settings_switches(Some(OsStr::new("on")), self_switch),
+                (true, false)
+            );
+            for value in ["off", "", "invalid"] {
+                assert_eq!(
+                    settings_switches(Some(OsStr::new(value)), self_switch),
+                    (false, false)
+                );
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_apply_value_is_present_and_never_enables_product_settings() {
+        use std::os::unix::ffi::OsStrExt;
+        assert_eq!(
+            settings_switches(Some(OsStr::from_bytes(&[0xff])), true),
+            (false, false)
+        );
     }
 }
