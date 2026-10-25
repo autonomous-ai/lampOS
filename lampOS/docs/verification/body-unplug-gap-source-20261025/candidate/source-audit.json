@@ -1,0 +1,16 @@
+{
+  "base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "source_only": true,
+  "runtime_and_other_test_bytes_unchanged": true,
+  "base_unplug_sha256": "6f5c57e6e8879b72d1633faadaa55e28fed144ed2c5fe0b0dd1c2bbee74817cf",
+  "candidate_unplug_sha256": "9df4671ed4c751f0c0148227dcdcdc9bc314095e8f3b47f2ab79a7f5b0e25392",
+  "changed_paths": [
+    "lampOS/crates/body/src/unplug.rs",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "fmt": "pass after correcting one initial line-wrap diagnostic",
+  "whitespace": "pass",
+  "clippy": "UNRUN",
+  "tests": "UNRUN",
+  "compiler_allocation": "none; Supervisor separate-target qualification is next after Cloud"
+}
