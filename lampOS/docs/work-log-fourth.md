@@ -1,3 +1,9 @@
+## 2026-10-25 16:47 — Onboarding expectation correction after the failed gate
+
+Ready for lamp-voice: no
+
+The full Voice run ended 4,017 passed / 25 failed / 21 ignored. Twenty-two onboarding failures compare the new consent invitation against the old shared test expectation; that test-only expectation is corrected, while the historical prompt oracle remains unchanged. Direct formatting and the independent 713-byte first/reoffer comparison pass; the corrected tests have not run. The other failures are two search/push fixture watchdogs and one privacy-reader host-stall assertion, retained without a waiver. The gate stopped before Update because free space fell below the five-GiB reserve, leaving 13 stages unrun. Failure executables and logs are being preserved before reclaiming build-cache space and running the corrected tests plus the unrun suites. No product PR or passing full gate is claimed.
+
 ## 2026-10-25 16:21 — Voice executing; Store source read completed
 
 Ready for lamp-voice: no
