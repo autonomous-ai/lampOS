@@ -1,0 +1,21 @@
+{
+  "head": "92511dc092d46ccb40ca156d7ba3dc41d7975e2e",
+  "base": "86416a0d3ff5575c37b48943ada962445ec935f9",
+  "preview": "93a259331b8c4ffccf576918416a2e83c5baf315",
+  "preview_and_head_tree": "e6fd13b1e490a5609fde3ee897f9fb5a29255c7c",
+  "arm64": {
+    "run": 40198533556,
+    "event": "pull_request",
+    "conclusion": "success",
+    "passed": 11277,
+    "leaky_included_in_passed": 1,
+    "skipped": 106,
+    "added_regressions_passed": 3,
+    "raw_log_sha256": "cc92013c4b3c5d139d5ee3d1636cfc4bba1d84a6955523a3d22c22fbb3e3d0ac"
+  },
+  "linux_clippy": {
+    "run": 40198533501,
+    "conclusion": "success"
+  },
+  "limits": "Original CI audit on this head/base only. Journal fixture leak retained; no lamp, physical latency or activation claim."
+}

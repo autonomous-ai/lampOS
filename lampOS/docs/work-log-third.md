@@ -5,6 +5,22 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 20:54 — Parent original Linux gates green
+
+Ready for lamp-voice: yes (#3408 and #3474; independent reads and train gates remain).
+
+#3408 `92511dc09` is current on `86416a0d3`. Original ARM64
+**40198533556** and Linux clippy **40198533501** passed. ARM ran
+**11,277 passed (one tracked journal fixture leak), 106 skipped**,
+including all three new regressions. Preview `93a259331` has exactly
+the offered tree `e6fd13b1e490a5609fde3ee897f9fb5a29255c7c`.
+[Native receipt](verification/carry-late-verdict-20261025/native-40198533556.json).
+The original log is retained; old failures and every previous execution
+keep their scope. Reviewer-three has READ-OK; Reviewer-two's independent
+gate/read continues. The PR is marked ready, with no activation or lamp
+claim. #3420's full local suite remains active, Body is in train 130, and
+the two-face carry and reminder-ordering diagnosis follow.
+
 ## 2026-10-25 20:51 — Parent carry pushed; Body enters train 130
 
 Ready for lamp-voice: yes (#3474, now in train 130; other pieces below are not ready).
