@@ -1,0 +1,112 @@
+{
+  "exit": 101,
+  "all_four_passed": false,
+  "observed_stages": 7,
+  "published_qualified_observation_count": 4,
+  "published_required_primary_observations": 4,
+  "source_stable": true,
+  "target_release_permitted": true,
+  "stages": [
+    {
+      "cleanup": true,
+      "counts": {
+        "failed": 1,
+        "ignored": 0,
+        "passed": 0
+      },
+      "exit": 101,
+      "primary": true,
+      "stage": "exact",
+      "variant": "baseline"
+    },
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "fmt",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "clippy",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "no-run",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "counts": {
+        "failed": 1,
+        "ignored": 9,
+        "passed": 518
+      },
+      "exit": 101,
+      "primary": true,
+      "stage": "full",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "counts": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      },
+      "exit": 0,
+      "primary": true,
+      "stage": "exact",
+      "variant": "candidate"
+    },
+    {
+      "cleanup": true,
+      "exit": 0,
+      "primary": false,
+      "stage": "workspace-build",
+      "variant": "candidate"
+    }
+  ],
+  "source_final": {
+    "baseline": {
+      "head": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+      "semantic_index_sha256": "38e7c209514a7755a96b12f6905c17186a32668dfeb82d385da0f0306b6ed807",
+      "source_files": 10446,
+      "source_stable": true,
+      "tree": "c5b58fe5507007068a15d7bec0a83b6ee453ea98"
+    },
+    "candidate": {
+      "head": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+      "semantic_index_sha256": "cc112a79271ad4f59204727e58ac6a2d13988cddfd50bc63f79ac77a53c963e0",
+      "source_files": 10446,
+      "source_stable": true,
+      "tree": "4d8aec77ca6f1b8a05d88e006d4f3790e075b6f9"
+    }
+  },
+  "private_terminal_sha256": "a5574ab67ede533b81fb67a6f72df7ae13133d26450b1bf16eaee325765a8d99",
+  "producer_patch_sha256": "c7495fa8ae6ecec00958acb26a0201277017e87e8f7e5775ea2a6b3327aea611",
+  "historical_baseline_full": {
+    "exit": 0,
+    "passed": 519,
+    "failed": 0,
+    "ignored": 9,
+    "qualification": "Separate read-only supplement; original wrapper terminal 125 retained, no rerun."
+  },
+  "cache_recovery": {
+    "saved_ELF_files_rehashed": 114,
+    "source_raw_context_and_witness_outside_target_untouched": true,
+    "original_observations_preserved": true,
+    "no_future_baseline_observation_authorized": true,
+    "cache_contents_removed": true,
+    "root_directory_identity_retained": true,
+    "free_after_bytes": 2104758272,
+    "target_files_remaining": 0,
+    "no_compilation_or_test_execution": true,
+    "private_receipt_sha256": "f7a1a051dd045cb91249809ac0f6da0bb215f0f6afe6d385f202c8fd7896c884"
+  }
+}

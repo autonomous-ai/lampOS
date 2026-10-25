@@ -1,3 +1,9 @@
+## 2026-10-25 08:06 — Skills fixed schedule terminal
+
+Ready for lamp-voice: no
+
+The four-observation Skills fixture schedule is complete: baseline full 519/0/9, baseline exact 0/1/0; candidate full 518/1/9, candidate exact 1/0/0. Candidate fmt, strict Clippy, no-run and workspace build passed; aggregate 101 and candidate HOLD remain. Sources and cleanup stayed valid. Tests owns the changed-source repair. [Selected terminal evidence](verification/skills-addon-drain-terminal-selected-20261025/) preserves the failure boundaries and hashes; raw context and executables stay private. The compiler lane is released, but disk remains below five GiB. Continuing the claimed chat hedge source/control review without another Skills sample.
+
 # Fourth builder's log
 
 Fourth writes `lamp-fourth` and works on `fourth/<task>`. The task list is
