@@ -657,10 +657,53 @@ pub fn someone_elses(speakers: &[String], person: &str, known: Option<(String, S
         .any(|id| theirs.as_deref() != Some(id.as_str()))
 }
 
+/// Whether a line admitted for `person`, or whose late look named them, is
+/// not theirs to be told, kept or forgotten for: the one rule every person
+/// scope taken from a line goes through (the line's own admission and a
+/// late look's keeper, `second_provider`). With `seen_only`
+/// (`LAMP_PERSON_SCOPE_SEEN=on`), unless their own face alone was seen
+/// speaking it ([`seen_saying`]): no face seen speaking is not theirs
+/// (reviewer-three's P1 and P2 on #3435). Without it, only when another
+/// face was ([`someone_elses`]), as before.
+pub fn not_theirs(
+    speakers: &[String],
+    person: &str,
+    known: Option<(String, String)>,
+    seen_only: bool,
+) -> bool {
+    if seen_only {
+        !seen_saying(speakers, person, known)
+    } else {
+        someone_elses(speakers, person, known)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use lamp_msgs::{Face, Speaking};
+
+    #[test]
+    fn with_person_scope_seen_a_line_no_face_was_seen_speaking_is_not_theirs() {
+        let lan = crate::known_faces::memory_person("A");
+        let known = || Some(("A".to_owned(), "f1".to_owned()));
+        let ids = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
+        // On: only their own face seen speaking keeps it theirs.
+        assert!(not_theirs(&ids(&[]), &lan, known(), true));
+        assert!(!not_theirs(&ids(&["f1"]), &lan, known(), true));
+        assert!(not_theirs(&ids(&["f2"]), &lan, known(), true));
+        assert!(not_theirs(&ids(&["f1", "f2"]), &lan, known(), true));
+        assert!(not_theirs(&ids(&["f1"]), &lan, None, true));
+        // Off: exactly `someone_elses`.
+        for speakers in [&[][..], &["f1"], &["f2"], &["f1", "f2"]] {
+            for pair in [known(), None] {
+                assert_eq!(
+                    not_theirs(&ids(speakers), &lan, pair.clone(), false),
+                    someone_elses(&ids(speakers), &lan, pair),
+                );
+            }
+        }
+    }
 
     fn faces(speaking: &[(&str, SpeakingState)]) -> Faces {
         Faces {

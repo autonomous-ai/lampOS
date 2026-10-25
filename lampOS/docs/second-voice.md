@@ -3285,6 +3285,25 @@ after a take-over, but now for every turn:
   goes on as the conversation, before the face is read, and stays carried.
   Risk: the owner turned to the lamp and asking, whose mouth the eyes read
   still through the whole line, needs its name or a follow-up.
+- **A line is a known person's only when their own face was seen speaking
+  it** (`LAMP_PERSON_SCOPE_SEEN=on`; with `LAMP_SECOND_SPEAKING_FACE`). Off,
+  a line admitted as the known person's is narrowed to the room only when
+  another face is seen speaking it (`speaking_faces::someone_elses`), so
+  with the owner silent in view an off-camera line is theirs: their
+  `forget_everything`, their observations (`FinishedExchange::whose`), and
+  a late look's keep (reviewer-three's P1 and P2 on #3435, Second's case).
+  With the switch, one rule, `speaking_faces::not_theirs`, decides both the
+  line's own admission and a late look's keeper: theirs only when their
+  face alone was seen speaking it (`seen_saying`), else the room's: `request
+  N: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN): told and kept as
+  the room's`. Every person scope taken from a line reads the lease this
+  narrows (`remember::forget_everything` and `forget_face_memory`, the
+  thread's exchanges, `tools.rs`' `keeper_within` and `run_scoped_for`), and
+  a narrowed lease never widens (`ScopeLease::late_open`). Risk: an owner
+  whose speaking read misses gets the room's scope for that line, so a
+  personal keep or forget is not done as theirs: `forget_everything`
+  refuses, and a keep is the room's, or withheld with
+  `LAMP_MEMORY_PERSONAL_NEEDS_FACE`.
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted
