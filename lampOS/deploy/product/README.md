@@ -42,6 +42,14 @@ What is one lamp's own is outside them:
 
 `lamp-update install` (docs/install.md) carries all of these inside it and puts them on a lamp.
 
+The proposed own-keys activation (#2846) remains **HOLD** for #2094's
+broker/account/TLS work and fresh activation acceptance. The existing
+`LAMP_SETTINGS_CHANGE=on` means enabling own keys opens the app's `keys.*`
+calls too; see [own-keys.md](../../docs/own-keys.md). The installer removes
+`lamp-voice.service.d/own-keys.conf` only if it is a regular file matching
+the exact historical template. It preserves edits, off overrides, links
+and other file kinds, and retries any reload debt after removal.
+
 Not here yet: the keeper's unit (asked of the fifth on #811), and
 `lamp-surround`, which no lamp runs.
 

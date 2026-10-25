@@ -1,4 +1,4 @@
-# A person's own keys (#2094, on in the product units, #2846)
+# A person's own keys (#2094, proposed product activation, #2846)
 
 Product lamps answer through the Autonomous relay and hold no provider key of
 the company's (the lead on #1711, 20 Oct 07:34). A person may bring their
@@ -7,22 +7,34 @@ and a **Deepgram** key for speech to text. Each is optional. With none, the
 lamp uses the relay, as before. The design was agreed on #2094 (El 09:42,
 the first builder 09:44, Third's privacy read 09:50).
 
-**`LAMP_OWN_KEYS=on`**, on three units, all set in the product's own
-units since #2846: `lamp-setup`, `lamp-cloud`, and `lamp-voice`, whose unit
-also loads the keys' folder (`LoadCredential=own:/etc/lampOS/voice/own`,
-with `ConfigurationDirectory=lampOS/voice/own`). Before #2846 the voice's
-half was a drop-in, `own-keys-voice.conf`, placed as
-`/etc/systemd/system/lamp-voice.service.d/own-keys.conf`. On a lamp that
-still has it, `lamp-update install` deletes it (`RETIRED_DROP_INS`, with
-systemd told), and the folder too only when nothing else is in it. `lamp-cloud`
-also needs `LAMP_CLOUD=on` and `LAMP_SETTINGS_CHANGE=on`, and the product
-leaves `LAMP_SETTINGS_CHANGE` off until its own lamp check: until then the
-app's `keys.*` are "not on this lamp", and a key comes only through setup.
+This proposed product change sets **`LAMP_OWN_KEYS=on`** in `lamp-setup`,
+`lamp-cloud`, and `lamp-voice`. Activation remains **HOLD** pending #2094's
+broker/account/TLS work and a fresh activation decision and lamp check on
+the current base; the earlier drop-in trial does not qualify this change.
+The voice unit also loads the keys' folder
+(`LoadCredential=own:/etc/lampOS/voice/own`, with
+`ConfigurationDirectory=lampOS/voice/own`).
+
+Before this change the voice's half was the shipped `own-keys-voice.conf`,
+placed as `/etc/systemd/system/lamp-voice.service.d/own-keys.conf`.
+`lamp-update install` removes only a regular file whose bytes exactly
+match that historical template (`RETIRED_DROP_INS`). Edited files, including
+an explicit `LAMP_OWN_KEYS=off`, symlinks and other file kinds stay. Removal
+is recorded as systemd reload debt before it happens and the parent is
+synced afterward; a failed reload is retried even though the file is gone.
+The folder is removed only when empty.
+
+`lamp-cloud` also needs `LAMP_CLOUD=on` and `LAMP_SETTINGS_CHANGE=on`.
+The product already sets both, so this proposal opens the app's `keys.set`,
+`keys.remove` and `keys.get` as well as setup's key fields. There is no
+remaining settings-off gate protecting those app calls. That is why this
+product activation remains held, rather than being qualified by the
+installer tests alone.
 The helper's units (`lamp-setup-keys.socket`, `lamp-setup-keys@.service`)
 are in `install`'s list, the socket enabled and the template never. The
 helper itself doesn't read the switch (its unit passes `--enable`): only
 `lamp-cloud` may ask, and `lamp-cloud` asks only with its switches on.
-Off (a unit's drop-in setting `LAMP_OWN_KEYS=off`), nothing changes:
+With `LAMP_OWN_KEYS=off` on all three units, each keeps its off behavior:
 setup checks and keeps nothing and says nothing new, the app's kinds are
 "not on this lamp", and the voice reads no person's key even if one is
 there.
