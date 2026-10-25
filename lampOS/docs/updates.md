@@ -26,7 +26,7 @@ It publishes nothing on the bus at any setting, and with `--apply off` it
 does not even subscribe. The product unit already passes `--apply on`.
 The separate `LAMP_UPDATE_SELF`, `LAMP_UPDATE_MODELS`, `LAMP_UPDATE_APPLY`
 and `LAMP_UPDATE_IMAGE` switches remain off unless set to `on`; the product
-unit sets `LAMP_UPDATE_SELF` since 25 Oct (below) and none of the others. The lamp trials below do not enable them elsewhere.
+unit sets `LAMP_UPDATE_SELF` and `LAMP_UPDATE_APPLY` since 25 Oct (below); models and image files remain separate. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
@@ -1198,7 +1198,7 @@ A build can carry the models its parts read (`models.rs`, #1680): a
 an optional `archive` for a file inside a pinned `.tgz`).
 `lamp-update manifest --models deploy/product/models.json` writes it and
 raises `min_updater` to 2 (`manifest::MODELS_UPDATER`), so an updater from
-before the field climbs first. The current `UPDATER` is 5. A manifest
+before the field climbs first. The current `UPDATER` is 6; a product service carrier raises the floor to 6. A manifest
 without models doesn't write the field and is byte for byte what it was.
 A model's path must be under `/opt/lampOS/`, neither the store nor in it, nor in a
 build's folder (a part with a 64-hex name) nor a `current` link itself, in
@@ -1265,7 +1265,54 @@ second copy. If every model changed at once, that would be 99.5 MB beside
 the old ones, plus the archive while it is unpacked, plus
 `--keep-free-mb`.
 
-### Settings and tmpfiles (`LAMP_UPDATE_APPLY`, off)
+### Product service units and settings over the air
+
+The publisher also carries the ordinary binary-backed services in
+`deploy/product/`, under the reserved manifest lamp name `product`.
+Their assets are `product.<unit>`, with the same signed SHA-256 and size
+checks as lamp-specific units. A product carrier needs updater level 6;
+an older updater first takes the carried updater through the existing
+self-update and confirmation path. Manifests without product entries keep
+their previous representation and behavior.
+
+A generic entry applies only to an already installed service started
+through its `current` link, with the same part folder and binary. An exact
+`deploy/<lamp>/` entry takes precedence regardless of manifest order.
+Pinned installations keep their lamp-specific unit handling. A product
+entry never adds or enables a missing part and never rewrites local
+drop-ins. Unit text, binary links and settings use the existing quiet
+switch, journal, health check and fallback; a failure restores the exact
+previous unit and link before restarting the old part.
+
+The carrier covers ordinary part services. It does not replace the
+updater's own service, the fixed fallback/helper units, targets, slices,
+timers or socket templates. In particular, the install-time fallback
+understands the updater's old link contract, not a backup of its service
+text; changing that contract requires a separately compatible fallback.
+Those exclusions are not claims of a complete systemd effective graph.
+
+`lamp-update manifest` now includes product settings and the reset plan
+by default when its deploy tree contains `product/`, as the release
+publisher's tree does. `--settings off` explicitly omits them; a deploy
+tree without a product folder keeps the old default. No key, credential,
+zone or lamp calibration is added to the settings allowlist.
+
+Fresh product installs explicitly set `LAMP_UPDATE_APPLY=on`. An existing
+product updater without that variable may apply a signed level-6 product
+carrier's settings only when self-update is enabled and its regular base
+service starts `update/current/lamp-update`. Explicit `off`, an unknown
+value, an unmanaged updater or an older non-product manifest keeps the
+old off behavior. This lets the existing settings helper operate after an
+updater climb without rewriting the updater's own service. Its signed
+settings request and fallback records keep their existing format.
+
+These changes add no work to Voice's input path. The existing quiet checks
+still gate actuator restarts; local fixtures use their fake clock and do
+not establish device timing, systemd sandbox behavior or power-cut safety
+on a shipped lamp.
+
+### Settings and tmpfiles (`LAMP_UPDATE_APPLY`)
+
 
 A build can carry the product's settings and tmpfiles (`apply.rs`,
 #1680): a `settings` list in the signed manifest, each entry `path`,
@@ -1277,7 +1324,7 @@ for the product skills' files under `/var/lib/lampOS/skills/`: those are
 guard, so one file never has two writers at the switch. Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
-(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 5.
+(`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 6; a product service carrier raises the floor to 6.
 A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
@@ -1400,10 +1447,11 @@ lamp-update-back as old as the lamp's install, as `self.json` is: their
 fields keep their meaning, a newer one may add fields, and each side
 ignores what it doesn't know. So does a setting in the manifest.
 
-Off, or absent: a build's settings aren't written, and the round says
-which (`build N's settings are not written (...): LAMP_UPDATE_APPLY=on is
-not set`). The rest of the build is taken as today. Users and groups
-aren't carried: a later step, when a build needs a new one.
+Explicit off, an invalid value, or absence outside the managed product
+carrier default leaves a build's settings unwritten. The round says which
+(`build N's settings are not written (...): LAMP_UPDATE_APPLY=on is not
+set`). The rest of the build is taken as today. Users and groups aren't
+carried: a later step, when a build needs a new one.
 
 ### Setup's reset plan (#806)
 
@@ -1417,7 +1465,7 @@ by install as "this lamp's own" and never carried by a round.
 - **Carried.** `lamp-update manifest --settings on` also writes
   `reset_plan`, the fixture `crates/setup/fixtures/reset-plan-product.json`
   as one setting (`install::reset_plan_setting`), 0644, and raises
-  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 5. It
+  `min_updater` to 5 (`manifest::RESET_PLAN_UPDATER`). `UPDATER` is 6. It
   is a field of its own, not in `settings`, for the image's reason: a
   lamp-update-back from before it refuses a setting path it doesn't know,
   and passes over a field it doesn't know. Its path must be the plan's,
@@ -2057,7 +2105,7 @@ test does (#1512):
   the body's start checks and the voice's first listening are not waited
   for. Until parts say ready (keeper.md), a first conversation after an
   update is the real check.
-- **Unit files that change between builds.** They are carried from
+- **Unit files that change between builds.** Ordinary linked product services now use the signed `product` carrier above; pinned and exact lamp-specific services are carried from
   `deploy/<lamp>/` of the build, which the first builder keeps by hand, and
   LAMP.md and the units there already disagree (LAMP.md says voice
   `d628ed1d`; `lamp-voice.service` names `c8ccd3dd...`). The build is
@@ -2123,13 +2171,11 @@ test does (#1512):
 - Settings and tmpfiles (`LAMP_UPDATE_APPLY`): tested on the Mac only
   (`apply.rs`, `tests/round.rs`), with lamp-update-apply called in the
   round's place of systemd. The unit's sandbox, `systemd-tmpfiles` and
-  `systemctl restart` of a one-shot haven't run on a lamp. No published
-  build carries settings yet.
+  `systemctl restart` of a one-shot haven't run on a lamp. The product publisher now includes settings; a published carrier and an attended settings switch still need device acceptance.
 - Setup's reset plan (#806): tested on the Mac only (`tests/round.rs`,
   `tests/install.rs`): a lamp with the plan of 19 Oct or of 20 Oct 10:36
   (lamp-0c89's), updated by a round, ends with the build's and a backup.
-  No round carrying the plan has run on a lamp, and no published build
-  carries it yet.
+  No round carrying the plan has run on a lamp. The product publisher now includes it with settings; this does not claim an attended published-plan switch.
 - The keeper,
   `lampos.target`, timers, models and libraries a build does not carry,
   configuration under `/etc/lampOS` (but for `second.json`, above), and a
