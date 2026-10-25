@@ -7709,6 +7709,15 @@ impl Sessions {
 /// ends, is still the line's. Two seconds, as the memory gives a client.
 const NOTE_AHEAD_WITHIN: Duration = Duration::from_secs(2);
 
+/// How long a turn waits for a note asked as it is told, not ahead: a run's
+/// first line, or the first after the person changed, has no line's time
+/// to read in. On lamp-4ace (48 h to 25 Oct 16:2x) all 56 such notes came
+/// late against the note's 300 ms, in a median 443 ms and at most 610 ms,
+/// so the first thing asked of a fresh session ("when does the plant need
+/// water?") was answered without what the lamp keeps. A note asked ahead
+/// still waits its 300 ms from the ask, long past by the line's end.
+const NOTE_TOLD_WITHIN: Duration = Duration::from_millis(900);
+
 /// How a Days note is read: its session number, whose (a person's memory
 /// id, or none for the room's), within how long, and whether its follow-up
 /// is read with it, for a turn already answered
@@ -7752,6 +7761,8 @@ struct NoteAsk {
     /// Let go when the camera or the microphone closed or opened: never
     /// told, though while it is still read no other is asked.
     void: bool,
+    /// Asked as a line began, not as its turn is told.
+    ahead: bool,
 }
 
 impl NoteAsk {
@@ -7812,6 +7823,18 @@ impl NoteAsk {
             waited: false,
             late: false,
             void: false,
+            ahead,
+        }
+    }
+
+    /// How long from the ask a turn waits for it: `first` (the note's 300
+    /// ms on the lamp) for one asked ahead, at least [`NOTE_TOLD_WITHIN`]
+    /// for one asked as the turn is told.
+    fn within(&self, first: Duration) -> Duration {
+        if self.ahead {
+            first
+        } else {
+            first.max(NOTE_TOLD_WITHIN)
         }
     }
 
@@ -7963,7 +7986,8 @@ impl Ahead {
     /// Just before a turn told in `lease` is built, which only an answered
     /// line is: its scope is the answered one now, the note asked for it if
     /// it is due and none is (someone else's answer let go), and what to
-    /// wait on, until `FIRST_READ` after that ask began (`within`). Reads
+    /// wait on, until `FIRST_READ` after that ask began (`within`), or
+    /// [`NOTE_TOLD_WITHIN`] for one asked now ([`NoteAsk::within`]). Reads
     /// nothing itself.
     fn ready_now(
         &self,
@@ -7990,7 +8014,7 @@ impl Ahead {
         asked.waited = true;
         Some((
             asked.done.clone(),
-            asked.at + self.within.0,
+            asked.at + asked.within(self.within.0),
             Arc::clone(&asked.answer),
         ))
     }
@@ -14347,6 +14371,30 @@ mod tests {
         assert_eq!(note(true), "note 2", "a new session asks again");
         assert_eq!(note(false), "note 2");
         assert_eq!(asked, [1, 2]);
+    }
+
+    /// A note asked as its turn is told (a run's first line) is waited for
+    /// [`NOTE_TOLD_WITHIN`] from the ask, past the note's 300 ms: on
+    /// lamp-4ace all 56 such notes in two days came late (a median 443 ms,
+    /// at most 610), so a fresh session's first question went without what
+    /// the lamp keeps. One asked ahead, as a line begins, keeps its 300 ms;
+    /// a longer wait given for a loaded test machine stands for both.
+    #[test]
+    fn a_note_asked_as_the_turn_is_told_is_waited_for_longer_than_one_asked_ahead() {
+        let ask: AskNote = Arc::new(|_, _, _, _| crate::remember::NoteRead::unavailable());
+        let ahead = Ahead::asking(Arc::new(Mutex::new(Sessions::default())), None, ask.clone());
+        let now = Instant::now();
+        let (_, until, _) = ahead
+            .ready_now(None, now)
+            .expect("a run's first turn asks its note");
+        assert_eq!(until.duration_since(now), NOTE_TOLD_WITHIN);
+        let first = crate::remember::FIRST_READ;
+        let asked = |ahead: bool| NoteAsk::start(1, None, (now, 1), &ask, ahead);
+        assert_eq!(asked(true).within(first), first);
+        assert_eq!(asked(false).within(first), NOTE_TOLD_WITHIN);
+        let loaded = Duration::from_secs(2);
+        assert_eq!(asked(true).within(loaded), loaded);
+        assert_eq!(asked(false).within(loaded), loaded);
     }
 
     /// #1693 (1), `LAMP_MEMORY_REOPEN_QUIET`: the same person back after ten

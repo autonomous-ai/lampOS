@@ -1502,6 +1502,11 @@ order is kept. A written turn is the same from the chat on.
     (`NOTE_AHEAD_WITHIN`). At the line's end the turn waits for it off the
     loop, never longer than what is left of 300 ms
     (`remember::FIRST_READ`) from the ask, not 300 ms more from the end.
+    A note asked as the turn is told waits up to 900 ms from that ask
+    (`NOTE_TOLD_WITHIN`): it has no line's time to read in, and on
+    lamp-4ace (48 h to 25 Oct) all 56 came late against 300 ms, in a
+    median 443 ms and at most 610 ms, so a fresh session's first question
+    was answered without what the lamp keeps.
     Only one read runs at a time: while one goes on no other starts, so a
     read the camera or the microphone voided holds the next back for up to
     its 2 s, and a turn whose own read cannot start keeps the note it had.
