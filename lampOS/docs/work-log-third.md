@@ -5,6 +5,40 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 23:27 — Reminder current carry published; child full gate running
+
+Ready for lamp-voice: no (#3491 current original Linux gates/readers pending).
+
+Draft #3491 is pushed at `868e8d72c` on latest `56cacbddd`. The d7 full
+remains **4,674/0/21** with all 7,062 source hashes fixed; old-code **0/1**
+and fixed focused **46/0** remain preserved. The equal ad9 carry passed
+fmt, strict Memory/Voice/Eval clippy, workspace build and **1,169/0/8**
+affected tests: Memory 327, worker 173, reminder/terminal/recovery 46, Eval 623.
+The 56c base delta is only the separate CI promotion tool/workflows/docs;
+all lampOS runtime/build inputs match ad9. Fresh current formatting, strict
+Memory/Voice/Eval/Update clippy, workspace build and workflow readers **2/0**
+passed before this push. [Separated proof](https://github.com/autonomous-ai/lampOS/tree/868e8d72c/lampOS/docs/verification/reminder-successor-boundary-20261025).
+
+Original earlier offered-head ARM **40210239270** and Linux clippy
+**40210239294** passed. Actual 56c+ef preview `4b116d518` has **11,296
+terminal passes including one tracked journal leak, 106 skipped**, both new
+controls passing. It differs from current 868 only in eight verification files.
+[Native receipt](verification/reminder-successor-boundary-20261025/native-40210239270.json).
+This is source identity, not a later-head execution or identical-binary claim.
+Current original ARM **40211578836** and Linux **40211578868** run separately.
+Reviewer-two found no source/proof P1/P2 on ef; current reads are requested.
+Second confirmed the separate reset/say production patch composes; both shared
+schedule-doc paragraphs must survive their eventual composition.
+
+#3420's current-parent full gate is now the sole compiler job on frozen
+`597fd5180` / 56c, both own commits equal. #3486's published d9/bf reader
+full failed **4,674/1/21** solely at light-call upper-middle 25.66326 ms
+against strict <25 ms; an identical-binary diagnostic passed at 3.5021 ms.
+Neither erases the failure or establishes its cause. It is a recurrence of
+Tests-owned **#3315**, already recorded there; no exemption was found.
+The two-face cadence P3 is corrected locally; runtime authored lines are exact.
+Its latest carry remains untested/unoffered while this child gate runs.
+
 ## 2026-10-25 22:48 — Late-verdict parent landed; child unblocked
 
 Ready for lamp-voice: yes (#3408 delivered through train136 #3487).

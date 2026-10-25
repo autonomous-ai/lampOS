@@ -1,0 +1,37 @@
+{
+  "offered_head": "ef1637d7d6b422fa1e375fea1d68a9421eb6d101",
+  "arm64_run": 40210239270,
+  "linux_clippy_run": 40210239294,
+  "conclusions": "Both success",
+  "executed_preview": "4b116d518f6bc5e83db2da62b4029151d91a7265",
+  "preview_tree": "31d26c530bdc99e032d5042f64d3f1f61b41cc12",
+  "preview_parents": [
+    "56cacbdddd84c85b49af564cb83d95c805c27958",
+    "ef1637d7d6b422fa1e375fea1d68a9421eb6d101"
+  ],
+  "passed": 11296,
+  "tracked_leaks_in_passed": 1,
+  "skipped": 106,
+  "unique_terminal_cases": 11296,
+  "repeated_equal_rows": 35,
+  "own_control_pass_counts": {
+    "a_settled_reminder_finishes_before_the_live_loop_admits_its_successor": 1,
+    "the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery_unacknowledged": 1
+  },
+  "raw_log_sha256": "804243387dcc2d64241c9b96fc453eb88641145bb039a2c83770f1adcc3bbec5",
+  "limits": "Original run on the old offered head and the actual recorded merge preview. Not relabelled as a later offered head. No lamp, acoustic latency or activation claim.",
+  "later_head_source_comparison": {
+    "head": "868e8d72ca6ab28335afdce7ed160154cb6da4f4",
+    "only_changed_paths": [
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-56cacbddd/README.md",
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-56cacbddd/gate-results.json",
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-56cacbddd/identity.json",
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-56cacbddd/test-results.txt",
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-ad9f1cb77/README.md",
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-ad9f1cb77/gate-results.json",
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-ad9f1cb77/identity.json",
+      "lampOS/docs/verification/reminder-successor-boundary-20261025/current-ad9f1cb77/test-results.txt"
+    ],
+    "limit": "Only verification records differ. This is source comparison, not another execution or binary identity claim."
+  }
+}
