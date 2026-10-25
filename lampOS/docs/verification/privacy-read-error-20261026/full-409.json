@@ -1,0 +1,85 @@
+{
+  "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+  "source_patch_sha256": "f043bdb9f1a614edb3b08803ef20ff76894aea650e22f33c25e5645ee2e58698",
+  "changed_source_sha256": {
+    "lampOS/crates/expression/src/runtime.rs": "ecc10ed90806472967453dde30ebca572ecde0ac9dc54780dd18b0bc3e284a99",
+    "lampOS/crates/expression/tests/it/rest_requests.rs": "de88407d77189a0bc90ba1ba0c402d897eb1615e16b31bee31aaeb498b7305cb",
+    "lampOS/crates/expression/tests/runtime.rs": "7ba4470c544843d9baac0d88474a83b72771b66af8f54093ca5cbcac60ac00cb",
+    "lampOS/docs/expression.md": "63b3f6288232a97a3b1c2201f1c13299324bea8cc2ec6994dc5370af59b4b099",
+    "lampOS/docs/reuse-decisions.md": "5faba7f0cec84db5d88dcefb7d230f72070e1bc19a0093907347fc519e79401e"
+  },
+  "frozen_source_count": 7122,
+  "frozen_manifest_sha256": "8ee61619ad9103edf53b386d81138f23233f2c5ad862b5f8f99cb61ff6ff4438",
+  "all_source_hashes_unchanged": true,
+  "packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T20:09:11Z",
+      "finished": "2026-10-25T20:09:23Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-25T20:09:23Z",
+      "finished": "2026-10-25T20:12:51Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-25T20:12:51Z",
+      "finished": "2026-10-25T20:16:45Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-all": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval -- --test-threads=1",
+      "started": "2026-10-25T20:16:45Z",
+      "finished": "2026-10-25T21:26:06Z",
+      "exit": 0,
+      "harnesses": 79,
+      "passed": 7380,
+      "failed": 0,
+      "ignored": 52,
+      "disk_error_lines": []
+    }
+  },
+  "own_control_pass_counts": {
+    "sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease": 1,
+    "rest_requests::live_privacy_read_error_refuses_rest_until_a_valid_open_lease": 1
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-all": "d65bba3eda287bdca6e2dff5b948aea195d767e57cd32b149113a71fa69de152"
+  },
+  "limits": "Native x86_64 Mac only. No local ARM64 link, lamp, physical privacy or latency acceptance. Later documentation clarifications are a separately compared delta."
+}

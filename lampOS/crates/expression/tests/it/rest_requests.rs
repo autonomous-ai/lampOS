@@ -796,6 +796,146 @@ fn live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_recei
 }
 
 #[test]
+fn live_privacy_read_error_refuses_rest_until_a_valid_open_lease() {
+    use lamp_msgs::MicrophonePrivacy;
+
+    let root = Root::new();
+    let bus = Bus::new(&root.0).unwrap().rescan_every(Duration::ZERO);
+    let mut service = runtime::Service::new(&bus, catalogue(), true, CLOCK)
+        .unwrap()
+        .with_rest_requests(&bus)
+        .unwrap();
+    let mut voice_publisher = bus
+        .publisher_declared(VoiceProgress::TOPIC, &VoiceProgress::declaration(), "voice")
+        .unwrap();
+    let mut joint_publisher = bus
+        .publisher_declared(JointState::TOPIC, &JointState::declaration(), "body")
+        .unwrap();
+    let mut privacy = bus
+        .publisher_declared(
+            MicrophonePrivacy::TOPIC,
+            &MicrophonePrivacy::declaration(),
+            "voice",
+        )
+        .unwrap();
+    let mut publisher = bus
+        .publisher_declared(Request::TOPIC, &Request::declaration(), "skills")
+        .unwrap();
+    publish_claim(&bus, START);
+    let mut context = |at, sequence| {
+        voice_publisher
+            .publish_json(at, &progress(voice(at, sequence)))
+            .unwrap();
+        joint_publisher.publish_json(at, &joints()).unwrap();
+    };
+    let receipt = || -> Receipt {
+        let value: Receipt = bus
+            .latest(Receipt::TOPIC)
+            .unwrap()
+            .unwrap()
+            .parse()
+            .unwrap();
+        value.check().unwrap();
+        value
+    };
+    let mut switch = |at: u64, closed: bool| {
+        let lease = MicrophonePrivacy {
+            stamp: stamp(at, privacy.totals().published + 1),
+            session_id: privacy.boot().to_owned(),
+            controller_boot: "0123456789abcdef0123456789abcdef".into(),
+            microphone_generation: 1,
+            observed_us: at,
+            expires_at_us: at + 50_000,
+            permitted: !closed,
+            physical_muted: Some(closed),
+            no_slide: false,
+        };
+        lease.check().unwrap();
+        privacy.publish_json(at, &lease).unwrap();
+        let message = bus.latest(MicrophonePrivacy::TOPIC).unwrap().unwrap();
+        assert_eq!(message.header.boot, lease.session_id);
+        assert_eq!(message.header.seq, lease.stamp.sequence);
+        assert_eq!(message.header.at_us, at);
+        assert_eq!(message.parse::<MicrophonePrivacy>().unwrap(), lease);
+    };
+    context(START, 1);
+    service.step(|| START, runtime::unix_ms());
+    let target = receipt().expression_session_id;
+
+    // sample-routine is not the night-sleep claimant: ordinary skill rest
+    // keeps its privacy gate, independently of the optional head-touch input.
+    // Each step reaches the service's 200 ms receipt cadence, so assertions
+    // read this decision rather than the initial retained Idle receipt.
+    for sequence in 1..=3 {
+        let now = START + sequence * 200_000;
+        match sequence {
+            1 => switch(now, true),
+            2 => {
+                fs::write(root.0.join("voice/privacy/latest"), b"broken\n").unwrap();
+                assert_eq!(
+                    bus.latest(MicrophonePrivacy::TOPIC).unwrap_err().kind(),
+                    std::io::ErrorKind::InvalidData
+                );
+            }
+            _ => switch(now, false),
+        }
+        context(now, sequence + 1);
+        let mut rest = request(now, sequence, sequence, Op::Rest);
+        rest.skill_session_id = publisher.boot().to_owned();
+        rest.expression_session_id = target.clone();
+        assert_eq!(publisher.publish_json(now, &rest).unwrap().delivered, 1);
+        let output = service.step(|| now, runtime::unix_ms());
+        let kept = receipt();
+        assert_eq!(kept.stamp.at_us, now);
+        assert_eq!(kept.request.as_ref(), Some(&rest));
+        assert_eq!(
+            kept.phase,
+            if sequence == 3 {
+                Phase::Resting
+            } else {
+                Phase::Refused
+            },
+            "only a valid open lease may admit this new rest episode; step {sequence}"
+        );
+        assert_eq!(service.counts.refused, sequence.min(2));
+        if sequence == 3 {
+            assert!(
+                output.body.is_some(),
+                "fresh open privacy restores rest planning"
+            );
+        }
+    }
+
+    // With no new request, an unreadable envelope must cancel the accepted
+    // ordinary rest, as a closed switch does, keeping its request in the receipt.
+    let active = receipt().request.unwrap();
+    fs::write(root.0.join("voice/privacy/latest"), b"broken\n").unwrap();
+    assert_eq!(
+        bus.latest(MicrophonePrivacy::TOPIC).unwrap_err().kind(),
+        std::io::ErrorKind::InvalidData
+    );
+    let now = START + 800_000;
+    context(now, 5);
+    service.step(|| now, runtime::unix_ms());
+    let cancelled = receipt();
+    assert_eq!(cancelled.stamp.at_us, now);
+    assert_eq!(cancelled.phase, Phase::Cancelled);
+    assert_eq!(cancelled.request.as_ref(), Some(&active));
+    assert_eq!(cancelled.reason, None);
+    assert_eq!(service.counts.refused, 2, "no new request was refused");
+
+    // Reopening is not a new episode and cannot resume the cancelled one.
+    let now = START + 1_000_000;
+    switch(now, false);
+    context(now, 6);
+    service.step(|| now, runtime::unix_ms());
+    let reopened = receipt();
+    assert_eq!(reopened.stamp.at_us, now);
+    assert_eq!(reopened.phase, Phase::Cancelled);
+    assert_eq!(reopened.request.as_ref(), Some(&active));
+}
+
+#[test]
 fn live_bus_keeps_the_original_receipt_after_a_stale_renewal_error() {
     let root = Root::new();
     let bus = Bus::new(&root.0).unwrap().rescan_every(Duration::ZERO);

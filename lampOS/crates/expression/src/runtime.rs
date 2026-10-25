@@ -80,6 +80,14 @@ pub fn privacy_muted_in(message: Option<lamp_bus::Message>) -> bool {
     })
 }
 
+fn read_privacy_muted(bus: &Bus) -> bool {
+    match bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC) {
+        Ok(message) => privacy_muted_in(message),
+        // A failed read is not the deliberate no-publisher compatibility case.
+        Err(_) => true,
+    }
+}
+
 /// The skill's claim on the night's sleep (#940), if `message` is a valid
 /// one from lamp-skills said within [`lamp_msgs::EXPRESSION_SLEEP_CLAIM_FRESH_US`]
 /// of `now_us` on this host's monotonic clock. Anything else is no claim.
@@ -674,11 +682,7 @@ impl Service {
         if self.rest.is_some() {
             self.engine.set_rest_paused(began, self.pause.paused());
             if let Some(bus) = &self.privacy {
-                self.engine.set_privacy_muted(privacy_muted_in(
-                    bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC)
-                        .ok()
-                        .flatten(),
-                ));
+                self.engine.set_privacy_muted(read_privacy_muted(bus));
             }
         }
         if let Some((bus, looked, said)) = self.sleep_claim.as_mut()
@@ -779,9 +783,7 @@ impl Service {
                 if message.header.topic == TouchEvent::TOPIC
                     && let Some(bus) = &self.privacy
                 {
-                    let latest = bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC);
-                    self.engine
-                        .set_privacy_muted(privacy_muted_in(latest.ok().flatten()));
+                    self.engine.set_privacy_muted(read_privacy_muted(bus));
                 }
                 let received = now();
                 // The wall sample belongs to `began`, not this later receive.
@@ -830,11 +832,7 @@ impl Service {
                 let received = now();
                 self.engine.set_rest_paused(received, self.pause.paused());
                 if let Some(bus) = &self.privacy {
-                    self.engine.set_privacy_muted(privacy_muted_in(
-                        bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC)
-                            .ok()
-                            .flatten(),
-                    ));
+                    self.engine.set_privacy_muted(read_privacy_muted(bus));
                 }
                 let observed_wall = wall_ms.saturating_add(received.saturating_sub(began) / 1_000);
                 match rest_from_message(&message, observed_wall).and_then(|request| {
@@ -864,9 +862,7 @@ impl Service {
         if (self.engine.looking_up() || self.rest.is_some())
             && let Some(bus) = &self.privacy
         {
-            let latest = bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC);
-            self.engine
-                .set_privacy_muted(privacy_muted_in(latest.ok().flatten()));
+            self.engine.set_privacy_muted(read_privacy_muted(bus));
         }
         let at_us = now();
         // Paused by the keeper: no new request to the body or the light;
