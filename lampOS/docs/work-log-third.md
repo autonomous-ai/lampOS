@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 22:48 — Late-verdict parent landed; child unblocked
+
+Ready for lamp-voice: yes (#3408 delivered through train136 #3487).
+
+Actual Main is `ad9f1cb77`; parent commits `cbdbce4ca`, `02bc38fc3`
+and `ad9f1cb77` have equal range-diffs against the offered parent. Original
+train ARM64 **40207134196** and Linux clippy **40207134190** passed.
+ARM has **11,294 passed including one tracked leak, 106 skipped**; all three
+late-verdict controls pass. The executed preview `8659b4a86`, train head
+`94a32e516` and actual landed commit have the same tree `7579da68c`.
+[Train receipt](verification/carry-late-verdict-20261025/train136-landed.json).
+No lamp or activation result is inferred from the merge.
+
+Child #3420 now has local actual-base source `cafc2da02` above ad9, both
+own commits equal. It remains draft until fresh current qualification, push,
+retarget to lamp-voice and new native checks. The two-face carry's resolved
+merge also now contains ad9; the intermediate untested d7 preparation is
+preserved separately. Reminder's full gate remains frozen on d7 and is
+executing its full tests after successful formatting, clippy and build.
+
 ## 2026-10-25 22:43 — Two-face original Linux qualification passed
 
 Ready for lamp-voice: no (#3486 needs its current-base carry and remaining read).

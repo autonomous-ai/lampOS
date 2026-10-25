@@ -1,0 +1,30 @@
+{
+  "train_pr": 3487,
+  "train_head": "94a32e516e6800965e69e0d15d72e6ab7414d89e",
+  "landed_head": "ad9f1cb77d662c432d8003a8b0ffc248cc1873a1",
+  "base_before_train": "d7d20bfc076b772a2d11cf86c6e31a5491dfb2ae",
+  "arm64_run": 40207134196,
+  "linux_clippy_run": 40207134190,
+  "conclusions": "Both success",
+  "unique_terminal_cases": 11294,
+  "tracked_leak_count": 1,
+  "repeated_equal_rows": 35,
+  "own_control_counts": {
+    "a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner": 1,
+    "a_late_window_keeps_the_same_voice_sign_for_going_on_same_one": 1,
+    "a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry": 1
+  },
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T15:42:35.2288344Z      Summary [ 209.442s] 11294 tests run: 11294 passed (1 leaky), 106 skipped"
+  ],
+  "range_diff": "1:  9284bae60 = 1:  cbdbce4ca lampOS: preserve owner evidence when applying late carry verdicts\n2:  2aca8150f = 2:  02bc38fc3 lampOS: record current late-verdict carry gates\n3:  c609cdb9c = 3:  ad9f1cb77 lampOS: record late-verdict gates on the current release base",
+  "raw_log_sha256": "607208f92a41e995c50dbca3b38b5bcee3e149963e15e35ed687bfec2c4ba609",
+  "limits": "Original train run; device and activation unrun. Earlier parent head qualification remains separately scoped.",
+  "executed_preview": "8659b4a86507e8296683e49d48d58db25c7d4b43",
+  "executed_preview_parents": [
+    "d7d20bfc076b772a2d11cf86c6e31a5491dfb2ae",
+    "94a32e516e6800965e69e0d15d72e6ab7414d89e"
+  ],
+  "landed_tree": "7579da68cbcd86ca1eeb42dbd35f401919f25306",
+  "preview_train_and_landed_trees_identical": true
+}
