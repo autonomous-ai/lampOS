@@ -1,0 +1,13 @@
+{
+  "build": {
+    "command": "cargo +1.96.0 build -q --locked --workspace",
+    "started": "2026-10-25T17:26:42Z",
+    "finished": "2026-10-25T17:28:02Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  }
+}
