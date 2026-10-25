@@ -1,0 +1,48 @@
+{
+  "head": "c4f16fbc9daf9c42cfc9b22358724a2dd05505af",
+  "tree": "b2ca40dde7487f4760734bf9394d87a462ee9ea4",
+  "base": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "prior_qualified_head": "d1dbc3ad681a48778c26d321f546095bc72a3e70",
+  "prior_qualified_base": "e1c69457aef3260ff411f73198431cce0b9fa9a7",
+  "range_diff": "1:  a638ff534 = 1:  8baa7f573 lampOS: retain held voice constraints for each caller\n2:  5b6fd1be5 = 2:  cf86ded4a lampOS: record current held-constraint carry gates\n3:  87eaa90e1 = 3:  1926a5ca2 lampOS: record held constraints on the landed parent\n4:  d1dbc3ad6 = 4:  c4f16fbc9 lampOS: qualify held constraints on the current Body fixture base",
+  "base_changed_paths": [
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs",
+    "lampOS/crates/voice/src/reminders.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/schedule.md",
+    "lampOS/docs/verification/reminder-reset-say-20261025/README.md"
+  ],
+  "source_before_docs_carry": "7a30ea9a56dd5d55bf99073b389aea705afa0464",
+  "docs_only_base_delta": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "range_diff_before_docs_carry": "1:  a638ff534 = 1:  04020fa03 lampOS: retain held voice constraints for each caller\n2:  5b6fd1be5 = 2:  541a9ad30 lampOS: record current held-constraint carry gates\n3:  87eaa90e1 = 3:  e6c7772ec lampOS: record held constraints on the landed parent\n4:  d1dbc3ad6 = 4:  7a30ea9a5 lampOS: qualify held constraints on the current Body fixture base",
+  "metadata_note": "The prior range-diff remains separately labelled; current range-diff now names the actual docs-carry commits. Frozen source head/tree/hash map did not change.",
+  "qualified_head": "c4f16fbc9daf9c42cfc9b22358724a2dd05505af",
+  "state": "Actual latest-base affected checks passed; earlier full and native executions retain their original sources.",
+  "tracked_source_records": 7089,
+  "source_map_sha256": "39f1511eacff25ee021bc7dc28109f33093db549936a40b515d4bb0ba3a678ee",
+  "own_control_pass_counts": {
+    "two_held_colleagues_keep_the_older_voice_constraint": 1,
+    "held_voice_constraints_close_with_the_carry_and_reject_old_callbacks": 1,
+    "a_full_held_voice_bound_keeps_the_owner_by_face_until_a_fresh_call": 1,
+    "a_recent_call_can_resume_after_forget_without_a_stale_closed_scope": 1,
+    "a_fresh_call_clears_the_previous_callers_held_voice_constraints": 1,
+    "every_held_print_constrains_the_voice_without_eviction": 1,
+    "a_missing_held_print_needs_its_own_cached_reply": 1,
+    "duplicates_fill_missing_evidence_without_replacing_known_evidence": 1,
+    "capacity_exhaustion_stays_face_only_until_a_fresh_call": 1,
+    "closed_scopes_and_old_callbacks_cannot_restore_constraints": 1
+  },
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-eval.log": "839ff77a57a9e98ac30f22cdded67834bd69f60c2894ddbcc8af954c658c339f",
+    "test-held-colleagues.log": "058d9ac7fcf859c6faed736a5427394721e67048443b2856bf4fae3867545a4f",
+    "test-provider-terminal.log": "13a0167a40a2fbbb89062a21848f4f90ccac036fddcf22ee7a8aeff5bce8fbd6",
+    "test-reminders.log": "788392a26f809066ab6173fcf58c08a8d70cdefa0188981fb56ea7246bf3d54c",
+    "test-worker.log": "b0a5324f539254994b4afeec3c0916d9466fc24f668dd0526aefca732069e66e"
+  }
+}
