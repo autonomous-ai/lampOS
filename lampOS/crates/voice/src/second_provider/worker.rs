@@ -2486,7 +2486,18 @@ pub fn serve(
             let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
             let reader = crate::speaking_faces::read_from(eyes.clone(), root);
             if reader.is_some() {
-                engine = engine.seeing_who_speaks(eyes.clone(), known.clone());
+                // A line is a known person's only when their own face was
+                // seen speaking it (`LAMP_PERSON_SCOPE_SEEN=on`).
+                let seen = std::env::var(crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT)
+                    .is_ok_and(|value| value == "on");
+                if seen {
+                    eprintln!(
+                        "lamp-voice second: a line is a known person's only when their own face was seen speaking it, else the room's (LAMP_PERSON_SCOPE_SEEN)"
+                    );
+                }
+                engine = engine
+                    .seeing_who_speaks(eyes.clone(), known.clone())
+                    .scoping_by_sight(seen);
                 speaking_eyes = Some(eyes);
             }
             reader
