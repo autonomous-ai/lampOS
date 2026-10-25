@@ -1,0 +1,16 @@
+{
+  "full-0ddd": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-voice-eval.log": "5b121fc7b02a726e4c3613edaa1fb3454f2a4f8746628993ab8824724b3be839"
+  },
+  "current-bf": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-actions-schedule.log": "09b5a6ef544a63ce1033abedf4e0355671a9809fcd4fdea1d3cc857ff0c06b58",
+    "test-voice-eval-switches.log": "5eb96297904adf74b089f0f860c4fc3ffef5f5d5b9421c09817e26d641f7d4b2",
+    "test-voice-tools.log": "a2adb52c787419f472cb17b309a49545692368203aceed55ce47005c9f009653"
+  }
+}

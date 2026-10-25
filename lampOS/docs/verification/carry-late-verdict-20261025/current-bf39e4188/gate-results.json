@@ -1,0 +1,116 @@
+{
+  "full-0ddd": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T14:25:17Z",
+      "finished": "2026-10-25T14:25:29Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy-final": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-25T14:25:29Z",
+      "finished": "2026-10-25T14:27:24Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --locked --workspace",
+      "started": "2026-10-25T14:27:24Z",
+      "finished": "2026-10-25T14:28:48Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-voice-eval": {
+      "command": "cargo +1.96.0 test --locked --no-fail-fast -p lamp-voice -p lamp-voice-eval",
+      "started": "2026-10-25T14:28:48Z",
+      "finished": "2026-10-25T14:45:01Z",
+      "exit": 0,
+      "harnesses": 11,
+      "passed": 4675,
+      "failed": 0,
+      "ignored": 21,
+      "disk_error_lines": []
+    }
+  },
+  "current-bf": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T14:48:19Z",
+      "finished": "2026-10-25T14:48:31Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy-final": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-actions -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-25T14:48:31Z",
+      "finished": "2026-10-25T14:50:27Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --locked --workspace",
+      "started": "2026-10-25T14:50:27Z",
+      "finished": "2026-10-25T14:51:49Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-actions-schedule": {
+      "command": "cargo +1.96.0 test --locked --no-fail-fast -p lamp-actions schedule",
+      "started": "2026-10-25T14:51:49Z",
+      "finished": "2026-10-25T14:52:22Z",
+      "exit": 0,
+      "harnesses": 5,
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-voice-tools": {
+      "command": "cargo +1.96.0 test --locked --no-fail-fast -p lamp-voice tools::",
+      "started": "2026-10-25T14:52:22Z",
+      "finished": "2026-10-25T14:55:26Z",
+      "exit": 0,
+      "harnesses": 6,
+      "passed": 82,
+      "failed": 0,
+      "ignored": 1,
+      "disk_error_lines": []
+    },
+    "test-voice-eval-switches": {
+      "command": "cargo +1.96.0 test --locked -p lamp-voice-eval switches",
+      "started": "2026-10-25T14:55:26Z",
+      "finished": "2026-10-25T14:56:59Z",
+      "exit": 0,
+      "harnesses": 3,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  }
+}
