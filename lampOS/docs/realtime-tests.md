@@ -1688,3 +1688,22 @@ scheduled conversation overlap, negative controls and complete x86/ARM64
 counts. The injected stalls are reproduction patches only; no fixed sleep
 is added to the submitted tests. These are fixture measurements, not
 acoustic or device latency evidence.
+
+## Body successor-socket ownership and fixture teardown
+
+`dropping_reaped_predecessor_does_not_remove_active_successor_sockets`
+still starts a real ready successor, drops the reaped predecessor, and
+requires the predecessor directory gone while every successor peer remains
+and the successor remains ready and unreaped. Its later fixture teardown
+explicitly kills only that owned successor and requires an actual reap,
+truthful non-clean exit, no IPC cleanup error, all peer paths removed, and
+the successor directory removed on drop.
+
+That teardown does not assert a graceful Stop inside the product's unchanged
+20 ms inhibit-acknowledgement deadline. Cooperative stop receipts and clean
+replacement remain covered by
+`actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement`;
+`hung_owned_child_is_killed_and_reaped_after_missing_inhibit` still checks the
+failed-acknowledgement path. No runtime bound or cleanup policy changes.
+The recorded 2/3 fixed observations remain their original failed/passed
+outcomes; separating the fixture's contracts establishes no historical cause.
