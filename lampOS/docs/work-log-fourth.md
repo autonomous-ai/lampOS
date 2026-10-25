@@ -1,3 +1,9 @@
+## 2026-10-25 16:21 — Voice executing; Store source read completed
+
+Ready for lamp-voice: no
+
+Onboarding's full Voice command has reached actual test execution, with fresh output and no observed failure in the bounded progress check; no final suite count exists yet. Its source stays fixed. In parallel, [the Store source read](https://github.com/autonomous-ai/lampOS/pull/3459#issuecomment-6395870745) found no concrete P1/P2 across 22 changed paths and verified 19 published input hashes. Separate key selection, default-off gates, preserved settings and interrupted-install reload debt are coherent; OTA does not provision the key or activate Store. This is source evidence only, with no independent runtime READ-OK. Main's latest change is build-rows.md only and will be carried after the onboarding gate.
+
 ## 2026-10-25 16:01 — Onboarding workspace build passed
 
 Ready for lamp-voice: no
