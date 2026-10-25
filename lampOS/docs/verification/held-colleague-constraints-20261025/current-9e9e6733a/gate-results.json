@@ -1,0 +1,90 @@
+{
+  "fmt": {
+    "command": "cargo +1.96.0 fmt --all --check",
+    "started": "2026-10-25T17:30:23Z",
+    "finished": "2026-10-25T17:30:35Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "clippy-final": {
+    "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+    "started": "2026-10-25T17:30:35Z",
+    "finished": "2026-10-25T17:32:23Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "build": {
+    "command": "cargo +1.96.0 build -q --locked --workspace",
+    "started": "2026-10-25T17:32:23Z",
+    "finished": "2026-10-25T17:33:42Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-reminders": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::reminders::",
+    "started": "2026-10-25T17:33:42Z",
+    "finished": "2026-10-25T17:35:53Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 28,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-provider-terminal": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::provider_terminal::",
+    "started": "2026-10-25T17:35:53Z",
+    "finished": "2026-10-25T17:35:54Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 13,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-worker": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib second_provider::worker::tests::",
+    "started": "2026-10-25T17:35:54Z",
+    "finished": "2026-10-25T17:36:17Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 178,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-held-colleagues": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib held_colleagues::",
+    "started": "2026-10-25T17:36:17Z",
+    "finished": "2026-10-25T17:36:18Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 5,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-eval": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice-eval",
+    "started": "2026-10-25T17:36:18Z",
+    "finished": "2026-10-25T17:39:25Z",
+    "exit": 0,
+    "harnesses": 4,
+    "passed": 623,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  }
+}
