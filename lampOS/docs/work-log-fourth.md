@@ -1,3 +1,9 @@
+## 2026-10-25 18:27 — Space recovery and package checks progressing
+
+Ready for lamp-voice: no
+
+The authorized 31-directory Voice incremental prune completed, preserving source, binaries and failure evidence; free space measured 8,560,054,272 bytes afterward. Two exact checks of the original Update round executable each passed once, 1/0/0, in 52.78 s and 12.21 s. They do not explain or waive the earlier incomplete target. The unchanged continuation resumed and passed Skills 516/0/9, VoiceEval 623/0/0 and Eyes 337/0/5. Body and the remaining service suites are running next. A complete Update round target, current-base composition and native/played gates remain required. The original failures and missing 118 outcomes remain recorded.
+
 ## 2026-10-25 18:08 — Update failure and closed-stage space recovery
 
 Ready for lamp-voice: no
