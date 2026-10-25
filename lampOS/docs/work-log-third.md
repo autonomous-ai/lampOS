@@ -5,6 +5,34 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+
+## 2026-10-25 16:05 — Store install preparation pushed
+
+Ready for lamp-voice: no (#3459; original Linux gates and reads pending).
+
+Store preparation is pushed as `34d3b8832` on `8e2405736`: install writes
+one shared default-off switch and the helper drop-in; the separate Store
+key is `/etc/lampOS/skills/store-key.pub`, provisioned by factory step 3
+with `--store-key`. No update-key fallback or automatic activation.
+Missing or malformed keys refuse installs before an HTTP client exists;
+removing a skill and turning one off or on remain available. The helper's
+network permissions are prepared even while off, documented explicitly.
+Installer settings preserve lamp edits and reload debt across a failed run.
+These Store settings are outside the current OTA settings allowlist;
+Tests is told their paths on the Queue. The key remains factory-owned.
+
+Mac Rust 1.96.0, native x86_64, one compiler job: fmt, strict clippy for all
+12 affected crates and targets, workspace build and full tests passed.
+Changed crates: **1,110/0/19**; dependent crates: **6,230/0/33**; factory:
+**84/0**, with Bash syntax clean. Original gate base `b241d0207`; the carry
+to `8e2405736` crosses build-row documentation only, equal range-diff and
+all 19 task-input hashes matching. Formatting passed after the carry.
+[Source and verification](https://github.com/autonomous-ai/lampOS/pull/3459).
+The original ARM64 run is `40179134613`, Linux clippy `40179134550`, both
+pending when posted. No lamp, local ARM64, real Store-key acceptance or
+device latency claim. No local compiler remains active. Next: original CI
+results and P1/P2 reads; earlier tasks remain deferred until after 20:00.
+
 ## 2026-10-25 06:58 — Controls ready; current parent and child pushed
 
 Ready for lamp-voice: yes (#3419 ea4580c36); no (#3408/#3420 current gates/reads).
