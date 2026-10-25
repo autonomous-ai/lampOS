@@ -1,0 +1,46 @@
+{
+  "fmt": {
+    "command": "cargo +1.96.0 fmt --all --check",
+    "started": "2026-10-25T16:48:27Z",
+    "finished": "2026-10-25T16:48:38Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "clippy-final": {
+    "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-body -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+    "started": "2026-10-25T16:48:38Z",
+    "finished": "2026-10-25T16:50:36Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "build": {
+    "command": "cargo +1.96.0 build -q --locked --workspace",
+    "started": "2026-10-25T16:50:36Z",
+    "finished": "2026-10-25T16:51:55Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-body-supervisor": {
+    "command": "cargo +1.96.0 test --locked -p lamp-body runtime::supervisor::tests::",
+    "started": "2026-10-25T16:51:55Z",
+    "finished": "2026-10-25T16:52:32Z",
+    "exit": 0,
+    "harnesses": 7,
+    "passed": 21,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "head": "efd08df4c813517fa95cd55a0181e51a9a16efd6",
+  "tree": "6e8ef0708bb27a360ba1ab6e0be69c0d530cb4ea",
+  "base": "e1c69457aef3260ff411f73198431cce0b9fa9a7",
+  "prior_qualified_head": "868e8d72ca6ab28335afdce7ed160154cb6da4f4",
+  "prior_qualified_base": "56cacbdddd84c85b49af564cb83d95c805c27958",
+  "range_diff": "1:  b9bbfed71 = 1:  7ec912cc9 lampOS: complete retired reminders before admitting the next line\n2:  82358489b = 2:  81fc585c3 lampOS: record reminder qualification on the landed release base\n3:  868e8d72c = 3:  efd08df4c lampOS: record reminder gates on the current workflow base",
+  "base_changed_paths": [
+    "lampOS/crates/body/src/runtime/supervisor/tests.rs",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "state": "Current source passed the narrow changed-base gate; earlier full runs retain their actual source identities.",
+  "tracked_source_records": 7086,
+  "source_map_sha256": "768b812a8bef0547c3840394a9fdc202bf8ad13f8f2bbf2bc793c15693cba8be",
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-body-supervisor.log": "33c618efc2b3a721c06fc2f9fa70495bf6dfad64a811e571d7a84ec186e7b37e"
+  }
+}
