@@ -1,0 +1,46 @@
+{
+  "fmt": {
+    "command": "cargo +1.96.0 fmt --all --check",
+    "started": "2026-10-25T16:57:38Z",
+    "finished": "2026-10-25T16:57:49Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "clippy-final": {
+    "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-body -p lamp-memory -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+    "started": "2026-10-25T16:57:49Z",
+    "finished": "2026-10-25T16:59:48Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "build": {
+    "command": "cargo +1.96.0 build -q --locked --workspace",
+    "started": "2026-10-25T16:59:48Z",
+    "finished": "2026-10-25T17:01:14Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-body-memory-voice-eval": {
+    "command": "cargo +1.96.0 test --locked --no-fail-fast -p lamp-body -p lamp-memory -p lamp-voice -p lamp-voice-eval",
+    "started": "2026-10-25T17:01:14Z",
+    "finished": "2026-10-25T17:25:28Z",
+    "exit": 0,
+    "harnesses": 38,
+    "passed": 5613,
+    "failed": 0,
+    "ignored": 29,
+    "disk_error_lines": []
+  }
+}

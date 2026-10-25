@@ -1,0 +1,29 @@
+{
+  "head_before_merge": "d9fa4c79ca2ae9ca0ed9fa4d44f03976291b337c",
+  "merge_base_input": "e1c69457aef3260ff411f73198431cce0b9fa9a7",
+  "prepared_index_tree": "0dedf0979b7c3f0279d4699925f38b4ab6162087",
+  "original_authored_head": "031990a89093ae5e205c65156f32a1b79d2eb934",
+  "runtime_added_removed_lines_equal": {
+    "lampOS/crates/voice/src/process.rs": true,
+    "lampOS/crates/voice/src/second_provider.rs": true,
+    "lampOS/crates/voice/src/second_provider/worker.rs": true
+  },
+  "docs_correction": "Reviewer-two P3: 7/4/4 looks at 250/500/600 ms span at least 1.5 s; four 600 ms looks span 1.8 s.",
+  "docs_correction_patch_sha256": "7a189a5bc307d2928e6a23fb77bb467f3b049cdbdca2c01598145b9c1f346ce5",
+  "clock_doc_correction": "Helper monotonic span guarantees do not establish live bus delivery across a wall-clock step.",
+  "committed_runtime_head": "a497afbd1e7173e137c5d6a35238b63c8e3df491",
+  "state": "The current merge and requested docs corrections passed the full host gate on the exact frozen tree.",
+  "tracked_source_records": 7079,
+  "source_map_sha256": "bf5d3e636345ad31de5c69e1419994ec28a8bd5c4262bd28554afc0663d3b59e",
+  "three_own_control_pass_counts": {
+    "with_two_faces_held_two_faces_must_stay": 1,
+    "with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room": 1,
+    "with_two_faces_held_looks_between_lines_make_the_first_line_busy": 1
+  },
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-body-memory-voice-eval.log": "d480723161559623c1546aea459d085428b3396e596cdb79c0f09e6947686371"
+  }
+}
