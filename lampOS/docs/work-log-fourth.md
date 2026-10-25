@@ -1,3 +1,9 @@
+## 2026-10-25 18:53 — Current-base carry prepared while checks continue
+
+Ready for lamp-voice: no
+
+The unchanged host continuation passed Body 608/0/0 and Cloud 196/0/4. A second bounded retirement removed only 184 identified local incremental directories; external cache entries, artifacts and source stayed. The full Update round target has now actually started once, using its original bound executable and serial cases alongside the remaining one-job package gate after free space exceeded eight GiB. Earlier admission refusals ran zero cases; original failed results stay separate. Expression is active. In an isolated lampOS-only checkout, all five prerequisite commits carried onto 22d93d199 unchanged by range-diff, and the ten authored files retain the same patch and verification text. Current-copy formatting and diff checks passed; a combined source read is underway. The active test source remains 0ce7b6789 on 83509fd04, and its results are not relabelled as current-base execution.
+
 ## 2026-10-25 18:27 — Space recovery and package checks progressing
 
 Ready for lamp-voice: no
