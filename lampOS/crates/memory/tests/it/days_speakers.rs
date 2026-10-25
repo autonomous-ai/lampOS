@@ -389,6 +389,100 @@ fn forget_said_leaves_a_version_someone_else_said() {
     }
 }
 
+/// Make the cross-scope replacement through public requests, retaining its
+/// provenance while adoption takes off the room-only speaker row.
+fn adopted_room_correction(store: &mut Days) -> (u64, u64) {
+    let original = id(
+        store,
+        json!({"op":"remember","at_unix_ms":NOW,"text":"The room's original plan","speaker":MAI}),
+    );
+    let correction = id(
+        store,
+        json!({"op":"remember","at_unix_ms":NOW+1,"text":"The corrected private plan","speaker":LAN,"replaces":original,"shown":[original]}),
+    );
+    let (adopted, _) = ask(
+        store,
+        json!({"op":"adopt","to":LAN,"ids":[correction]}),
+        NOW + 2,
+    );
+    assert_eq!(adopted["ok"], true, "{adopted}");
+    let private = adopted["ids"][0][1].as_u64().unwrap();
+    assert_eq!(
+        adopted,
+        json!({"ok":true,"moved":1,"ids":[[correction,private]]})
+    );
+    assert!(!exists(store, "everyone", correction));
+    assert!(exists(store, LAN, private));
+    (original, private)
+}
+
+/// A speaker's room-only forget cannot follow the correction into the
+/// private scope it was adopted into, even though its speaker row is gone.
+#[test]
+fn forget_said_keeps_a_correction_adopted_into_a_persons_scope() {
+    let scratch = Scratch::new("adopted-correction");
+    let mut store = scratch.open(30, NOW);
+    let (original, private) = adopted_room_correction(&mut store);
+    assert_eq!(scratch.speakers(), (vec![room(original, MAI)], 0));
+
+    let (gone, _) = ask(
+        &mut store,
+        json!({"op":"forget_said","speaker":MAI}),
+        NOW + 3,
+    );
+    assert_eq!(gone, json!({"ok":true,"removed":1}));
+    assert!(!exists(&store, "everyone", original));
+    assert!(exists(&store, LAN, private));
+    let (kept, _) = ask(&mut store, json!({"op":"kept","person":LAN}), NOW + 3);
+    assert_eq!(kept["entries"].as_array().unwrap().len(), 1);
+    assert_eq!(kept["entries"][0]["id"], private);
+    assert_eq!(scratch.speakers(), (vec![], 0));
+}
+
+/// A private correction and its later private versions all stay beyond
+/// the adopted boundary; the room speaker's walk cannot bridge through it.
+#[test]
+fn forget_said_keeps_the_private_chain_after_an_adopted_correction() {
+    let scratch = Scratch::new("adopted-private-chain");
+    let mut store = scratch.open(30, NOW);
+    let (original, private) = adopted_room_correction(&mut store);
+    let later = id(
+        &mut store,
+        json!({"op":"remember","person":LAN,"at_unix_ms":NOW+3,"text":"The later private plan","replaces":private,"shown":[private]}),
+    );
+    let latest = id(
+        &mut store,
+        json!({"op":"remember","person":LAN,"at_unix_ms":NOW+4,"text":"The latest private plan","replaces":later,"shown":[later]}),
+    );
+    let (gone, _) = ask(
+        &mut store,
+        json!({"op":"forget_said","speaker":MAI}),
+        NOW + 5,
+    );
+    assert_eq!(gone, json!({"ok":true,"removed":1}));
+    assert!(!exists(&store, "everyone", original));
+    for version in [private, later, latest] {
+        assert!(exists(&store, LAN, version), "private version {version}");
+    }
+    let (kept, _) = ask(&mut store, json!({"op":"kept","person":LAN}), NOW + 5);
+    assert_eq!(kept["entries"].as_array().unwrap().len(), 1);
+    assert_eq!(kept["entries"][0]["id"], latest);
+}
+
+/// Adoption deliberately keeps cross-scope links for ordinary forget.
+/// Fixing the room-only operator must not sever that provenance instead.
+#[test]
+fn ordinary_forget_still_follows_an_adopted_corrections_provenance() {
+    let scratch = Scratch::new("adopted-ordinary-forget");
+    let mut store = scratch.open(30, NOW);
+    let (original, private) = adopted_room_correction(&mut store);
+    let (gone, _) = ask(&mut store, json!({"op":"forget","id":original}), NOW + 3);
+    assert_eq!(gone, json!({"ok":true,"removed":2}));
+    assert!(!exists(&store, "everyone", original));
+    assert!(!exists(&store, LAN, private));
+    assert_eq!(scratch.speakers(), (vec![], 0));
+}
+
 /// `forget_said` is the room's alone: a person's scope, a rules scope or
 /// every person is `bad_person`; a speaker that is no known person's id, or
 /// none, is `bad_request`. Nothing is removed by any of them.
