@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-25 15:59 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-25 16:53 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 93.1% over 70 rows. Quality 65.3% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 93.1% over 70 rows. Quality 65.6% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -98,10 +98,10 @@ Written by the first builder from the team's review page at 2026-10-25 15:59 (+0
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 18 Oct 15:39, everything the lamp said unasked since midnight (Jarvis’s readout, 14 sessions): 17 reminders and timers, a median 0.98 s after they were due (16 within 5 s, one held back by the link), and 17 pieces of tas… |
-| Remembers you: your name and what you told it | 0.35 | 0.90 | 24 Oct 15:5x, down from 0.45: the owner’s own test: “Lamp, remember my face, and I’m …” was heard as “Man. |
+| Remembers you: your name and what you told it | 0.35 | 0.90 | 25 Oct 17:0x, unchanged: on the ship candidate’s product unit (lamp-4ace, played lines, no face), a room fact was kept and recalled in the same session, but a fresh session’s first question went without the lamp’s memory… |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
-| Body | 0.65 | 0.80 | 25 Oct 00:2x, up from 0.6: in the product now, merged in train 95: the body rests half an hour after three strains and stands again (#3365), says so on its health (#3378), and moves its pose at 300 counts a second so the… |
+| Body | 0.70 | 0.80 | 25 Oct 17:0x, up from 0.65: the livelier postures and nods (#3387) are in the product since train 109 (04:25), and on the ship candidate (6786) lamp-4ace stood for a played question, turned and tilted its head a little b… |
 | Head and eye | 0.65 | 0.80 | 23 Oct 11:2x, up from 0.6: head touch passed with the lead’s own hand on lamp-52e6: a tap, a stroke, a 3 s hold that put it to sleep, a tap that woke it, and nothing with hands away (#2857 closed). |
 | The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live | 0.65 | 0.90 | 25 Oct 16:0x, up from 0.6: the ship candidate on the exact product unit answered 49 of 49 played lines meant for it (the owner’s 22, three conversations of up to six turns, two more with colleagues talking), first sound … |
 | Light and all of it together | 0.75 | 0.80 | 24 Oct 16:1x, down from 0.8: the not-feeling-well light (pale white) came on 18 times in three hours on lamp-4ace because its case at 40 °C was judged an error (#3367 makes that 46, off at 50). |
