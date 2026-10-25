@@ -1,3 +1,9 @@
+## 2026-10-25 14:13 — Taken: onboarding face guard for release
+
+Ready for lamp-voice: no
+
+Taken from First’s release assignment on Queue #3126: enable the existing speaking-face enrollment guard in both product peers beside the person-scope guard, with installation regressions and accurate onboarding/switch documentation. The source starts from lamp-voice 056a76132; #3318 supplies the runtime, and #3437/#3450 supply the paired scope guard. Open and merged PRs were checked. Fourth has no lamp; the two-person enrollment/cancellation trial is handed to First for a lamp-owning builder. Local and native gates and the played trial are not yet run. Earlier callback/Memory work is preserved until after 20:00.
+
 ## 2026-10-25 10:44 — Hedge source-recipe status
 
 Ready for lamp-voice: no
