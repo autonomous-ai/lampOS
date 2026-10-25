@@ -1507,6 +1507,7 @@ fn second_route_worker_environment(
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
+        crate::second_provider::NAME_STAYS_ENVIRONMENT,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
@@ -1611,6 +1612,7 @@ mod tests {
     fn the_known_names_switch_reaches_only_the_second_route() {
         for name in [
             crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT,
+            crate::second_provider::NAME_STAYS_ENVIRONMENT,
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
             crate::second_config::OWN_KEYS_ENV,
@@ -2219,6 +2221,7 @@ mod tests {
                     "Hanoi, Vietnam"
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
                     || name == crate::second_provider::NAME_SECOND_SIGN_ENVIRONMENT
+                    || name == crate::second_provider::NAME_STAYS_ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STT_WARM_ENVIRONMENT
                     || name == crate::second_provider::net::QUIET_HELD_ENVIRONMENT
@@ -2366,6 +2369,7 @@ mod tests {
                     "LAMP_NAMED_ALWAYS=on",
                     "LAMP_NAME_NEAR=on",
                     "LAMP_NAME_SECOND_SIGN=on",
+                    "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",

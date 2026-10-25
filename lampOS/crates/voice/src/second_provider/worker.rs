@@ -2886,6 +2886,18 @@ pub fn serve(
                 heeding.attention.ask_a_second_sign_of_the_name(true);
             }
         }
+        // A hearing of the name inside one line's sound counts for that line
+        // only (`LAMP_NAME_STAYS_IN_ITS_LINE=on`).
+        if std::env::var(crate::second_provider::NAME_STAYS_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a hearing of the lamp's name inside one line's sound counts for that line only, never for the line begun after it (LAMP_NAME_STAYS_IN_ITS_LINE)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.keeping_the_name_in_its_line();
+            }
+        }
         // At a desk, a face turned to the lamp is no sign, and a
         // conversation goes on only shortly after its words
         // (`LAMP_NAME_OR_FOLLOW_UP=on`).
@@ -4319,6 +4331,11 @@ pub(crate) struct Heeding {
     /// `LAMP_TWO_FACES_HELD=on` ([`Self::holding_two_faces`]): the eyes'
     /// last looks, so two faces make the room busy only when they stay.
     faces_held: Option<Arc<Mutex<FacesHeld>>>,
+    /// `LAMP_NAME_STAYS_IN_ITS_LINE=on` ([`Self::keeping_the_name_in_its_line`]),
+    /// and the request last judged with its line's sound, and whether its
+    /// words called the lamp by name, a call whose hearing goes on.
+    name_stays: bool,
+    last_said: Option<(u64, (u64, u64), bool)>,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
@@ -5021,6 +5038,8 @@ impl Heeding {
             face_not_speaking: None,
             name_or_follow_up: false,
             faces_held: None,
+            name_stays: false,
+            last_said: None,
             spoke: std::collections::VecDeque::new(),
             near: None,
             turned_near_speaks: false,
@@ -5164,6 +5183,24 @@ impl Heeding {
                 });
         }
         self.faces_held = Some(held);
+    }
+
+    /// From now on, a hearing of the lamp's name that began inside the
+    /// sound of the line judged last, before the line in hand began, is that
+    /// line's, and is not among the line in hand's signs ([`Self::heed_signs`]):
+    /// not its name heard, its name's note, nor its name said to a face. A
+    /// line going on from the one before keeps it, so does the line after one
+    /// whose words called the lamp by name ("Lamp."), and a hearing in its
+    /// own window is its own. `lamp-name` tells a hearing once its score falls,
+    /// up to 0.8 s after it began, so one from a line's last words can come
+    /// after that line is judged. On lamp-4ace on 2026-10-26 at 06:21 (build
+    /// 6919, the busy scene played) a hearing at 0.92 in "Can you pass me
+    /// the charger? The white one.", which has no name in it, counted for
+    /// "Here you go. Is your phone dying again?", begun 0.7 s after it, and
+    /// that was answered (`LAMP_NAME_STAYS_IN_ITS_LINE=on`).
+    pub(crate) fn keeping_the_name_in_its_line(&mut self) {
+        self.name_stays = true;
+        self.attention.keep_the_name_in_its_line(true);
     }
 
     /// With [`Self::needing_name_or_follow_up`], whether the line in hand,
@@ -6337,12 +6374,35 @@ impl Heeding {
         heard: &str,
         mut signs: Signs,
     ) -> Option<&'static str> {
+        self.keep_the_name_in_its_line(request, said, &mut signs);
         self.silence_turned(request, said, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
+        self.last_said = Some((request, said, self.attention.called_in_its_words()));
         if self.noted.is_none_or(|(judged, _)| judged != request) {
             self.note_the_name(request, said, &signs);
         }
         verdict
+    }
+
+    /// [`Self::keeping_the_name_in_its_line`]: the hearings that began in the
+    /// sound of the line judged last, before this one began, left out of
+    /// this one's signs, and said in the journal.
+    fn keep_the_name_in_its_line(&self, request: u64, said: (u64, u64), signs: &mut Signs) {
+        let Some((before, (began, ended), _)) = self.last_said.filter(|(before, _, call)| {
+            self.name_stays && *before != request && !call && signs.continues_from.is_none()
+        }) else {
+            return;
+        };
+        let all = signs.names.len();
+        signs
+            .names
+            .retain(|(at, _)| !((began..=ended).contains(at) && *at < said.0));
+        if signs.names.len() < all {
+            eprintln!(
+                "lamp-voice second: request {request}: {} hearing(s) of its name began in request {before}'s sound, before this line, and stay with that line (LAMP_NAME_STAYS_IN_ITS_LINE)",
+                all - signs.names.len()
+            );
+        }
     }
 
     /// `LAMP_TURNED_SPEAKING`: a face turned to the lamp but seen silent
@@ -16561,6 +16621,68 @@ mod tests {
             noted(true, Some(true)),
             Some(crate::called::note(false)),
             "turned"
+        );
+    }
+
+    /// `LAMP_NAME_STAYS_IN_ITS_LINE=on`, the busy scene on lamp-4ace on
+    /// 2026-10-26 at 06:21 (build 6919) with the product's second sign: a
+    /// hearing at 0.92 that began at 11.0 s in "Can you pass me the
+    /// charger? The white one." (9.2 s to 11.7 s), which has no name in it,
+    /// played "Here you go. Is your phone dying again?" begun at 12.4 s. It
+    /// came late, among the next line's signs, as on 4ace, or in time, among
+    /// its own. With the switch the next line is held either way, and a line
+    /// with its own hearing as it begins is played.
+    #[test]
+    fn a_name_heard_in_the_line_before_does_not_play_the_next() {
+        use crate::room_told::Room;
+        let charger = (9_200_000, 11_700_000);
+        let phone = (12_400_000, 14_000_000);
+        let desk = "Can you pass me the charger? The white one.";
+        let hearing = |here: bool| {
+            if here {
+                vec![(11_000_000, 0.92)]
+            } else {
+                Vec::new()
+            }
+        };
+        for late in [true, false] {
+            let judged = |stays: bool| {
+                let mut heeding = room_name_heeding(true);
+                if stays {
+                    heeding.keeping_the_name_in_its_line();
+                }
+                heeding.heed_signs(
+                    45,
+                    charger,
+                    desk,
+                    room_name_signs(Room::Busy, false, None, false, hearing(!late)),
+                );
+                heeding.heed_signs(
+                    46,
+                    phone,
+                    "Here you go. Is your phone dying again?",
+                    room_name_signs(Room::Busy, false, None, false, hearing(late)),
+                )
+            };
+            assert_eq!(judged(false), None, "off, late {late}: played, as on 4ace");
+            assert!(judged(true).is_some(), "late {late}");
+        }
+        let mut heeding = room_name_heeding(true);
+        heeding.keeping_the_name_in_its_line();
+        heeding.heed_signs(
+            45,
+            charger,
+            desk,
+            room_name_signs(Room::Busy, false, None, false, Vec::new()),
+        );
+        assert_eq!(
+            heeding.heed_signs(
+                46,
+                phone,
+                "Lamp, is my phone dying?",
+                room_name_signs(Room::Busy, false, None, false, vec![(12_500_000, 0.95)]),
+            ),
+            None
         );
     }
 
