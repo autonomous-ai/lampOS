@@ -1,0 +1,26 @@
+{
+  "head": "094bba830e96575229d8bf140a719707aac6dd7c",
+  "authored_base": "2f48b0edd24c07c0fda0e67c8985addc8a40cdf2",
+  "changed_paths": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "document_sha256": "3be20480b397f54e98dddf155ceb59c76f04b18ccad8231f3f205834ad7cc9b1",
+  "row_counts": {
+    "shipping": 70,
+    "quality": 16,
+    "mood": 2
+  },
+  "score_sums": {
+    "shipping": "65.10",
+    "quality": "10.00",
+    "mood": "1.17"
+  },
+  "percentages": {
+    "shipping": "93.0",
+    "quality": "62.5",
+    "mood": "58.5"
+  },
+  "mood_excluded_from_shipping": true,
+  "old_rollback_paths_restored_to_authored_base": true,
+  "scope": "Independent exact-source scope and Decimal arithmetic read; no compiler, underlying lamp-result audit, current-base readiness or merge claim."
+}
