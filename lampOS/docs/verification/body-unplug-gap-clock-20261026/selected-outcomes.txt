@@ -1,0 +1,49 @@
+[positive-gap]
+test unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 440 filtered out; finished in 0.01s
+
+[positive-full]
+test unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails ... ok
+test unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop ... ok
+test result: ok. 441 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.44s
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[period-3s]
+test unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 440 filtered out; finished in 0.01s
+assertion location: crates/body/src/unplug.rs:1014:17:
+first proof: no Ready in 2 s: Some((Folding, ""))
+
+[proof-100ms]
+test unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 440 filtered out; finished in 0.01s
+assertion location: crates/body/src/unplug.rs:1031:9:
+100ms
+
+[gap-permanent]
+test unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 440 filtered out; finished in 0.02s
+assertion location: crates/body/src/unplug.rs:1023:21:
+assertion `left != right` failed: sample gap: waiting for Folding: physical readiness was lost (an unsafe sample); unplug preparation remains latched
+  left: Failed
+ right: Failed
+
+[sample-noop]
+test unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 440 filtered out; finished in 0.13s
+assertion location: crates/body/src/unplug.rs:1076:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+[worker-no-tick]
+test unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 440 filtered out; finished in 2.04s
+assertion location: crates/body/src/unplug.rs:1059:17:
+no Folding in 2 s

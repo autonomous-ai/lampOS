@@ -1,0 +1,898 @@
+{
+  "schema": 1,
+  "scope": "completed native Mac Body gate; no test executed while preparing this proof",
+  "base_commit": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "candidate_unplug_sha256": "e82d160ea17c64c49c55ac34774a6007c4d90c5052d2b4e6be5a6e941d6c79e7",
+  "candidate_patch_sha256": "449d9ffb363c3102b18d0432d68b0aa3b89ef60f977f78ca03dd4876eb270be1",
+  "corrected_source_proposal": "https://github.com/autonomous-ai/lampOS/tree/7964c07fc/lampOS/docs/verification/body-unplug-gap-source-20261025/candidate-with-live-worker",
+  "compiler": {
+    "rust": "1.96.0",
+    "commit": "ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+    "target_triple": "aarch64-apple-darwin",
+    "jobs": 1,
+    "incremental": false,
+    "offline": true,
+    "locked": true,
+    "test_threads": 1,
+    "owned_targets": "one positive target and five separate mutation targets; all newly created",
+    "record_census": {
+      "positive-no-run": {
+        "records": 58,
+        "fresh_true": 17,
+        "fresh_false": 41
+      },
+      "positive-full": {
+        "records": 58,
+        "fresh_true": 58,
+        "fresh_false": 0
+      },
+      "period-3s-no-run": {
+        "records": 44,
+        "fresh_true": 0,
+        "fresh_false": 44
+      },
+      "proof-100ms-no-run": {
+        "records": 44,
+        "fresh_true": 0,
+        "fresh_false": 44
+      },
+      "gap-permanent-no-run": {
+        "records": 44,
+        "fresh_true": 0,
+        "fresh_false": 44
+      },
+      "sample-noop-no-run": {
+        "records": 44,
+        "fresh_true": 0,
+        "fresh_false": 44
+      },
+      "worker-no-tick-no-run": {
+        "records": 44,
+        "fresh_true": 0,
+        "fresh_false": 44
+      }
+    }
+  },
+  "controller_sha256": "be2ad1c0bdc976afecd87d014d2b32dc1896a967f146e0dd7ebbe4a4795e5a1e",
+  "runner_sha256": "2a7b5d2224ad4f609e3fb87fb5072b20bacc581b2861b0313b8b9e55e1892be8",
+  "clock_scope": {
+    "timestamps": "local evidence file modification times, except explicit pre-exec wall-clock records",
+    "carry_before_recorded_plus07": "2026-10-26T00:29:54.636440+07:00",
+    "carry_after_recorded_plus07": "2026-10-26T00:29:55.084447+07:00",
+    "candidate_recorded_plus07": "2026-10-26T00:34:59.846194+07:00",
+    "gate_identity_recorded_plus07": "2026-10-26T00:34:59.877860+07:00",
+    "gate_verdict_recorded_plus07": "2026-10-26T00:39:01.662733+07:00"
+  },
+  "source_guards": {
+    "entries": 7075,
+    "candidate_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+    "final_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+    "runtime_and_other_existing_tests_unchanged": true,
+    "every_observation_fixed": true,
+    "five_mutations_each_restored": true
+  },
+  "full_body_counts": {
+    "passed": 609,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "summaries": 8,
+    "witnessed_test_executables": 7,
+    "doc_test_summary_passed": 0
+  },
+  "stages": [
+    {
+      "name": "toolchain",
+      "command_argv": [
+        "rustc",
+        "+1.96.0",
+        "-vV"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 30,
+      "timed_out": false,
+      "source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:35:00.573315+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:35:00.946854+07:00",
+      "stdout_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "fmt",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 120,
+      "timed_out": false,
+      "source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:35:01.314665+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:35:07.190698+07:00",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 1800,
+      "timed_out": false,
+      "source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:35:07.556659+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:35:30.275148+07:00",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "571ff394e795f702cc29e71beb2db830db40dc6d39317ff490a09632de418b06"
+    },
+    {
+      "name": "positive-no-run",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-run",
+        "--message-format=json-render-diagnostics"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 1800,
+      "timed_out": false,
+      "source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:35:30.640341+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:35:56.354393+07:00",
+      "stdout_sha256": "7d2b82a547ed45bdb2b092709888dc0defea740f33ca8d44c456cddde54484de",
+      "stderr_sha256": "16c745712416c2585d35180af82ff66708b7e17f919a8954d4828fa3e1329040"
+    },
+    {
+      "name": "positive-gap",
+      "command_argv": [
+        "<pre-exec-runner>",
+        "<compiled-library-test-executable>",
+        "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 20,
+      "timed_out": false,
+      "source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 440,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "result": "ok"
+        }
+      ],
+      "command_recorded_at_plus07": "2026-10-26T00:35:56.742425+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:35:58.314505+07:00",
+      "stdout_sha256": "41c3f83530ae49ef57af5d887e95fc19f1d732615bb672fb1f99623993b97d92",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "positive-full",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 900,
+      "timed_out": false,
+      "source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 441,
+          "result": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 32,
+          "result": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "result": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 5,
+          "result": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "result": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "result": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 125,
+          "result": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "result": "ok"
+        }
+      ],
+      "command_recorded_at_plus07": "2026-10-26T00:35:58.675632+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:36:33.163729+07:00",
+      "stdout_sha256": "3790b48d881410e597ab8e4a663648b2a1c52d77bfc3f0f98e2341a2cb1bce49",
+      "stderr_sha256": "bb076c45f5099c1edf7f038236e3507cde520e1c1c00b999542e2ed533bd3782"
+    },
+    {
+      "name": "period-3s-no-run",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-run",
+        "--message-format=json-render-diagnostics",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 1800,
+      "timed_out": false,
+      "source_manifest_sha256": "9fb80ea085f94cd3e9343b119ff905758f261e1f86dedf9bd4bbaee971a3b71d",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:36:33.526524+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:37:00.159216+07:00",
+      "stdout_sha256": "07cee77efb59a957aece5bfb889d56dd17380d05fa9e51a849245fd905d8e10a",
+      "stderr_sha256": "1c32a950762eaee7f305e219f05be7c56c904198dded581236741943c4ad8505"
+    },
+    {
+      "name": "period-3s",
+      "command_argv": [
+        "<pre-exec-runner>",
+        "<compiled-library-test-executable>",
+        "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "watchdog_seconds": 20,
+      "timed_out": false,
+      "source_manifest_sha256": "9fb80ea085f94cd3e9343b119ff905758f261e1f86dedf9bd4bbaee971a3b71d",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [
+        {
+          "failed": 1,
+          "filtered": 440,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "result": "FAILED"
+        }
+      ],
+      "command_recorded_at_plus07": "2026-10-26T00:37:00.539746+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:37:01.603904+07:00",
+      "stdout_sha256": "32a5e21018d19090f532accad5077533d874e4658f61a1c9dc9bfaec4515d2cd",
+      "stderr_sha256": "cd2295ed356a205013b966500c9a27fa6bf5b387b8915b48fa89d9e2064f82c1"
+    },
+    {
+      "name": "proof-100ms-no-run",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-run",
+        "--message-format=json-render-diagnostics",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 1800,
+      "timed_out": false,
+      "source_manifest_sha256": "cc0149694bb1cdef0a498100c5c7a84d242e31333850fa3f6b140346d6878408",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:37:02.304511+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:37:29.134353+07:00",
+      "stdout_sha256": "b8595692d9caede189cede2625de1f178083888481cc9339248b60fdcc47387d",
+      "stderr_sha256": "f0e1f1267428e12be7fef348c5caa6d2be105a48e2407487be4a1e112e54c8d8"
+    },
+    {
+      "name": "proof-100ms",
+      "command_argv": [
+        "<pre-exec-runner>",
+        "<compiled-library-test-executable>",
+        "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "watchdog_seconds": 20,
+      "timed_out": false,
+      "source_manifest_sha256": "cc0149694bb1cdef0a498100c5c7a84d242e31333850fa3f6b140346d6878408",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [
+        {
+          "failed": 1,
+          "filtered": 440,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "result": "FAILED"
+        }
+      ],
+      "command_recorded_at_plus07": "2026-10-26T00:37:29.510788+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:37:30.597034+07:00",
+      "stdout_sha256": "32a5e21018d19090f532accad5077533d874e4658f61a1c9dc9bfaec4515d2cd",
+      "stderr_sha256": "ff1069d7c83ad67fc748a34b0c4a28d1380796f2e3c1911d47f0449b40a94c5b"
+    },
+    {
+      "name": "gap-permanent-no-run",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-run",
+        "--message-format=json-render-diagnostics",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 1800,
+      "timed_out": false,
+      "source_manifest_sha256": "d47cd0a5b2db4541d1514bbd97e2edbcd92dc0b8daa4c931bb2a952f1fc5cd26",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:37:31.312392+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:37:58.555404+07:00",
+      "stdout_sha256": "329cf783564754dc23692869fe366ce3411ab53cdae6644618e610bb8efd3d43",
+      "stderr_sha256": "f01e5c2e6872af7d7783726dcdaeb817dd6a6223ff7e9d197ebce3a7557a752d"
+    },
+    {
+      "name": "gap-permanent",
+      "command_argv": [
+        "<pre-exec-runner>",
+        "<compiled-library-test-executable>",
+        "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "watchdog_seconds": 20,
+      "timed_out": false,
+      "source_manifest_sha256": "d47cd0a5b2db4541d1514bbd97e2edbcd92dc0b8daa4c931bb2a952f1fc5cd26",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [
+        {
+          "failed": 1,
+          "filtered": 440,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "result": "FAILED"
+        }
+      ],
+      "command_recorded_at_plus07": "2026-10-26T00:37:58.939696+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:37:59.999981+07:00",
+      "stdout_sha256": "3d36b84a8dfdbd2153ed984619585a6ce96b8501788e32d6ccc20d34254d3246",
+      "stderr_sha256": "483fdde2a74c0743cf3236cf84d70087fafee31d21e3193f5677ee99550d6c3c"
+    },
+    {
+      "name": "sample-noop-no-run",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-run",
+        "--message-format=json-render-diagnostics",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 1800,
+      "timed_out": false,
+      "source_manifest_sha256": "96ad999647d90ce406d8f03aa66607ff22dbecde62d3ca82c2daf6b1928a97c8",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:38:00.701719+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:38:27.958944+07:00",
+      "stdout_sha256": "5ca7625e5d91d09c6ca37a6bb25c4c597c81e355da0e720cbfbbf052dd2b22de",
+      "stderr_sha256": "95ff1e3ab2c59ebe3dc02e3d47507aaa78a332377c1902dc79af49e674d7f7e5"
+    },
+    {
+      "name": "sample-noop",
+      "command_argv": [
+        "<pre-exec-runner>",
+        "<compiled-library-test-executable>",
+        "unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "watchdog_seconds": 20,
+      "timed_out": false,
+      "source_manifest_sha256": "96ad999647d90ce406d8f03aa66607ff22dbecde62d3ca82c2daf6b1928a97c8",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [
+        {
+          "failed": 1,
+          "filtered": 440,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "result": "FAILED"
+        }
+      ],
+      "command_recorded_at_plus07": "2026-10-26T00:38:28.346956+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:38:29.548791+07:00",
+      "stdout_sha256": "70aabb5ffd56914bd36d8cb45f4ff63e5ff0ae7b0c9564031baddb435ecdac95",
+      "stderr_sha256": "60675ac6ccfb863cc41bbf9b827b7a3f0514e249e0bf40b09e8cbe9666225927"
+    },
+    {
+      "name": "worker-no-tick-no-run",
+      "command_argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-run",
+        "--message-format=json-render-diagnostics",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "watchdog_seconds": 1800,
+      "timed_out": false,
+      "source_manifest_sha256": "cfea7889f7c7c27a81773a56a92bd0f109db29218c74461ed5e1606ff63531d0",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [],
+      "command_recorded_at_plus07": "2026-10-26T00:38:30.258626+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:38:57.494990+07:00",
+      "stdout_sha256": "bb66f1b94495f8fe3efa590b51b26435a0e92e54c08edbad06946b6ea67b6920",
+      "stderr_sha256": "b4244e43610ba0e7f77610a4d5c44c89bf4db1896b3b286162b042b7c8c8791d"
+    },
+    {
+      "name": "worker-no-tick",
+      "command_argv": [
+        "<pre-exec-runner>",
+        "<compiled-library-test-executable>",
+        "unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "watchdog_seconds": 20,
+      "timed_out": false,
+      "source_manifest_sha256": "cfea7889f7c7c27a81773a56a92bd0f109db29218c74461ed5e1606ff63531d0",
+      "source_unchanged": true,
+      "process_group_closed": true,
+      "process_group_present_when_cleanup_began": false,
+      "owned_temporary_directory_removed": true,
+      "counts": [
+        {
+          "failed": 1,
+          "filtered": 440,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 0,
+          "result": "FAILED"
+        }
+      ],
+      "command_recorded_at_plus07": "2026-10-26T00:38:57.879901+07:00",
+      "result_recorded_at_plus07": "2026-10-26T00:39:00.959779+07:00",
+      "stdout_sha256": "40848b66db7edec6b7b4fbc64ed78cf8ef1f9190bdc00bd3472a307ed7a7e400",
+      "stderr_sha256": "a7024480890d3fdeb2dae503c7362c2f1d83ef7d402d372ee2e50e8406558dad"
+    }
+  ],
+  "positive_executable_bindings": [
+    {
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "source": "lampOS/crates/body/tests/it/main.rs",
+      "source_sha256": "4281b363940f8cbc823b147db9327656f74d11f802918976814884f18b4886be",
+      "executable_sha256": "251f84a5b1ae4b92537787024fea15a213036801b6a039d2129a29ce2920112f",
+      "size_bytes": 6632656,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "full_command_fresh": true,
+      "pre_exec_source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "observed_launches": [
+        {
+          "scope": "positive-full",
+          "at_plus07": "2026-10-26T00:36:31.932976+07:00",
+          "args": [
+            "--test-threads=1"
+          ]
+        }
+      ]
+    },
+    {
+      "target": "lamp-body",
+      "kind": [
+        "bin"
+      ],
+      "source": "lampOS/crates/body/src/bin/lamp-body.rs",
+      "source_sha256": "babf765889da252836437bb7d70de8c94f4e10e7c215a9aa2503fde194684291",
+      "executable_sha256": "b14c5b2d05c8021959516277234d861089bebbfeba31ab4fc5fdaeb61ab78c2d",
+      "size_bytes": 2741048,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "full_command_fresh": true,
+      "pre_exec_source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "observed_launches": [
+        {
+          "scope": "positive-full",
+          "at_plus07": "2026-10-26T00:36:29.281790+07:00",
+          "args": [
+            "--test-threads=1"
+          ]
+        }
+      ]
+    },
+    {
+      "target": "lamp-body-inspect",
+      "kind": [
+        "bin"
+      ],
+      "source": "lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+      "source_sha256": "4a62f197e62ef531643730e162c624c2f9ff562bae622582722207e941b04480",
+      "executable_sha256": "d724b3126e3babf2a49e0b4042f837296dcd4a326359acc50ae53dcec572a6d3",
+      "size_bytes": 1122608,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "full_command_fresh": true,
+      "pre_exec_source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "observed_launches": [
+        {
+          "scope": "positive-full",
+          "at_plus07": "2026-10-26T00:36:29.834909+07:00",
+          "args": [
+            "--test-threads=1"
+          ]
+        }
+      ]
+    },
+    {
+      "target": "lamp-body-measure",
+      "kind": [
+        "bin"
+      ],
+      "source": "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+      "source_sha256": "6892bc68303be099e2fa462a6f38da4f397c3a8803646f7ff4459d970694f62d",
+      "executable_sha256": "69ee77f8cc44aa33e1113017f993f2776e65da05230c4d2970781f7d2a9b9428",
+      "size_bytes": 1347856,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "full_command_fresh": true,
+      "pre_exec_source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "observed_launches": [
+        {
+          "scope": "positive-full",
+          "at_plus07": "2026-10-26T00:36:30.355222+07:00",
+          "args": [
+            "--test-threads=1"
+          ]
+        }
+      ]
+    },
+    {
+      "target": "lamp-body-mood",
+      "kind": [
+        "bin"
+      ],
+      "source": "lampOS/crates/body/src/bin/lamp-body-mood.rs",
+      "source_sha256": "962a18ca28278057126e120daab0a5fb5e0184ad8016bcaa8defbf4ea048ad30",
+      "executable_sha256": "49b11469766e5fba6b579c9ebb3628d19aeb40825dbdde2382900a4dfcb35718",
+      "size_bytes": 1142608,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "full_command_fresh": true,
+      "pre_exec_source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "observed_launches": [
+        {
+          "scope": "positive-full",
+          "at_plus07": "2026-10-26T00:36:30.883409+07:00",
+          "args": [
+            "--test-threads=1"
+          ]
+        }
+      ]
+    },
+    {
+      "target": "lamp-body-worker",
+      "kind": [
+        "bin"
+      ],
+      "source": "lampOS/crates/body/src/bin/lamp-body-worker.rs",
+      "source_sha256": "4f563278ef70e41037c12fd911788fcf3193b92680e8302bfc1fc1d6e8f06ea7",
+      "executable_sha256": "1be64941068e88dd4c655e2ba07cf2af89891e3cb223dd255f49c02e72042738",
+      "size_bytes": 1150528,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "full_command_fresh": true,
+      "pre_exec_source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "observed_launches": [
+        {
+          "scope": "positive-full",
+          "at_plus07": "2026-10-26T00:36:31.409086+07:00",
+          "args": [
+            "--test-threads=1"
+          ]
+        }
+      ]
+    },
+    {
+      "target": "lamp_body",
+      "kind": [
+        "lib"
+      ],
+      "source": "lampOS/crates/body/src/lib.rs",
+      "source_sha256": "d3d2c30cc4c2684f542ecb469a9d8b5eee9f32c963d9e60caf64b54de78e9eb5",
+      "executable_sha256": "2c79c2f35da69063bd8af32e4a493d45982c1cc01f5e6a5a7aa90d9a02e65884",
+      "size_bytes": 21002648,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "full_command_fresh": true,
+      "pre_exec_source_manifest_sha256": "ccdba309a61ab241c5ca374ac9b358198a1fe2583559d35e1201008fd8b425e9",
+      "observed_launches": [
+        {
+          "scope": "positive-gap",
+          "at_plus07": "2026-10-26T00:35:57.279568+07:00",
+          "args": [
+            "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+            "--exact",
+            "--nocapture",
+            "--test-threads=1"
+          ]
+        },
+        {
+          "scope": "positive-full",
+          "at_plus07": "2026-10-26T00:35:58.807692+07:00",
+          "args": [
+            "--test-threads=1"
+          ]
+        }
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "period-3s",
+      "unplug_sha256": "ec86dc69563569c441c926f17d2cb843f449067b85848e98d54fe9c2be96ed48",
+      "source_manifest_sha256": "9fb80ea085f94cd3e9343b119ff905758f261e1f86dedf9bd4bbaee971a3b71d",
+      "test": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+      "observations": 1,
+      "expected_failure": {
+        "classification": "intended-assertion",
+        "expected_line": 1014,
+        "expected_message": "first proof: no Ready in 2 s",
+        "intended_assertion_seen": true,
+        "test_failure_complete": true
+      },
+      "executable_sha256": "30302b59e091faceb52e26194a011145b6a0a2c5cb3c1192044595a6ffd2a6b0",
+      "size_bytes": 21002760,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "at_plus07": "2026-10-26T00:37:00.575800+07:00",
+      "source_restored_to_candidate": true
+    },
+    {
+      "name": "proof-100ms",
+      "unplug_sha256": "d23ef40dbcdae1eaafc646abe9cfad9798e584d38b0e86110346405211efc479",
+      "source_manifest_sha256": "cc0149694bb1cdef0a498100c5c7a84d242e31333850fa3f6b140346d6878408",
+      "test": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+      "observations": 1,
+      "expected_failure": {
+        "classification": "intended-assertion",
+        "expected_line": 1031,
+        "expected_message": "100ms",
+        "intended_assertion_seen": true,
+        "test_failure_complete": true
+      },
+      "executable_sha256": "86ac75e7ab7a5802294ea345ef88495896b919845170b354b7df447601a234cd",
+      "size_bytes": 21002952,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "at_plus07": "2026-10-26T00:37:29.546106+07:00",
+      "source_restored_to_candidate": true
+    },
+    {
+      "name": "gap-permanent",
+      "unplug_sha256": "64934f51a46956f4d3b21a6237eb56ad5eb0258b5abe68d771b6bf64562ea311",
+      "source_manifest_sha256": "d47cd0a5b2db4541d1514bbd97e2edbcd92dc0b8daa4c931bb2a952f1fc5cd26",
+      "test": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+      "observations": 1,
+      "expected_failure": {
+        "classification": "intended-assertion",
+        "expected_line": 1023,
+        "expected_message": "sample gap: waiting for Folding:",
+        "intended_assertion_seen": true,
+        "test_failure_complete": true
+      },
+      "executable_sha256": "97498098d44f7c52bbfbbbf2e0b65e1f7b43770e4902274a7c38dc73bf1a0480",
+      "size_bytes": 21003160,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "at_plus07": "2026-10-26T00:37:58.976379+07:00",
+      "source_restored_to_candidate": true
+    },
+    {
+      "name": "sample-noop",
+      "unplug_sha256": "b442a328402cc58e44678b7e5874e1f2de886f7f56a6d61bcf669503e30dc963",
+      "source_manifest_sha256": "96ad999647d90ce406d8f03aa66607ff22dbecde62d3ca82c2daf6b1928a97c8",
+      "test": "unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop",
+      "observations": 1,
+      "expected_failure": {
+        "classification": "intended-assertion",
+        "expected_line": 1076,
+        "expected_message": "left: 0",
+        "intended_assertion_seen": true,
+        "test_failure_complete": true
+      },
+      "executable_sha256": "3610dbe15fe206c77c39346eb8b707d3f96c0b0890c77379f3fbc2194e7e1d41",
+      "size_bytes": 21019160,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "at_plus07": "2026-10-26T00:38:28.382248+07:00",
+      "source_restored_to_candidate": true
+    },
+    {
+      "name": "worker-no-tick",
+      "unplug_sha256": "b25cb5f3c242de6ad2bd762ce381b432f5f12210f92be6382bfc9269d62a180a",
+      "source_manifest_sha256": "cfea7889f7c7c27a81773a56a92bd0f109db29218c74461ed5e1606ff63531d0",
+      "test": "unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop",
+      "observations": 1,
+      "expected_failure": {
+        "classification": "intended-assertion",
+        "expected_line": 1059,
+        "expected_message": "no Folding in 2 s",
+        "intended_assertion_seen": true,
+        "test_failure_complete": true
+      },
+      "executable_sha256": "1e9318a878b36c04193be45e38eb6ef1ddaffcb5d3c021e5563aab351a6c2c52",
+      "size_bytes": 21003256,
+      "mode_octal": "0755",
+      "no_run_fresh": false,
+      "at_plus07": "2026-10-26T00:38:57.916689+07:00",
+      "source_restored_to_candidate": true
+    }
+  ],
+  "limits": [
+    "Original three failed observations remain failed; no unchanged baseline was repeated.",
+    "No historical cause, host isolation, physical settling or hardware latency claim.",
+    "This proof records the exact execution base; later carries need their own input comparison.",
+    "Original PR Linux ARM64 and Linux formatting/Clippy CI are not run at this checkpoint.",
+    "No device or release action. Private controllers, complete inventories, absolute paths and binaries are omitted."
+  ]
+}

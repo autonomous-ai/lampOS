@@ -969,7 +969,11 @@ mod tests {
         let root = std::env::temp_dir().join(format!("unplug-gap-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let bus = Bus::new(&root).unwrap();
-        let adapter = Adapter::configured(bus.clone(), true).unwrap().unwrap();
+        let shared = Shared::default();
+        let mut publisher = bus
+            .publisher_declared(STATE_TOPIC, &State::declaration(), "body")
+            .unwrap();
+        let mut preparation = None;
         bus.publisher_declared(REQUEST_TOPIC, &Request::declaration(), "skills")
             .unwrap()
             .publish_json(
@@ -985,43 +989,122 @@ mod tests {
                 .map(|message| message.parse::<State>().unwrap())
                 .map(|state| (state.phase, state.why))
         };
-        // Each phase is waited for, sampling every 20 ms or not, up to 2 s
-        // (the reviewer-lead's P3 on #2548): a loaded runner can stall either
-        // thread past `FRESH_US`, and a fixed window then ends before the
-        // 500 ms of proof (#1569 row 67). Failing on the way is never waited
-        // out. How long each took, from its first sample.
-        let until = |want: Phase, sampling: bool| {
-            let began = std::time::Instant::now();
+        // Drive the existing production tick, as run_worker does, on one
+        // timeline. Samples remain 20 ms apart and worker steps use PERIOD;
+        // host scheduling cannot create an extra gap between these actors.
+        let origin = lamp_ipc::monotonic_us();
+        let elapsed = std::cell::Cell::new(0_u64);
+        let period_us = u64::try_from(PERIOD.as_micros()).unwrap();
+        let mut next_tick = 0;
+        let mut until = |label: &str, want: Phase, sampling: bool| {
+            let began = elapsed.get();
+            let host_began = std::time::Instant::now();
             loop {
-                if sampling {
-                    adapter.sample(true, None);
+                let offset = elapsed.get();
+                let now = origin + offset;
+                if sampling && offset.is_multiple_of(20_000) {
+                    shared.evidence.store((now << 1) | 1, Ordering::SeqCst);
                 }
-                if let Some((now, why)) = phase() {
-                    if now == want {
-                        return (why, began.elapsed());
-                    }
-                    assert_ne!(now, Phase::Failed, "waiting for {want:?}: {why}");
+                if offset >= next_tick {
+                    shared.tick(&bus, &mut publisher, &mut preparation, false, || now);
+                    next_tick = offset + period_us;
                 }
+                assert!(shared.latched.load(Ordering::SeqCst));
+                let took = Duration::from_micros(offset - began);
                 assert!(
-                    began.elapsed() < Duration::from_secs(2),
-                    "no {want:?} in 2 s: {:?}",
+                    took < Duration::from_secs(2) && host_began.elapsed() < Duration::from_secs(2),
+                    "{label}: no {want:?} in 2 s: {:?}",
                     phase()
                 );
-                thread::sleep(Duration::from_millis(20));
+                if let Some((now, why)) = phase() {
+                    if now == want {
+                        return (why, took);
+                    }
+                    assert_ne!(now, Phase::Failed, "{label}: waiting for {want:?}: {why}");
+                }
+                // Read the synchronous bus result before advancing time.
+                elapsed.set(offset + 10_000);
             }
         };
         // Never Ready before half a second of samples.
-        let (_, took) = until(Phase::Ready, true);
+        let (_, took) = until("first proof", Phase::Ready, true);
         assert!(took >= Duration::from_micros(SETTLE_US), "{took:?}");
         // A gap is not Ready, and not a failure.
-        until(Phase::Folding, false);
-        let (_, took) = until(Phase::Ready, true);
+        until("sample gap", Phase::Folding, false);
+        let (_, took) = until("proof after gap", Phase::Ready, true);
         assert!(took >= Duration::from_micros(SETTLE_US), "again {took:?}");
-        adapter.sample(false, Some(3));
-        let (why, _) = until(Phase::Failed, false);
+        // The same unsafe-sample fields that Adapter::sample publishes.
+        shared.why.store(4, Ordering::SeqCst);
+        shared.invalid.fetch_add(1, Ordering::SeqCst);
+        shared
+            .evidence
+            .store((origin + elapsed.get()) << 1, Ordering::SeqCst);
+        let (why, _) = until("unsafe sample", Phase::Failed, false);
         assert!(why.contains("a joint moved"), "{why}");
-        drop(adapter);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_enabled_adapter_publishes_its_latch_and_joins_after_stop() {
+        let root = std::env::temp_dir().join(format!("unplug-live-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = Bus::new(&root).unwrap();
+        let adapter = Adapter::configured(bus.clone(), true).unwrap().unwrap();
+        bus.publisher_declared(REQUEST_TOPIC, &Request::declaration(), "skills")
+            .unwrap()
+            .publish_json(
+                1,
+                &Request {
+                    request: "live-1".into(),
+                },
+            )
+            .unwrap();
+        let until = |want: Phase| {
+            let began = std::time::Instant::now();
+            loop {
+                assert!(
+                    began.elapsed() < Duration::from_secs(2),
+                    "no {want:?} in 2 s"
+                );
+                if let Some(message) = bus.latest(STATE_TOPIC).unwrap() {
+                    let state = message.parse::<State>().unwrap();
+                    assert_eq!(state.request, "live-1");
+                    if state.phase == want {
+                        return state;
+                    }
+                    assert_ne!(state.phase, Phase::Failed, "{}", state.why);
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+        };
+        assert!(until(Phase::Folding).why.is_empty());
+        assert!(adapter.latched());
+        // Exercise the actual Adapter encoder as well as the worker thread;
+        // the functional gap test drives its evidence fields explicitly.
+        let began = lamp_ipc::monotonic_us();
+        adapter.sample(true, None);
+        let evidence = adapter.shared.evidence.load(Ordering::SeqCst);
+        assert_eq!(evidence & 1, 1);
+        assert!((began..=lamp_ipc::monotonic_us()).contains(&(evidence >> 1)));
+        let began = lamp_ipc::monotonic_us();
+        adapter.sample(false, Some(3));
+        let evidence = adapter.shared.evidence.load(Ordering::SeqCst);
+        assert_eq!(evidence & 1, 0);
+        assert!((began..=lamp_ipc::monotonic_us()).contains(&(evidence >> 1)));
+        assert_eq!(adapter.shared.invalid.load(Ordering::SeqCst), 1);
+        assert_eq!(adapter.shared.why.load(Ordering::SeqCst), 4);
+        adapter.stop();
+        let stopped = until(Phase::Failed);
+        assert!(stopped.why.contains("body stopped"), "{}", stopped.why);
+        assert!(adapter.latched());
+        let began = std::time::Instant::now();
+        drop(adapter);
+        assert!(
+            began.elapsed() < Duration::from_secs(2),
+            "worker join took 2 s"
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(!root.exists());
     }
 
     /// The reviewer on #1699 (09:38): Ready at 12 s, a gap at 35 s. Proving
