@@ -1084,10 +1084,11 @@ impl Days {
         )?;
         // Their versions, both ways, stopping at one someone else was seen
         // saying: it stays, and so does what lies past it (Friday's P2 on
-        // #3213).
+        // #3213). An adopted version is now someone's own and stops this
+        // room-only walk too; adoption keeps its links for ordinary forget.
         tx.execute(
-            "WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid WHERE NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.newer AND p.speaker!=?1) UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid WHERE NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.older AND p.speaker!=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",
-            [speaker],
+            "WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid JOIN entries e ON e.rid=r.newer WHERE e.person=?2 AND NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.newer AND p.speaker!=?1) UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid JOIN entries e ON e.rid=r.older WHERE e.person=?2 AND NOT EXISTS (SELECT 1 FROM speakers p WHERE p.rid=r.older AND p.speaker!=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",
+            params![speaker, Person::EVERYONE],
         )?;
         // One step down from what is named, never up: only what has at
         // least one source and none outside it, read whole before any of

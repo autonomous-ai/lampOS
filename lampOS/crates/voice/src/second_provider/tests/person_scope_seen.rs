@@ -108,6 +108,8 @@ struct Outcome {
     noted: Vec<Noted>,
     /// Whose context each chat was told, in the order asked.
     asked: Vec<Message>,
+    /// Every output of the turn, as [`turn`]'s labels.
+    labels: Vec<String>,
 }
 
 async fn one_line(
@@ -204,7 +206,7 @@ async fn one_line_eyes(
     engine.submit(audio(1, 1));
     tokio::time::sleep(Duration::from_millis(40)).await;
     engine.submit(end(1));
-    turn(&mut engine).await;
+    let labels = turn(&mut engine).await;
     done.store(true, Ordering::Release);
     feeder.join().unwrap();
     clean(&path);
@@ -226,6 +228,7 @@ async fn one_line_eyes(
         told: asked[0].clone(),
         noted: noted.lock().unwrap().clone(),
         asked,
+        labels,
     }
 }
 
@@ -354,6 +357,8 @@ async fn with_no_eyes_to_read_a_line_is_the_rooms() {
 }
 
 const TOKYO: &str = "I'm flying to Tokyo next week.";
+/// The scripted voice's audio label for the reply.
+const AUDIO: &str = "audio:17";
 const TOKYO_EARLY: &str = "i'm flying to tokyo next week";
 
 /// A chat that answers in words, enough for a prepared round and another.
@@ -362,6 +367,28 @@ fn answers() -> Vec<Vec<net::Result<ChatEvent>>> {
         vec![text("Have a good trip."), Ok(ChatEvent::Done)],
         vec![text("Have a good trip."), Ok(ChatEvent::Done)],
     ]
+}
+
+/// The scripted reply said once, its audio played, and the turn complete,
+/// not failed.
+fn spoken(got: &Outcome, why: &str) {
+    let said: Vec<&String> = got
+        .labels
+        .iter()
+        .filter(|label| label.starts_with("said:"))
+        .collect();
+    assert_eq!(said, ["said:Have a good trip."], "{why}: {:?}", got.labels);
+    assert!(
+        got.labels.iter().any(|label| label == AUDIO),
+        "{why}: its audio, {:?}",
+        got.labels
+    );
+    assert_eq!(
+        got.labels.last().map(String::as_str),
+        Some("complete"),
+        "{why}: {:?}",
+        got.labels
+    );
 }
 
 /// One line with `LAMP_SECOND_PREPARED` and early words.
@@ -398,6 +425,7 @@ async fn an_off_camera_lines_early_words_ask_nothing_for_the_silent_owner() {
         "one chat, the room's"
     );
     assert_eq!(got.lease, None);
+    spoken(&got, "the room's answer comes");
 }
 
 /// The owner seen speaking: not prepared early either, and their answer is
@@ -411,6 +439,7 @@ async fn the_owner_seen_speaking_is_answered_as_theirs_on_the_final_words() {
         got.asked,
         [Message::system(format!("for {:?}", Some(a.as_str())))]
     );
+    spoken(&got, "answered as theirs");
 }
 
 /// Off, the early words prepare as before: memory asked on them for the

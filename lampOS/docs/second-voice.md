@@ -3160,7 +3160,26 @@ after a take-over, but now for every turn:
   actual answer renews the allowance; admitting a line does not. At most
   four recent eligible line ends are kept, and missing, future or evicted
   ends give no extension. Identity checks and the switch-off path remain
-  unchanged. A stop (`Did::Stopped`, from the next line's `after_stop`) and
+  unchanged. When that colleague print is first learned at the current
+  owner's verdict, the worker rechecks the current line's captured start
+  against the newly available window. It always reads the cached reply
+  again and retains any own-voice likeness consumed by the first lookup
+  in preference to the second result, including its same/other-voice
+  classification for the downstream same-speaker rule. Neither lookup
+  waits for a print. A line admitted only by this newly opened late window
+  is not recorded as another eligible colleague end: a later print for
+  that line gives no further extension. This fails closed.
+  In Busy, Unknown and Quiet, that new eligibility still needs the owner's
+  positive face or sufficiently nearer voice; missing, uncertain or
+  confusable voice evidence is held for this verdict without turning a
+  quiet or unknown room busy. A +25 s owner start can pass; +45 s cannot.
+  The chronological control covers both an active 30 s thread and an
+  expired 60 s thread. It uses a synthetic 1.5 s sure-other bar only;
+  the production 2.5 s bar and the 1.5 s print limit are unchanged.
+  The answer clock is existing `Did::Said` queued-PCM duration bookkeeping,
+  not acoustic drain attestation. Physical last-word timing and activation
+  still need the lamp's attended check.
+  A stop (`Did::Stopped`, from the next line's `after_stop`) and
   a privacy change end it, and a forgetting leaves no words to carry from.
   The caller's own face seen speaking turned away from the lamp is someone
   talking to a colleague (reviewer-two at 03:01): held, and it ends the
@@ -3315,7 +3334,9 @@ after a take-over, but now for every turn:
   `LAMP_SECOND_PREPARED`, a person-scoped line is not prepared on its early
   words (`prepared_on`): no memory, context or chat for them before its end
   is read; the final words are asked as ever, and a room's line still
-  prepares (Second's P2 on #3437).
+  prepares (Second's P2 on #3437). Cost: the owner's own lines lose the
+  early start too, even when their face is seen speaking (reviewer-three's
+  P3 on #3437).
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted

@@ -267,6 +267,13 @@ fn all_six_tools_reach_real_schedule_through_the_real_actions_server() {
     assert_eq!(timer["result"]["status"], "committed");
     assert_eq!(timer["result"]["id"], 1);
     assert_eq!(timer["result"]["due_unix_ms"], WALL + 600_000);
+    // The local HH:MM the model says, beside `local` (lamp-4ace, 25 Oct: it
+    // read "07:34" out of `local` and said "seven thirty-four" at 21:07).
+    let local = timer["result"]["local"].as_str().unwrap();
+    assert_eq!(
+        timer["result"]["clock"].as_str(),
+        lamp_actions::schedule::clock_of(local).as_deref()
+    );
     let once = actions.call("set_reminder", json!({"text":"Call Ana","time":"09:00","day":"tomorrow","zone":"Asia/Ho_Chi_Minh","fold":"reject"}));
     assert_eq!(once["result"]["id"], 2);
     for (args, id) in [
@@ -956,4 +963,21 @@ fn a_full_due_only_page_still_fits_its_count_of_what_is_not_yet_due() {
         }
         script.finish();
     }
+}
+
+/// The clock the model says, from the schedule's `local`: the wall clock's
+/// hour and minute, never the minute and second (lamp-4ace, 25 Oct).
+#[test]
+fn the_clock_is_the_local_hour_and_minute() {
+    use lamp_actions::schedule::clock_of;
+    assert_eq!(
+        clock_of("2026-10-25T21:07:34.939+07:00[Asia/Ho_Chi_Minh]").as_deref(),
+        Some("21:07")
+    );
+    assert_eq!(
+        clock_of("2026-10-26T09:00:00+00:00[Etc/UTC]").as_deref(),
+        Some("09:00")
+    );
+    assert_eq!(clock_of("next week"), None);
+    assert_eq!(clock_of("2026-10-25T9:7"), None);
 }

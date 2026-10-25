@@ -936,17 +936,25 @@ fn dropping_reaped_predecessor_does_not_remove_active_successor_sockets() {
         assert!(next_dir.join(name).exists());
     }
     assert!(next.is_ready() && !next.reaped());
-    next.stop().unwrap();
+    // The assertion above is about the predecessor leaving a live successor
+    // alone. Fixture cleanup does not make that proof depend on a graceful
+    // Stop acknowledgement arriving inside the product's 20 ms deadline.
+    // The worker-loop/clean-replacement test checks that separate contract.
+    next.fail(
+        "successor socket fixture cleanup",
+        SystemClock.now().as_micros(),
+    );
     until(&mut next, |s| {
-        s.poll().unwrap();
+        let _ = s.poll();
         s.reaped()
     });
-    for _ in 0..8 {
-        if next.poll().unwrap().is_none() {
-            break;
-        }
+    assert!(next.killed_at.is_some());
+    assert!(!next.clean_exit());
+    assert!(next.ipc_cleanup_error().is_none());
+    assert!(next.directory.peers_cleaned);
+    for name in Directory::PEERS {
+        assert!(!next_dir.join(name).exists());
     }
-    assert!(next.clean_exit(), "{:?}", next.failure());
     drop(next);
     assert!(!next_dir.exists());
 }
