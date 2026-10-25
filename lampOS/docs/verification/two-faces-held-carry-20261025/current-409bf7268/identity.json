@@ -1,0 +1,50 @@
+{
+  "previous_head": "246a353bde0447599771b342d1c3e7cc6c9e73b1",
+  "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+  "prepared_tree": "6c1018f7fb780af383e47f5664648d883cd90903",
+  "inherited_paths_only": [
+    ".github/workflows/ci.yml",
+    "lampOS/docs/verification/v2-image-bootstrap-20261026/README.md",
+    "lampOS/docs/verification/v2-image-bootstrap-20261026/SHA256SUMS",
+    "lampOS/docs/verification/v2-image-bootstrap-20261026/inputs.sha256",
+    "lampOS/docs/verification/v2-image-bootstrap-20261026/test-results.txt",
+    "scripts/imager/Makefile",
+    "scripts/imager/README.md",
+    "scripts/imager/build-orangepi-v2.sh",
+    "scripts/imager/tests/test_v2_image_inputs.sh"
+  ],
+  "rust_and_named_build_inputs_unchanged": true,
+  "reader_search": "lampOS/crates/update/src/image.rs:33:/// the standard lamp (scripts/imager, `apply-overrides.py`).\nlampOS/crates/setup/fixtures/nginx-setup.conf:1:# V1's site (scripts/imager/build-orangepi.sh on origin/main, \"verbatim from\n",
+  "gate_scope": "Nine inherited image-only paths. Rust source, Cargo manifests/lock/toolchain, install.md and the two lampOS CI workflow inputs are unchanged. Existing exact-source Mac qualification is retained; fresh format and all five new image-input checks pass. Fresh native checks will run on the offered head.",
+  "fresh_fmt": {
+    "command": "cargo +1.96.0 fmt --all --check",
+    "exit": 0
+  },
+  "image_inputs": {
+    "command": "bash scripts/imager/tests/test_v2_image_inputs.sh",
+    "exit": 0,
+    "passed": 5,
+    "failed": 0,
+    "started": "2026-10-25T19:59:36.379614+00:00",
+    "finished": "2026-10-25T19:59:37.507879+00:00",
+    "raw_log_sha256": "5cf45f949102cb09ae58b7757e8dc2f7734ee067dbfb3b0d60c560345c4833a9"
+  },
+  "qualified_head": "5e091090926aa8d4288e0f654acd12daa5f1ae4e",
+  "qualified_tree": "6c1018f7fb780af383e47f5664648d883cd90903",
+  "comparison": {
+    "previous_entries": 10574,
+    "current_entries": 10575,
+    "changed_entries": [
+      ".github/workflows/ci.yml",
+      "lampOS/docs/verification/v2-image-bootstrap-20261026/README.md",
+      "lampOS/docs/verification/v2-image-bootstrap-20261026/SHA256SUMS",
+      "lampOS/docs/verification/v2-image-bootstrap-20261026/inputs.sha256",
+      "lampOS/docs/verification/v2-image-bootstrap-20261026/test-results.txt",
+      "scripts/imager/Makefile",
+      "scripts/imager/README.md",
+      "scripts/imager/build-orangepi-v2.sh",
+      "scripts/imager/tests/test_v2_image_inputs.sh"
+    ],
+    "incoming_diff_equals_release_delta": true
+  }
+}
