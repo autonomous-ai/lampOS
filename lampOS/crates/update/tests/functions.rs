@@ -31,13 +31,13 @@ const CHAT: &str = "chat: ";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 15 (with
-/// onboarding's two since 25 Oct), the actions part's 17 and the skills' 2
-/// (Dance's, and the wellbeing nudges' one `wellbeing_nudges`), before the
-/// search and the look. A change to it is a change to what every session is
-/// told: say in its pull request what is left out past the bound, if
-/// anything.
-const PRODUCT_FUNCTIONS: usize = 34;
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 16 (with
+/// onboarding's two and memory's `forget_everything` since 25 Oct), the
+/// actions part's 17 and the skills' 2 (Dance's, and the wellbeing nudges'
+/// one `wellbeing_nudges`), before the search and the look. A change to it
+/// is a change to what every session is told: say in its pull request what
+/// is left out past the bound, if anything.
+const PRODUCT_FUNCTIONS: usize = 35;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
