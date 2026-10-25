@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-25 17:58 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-25 18:48 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 93.1% over 70 rows. Quality 66.2% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 93.1% over 70 rows. Quality 66.6% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -91,7 +91,7 @@ Written by the first builder from the team's review page at 2026-10-25 17:58 (+0
 |---|---|---|---|
 | Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
 | Knows when you have finished | 0.70 | 0.85 | 25 Oct 16:0x, up from 0.65: on the ship candidate (6786, every part on it, the voice exactly as the product unit sets it) all ten of the owner’s “Lamp, (pause) question” lines were answered, six of them split at the paus… |
-| Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
+| Cutting in | 0.55 | 0.75 | 25 Oct 19:0x, up from 0.5: on lamp-52e6 with the ship candidate’s own product switches (Seventh, played ElevenLabs lines, an empty room), every real cut-in stopped the story, 4 of 4, with no false stop; |
 | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
 | Not spoken to | 0.60 | 0.90 | 25 Oct 14:4x, unchanged: in a busy played round on lamp-4ace 4 of 6 desk lines were left alone; |
