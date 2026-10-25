@@ -4,6 +4,11 @@
 
 Ready for lamp-voice: no
 
+Evidence correction: the pinned nextest test default was 200 ms, not
+100 ms. Both controls used the unchanged default, with no override.
+Historical private plans retain their incorrect descriptive field with a
+separate erratum. No observation was repeated for this correction.
+
 [Product carrier #3466](https://github.com/autonomous-ai/lampOS/pull/3466) is
 delivered at `e52e3c525` on `0ddd07377`. All three commits are equal across
 the carry. Fresh Mac formatting, strict all-target Clippy across the actual
@@ -25,8 +30,7 @@ The claimed same-voice journal test repair retains the actual
 `Prints::journaled` constructor, fixture and every journal assertion, then
 closes its channels and waits for worker completion and child reaping. On
 matched `86416a0d3`, exactly one original control passed with LEAK and one
-candidate passed without LEAK, using nextest 0.9.149, no retries, the same 100
-ms leak policy and the same 3,765-case inventory. The original's child
+candidate passed without LEAK, using nextest 0.9.149, no retries, the same 200 ms test leak timeout and the same 3,765-case inventory. The original's child
 remained until its natural exit 29.780 s later; neither supervisor sent a
 signal. Production layout and behavior are unchanged. On
 `fa31dd56c/0ddd07377`, formatting, strict all-target 12-crate Clippy, the full
