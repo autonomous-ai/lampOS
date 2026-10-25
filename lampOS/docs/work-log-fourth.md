@@ -8712,3 +8712,7 @@ Current build-rows.md on22b scores the memory-quality row0.35 after today's owne
 ## 2026-10-24: Photo origin interface made concrete
 
 [Source-owner proposal](verification/photo-origin-contract-20261024/README.md) maps actual capture identity loss, clone/rebind and fresh-timestamp replay on pinned Main6b/Commone9d. It recommends a bounded producer-owned monotone decision, optional existing private IPC and one-shot accepted-audio seal; no ledger, source freshness inference or new service. Budgets and compatibility cases are proposed, not measured. First retains active producer fixes; Fourth consumes only opaque evidence, with original/interval/physical holds unchanged. No code or test claim.
+
+## 25 October, 11:00 ICT — memory plan checkpoint
+
+Updated [the 0.35-to-0.90 plan](verification/memory-quality-plan-20261024/README.md) against Main a176e66d9: historical green heads, the later failed Mac carry, the reviewer-cleared but unrun callback correction, current Common carry and fixture validation are distinct. Name/callback remain parent-first; Photo remains off. No score, default, lamp or new runtime qualification is claimed. Final journal validation is active after fmt/strict Skills Clippy/no-run passed; full and direct exact outcomes will be recorded separately.

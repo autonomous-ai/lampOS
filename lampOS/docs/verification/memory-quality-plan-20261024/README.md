@@ -1,6 +1,6 @@
 # Memory quality: current route to 0.90
 
-The sampled `origin/lamp-voice` is `22b753df5`; its quality row is **0.35**, target **0.90**, after the owner's 24 October recognition/hearing failure. First owns the score and release acceptance. This plan updates the stale 0.40 handoff; completed software and historical tests do not raise today's score by themselves.
+The current checkpoint below samples `origin/lamp-voice` at `a176e66d9` on 25 October, 11:00 ICT; its quality row remains **0.35**, target **0.90**, after the owner's 24 October recognition/hearing failure. First owns the score and release acceptance. This plan updates the stale 0.40 handoff; completed software and historical tests do not raise today's score by themselves.
 
 ## Already built
 
@@ -18,9 +18,12 @@ The sampled `origin/lamp-voice` is `22b753df5`; its quality row is **0.35**, tar
 
 ## Next delivery and evidence
 
-#3064 is the next code delivery; its current source is tested tree 778e51d10 on 2e2eee360. At this note's publication Linux is all eight stages exit 0; Mac fmt/strictClippy/build/Eyes/Voice/Update/Skills pass and Memory remains active. A docs-only final binding and exact own-branch lease push follow a successful terminal. No unrun stage is green.
+Current checkpoint, 25 October 11:00 ICT:
 
-Two useful test-only combinations are under harness feasibility audit: real name+hits callbacks under both flags through captured model payload for silent-A/off-camera-B; and production missing-read/frame recovery through carried/current dispatch. Existing component tests and source fences cover those pieces, but no single combined fixture is claimed. Check open and merged work and claim before coding any follow-up.
+- **Common #3064 remains the next parent delivery.** Public `e9d00f935` has historical green native gates on its original base; those do not qualify a later carry. A fresh source carry onto `a176e66d9` is being prepared, preserving Main's newer bounded chat-tool behavior. Its current gates are not run. The intervening `f5d92567e` Mac full Voice failure (12 failures) remains failed; matching baseline diagnostics provide no waiver.
+- **The combined callback fixture now exists in #3391.** Public `26102b834` has its earlier two-host receipts. Review later found that its three selector negatives did not prove a refusing final validator, and found stderr/temp-root gaps. The unapplied correction at [6aeae8175](https://github.com/autonomous-ai/lampOS/commit/6aeae8175f) adds actual admitted private composition followed by real final denial, checks child stderr and exclusively creates a private temporary root. Reviewer-lead has cleared all three corrections in source. Its new runtime gates and forced-Ready control remain unrun; no correction-head READ-OK or code push is claimed.
+- **Fixture validation is separate from product qualification.** The producer's final Skills journal fixture `cf762f38e`, frozen on `34c8b517c`, is running one full Skills observation and one direct exact observation after fmt, strict Skills Clippy and no-run passed. This is not a latest-Main Common gate, and no old failed observation is replaced. All old source and raw records retain their identities.
+- **Children remain parent-first.** Name #3014 and callback #3391 stay draft until Common lands, then require their own actual-Main rebase, range-diff and current gates. Photo #2988 remains off and additionally lacks trusted original-capture/whole-interval implementation and acceptance. No default, score, lamp or release acceptance changes in this checkpoint.
 
 After source/native/privacy acceptance and the hearing freeze is lifted, the assigned lamp holder runs the controlled name/fact/correction/privacy round under the current product. #2510 already specifies 10 runs per shipping case and a 60 ms per-turn-hit budget; keep these boundaries and report first use, repeated use, slow/unavailable Memory and first-sound latency separately. The historical 377 second recall remains credited without pretending it validates a new binary. No target-hardware latency or original-capture/liveness proof is claimed here.
 
