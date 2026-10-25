@@ -6,6 +6,24 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 19:03 — Aside source read completed
+
+Ready for lamp-voice: no (Body's current dependent command remains active).
+
+Source-only read of #3468 `aacf20f38`: no P1/P2 in the off path, both
+listener paths, stop/question precedence or census. The existing 700 ms
+speech, 500 ms post-ask and 1.1 s yield bounds remain. No independent
+execution or READ-OK from Third; Seventh owns the played A/B and product
+activation. [Review](https://github.com/autonomous-ai/lampOS/pull/3468#issuecomment-6397264854).
+#3469 already has two completed docs reads, so no duplicate Third read.
+
+After the Queue's disk notice, this workspace's data volume reports
+109 GiB available. Third's sole active Cargo target is 35 GB. It is kept
+while the gate runs; results and any failure controls are preserved before
+cleaning the whole owned target. No other builder's cache was touched.
+The Body evidence draft now separates the completed original gate from
+the current command and later integration; no pending result is green.
+
 ## 2026-10-25 18:44 — Current Body build passed; Store boundary read
 
 Ready for lamp-voice: no (dependent tests and the current integration remain).
