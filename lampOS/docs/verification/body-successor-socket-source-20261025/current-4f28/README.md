@@ -9,3 +9,5 @@ All 7,041 tracked source records match before/after and independently bind to th
 The export contains 14 safe text payloads with original/published hashes; private home paths are redacted, no Python or binaries are published. Wrapper/auditor/private witness bytes and live closure remain producer-bound to external readers. Fixture-spawned children are not individually wrapped. No acoustic, hardware, isolation, old-failure cause or waiver claim.
 
 Original new-head ARM 40154602787 and Linux 40154602728 are separate and pending at publication. Independent prior 56 read approvals require an explicit carry disposition; author readiness is not inferred. Old 56/662 native and local results, including the unqualified baseline-library epoch and all failed observations, remain separate and unchanged.
+
+The complete test transcript retains its emitted trailing blank line. Ordinary Git whitespace checking reports that evidence-file blank at EOF; it is intentionally retained with the recorded payload hash. Code and documentation whitespace checks pass, and checking the whole evidence diff with only blank-at-EOF excluded reports no other whitespace fault.
