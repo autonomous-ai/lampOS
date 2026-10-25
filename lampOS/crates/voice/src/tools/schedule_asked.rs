@@ -43,78 +43,74 @@ const ASKS: &[(&[&str], bool)] = &[
     (&["timer", "for"], true),
     (&["wake", "me"], false),
 ];
-/// A timer or reminder taken back anywhere in the line, clause by clause,
-/// beside [`crate::remember::asked::withdrawn`]'s ("Actually, don't remind
-/// me", "do not set the timer", "cancel the timer": reviewer-two's P2 on
-/// `50e0a193b`). After a pronoun the words are the line's content ("…that
-/// I don't set the table").
-const WITHDRAWN: &[&[&str]] = &[
-    &["don't", "remind"],
-    &["dont", "remind"],
-    &["do", "not", "remind"],
-    &["don't", "set"],
-    &["dont", "set"],
-    &["do", "not", "set"],
-    &["don't", "wake"],
-    &["do", "not", "wake"],
-    &["don't", "start"],
-    &["do", "not", "start"],
-    &["cancel", "the"],
-    &["cancel", "it"],
-    &["cancel", "that"],
-    &["cancel", "this"],
-    &["no", "timer"],
-    &["no", "reminder"],
-    &["no", "alarm"],
-    &["forget", "the", "timer"],
-    &["forget", "the", "reminder"],
-];
-/// Before a withdrawal's words, what makes them the line's content.
-const ABOUT_SOMEONE: &[&str] = &["i", "we", "they", "he", "she", "you", "it"];
-
-/// Whether the line takes a timer or a reminder back anywhere
-/// ([`WITHDRAWN`]), or a keep ([`crate::remember::asked::withdrawn`]).
-fn withdrawn(said: &str) -> bool {
-    crate::remember::asked::withdrawn(said)
-        || said
-            .replace('\u{2019}', "'")
-            .split(['.', '!', '?', ';', ',', ':', '\u{2014}', '\u{2013}'])
-            .any(|clause| {
-                let words = lower_words(clause);
-                (0..words.len()).any(|at| {
-                    WITHDRAWN.iter().any(|phrase| {
-                        words.len() >= at + phrase.len()
-                            && words[at..at + phrase.len()]
-                                .iter()
-                                .zip(phrase.iter())
-                                .all(|(word, withdrawn)| word == withdrawn)
-                            && !at.checked_sub(1).is_some_and(|before| {
-                                ABOUT_SOMEONE.contains(&words[before].as_str())
-                            })
-                    })
-                })
-            })
-}
 /// Units of a duration, whole words.
 const UNITS: &[&str] = &[
     "second", "seconds", "minute", "minutes", "min", "mins", "hour", "hours", "half",
 ];
 
+/// A word that, anywhere in the line, may take the ask back or put it in
+/// doubt: "Actually no, don't.", "No wait, don't.", "don't bother", "Hold
+/// on", "Can you cancel the timer?" (reviewer-three's and reviewer-two's P2s
+/// on `52fbf23c4`). With one, nothing is forced: a missed force only means
+/// the model answers as it would without the switch, while a wrong one sets
+/// what nobody asked for. Words, not phrases, so no form of them slips past.
+const DOUBT: &[&str] = &[
+    "don't",
+    "dont",
+    "not",
+    "no",
+    "nope",
+    "wait",
+    "hold",
+    "cancel",
+    "stop",
+    "never",
+    "nevermind",
+    "scratch",
+    "forget",
+    "bother",
+    "actually",
+    "instead",
+    "rather",
+    "unless",
+    "maybe",
+    "whichever",
+    "either",
+    "or",
+];
+
+/// Words that may stand between the ask and its time ("remind me tomorrow
+/// at six", "wake me up at seven").
+const BETWEEN: &[&str] = &["up", "tomorrow", "today", "tonight", "please", "again"];
+
+/// What may follow a clock time for it to stand as one ("at nine.", "at 6:30
+/// to …", "at seven tomorrow"), never a noun ("at 180 degrees", "at 3
+/// pharmacies").
+const AFTER_A_TIME: &[&str] = &[
+    "to", "and", "am", "pm", "a", "p", "o'clock", "tonight", "tomorrow", "today", "please",
+    "sharp", "in", "this", "on",
+];
+
 /// Which function a line that plainly asks for a timer or a reminder
-/// ([`ASKS`]) at a sentence's start must call, from that ask's own sentence
-/// and only the words after the ask (reviewer-two's P2 on `50e0a193b`: a
-/// time in another sentence, "My train got in at nine.", is not the
-/// reminder's): [`TIMER`] for a duration from now ("in three minutes", and
-/// for a timer "for ten minutes"), [`REMINDER`] for a clock time ("at
-/// nine", "at 6:30", "o'clock", "noon"). None when that part says neither
-/// or both, the line asks what is set ("do I have any reminders?"), is a
-/// question that isn't an ask ("Will you remind me?"), or takes the ask
-/// back anywhere ([`withdrawn`]).
+/// ([`ASKS`]) at a sentence's start must call, from the words right after
+/// the ask (reviewer-two's and reviewer-three's P2s on `50e0a193b` and
+/// `52fbf23c4`): [`TIMER`] for a length from now ("remind me in three
+/// minutes …", "set a timer for ten minutes"), [`REMINDER`] for a clock time
+/// ("remind me at nine …", "remind me tomorrow at 6:30 …", "wake me up at
+/// seven", "at noon"). A time later in the line ("remind me to tell her I got
+/// home at nine", "it needs 20 minutes at 180 degrees") forces nothing, nor
+/// a line with a word of [`DOUBT`] anywhere, nor one that is a question that
+/// isn't an ask, nor a keep taken back
+/// ([`crate::remember::asked::withdrawn`]). It errs toward not forcing.
 pub fn asks_to_set(said: &str) -> Option<&'static str> {
-    if withdrawn(said) {
+    let said = said.replace('\u{2019}', "'");
+    if crate::remember::asked::withdrawn(&said)
+        || lower_words(&said)
+            .iter()
+            .any(|word| DOUBT.contains(&word.as_str()))
+    {
         return None;
     }
-    let said = said.replace('\u{2019}', "'");
     let (words, timer) = said
         .split_inclusive(['.', '!', '?', ';'])
         .find_map(|sentence| {
@@ -150,29 +146,49 @@ pub fn asks_to_set(said: &str) -> Option<&'static str> {
                         .all(|(word, ask)| word == ask))
                 .then(|| {
                     // "timer for" ends with its own "for": the length follows it.
-                    let from = at + phrase.len() - usize::from(phrase.last() == Some(&"for"));
+                    let mut from = at + phrase.len() - usize::from(phrase.last() == Some(&"for"));
+                    while words
+                        .get(from)
+                        .is_some_and(|word| BETWEEN.contains(&word.as_str()))
+                    {
+                        from += 1;
+                    }
                     (words[from..].to_vec(), *timer)
                 })
             })
         })?;
-    // A length: "in"/"for" (a timer's only), a number, and its unit within
-    // the next two words ("in half an hour", "in ten minutes").
-    let duration = (0..words.len()).any(|at| {
-        let lead = words[at].as_str();
-        (lead == "in" || (timer && lead == "for"))
-            && words
-                .get(at + 1)
-                .is_some_and(|word| word.chars().all(|c| c.is_ascii_digit()) || is_a_number(word))
-            && words[at + 2..(at + 4).min(words.len())]
-                .iter()
-                .any(|word| UNITS.contains(&word.as_str()))
-    });
-    let clock = words
-        .windows(2)
-        .any(|pair| pair[0] == "at" && starts_a_time(&pair[1]))
-        || words
+    let number = |word: &String| word.chars().all(|c| c.is_ascii_digit()) || is_a_number(word);
+    // A length right after the ask: "in"/"for" (a timer's only), a number,
+    // and its unit within the next two words ("in half an hour").
+    let duration = words
+        .first()
+        .is_some_and(|lead| lead == "in" || (timer && lead == "for"))
+        && words.get(1).is_some_and(number)
+        && words[2..words.len().min(4)]
             .iter()
-            .any(|word| word == "o'clock" || word == "noon" || word == "midnight");
+            .any(|word| UNITS.contains(&word.as_str()));
+    // A clock time right after the ask that stands as one: "at" and a time
+    // ("9", "6 30" as "6:30" is read, "nine"), then the line's end or a word
+    // of [`AFTER_A_TIME`]; or "at noon", "at midnight".
+    let clock = words.first().is_some_and(|lead| lead == "at")
+        && words
+            .get(1)
+            .is_some_and(|word| word == "noon" || word == "midnight" || starts_a_time(word))
+        && {
+            let mut next = 2;
+            if words
+                .get(1)
+                .is_some_and(|word| word.chars().all(|c| c.is_ascii_digit()))
+                && words
+                    .get(2)
+                    .is_some_and(|word| word.len() == 2 && word.chars().all(|c| c.is_ascii_digit()))
+            {
+                next = 3;
+            }
+            words
+                .get(next)
+                .is_none_or(|word| AFTER_A_TIME.contains(&word.as_str()))
+        };
     match (duration, clock) {
         (true, false) => Some(TIMER),
         (false, true) => Some(REMINDER),
@@ -277,6 +293,16 @@ mod tests {
             "Remind me to buy milk. I waited for ten minutes.",
             "Remind me to exercise for ten minutes.",
             "Remind me at nine to call home, do not set it at all.",
+            // Reviewer-three's and reviewer-two's on `52fbf23c4`.
+            "Remind me in five minutes to call Mom. Actually no, don't.",
+            "Remind me in five minutes to call Mom. No wait, don't.",
+            "Set a timer for ten minutes. Actually, don't bother.",
+            "Remind me at nine to call Mom. Hold on, don't do that.",
+            "Remind me to check the oven, it needs 20 minutes at 180 degrees.",
+            "Remind me to take the pills I got at 3 pharmacies.",
+            "Set a timer for ten minutes. Can you cancel the timer?",
+            "Remind me to tell a colleague I got home at nine.",
+            "Remind me to call Mom at nine.",
         ] {
             assert_eq!(asks_to_set(said), None, "{said}");
         }
@@ -336,8 +362,17 @@ mod tests {
             "Remind me in three minutes to stretch. Actually, cancel the timer.",
             "Remind me to buy milk. My train got in at nine.",
             "Remind me to exercise for ten minutes.",
+            "Set a timer for ten minutes. Can you cancel the timer?",
+            "Remind me to tell a colleague I got home at nine.",
+            "Remind me in five minutes to call Mom. Actually no, don't.",
+            "Remind me to check the oven, it needs 20 minutes at 180 degrees.",
         ] {
             assert_eq!(choice(said), None, "{said}");
         }
+        assert_eq!(choice("Wake me up at seven."), named(REMINDER));
+        assert_eq!(
+            choice("Lamp, remind me tomorrow at 6:30 to leave early."),
+            named(REMINDER)
+        );
     }
 }
