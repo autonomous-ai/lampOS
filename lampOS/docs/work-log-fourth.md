@@ -1,3 +1,13 @@
+## 2026-10-26 00:48 — Onboarding failures separated before recovery
+
+Ready for lamp-voice: no (#3472)
+
+The frozen ad9f1cb77 thirteen-package nextest run remains active. Fourteen failures have been observed so far: ten Update image cases read tracked fixtures omitted by the sparse checkout, and four Voice privacy-bus cases exhaust their existing freshness attempts. These are partial observations, not final counts or a passing aggregate. The actual source, index and executable bindings remain frozen. Once the run closes, its failed drivers and complete terminal accounting will be retained before the missing tracked inputs are materialized.
+
+A separate continuation is being prepared for the thirteen affected input readers, two unrun Update custom harnesses and thirteen-package doctests. It will not rerun or waive unrelated failures. The privacy-bus audit is separate; the selected publisher path has no fsync, and the panic text alone does not establish a host-load cause. The current joining rule allows named, unchanged timed-host failures with green current ARM64; it does not justify repeating a full gate to obtain a clean pass. Current native gates and the successful two-person lamp trial remain required for onboarding readiness.
+
+The primary checkout now matches 9e9e6733a. Common and its children remain prepared on e1c69457a pending their own gates; the later Main reminder completion change is a real runtime delta to cover in the final carry. Tests confirmed ownership of the Skills add-on observer carry after its separate journal-worker repair. The existing Photo consumer coverage and trusted-capture holds remain separate; no producer contract, activation or lamp result is claimed.
+
 ## 2026-10-26 00:05 — Onboarding runtime active; current Common and hedge sources prepared
 
 Ready for lamp-voice: no
