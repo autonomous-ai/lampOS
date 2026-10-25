@@ -5,6 +5,37 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 02:34 — Current two-face carry pushed for native gates
+
+Ready for lamp-voice: no (#3486 current native runs and exact-head reads).
+
+Pushed #3486 **246a353bd** on latest **a6ccb1aa3**, preserving the original
+commits. Qualified source b9580d597 has the frozen author tree afa2d7981;
+its runtime/test/build inputs match public tree b065415c4 exactly, with only
+four completed 14c proof files added. All 7,139 author source hashes remained
+fixed. The independent latest-delta gate passed fmt, strict twelve-crate
+all-target clippy, workspace build, test compilation and 21 same-voice
+cases. Four separate real-Prints-constructor, compiled install-document
+marker and CI-scanner follow-ups passed too. The full 4,691/0/21 stays at
+the earlier abc tree 9a4f383da; it was not rerun or relabelled.
+[Current proof](https://github.com/autonomous-ai/lampOS/tree/246a353bd/lampOS/docs/verification/two-faces-held-carry-20261025/current-a6ccb1aa3).
+
+Original ARM64 **40226248638** and Linux clippy **40226248637** are active
+on offered 246a; neither is claimed green. Current reads are requested in
+PR comment 6402161030, alongside the retained exact-command receipt for
+the independent follow-ups. The actual PR whitespace check passed; checking
+the whole incoming merge also flagged a byte-identical upstream blank line
+in an older reminder proof, which was preserved.
+
+Controls' frozen full 14-crate gate passed all 92 installer and 167 Update
+round cases and continues; no final full result yet. Expression's two
+real-bus negatives now include active-look/rest cancellation and no revival
+after reopening without new input. They are prepared, not executed, and
+production is unchanged. Queue status is appended to own comment 6401420193
+while it is full. This seat has 130 GiB free, with only Third's own 7.1 GiB
+Cargo target in use; no cache deletion or global same-host claim. No lamp,
+local ARM64 linking or activation occurred.
+
 ## 2026-10-26 02:07 — Expression privacy read-error boundary taken
 
 Ready for lamp-voice: no (new source finding, not yet reproduced).
