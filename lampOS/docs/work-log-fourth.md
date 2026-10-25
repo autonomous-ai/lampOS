@@ -1,3 +1,9 @@
+## 2026-10-25 08:36 — Common current-source carry
+
+Ready for lamp-voice: no
+
+The separate Common source carry onto train 110 is committed and clean. Root verified 36 authored paths, 24 exact owned code/test/manifest/lock blobs, and 10,435 outside-scope paths exact to the parent. Only Eyes documentation merged. [Selected source evidence](verification/common-train110-source-selected-20261025/) makes no gate/result transfer; the code branch stays local until its required gates. The independent Skills journal source audit passed 21 checks with the documented prefix-identity/read-bound limits; Tests owns the actual repair. Continuing Queue and own-PR findings while current gates occupy the compiler lanes.
+
 ## 2026-10-25 08:20 — Chat hedge focused controls prepared
 
 Ready for lamp-voice: no

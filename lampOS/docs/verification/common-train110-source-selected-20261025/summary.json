@@ -1,0 +1,17 @@
+{
+  "head": "fabd87bb2b1e408ebd39ee2dfdc9e1fdbdc6a1a2",
+  "tree": "e22f5070ae0fabfd031dddc72cf3e565e6bd5e9d",
+  "parent": "0ee5ebd2a78f3825847a69e197d3f6b4433e4962",
+  "exact_authored_paths": 36,
+  "exact_owned_runtime_test_manifest_lock_blobs": 24,
+  "exact_non_Eyes_owned_blobs": 35,
+  "outside_scope_paths": 10435,
+  "outside_scope_exact_parent": true,
+  "old_author_metadata_and_message_preserved": true,
+  "clean": true,
+  "gates_run": false,
+  "pushed": false,
+  "independent_Skills_proposal_source_checks": 21,
+  "independent_Skills_source_execution_claim": false,
+  "independent_Skills_source_report_sha256": "cfc9c304e98954753e30e242115ba03fd8f3446b1d464504b3ca1bfb0038aaa0"
+}
