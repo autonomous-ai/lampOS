@@ -1,0 +1,25 @@
+{
+  "head": "5436db671f03a65f9ab18650bc43efee9a462c2d",
+  "base": "056a76132354f40f97eb5fbc519778c04f1ccb19",
+  "document_sha256": "7543eda857315e32441e0ca579aaaffb3453f43f25687df6ac43078884036aed",
+  "groups": {
+    "shipping": {
+      "count": 70,
+      "sum": "65.15",
+      "percent_exact": "93.07142857142857142857142857",
+      "nearest_tenth": "93.1"
+    },
+    "mood": {
+      "count": 2,
+      "sum": "1.17",
+      "percent_exact": "58.50",
+      "nearest_tenth": "58.5"
+    },
+    "quality": {
+      "count": 16,
+      "sum": "10.20",
+      "percent_exact": "63.75",
+      "nearest_tenth": "63.8"
+    }
+  }
+}

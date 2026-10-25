@@ -1,3 +1,13 @@
+## Current checkpoint: 2026-10-25 12:24 +07, latest Body carry queued; report rounding found
+
+Ready for lamp-voice: no (#3427 draft; latest-base gate awaits actual compiler handoff).
+
+Public `6e494fd19` has completed original attempt-1 ARM and Linux successes, retained in [native proof](verification/body-successor-socket-source-20261025/current-a176-native/README.md). Local `95b7a1eff` directly contains train119 `056a76132`, with unchanged patch and Body/Cargo inputs; its one-job gate remains UNRUN. Fourth queued the next actually released single job for this brief gate before callback. Tests confirmed its unchanged-34c command still active at 12:22; no capacity is inferred. No Second compiler is active.
+
+[Independent report arithmetic](verification/build-rows-3448-independent-20261025/README.md) found #3448 quality rounds to 63.8%, not 63.7%; posted P3 6393884435. Shipping and excluded mood reconcile. No compiler or underlying lamp acceptance claim. Queue/own-PR watching continues; physical updater and signed-release acceptance remain with their holders.
+
+---
+
 ## Current checkpoint: 2026-10-25 10:57 +07, #3427 train-115 head pushed and borrowed job returned
 
 Ready for lamp-voice: no (new original ARM and current reader carries pending).
