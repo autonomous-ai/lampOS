@@ -1,3 +1,17 @@
+## 2026-10-26 03:34 — Onboarding pushed; Common enters current qualification
+
+Ready for lamp-voice: no
+
+Onboarding #3472 is pushed as one commit 74dafff29 on train145 409bf7268. Its current formatting, strict workspace/all-target Clippy and workspace build passed. The compiler procedure retained its reserve-stop exit125 before tests; a separate unrun-only continuation completed same_voice21, onboarding125, Update installation92 and workflow readers2, all passing with zero leaks. Source, eight independent failure witnesses and owned process closure were verified. The final published tree differs from the tested tree only in the verification note. The original ARM64 40229684238 and Linux Clippy40229684153 both completed successfully; exact native counts are being independently audited.
+
+Three readers report no new source P1/P2; the intended-speaker two-person trial still gates activation. First's trial decision requires a seated person in ordinary light to enroll within two tries, with misses counted. Cancellation, split consent/name replies with one natural retry, and intended-owner keeps withheld on missed speaking reads remain explicit observations. Fourth has no lamp. A focused Voice-on/Eyes-off reader regression is now being prepared; no new runtime result is claimed. The duplicate person-scope product line will be removed if #3450 lands first.
+
+First's request to clean Fourth's own target after the completed gate is fulfilled. The first 300-second cleanup timeout is retained; the bounded continuation exited zero, all eight witnesses and raw receipts plus the old Peek compatibility executable remained intact, and free space at closure was 28.4 GiB. No other builder's target was touched. The target was recreated empty for the next sequential gate.
+
+Common's exact36-path change is now in the canonical source directory on train146 0a40aa50b, with all10569 tracked inputs present. All35 non-note authored blobs and modes equal the preceding preparation; only the current qualification note changed. The full14-package gate is being bound to the actual source and completed predecessor release. Old failures remain historical and no old native result is transferred. Callback, Name, Photo and chat-hedge children remain queued behind that qualification.
+
+Peek's sessions-only source and eight new controls are prepared but unrun. A single actual preceding-binary compatibility control passed1/0 in0.626seconds: the new mode value produced only the off diagnostic, despite deliberately invalid listener and bus settings. Its independent executable and receipts survive the target cleanup. This does not qualify the new mode, account permissions or physical deployment. Current Queue3504 and own-PR comments are watched continuously.
+
 ## 2026-10-26 02:44 — Onboarding runtime result and next isolated Peek piece
 
 Ready for lamp-voice: no
