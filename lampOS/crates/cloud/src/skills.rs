@@ -8,7 +8,7 @@
 //! ([`turn`], #2815); and, with
 //! `LAMP_SKILLS_STORE=on` too, `skills.install`, a package from the Skills
 //! Store at a URL, which root's manage helper fetches, checks against the
-//! update channel's key and installs ([`install`]). Nothing here writes the
+//! Store's key and installs ([`install`]). Nothing here writes the
 //! skills folder. Off unless `LAMP_SKILLS_PAGE=on`, with
 //! `LAMP_CLOUD=on`; without it each kind is answered as any this lamp
 //! lacks, `not on this lamp: skills.list` (`docs/cloud.md`, "The skills
@@ -70,13 +70,14 @@ pub fn store_gates(cloud: Option<&str>, page: Option<&str>, store: Option<&str>)
     gates(cloud, page) && lamp_skills::package::store_switched_on(store)
 }
 
-/// [`store_gates`] as the environment says.
+/// [`store_gates`] as the environment says, and the Store's own public key
+/// must be present and valid before the app is offered installs.
 pub fn store_on_from_environment() -> bool {
     store_gates(
         std::env::var("LAMP_CLOUD").ok().as_deref(),
         std::env::var(ENVIRONMENT).ok().as_deref(),
         std::env::var(STORE_ENVIRONMENT).ok().as_deref(),
-    )
+    ) && lamp_skills::package::store_key(Path::new(lamp_skills::package::STORE_KEY)).is_ok()
 }
 
 /// Whether the switch is on: both `LAMP_CLOUD` and `LAMP_SKILLS_PAGE` are `on`.
@@ -463,7 +464,7 @@ pub fn store_off() -> String {
 /// lowercase hex, a skill's name, `MAJOR.MINOR.PATCH`) so the app is told
 /// plainly, and passes it on: root's
 /// manage helper fetches the package itself, checks it again and installs
-/// it only when it is signed with the update channel's key, never a core
+/// it only when it is signed with the Store's key, never a core
 /// skill or one with a core skill's name
 /// ([`lamp_skills::package::install_from_url`]). `lamp-cloud` writes nothing
 /// and fetches nothing. The reply is the page as it now is, [`list`]'s.

@@ -127,7 +127,7 @@ lamp says so.
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Without the switch, V1's "not on this lamp" |
-| `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on` and `LAMP_SKILLS_STORE=on` ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the update channel's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without `LAMP_SKILLS_STORE`, V1's "not on this lamp" |
+| `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
@@ -514,10 +514,10 @@ lacks until then.
 set. Without it the kind is answered as any this lamp lacks, `not on this
 lamp: skills.list` (and `not on this lamp: skills.remove`), and the app
 shows no Skills row. Its envelope is V1's, as `reports.*`'s.
-`skills.install` needs `LAMP_SKILLS_STORE=on` as well; without it, `not on
-this lamp: skills.install`. The manage helper checks the same switch in
-its own environment and refuses with the same words ([skills.md](skills.md),
-"The manage helper"). `LAMP_ADDONS` is read the same way: without
+`skills.install` needs `LAMP_SKILLS_STORE=on` and a valid Store public key
+as well; without either, `not on this lamp: skills.install`. The manage
+helper checks both in its own process and refuses with the same words
+([skills.md](skills.md), "The manage helper"). `LAMP_ADDONS` is read the same way: without
 `LAMP_ADDONS=on` in `lamp-cloud`'s unit, an add-on (`kind = "addon"`,
 [addons.md](addons.md)) is listed with `loads: false` and `why: "add-ons
 are off on this lamp"`, as `lamp-skills` does not run it then.
@@ -772,13 +772,18 @@ kept as a `[stop]`'s off is, so an update round and a restart keep it.
 "https://…/desk-tutor-1.0.0.tar"}`, a Skills Store catalogue entry (the
 first builder's 22:23 on #1722), sent by the app when the person taps Add;
 `url` alone is taken too. Only with `LAMP_SKILLS_STORE=on` beside the
-page's two switches: listing and removing change nothing new on the lamp,
-and an install puts new code there, so the page can be on while the Store,
+page's two switches and a valid Store public key: listing and removing
+change nothing new on the lamp, and an install puts new code there, so the page can be on while the Store,
 its server and its key are not. Without it, `not on this lamp:
-skills.install`. `lamp-cloud` is not the only gate: root's manage helper
-reads `LAMP_SKILLS_STORE` in its own environment (its unit's drop-in,
-which also gives it the network for the fetch) and, off, refuses an
-install with the same words whoever asked, while a remove still runs.
+skills.install`. Install writes `/etc/lampOS/skills/store.env` with the
+switch off, and both parts read it. The product cloud unit also defaults
+the Store to off; placing a key does not turn it on. `lamp-cloud` is not the only gate:
+root's manage helper checks the switch and key itself and, off or without
+a valid key, refuses an install with the same words whoever asked, while
+a remove still runs. Its installed `store.conf` prepares the network even
+while off, but the helper creates no HTTP client until both checks pass.
+[install.md](install.md), "The Store, prepared but off", gives the factory
+key step and the single shared switch to change after it.
 
 - **What `lamp-cloud` does: checks the shape and passes it on.** An
   https URL (`url must be an https URL of at most 2048 characters, with no
@@ -790,8 +795,8 @@ install with the same words whoever asked, while a remove still runs.
   fetches nothing: a network message never puts code on the lamp through
   it (the first builder, 18:33).
 - **What the helper does** ([skills.md](skills.md), "From the Skills
-  Store"): checks the request again; reads the update channel's key
-  (`/etc/lampOS/update/key.pub`); fetches the package itself over HTTPS
+  Store"): checks the request again; reads the Store's key
+  (`/etc/lampOS/skills/store-key.pub`); fetches the package itself over HTTPS
   (redirects only to https, at most 18 MiB, within 25 s); checks the
   entry's `sha256` against the bytes; checks `lamp-skill.sig` against the
   key before the manifest is read; checks the package as any install does
@@ -805,10 +810,12 @@ install with the same words whoever asked, while a remove still runs.
   desk-tutor 1.10.0 is on this lamp, and this package is the older 1.2.3:
   a skill is never put back to an older version`). Nothing is written
   before that last step.
-- **The key: pending the first builder's word.** The update channel's own
-  key, as "only signed packages from the update channel" says, unless the
-  Store gets one of its own (asked on #1722 at 21:5x). One constant
-  (`lamp_skills::package::STORE_KEY`) and the helper unit's `--key-file`.
+- **The key: separate from updates.**
+  `/etc/lampOS/skills/store-key.pub`, named by
+  `lamp_skills::package::STORE_KEY` and the helper unit's `--key-file`.
+  Factory step 3 takes it with `--store-key FILE`, as a 32-byte Ed25519
+  public key in base64. No fallback reads the update key. The helper's
+  explicit `--key-file` override remains available for a manual run.
 - **The reply** is `skills.list`'s, read after the install, as a remove's.
   A refusal is the helper's words on one line (at most 300 bytes), for
   example `not installed: it carries no lamp-skill.sig: …` or `not

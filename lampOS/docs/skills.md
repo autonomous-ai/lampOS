@@ -1213,7 +1213,7 @@ for it.
   `/run/lampos-skills-manage/manage.sock` (`deploy/product/lamp-skills-manage.socket`:
   root's, 0660, group `lampos`, `Accept=yes`, at most 4 connections), and for
   each connection starts `lamp-skills asked --dir /var/lib/lampOS/skills
-  --key-file /etc/lampOS/update/key.pub` as root
+  --key-file /etc/lampOS/skills/store-key.pub` as root
   (`lamp-skills-manage@.service`), the connection its standard input and
   output. It reads one line of at most 4 KiB, answers one line,
   `{"done": WHAT}` or `{"refused": WHY}`, and exits. Its unit has only the
@@ -1227,21 +1227,25 @@ for it.
   target untouched), and read never through a link (the reviewer's P2 on
   #2878).
 - **The Store's switch, in the helper too.** `LAMP_SKILLS_STORE=on`
-  (`package::STORE_SWITCH`), off unless set, as `lamp-cloud`'s is. The
-  helper reads it in its own environment, so a process that reaches the
-  socket past `lamp-cloud` installs nothing while the Store is off: an
-  install is refused with `lamp-cloud`'s own words, `not on this lamp:
-  skills.install` (`package::STORE_OFF`), and nothing is fetched. A remove
-  runs either way. Off, the unit has no network (`PrivateNetwork=yes`, Unix
-  sockets only). A drop-in turns the Store on,
-  `/etc/systemd/system/lamp-skills-manage@.service.d/store.conf`:
-  `Environment=LAMP_SKILLS_STORE=on`, `PrivateNetwork=no`, and
-  `RestrictAddressFamilies=` reset to `AF_UNIX AF_INET AF_INET6`, for the
-  fetch the helper makes itself (`lamp-cloud` passes the URL and fetches
-  nothing). systemd can't open the network for one request and not
-  another in one template unit, so with the Store on a remove runs with
-  the network too; the network for installs alone would need a unit and
-  socket of their own, not built.
+  (`package::STORE_SWITCH`), off unless set, as `lamp-cloud`'s is.
+  `lamp-update install` writes `/etc/lampOS/skills/store.env` with
+  `LAMP_SKILLS_STORE=off`; both parts read it with `EnvironmentFile=`.
+  A lamp's edited file is kept on another install. Both require the Store's
+  separate public key too: missing or invalid, no install is accepted.
+  A process that reaches the socket past `lamp-cloud` therefore installs
+  nothing while the Store is off: the helper answers `not on this lamp:
+  skills.install` (`package::STORE_OFF`) and creates no HTTP client. Removing
+  a skill, or turning one off or on, needs neither the switch nor the key.
+  Install also writes
+  `/etc/systemd/system/lamp-skills-manage@.service.d/store.conf`, which
+  reads the shared environment file and prepares `PrivateNetwork=no` and
+  `RestrictAddressFamilies=` reset to `AF_UNIX AF_INET AF_INET6` for the
+  fetch the helper makes itself (`lamp-cloud` fetches nothing). This network
+  permission exists even while the switch is off; the helper's own switch
+  and key checks prevent a fetch. systemd cannot change that permission by
+  request within one template, so a remove uses the same sandbox.
+  Provision the key and turn on the shared switch as [install.md](install.md),
+  "The Store, prepared but off", describes; nothing enables it automatically.
 - **Only two parts may ask** (the reviewer's P3 on #2429): before reading
   the line, the helper takes its peer's credentials (`SO_PEERCRED`) and
   `/proc/<pid>/cgroup`. Only `lamp-cloud` (the app's remove, a Store
@@ -1268,7 +1272,7 @@ for it.
     install deletes it); that folder's path is in the journal only.
   - `{"install": {"url", "sha256", "name", "version"}}`, strings, all but
     `url` optional (a Skills Store catalogue entry's fields): a package
-    fetched and installed only signed with the update channel's key, and
+    fetched and installed only signed with the Store's key, and
     only with the Store's switch on ("From the Skills Store", below).
   - `{"install_made": SHA256}`, 64 lowercase hex: a skill made here by
     voice, put on at its person's yes (below). It needs no Store switch:
@@ -1554,13 +1558,14 @@ nothing written before the last step:
    printable ASCII with no space and no user; `sha256` 64 lowercase hex;
    `name` a skill's name; `version` `MAJOR.MINOR.PATCH`. `http://`,
    `file://` and anything else is refused unfetched.
-2. **The key.** The update channel's public key, `/etc/lampOS/update/key.pub`
-   (`package::STORE_KEY`, the unit's `--key-file`), read as `lamp-update`
-   reads it. With none, nothing is fetched. **Pending:** whether the Store
-   signs with the update channel's own key or a key of its own is the
-   first builder's to say (asked at 21:5x on #1722). The update channel's
-   is the default, as "only signed packages from the update channel" says;
-   the path is one constant and one unit line.
+2. **The key.** The Store's public key,
+   `/etc/lampOS/skills/store-key.pub` (`package::STORE_KEY`, the unit's
+   `--key-file`): 32 bytes of Ed25519 in base64, the same format
+   `lamp-update` reads. Missing or invalid, nothing is fetched. Factory
+   step 3 places it with `--store-key FILE`; neither setup nor install
+   invents or copies a key. There is no fallback to the update channel's
+   `/etc/lampOS/update/key.pub`. A manual `--key-file` remains an explicit
+   override of the Store key path.
 3. **The fetch.** By `lamp-update`'s own HTTPS client (rustls, the web's
    roots): one GET, at most 5 redirects, each only to https (a redirect to
    `http://` or `file://` is refused), into memory, at most 18 MiB (a
@@ -1571,7 +1576,7 @@ nothing written before the last step:
    tar is read.
 5. **The signature,** once the tar is read in memory (its entries, with the
    bounds below) and before the manifest is parsed or a file compared with
-   it: `lamp-skill.sig` must be there, name the channel's key, and be its
+   it: `lamp-skill.sig` must be there, name the Store's key, and be its
    signature over `lamp-skill.json`'s exact bytes. Unsigned, signed with
    another key, a signature that is not one, or a manifest changed by a
    byte: refused.
@@ -1608,7 +1613,7 @@ by hand from a file (root at the lamp) is not held to this, as it is not
 held to the signature, so root can still put an older one back.
 
 The answer is `install`'s line (`installed desk-tutor 1.0.0 (installable)
-from its package, N files, …; signed with the update channel's key
+from its package, N files, …; signed with the Store's key
 FINGERPRINT. It may use: …`), and `lamp-cloud` replies with `skills.list`
 read after it. The helper journals each request and its answer.
 

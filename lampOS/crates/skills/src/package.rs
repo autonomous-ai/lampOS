@@ -13,7 +13,7 @@
 //! installed by hand from a file on the lamp is not held to its signature;
 //! one from the Skills Store, fetched from a URL by root's manage helper
 //! ([`install_from_url`], `docs/skills.md`, "From the Skills Store"), is
-//! installed only when it is signed with the update channel's key
+//! installed only when it is signed with the Store's key
 //! ([`STORE_KEY`]), checked before anything is written.
 use super::{Skill, SkillKind, load, load_each, plain_name, version_ok};
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -41,12 +41,9 @@ pub const MANIFEST: &str = "lamp-skill.json";
 /// the Ed25519 signature. The manifest names every file with its SHA-256,
 /// so the signature covers every byte of the skill.
 pub const SIGNATURE: &str = "lamp-skill.sig";
-/// The key a package from the Skills Store must be signed with: the update
-/// channel's own (`lamp-update install` checks a build's manifest with it),
-/// so only what the channel's owner signed is put on a lamp from a URL (the
-/// first builder's 18:33 on #1722: "only signed packages from the update
-/// channel"). One place, to change it if the Store gets a key of its own.
-pub const STORE_KEY: &str = "/etc/lampOS/update/key.pub";
+/// The Skills Store's own public key. Provisioned separately from the
+/// update channel's key; an update key is never a fallback for this one.
+pub const STORE_KEY: &str = "/etc/lampOS/skills/store-key.pub";
 /// The Store's switch, `on` or off: `lamp-cloud` answers `skills.install`
 /// only with it, and the manage helper itself takes an `install` only with
 /// it in its own environment (`lamp-skills-manage@.service`'s drop-in), so
@@ -60,6 +57,12 @@ pub const STORE_OFF: &str = "not on this lamp: skills.install";
 /// Whether the Store's switch ([`STORE_SWITCH`]) is on: `on` only.
 pub fn store_switched_on(value: Option<&str>) -> bool {
     value == Some("on")
+}
+/// The Store is usable only when explicitly on and its own key is readable
+/// and valid. Check before constructing an HTTP client; removal never needs
+/// a Store key. The install path reads the key again before every fetch.
+pub fn store_ready(value: Option<&str>, key_file: &Path) -> bool {
+    store_switched_on(value) && store_key(key_file).is_ok()
 }
 /// The longest a package's URL may be.
 pub const MOST_URL: usize = 2_048;
@@ -222,7 +225,7 @@ pub fn check_signature(
                 "that is not a key's fingerprint"
             };
         return Err(format!(
-            "signed with key {theirs}, and this lamp takes skills signed with the update channel's key {ours}"
+            "signed with key {theirs}, and this lamp takes skills signed with the Store's key {ours}"
         ));
     }
     let raw = STANDARD
@@ -1178,7 +1181,7 @@ fn moved_in(
         Some(package) => format!(
             "from its package, {count} files, each one's size and sha256 as {MANIFEST} says; {}",
             match (&package.signed_by, package.signature.is_some()) {
-                (Some(key), _) => format!("signed with the update channel's key {key}"),
+                (Some(key), _) => format!("signed with the Store's key {key}"),
                 (None, true) => {
                     "its signature not checked: a package installed by hand from a file".to_owned()
                 }
@@ -1469,22 +1472,17 @@ pub fn sha256_ok(text: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-/// The update channel's public key from `key_file`, as `lamp-update` reads
+/// The Store's public key from `key_file`, as `lamp-update` reads
 /// it.
 pub fn store_key(key_file: &Path) -> Result<[u8; 32], String> {
     let text = fs::read_to_string(key_file).map_err(|error| {
         format!(
-            "the update channel's key ({}) can't be read: {error}",
+            "the Store's key ({}) can't be read: {error}",
             key_file.display()
         )
     })?;
-    lamp_update::manifest::read_public_key(&text).map_err(|why| {
-        format!(
-            "the update channel's key ({}): {}",
-            key_file.display(),
-            why.0
-        )
-    })
+    lamp_update::manifest::read_public_key(&text)
+        .map_err(|why| format!("the Store's key ({}): {}", key_file.display(), why.0))
 }
 
 /// Installs the package at `url`, from the Skills Store, in `skills`, and
@@ -1495,7 +1493,7 @@ pub fn store_key(key_file: &Path) -> Result<[u8; 32], String> {
 /// https ([`store_url_ok`]); the package is fetched through `channel` into
 /// memory, at most [`MOST_PACKAGE_BYTES`], within [`FETCH_WITHIN`]; its
 /// bytes must have `sha256` when one is given; its signature must be the
-/// update channel's key's ([`STORE_KEY`]) over its manifest, checked before
+/// Store's key's ([`STORE_KEY`]) over its manifest, checked before
 /// the manifest is read; its files, their paths (no `..`, no absolute path,
 /// no hidden name, at most four parts), sizes, count and kinds (no link, no
 /// device) as [`read_package_bytes`] checks them. Then it is installed as
@@ -1663,7 +1661,7 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 ///   VERSION}}`, all but `url` optional (a catalogue entry's fields,
 ///   [`Asked`]), a package from the Skills Store installed by
 ///   [`install_from_url`]: only
-///   over https, only signed with the update channel's key, never core.
+///   over https, only signed with the Store's key, never core.
 ///   Without a `store`, refused;
 /// - `{"install_made": SHA256}`, a skill made here by voice put on from the
 ///   voice's made-skills folder `made`, at its person's spoken yes

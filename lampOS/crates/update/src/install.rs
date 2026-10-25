@@ -12,7 +12,8 @@
 //! Run again, it changes nothing that is as it should be, and says so.
 //! It never writes what is one lamp's own (`/etc/lampOS/body/lamp.env`) or
 //! what setup writes, and leaves a unit's other drop-ins alone: only the
-//! reserved `exit-note.conf` is install's. A product setting
+//! reserved `exit-note.conf` is always install's. Store's `store.conf` is
+//! installed as a setting and keeps a lamp's edits. A product setting
 //! changed on the lamp since an install wrote it is the lamp's own too, and
 //! is kept ([`settings`]).
 use crate::{
@@ -623,6 +624,22 @@ pub fn models_from(text: &str) -> Result<Vec<Model>, String> {
         .map(|list| list.models)
         .map_err(|error| error.to_string())
 }
+
+/// Store preparation belongs to install, not a channel's settings manifest:
+/// these paths are outside the updater's setting allowlist. The signing key
+/// is never a default, and changes to these two files are the lamp's own.
+pub const STORE_SETTINGS: &[(&str, &str)] = &[
+    // Store preparation only: both readers stay off until the shared switch
+    // is explicitly on and the separate factory-provisioned key is valid.
+    (
+        "/etc/lampOS/skills/store.env",
+        include_str!("../../../deploy/product/settings/store.env"),
+    ),
+    (
+        "/etc/systemd/system/lamp-skills-manage@.service.d/store.conf",
+        include_str!("../../../deploy/product/settings/store.conf"),
+    ),
+];
 
 /// The product's settings as a build carries them (#1680, crate::apply):
 /// every one of [`SETTINGS`] and the tmpfiles, 0644. Never setup's, the
@@ -1337,6 +1354,7 @@ pub fn install(
         .zip(&texts)
         .map(|((path, _), text)| (*path, text.as_str()))
         .collect();
+    defaults.extend_from_slice(STORE_SETTINGS);
     if config.setup {
         defaults.extend_from_slice(SETUP_SETTINGS);
     }
@@ -1790,6 +1808,9 @@ pub fn settings_with_mode(
         }
     }
     if !writes.is_empty() {
+        // A stopped run must reload a Store drop-in even if the next run
+        // finds its bytes already correct. Record the debt before writing.
+        state.systemd_owed |= writes.iter().any(|(path, _, _)| path.starts_with(UNITS));
         for (path, _, default) in &writes {
             state
                 .settings_writing

@@ -243,6 +243,38 @@ check "a key that is not 32 bytes is refused" '[[ $status == 1 ]] && grep -q "no
 lamp; run; status=$?
 check "no key given and none in place fails step 3" '[[ $status == 1 ]] && grep -q "step 3 (the update key) failed" "$T/out"'
 
+# Store key provisioning is optional, separate, dry by default, and never
+# enables Store or starts a service. Existing key material is not replaced.
+STOREKEY=$T/store-key.pub
+head -c 32 /dev/urandom | base64 >"$STOREKEY"
+STOREPUB=$T/root/etc/lampOS/skills/store-key.pub
+lamp; run --from 3 --to 3 --update-key "$KEYFILE" --store-key "$STOREKEY"; status=$?
+check "Store key dry run writes neither public key" '[[ $status == 0 && ! -e $STOREPUB && ! -e $T/root/etc/lampOS/update/key.pub ]]'
+lamp; run --write --from 3 --to 3 --update-key "$KEYFILE"; status=$?
+check "Store key is optional and never borrowed from update" '[[ $status == 0 && ! -e $STOREPUB ]] && grep -q "Store stays off" "$T/out"'
+run --write --from 3 --to 3 --store-key "$STOREKEY"; status=$?
+check "Store key goes to its own path and changes no switch or service" '[[ $status == 0 ]] && cmp -s "$STOREKEY" "$STOREPUB" && cmp -s "$KEYFILE" "$T/root/etc/lampOS/update/key.pub" && [[ ! -e $T/root/etc/lampOS/skills/store.env && ! -s $T/log ]]'
+check "Store public key is readable, never writable by group or others" '[[ $(ls -l "$STOREPUB" | cut -c1-10) == -rw-r--r-- ]]'
+run --write --from 3 --to 3 --store-key "$STOREKEY"; status=$?
+check "the same Store key is kept on repeat" '[[ $status == 0 ]] && cmp -s "$STOREKEY" "$STOREPUB"'
+run --write --from 3 --to 3 --store-key "$KEYFILE"; status=$?
+check "a different Store key is refused, original kept" '[[ $status == 1 ]] && grep -q "different key" "$T/out" && cmp -s "$STOREKEY" "$STOREPUB"'
+lamp; run --write --from 3 --to 3 --update-key "$KEYFILE" --store-key "$T/bad.pub"; status=$?
+check "a malformed Store key is refused without writing it" '[[ $status == 1 && ! -e $STOREPUB ]] && grep -q "not a 32-byte" "$T/out"'
+lamp; cp "$STOREKEY" "$T/invalid-base64.pub"; printf '!' >>"$T/invalid-base64.pub"
+run --write --from 3 --to 3 --update-key "$KEYFILE" --store-key "$T/invalid-base64.pub"; status=$?
+check "32 decoded bytes followed by invalid base64 are refused" '[[ $status == 1 && ! -e $STOREPUB ]]'
+lamp; fold -w 22 "$STOREKEY" >"$T/wrapped.pub"
+run --write --from 3 --to 3 --update-key "$KEYFILE" --store-key "$T/wrapped.pub"; status=$?
+check "wrapped base64 rejected by Rust is also refused at the factory" '[[ $status == 1 && ! -e $STOREPUB ]]'
+lamp; run --from 3 --to 3 --store-key; status=$?
+check "a missing Store key argument exits with usage instead of looping" '[[ $status == 2 ]] && grep -q "needs FILE" "$T/out"'
+lamp; run --from 3 --to 3 --store-key --write; status=$?
+check "an option cannot stand in for the Store key file" '[[ $status == 2 ]]'
+lamp; mkdir -p "$(dirname "$STOREPUB")"; ln -s "$KEYFILE" "$STOREPUB"
+run --write --from 3 --to 3 --update-key "$KEYFILE" --store-key "$STOREKEY"; status=$?
+check "Store key destination links are not followed" '[[ $status == 1 && -L $STOREPUB ]] && cmp -s "$KEYFILE" "$STOREPUB"'
+
 # An MPR121 lamp: dry, the touch step only says what it would do; written,
 # it asks for a person, so it stops without one.
 mpr121() {

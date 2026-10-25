@@ -1,0 +1,21 @@
+{
+  "lampOS/deploy/product/settings/store.conf": "4fb0b8e2d396c1498a411fe2e3056e520b96ac44f33046ea4ae0253d86595cca",
+  "lampOS/deploy/product/settings/store.env": "725c22408190ecf9588d74a43c0540920ba617c8a76cd74dca478ce268eb1ba7",
+  "lampOS/crates/cloud/src/answer.rs": "3e99b9b71ce7f16c325e5d3e9947c22494737f05eb5739c65b0653dce06ebc37",
+  "lampOS/crates/cloud/src/skills.rs": "4d0c91aeab3be13cb74804cdb10d91b00797e9a6ba1749e25e50add7ba2134b1",
+  "lampOS/crates/skills/Cargo.toml": "e471ae369f2a32a479c9e34a48480535cbca7720bfc4f85a90b6b46a4d64beb1",
+  "lampOS/crates/skills/src/main.rs": "d43fedb99fa40c05ac32ceb413ede3b723a5ee2f992ebba103d9f9c343be486e",
+  "lampOS/crates/skills/src/package.rs": "7bda72a112a2e2db258f5e8f130e82072f4f93a158fc75e6e4d45ee708cd8c4e",
+  "lampOS/crates/skills/tests/it/store.rs": "f7a3ae1f4ea3399dda7fd39ae4e81df9f01d9da904e454a644031d97471539c7",
+  "lampOS/crates/update/src/install.rs": "bd287e1a228d59561d64449270d0bd3cdb0c3410d8d5c4a7d5648c2009ce7899",
+  "lampOS/crates/update/tests/install.rs": "0a48efebe83ceddf73a74bb0cc0ed540bb30113044f93b79d47146b54ceeb977",
+  "lampOS/deploy/factory/steps-test.sh": "fcde2760f19b826a1886df921603ec1b50595f22c0ea008ff824580437ffd8f1",
+  "lampOS/deploy/factory/steps.sh": "e9de592337c276b3a7b8b463419170629fe237d8c1c9d419db5b997f0414f5bf",
+  "lampOS/deploy/product/README.md": "30c45e8057a40ad09c4f06a3b242877752c58f33eeb69eaabeb30010fdeb85ce",
+  "lampOS/deploy/product/lamp-cloud.service": "afc2bd60fe0e740b9583fa3a1d3851a9b5d5812e3a3a9711785cfe3693c6ba03",
+  "lampOS/deploy/product/lamp-skills-manage@.service": "7b9e63409f79790e1802aa35517ec6c41ab064da73f03f077e095969ea9085fe",
+  "lampOS/docs/cloud.md": "3036235b258a5c037b775f348727fa5e5330102882ef3f09a822b311967fb935",
+  "lampOS/docs/install.md": "097c96231eecb4878ef6ad6fe420ece8a4b424521f95cddfe1935f636627f42f",
+  "lampOS/docs/skills.md": "3d01c092114e18e065a48d611323fe002abb75f958cec0a264bcd368f465d48c",
+  "lampOS/docs/switches.md": "124b47c4b77660e7ee2f2fdf47e0c2e9c3e987780eff4d528610a07a9121847d"
+}

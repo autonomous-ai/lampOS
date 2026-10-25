@@ -7,7 +7,8 @@
 #      and which way they read (lamp-controls discover-head, a person holding
 #      each pad), into the pins file; on an MPR121, calibrate-touch
 #      only while lamp-controls runs with LAMP_CONTROLS_STRIP=on
-#   3. the update key's public half: /etc/lampOS/update/key.pub
+#   3. the update key's public half: /etc/lampOS/update/key.pub; optionally
+#      the separate Store key: /etc/lampOS/skills/store-key.pub (never enables Store)
 #   4. the self-test: lamp-selftest --occasion factory, the lamp first stood
 #      up by its running lamp-body ("listening" on its mood socket) so
 #      that head_move is checked whether or not the voice is up (#2232),
@@ -21,7 +22,7 @@
 # press; the self-test moves the head a little and lights the ring), so each
 # asks first and is refused without a console.
 #
-#   steps.sh --unit-id ID [--write] [--update-key FILE] [--from N] [--to N]
+#   steps.sh --unit-id ID [--write] [--update-key FILE] [--store-key FILE] [--from N] [--to N]
 #            [--device /dev/ttyACM0] [--lock-directory /run/lampos-locks/motor]
 #            [--body-user lampos] [--pins /etc/lampOS/controls/controls-pins.json]
 #
@@ -65,7 +66,7 @@ SELFTEST_BIN=${SELFTEST_BIN:-/opt/lampOS/selftest/current/lamp-selftest}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
 KEEPER_BIN=${KEEPER_BIN:-/usr/local/bin/lamp-keeper}
 JQ=${JQ:-jq}
-UNIT_ID='' WRITE=0 KEY='' FROM=1 TO=4
+UNIT_ID='' WRITE=0 KEY='' STORE_KEY='' FROM=1 TO=4
 DEVICE=/dev/ttyACM0 LOCKS=/run/lampos-locks/motor BODY_USER=lampos
 PINS=$ROOT/etc/lampOS/controls/controls-pins.json
 while [[ $# -gt 0 ]]; do
@@ -73,6 +74,9 @@ while [[ $# -gt 0 ]]; do
     --unit-id) UNIT_ID=${2:-}; shift 2 ;;
     --write) WRITE=1; shift ;;
     --update-key) KEY=${2:-}; shift 2 ;;
+    --store-key)
+      [[ $# -ge 2 && -n ${2:-} && ${2:-} != --* ]] || { echo "factory: --store-key needs FILE" >&2; exit 2; }
+      STORE_KEY=$2; shift 2 ;;
     --from) FROM=${2:-}; shift 2 ;;
     --to) TO=${2:-}; shift 2 ;;
     --device) DEVICE=${2:-}; shift 2 ;;
@@ -94,6 +98,7 @@ fi
 
 LAMP_ENV=$ROOT/etc/lampOS/body/lamp.env
 KEY_PUB=$ROOT/etc/lampOS/update/key.pub
+STORE_KEY_PUB=$ROOT/etc/lampOS/skills/store-key.pub
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 MODE=$([[ $WRITE == 1 ]] && echo write || echo dry)
 
@@ -468,29 +473,52 @@ step_touch() {
   "$SYSTEMCTL" restart lamp-controls || { fail "lamp-controls did not restart with the calibrated pins"; return 1; }
 }
 
-step_key() {
-  if [[ -z $KEY ]]; then
-    [[ -s $KEY_PUB ]] && { say "the update key is already in $KEY_PUB"; return 0; }
-    fail "no update key: give the owner's public half with --update-key FILE"
+# One public key per purpose. Missing optional Store material never copies
+# the update key, and provisioning either key changes no service or switch.
+place_key() {
+  local kind=$1 source=$2 destination=$3 option=$4 required=$5 bytes encoded canonical
+  if [[ -z $source ]]; then
+    if [[ -e $destination ]]; then
+      source=$destination
+    elif [[ $required == 0 ]]; then
+      say "no Store key supplied: Store stays off; use --store-key FILE when its public key is available"
+      return 0
+    else
+      fail "no $kind key: give the owner's public half with $option FILE"
+      return 1
+    fi
+  fi
+  [[ -r $source && -f $source ]] || { fail "cannot read $source"; return 1; }
+  # The public half: one line of base64, exactly 32 bytes of Ed25519.
+  # Rust's reader rejects internal whitespace and noncanonical pad bits.
+  # Validate the bytes we will actually copy, not a newline-stripped form.
+  encoded=$(cat "$source")
+  [[ $encoded =~ ^[A-Za-z0-9+/]{43}=$ ]] || { fail "$source is not a 32-byte Ed25519 public key in base64 on one line"; return 1; }
+  if ! bytes=$(printf '%s' "$encoded" | base64 -d 2>/dev/null | wc -c | tr -d ' '); then
+    fail "$source is not a 32-byte Ed25519 public key in base64"
     return 1
   fi
-  [[ -r $KEY ]] || { fail "cannot read $KEY"; return 1; }
-  # The public half: one line of base64, 32 bytes of Ed25519 (updates.md).
-  local bytes
-  bytes=$(tr -d '\n' <"$KEY" | base64 -d 2>/dev/null | wc -c | tr -d ' ')
-  [[ $bytes == 32 ]] || { fail "$KEY is not a 32-byte Ed25519 public key in base64 (decoded $bytes bytes)"; return 1; }
-  if [[ -e $KEY_PUB ]]; then
-    cmp -s "$KEY" "$KEY_PUB" && { say "the same key is already in $KEY_PUB"; return 0; }
-    fail "a different key is already in $KEY_PUB: not replaced"
+  [[ $bytes == 32 ]] || { fail "$source is not a 32-byte Ed25519 public key in base64 (decoded $bytes bytes)"; return 1; }
+  canonical=$(printf '%s' "$encoded" | base64 -d | base64 | tr -d '\n')
+  [[ $canonical == "$encoded" ]] || { fail "$source is not canonical base64"; return 1; }
+  if [[ -e $destination || -L $destination ]]; then
+    [[ ! -L $destination ]] || { fail "$destination is a link: not followed"; return 1; }
+    cmp -s "$source" "$destination" && { say "the same $kind key is already in $destination"; return 0; }
+    fail "a different key is already in $destination: not replaced"
     return 1
   fi
   if [[ $WRITE == 1 ]]; then
-    install -d -m 0755 "$(dirname "$KEY_PUB")" && install -m 0644 "$KEY" "$KEY_PUB" \
-      || { fail "could not place $KEY_PUB"; return 1; }
-    say "the update key is in $KEY_PUB"
+    install -d -m 0755 "$(dirname "$destination")" && install -m 0644 "$source" "$destination" \
+      || { fail "could not place $destination"; return 1; }
+    say "the $kind key is in $destination"
   else
-    say "would place $KEY as $KEY_PUB (dry)"
+    say "would place $source as $destination (dry)"
   fi
+}
+
+step_key() {
+  place_key update "$KEY" "$KEY_PUB" --update-key 1 || return 1
+  place_key Store "$STORE_KEY" "$STORE_KEY_PUB" --store-key 0
 }
 
 # head_move is checked only on a lamp at rest and standing, and never stands

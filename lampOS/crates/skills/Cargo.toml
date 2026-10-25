@@ -44,7 +44,7 @@ tar = { version = "0.4", default-features = false }
 # macOS. Constants only: no unsafe code.
 libc = "0.2"
 # A package from the Skills Store (src/package.rs, `install_from_url`): its
-# signature checked with Ed25519 against the update channel's key, and the
+# signature checked with Ed25519 against the Store's key, and the
 # package fetched over HTTPS by lamp-update's own client (only https, at most
 # five redirects, each to https, within a bound). The same versions as
 # lamp-update's, so nothing new is built.

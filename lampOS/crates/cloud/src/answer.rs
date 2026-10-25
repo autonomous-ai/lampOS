@@ -435,7 +435,7 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         }
         // A package from the Skills Store, from a URL (#1722), with
         // `LAMP_SKILLS_STORE=on` too: root's manage helper fetches it and
-        // installs it only signed with the update channel's key.
+        // installs it only signed with the Store's key.
         "skills.install" if on(lamp, kind) => {
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::install(&places, data).map(Some)

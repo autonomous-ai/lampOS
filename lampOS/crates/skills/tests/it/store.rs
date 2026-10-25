@@ -1,6 +1,6 @@
 //! The Skills Store's lamp side (`docs/skills.md`, "From the Skills Store",
 //! #1722): a package fetched from a URL by root's manage helper and
-//! installed only when it is signed with the update channel's key. Every
+//! installed only when it is signed with the Store's key. Every
 //! request here goes straight to the helper's own code (`package::asked`),
 //! or to the real `lamp-skills asked` binary, with no `lamp-cloud` before
 //! it: the helper refuses a bad package on its own.
@@ -42,13 +42,13 @@ fn copy(from: &Path, to: &Path) {
     }
 }
 
-/// The update channel's key, from a seed: `which` tells two keys apart.
+/// The Store's key, from a seed: `which` tells two keys apart.
 fn key(which: u8) -> Ed25519KeyPair {
     Ed25519KeyPair::from_seed_unchecked(&[which; 32]).unwrap()
 }
 
-/// The channel's public key written as a lamp keeps it
-/// (`/etc/lampOS/update/key.pub`): 32 bytes in base64 on one line.
+/// The Store's public key written as a lamp keeps it
+/// (`/etc/lampOS/skills/store-key.pub`): 32 bytes in base64 on one line.
 fn key_file(dir: &Path, key: &Ed25519KeyPair) -> PathBuf {
     use base64::Engine;
     let path = dir.join("key.pub");
@@ -61,6 +61,29 @@ fn key_file(dir: &Path, key: &Ed25519KeyPair) -> PathBuf {
     )
     .unwrap();
     path
+}
+
+#[test]
+fn store_readiness_requires_its_own_key_and_an_explicit_on() {
+    assert_eq!(package::STORE_KEY, "/etc/lampOS/skills/store-key.pub");
+    let dir = tempfile::tempdir().unwrap();
+    let update = dir.path().join("update");
+    let store = dir.path().join("skills/store-key.pub");
+    fs::create_dir_all(&update).unwrap();
+    fs::create_dir_all(store.parent().unwrap()).unwrap();
+    let update_key = key_file(&update, &key(1));
+    assert!(!package::store_ready(Some("on"), &store));
+    fs::write(&store, "not a key").unwrap();
+    assert!(!package::store_ready(Some("on"), &store));
+    let separate = key_file(dir.path(), &key(2));
+    fs::copy(separate, &store).unwrap();
+    for switch in [None, Some("off"), Some("ON"), Some("")] {
+        assert!(!package::store_ready(switch, &store));
+    }
+    assert!(package::store_ready(Some("on"), &store));
+    assert_ne!(package::store_key(&store), package::store_key(&update_key));
+    fs::remove_file(&store).unwrap();
+    assert!(!package::store_ready(Some("on"), &store));
 }
 
 /// Every name in a folder, hidden ones too.
@@ -339,7 +362,7 @@ fn refused(answer: &serde_json::Value) -> &str {
 }
 
 #[test]
-fn a_package_signed_with_the_update_channels_key_installs_and_is_listed() {
+fn a_package_signed_with_the_store_key_installs_and_is_listed() {
     let dir = tempfile::tempdir().unwrap();
     let skills = skills(dir.path());
     let channel = key(1);
@@ -361,7 +384,7 @@ fn a_package_signed_with_the_update_channels_key_installs_and_is_listed() {
     let ours =
         lamp_update::manifest::fingerprint(channel.public_key().as_ref().try_into().unwrap());
     assert!(
-        said.contains(&format!("signed with the update channel's key {ours}")),
+        said.contains(&format!("signed with the Store's key {ours}")),
         "{said}"
     );
     assert_eq!(store.join().unwrap(), 1);
@@ -697,10 +720,7 @@ fn only_an_https_url_is_fetched_and_a_redirect_only_to_https() {
     let (port, store) = serve(vec![ok(&bytes)]);
     let (answer, done) = ask(&skills, &dir.path().join("no-key.pub"), port, install(URL));
     assert!(!done);
-    assert!(
-        refused(&answer).contains("the update channel's key"),
-        "{answer}"
-    );
+    assert!(refused(&answer).contains("the Store's key"), "{answer}");
     assert_eq!(store.join().unwrap(), 0);
 }
 
@@ -772,6 +792,33 @@ fn the_real_helper_refuses_on_its_own() {
         "{answer}"
     );
     assert_eq!(left(&skills), ["dance"]);
+    // A missing or malformed Store key keeps the real helper off even
+    // with its switch on. The update key is never substituted.
+    let saved_key = fs::read(&key_file).unwrap();
+    let (port, served) = serve(vec![ok(b"never asked for")]);
+    for malformed in [None, Some("not a key")] {
+        if let Some(text) = malformed {
+            fs::write(&key_file, text).unwrap();
+        } else {
+            fs::remove_file(&key_file).unwrap();
+        }
+        let (answer, success) = ask_binary(
+            format!("{}\n", install(&format!("https://127.0.0.1:{port}/x.tar"))),
+            Some("on"),
+        );
+        assert!(!success);
+        assert_eq!(refused(&answer), package::STORE_OFF);
+    }
+    assert_eq!(served.join().unwrap(), 0);
+    // Removal still works with an invalid key and Store explicitly on.
+    package::install(&skills, &tutor(&dir.path().join("keyless-remove"))).unwrap();
+    let (answer, success) = ask_binary(
+        format!("{}\n", serde_json::json!({ "remove": "desk-tutor" })),
+        Some("on"),
+    );
+    assert!(success, "{answer}");
+    assert_eq!(left(&skills), ["dance"]);
+    fs::write(&key_file, saved_key).unwrap();
     // The Store's switch off in the helper's own environment (unset, or
     // anything but `on`): an install is refused as `lamp-cloud` refuses
     // it, whoever reached the socket, and nothing is fetched; a remove
