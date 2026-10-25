@@ -1,0 +1,13 @@
+{
+  "current authored head": "3bdc7c415717263697c25250294f2e2eca24d044",
+  "actual tested preview": "2ea6b5e0b8b9a79d48a98b702abb05231131f456",
+  "preview parents": [
+    "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+    "3bdc7c415717263697c25250294f2e2eca24d044"
+  ],
+  "actual preview tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "authored head tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "original 2cf preview tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "all complete trees equal": true,
+  "proof source": "Selected SHA/tree/parents from GitHub git/commits API responses under github-objects; full original responses private and identified by SHA-256. Consoles independently identify current preview checkout."
+}

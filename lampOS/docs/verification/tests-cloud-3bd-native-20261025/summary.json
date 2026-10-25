@@ -1,0 +1,33 @@
+{
+  "current authored head": "3bdc7c415717263697c25250294f2e2eca24d044",
+  "tested preview": "2ea6b5e0b8b9a79d48a98b702abb05231131f456",
+  "tested preview parents": [
+    "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+    "3bdc7c415717263697c25250294f2e2eca24d044"
+  ],
+  "complete source tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "ARM64 run": 40147655240,
+  "ARM64 job": 121032347873,
+  "ARM64 conclusion": "success",
+  "ARM64 counts": {
+    "passed": 1216,
+    "failed": 0,
+    "skipped": 8
+  },
+  "ARM64 package counts": {
+    "lamp-cloud": 196,
+    "lamp-update": 397,
+    "lamp-voice-eval": 623
+  },
+  "ARM64 job start": "2026-10-25T00:41:14Z",
+  "ARM64 job finish": "2026-10-25T00:45:02Z",
+  "Linux run": 40147655339,
+  "Linux job": 121032348295,
+  "Linux conclusion": "success",
+  "Linux job start": "2026-10-25T00:41:12Z",
+  "Linux job finish": "2026-10-25T00:44:27Z",
+  "complete executed case census equal to original 2cf": true,
+  "named skipped-set equality claimed": false,
+  "source or target mutations": false,
+  "issues": "No case, hash, checkout, or tree-binding discrepancy found. Per-case skipped names are not enumerated in console renderings; only skipped counts are compared."
+}

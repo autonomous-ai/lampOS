@@ -1,0 +1,111 @@
+{
+  "files": [
+    {
+      "file": "40147655240/case-outcomes.json",
+      "bytes": 262814,
+      "SHA-256": "51bc092ac94f10d58539ca9c7d5d5501f8770b3ee19ddccba9c7ddec01ae52d3"
+    },
+    {
+      "file": "40147655240/console.txt",
+      "bytes": 410912,
+      "SHA-256": "11f6236c19a7b92fc224a52cb03612363a3fb13d2a39e633073f79262c31bbb4"
+    },
+    {
+      "file": "40147655240/console.txt.retrieval.stderr.txt",
+      "bytes": 0,
+      "SHA-256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "40147655240/receipt.json",
+      "bytes": 1264,
+      "SHA-256": "aeae8217c91cbd6d82ba2d083aff7ca281a7f90a6cc4457aa99bf5253aef8b61"
+    },
+    {
+      "file": "40147655240/run.json",
+      "bytes": 5255,
+      "SHA-256": "96fc2e22324e5052380ac83720d45e2075bfba36e12ea77cc3c1926e483468b8"
+    },
+    {
+      "file": "40147655240/run.json.retrieval.stderr.txt",
+      "bytes": 0,
+      "SHA-256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "40147655339/console.txt",
+      "bytes": 69831,
+      "SHA-256": "3e2ea6473faf40cd585a4550a2834807503ce6bc45a445e71dbc7e160c06c5e3"
+    },
+    {
+      "file": "40147655339/console.txt.retrieval.stderr.txt",
+      "bytes": 0,
+      "SHA-256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "40147655339/receipt.json",
+      "bytes": 1707,
+      "SHA-256": "0a5b7e3ea553e4dacc4843b3f1c0f013c9a126e57a7202899262b302f2cb96f7"
+    },
+    {
+      "file": "40147655339/run.json",
+      "bytes": 2320,
+      "SHA-256": "bfe20606ab82809bac920fef17daba1d7ce9c7efc9dcacff855ccdc2fe3bfcb5"
+    },
+    {
+      "file": "40147655339/run.json.retrieval.stderr.txt",
+      "bytes": 0,
+      "SHA-256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "README.md",
+      "bytes": 3012,
+      "SHA-256": "a7fb98d8c9b2f319b0da99a87e719a2fb2f49cd6508a34e4c9c0caa2097c2819"
+    },
+    {
+      "file": "github-objects/162216f82db66e642e0c8e3033a9866cfec1ce1f.json",
+      "bytes": 438,
+      "SHA-256": "48a6062f69142f968475966ef71c2bde8518065516682f63c599f472d22750ef"
+    },
+    {
+      "file": "github-objects/2ea6b5e0b8b9a79d48a98b702abb05231131f456.json",
+      "bytes": 486,
+      "SHA-256": "1e09d27ce0bfa8337535f2ce17d3b3d988ef42516fb9271055aa9fc92839d246"
+    },
+    {
+      "file": "github-objects/3bdc7c415717263697c25250294f2e2eca24d044.json",
+      "bytes": 438,
+      "SHA-256": "bff02f583b9d0adaeca3ea40d8de88f56e42bfa22fa9967f81615c00dcac1655"
+    },
+    {
+      "file": "github-objects/5e8816d29705fa59bf490b24b0713b2e5b4f43d9.json",
+      "bytes": 486,
+      "SHA-256": "911c1886b9a76309892bd1af2a2558babb6d7808098b63759f36dd921095c4b4"
+    },
+    {
+      "file": "original-2cf-census-comparison.json",
+      "bytes": 656,
+      "SHA-256": "abf627d561755fcc52cc8d545c9aa1f9bf49224b07da60e0817dcc84c265cd6b"
+    },
+    {
+      "file": "original-2cf-reference/case-outcomes.json",
+      "bytes": 262826,
+      "SHA-256": "5c2f1fe5474b1ea18e2b02a48e88246b5acf578f7ec2be87a4e18323fd0bb23e"
+    },
+    {
+      "file": "original-2cf-reference/receipt.json",
+      "bytes": 839,
+      "SHA-256": "7f4b1ec7c04db104a2ca7ffb8abeb67fef32e7807b0241e742affb9cd5af955e"
+    },
+    {
+      "file": "source-tree-binding.json",
+      "bytes": 740,
+      "SHA-256": "56dd1b22bcf77e3f1c0bff39dfc300c4c4812d30224c9655239ce05a883ad5ae"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 1209,
+      "SHA-256": "d0cffb2f3dc39d44dcf3a591791ed92cde61823ac541e63251fd2788d3a452f0"
+    }
+  ],
+  "file count excluding manifest and SHA256SUMS": 21,
+  "collection method": "Read-only gh run view --log and selected run metadata; GitHub commit API responses are projected to SHA/tree/parents with original-response hashes to omit personal author metadata. Console and run metadata bytes remain unchanged."
+}

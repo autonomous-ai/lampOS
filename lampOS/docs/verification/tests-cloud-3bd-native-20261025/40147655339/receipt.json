@@ -1,0 +1,22 @@
+{
+  "head": "3bdc7c415717263697c25250294f2e2eca24d044",
+  "run": 40147655339,
+  "job": 121032348295,
+  "status": "completed",
+  "conclusion": "success",
+  "console_rendering_sha256": "3e2ea6473faf40cd585a4550a2834807503ce6bc45a445e71dbc7e160c06c5e3",
+  "console_bytes": 69831,
+  "checkout_lines": [
+    "lampOS \u2014 clippy, every crate and target (x86 Linux)\tRun actions/checkout@v4\t2026-10-25T00:42:18.2765296Z HEAD is now at 2ea6b5e Merge 3bdc7c415717263697c25250294f2e2eca24d044 into 162216f82db66e642e0c8e3033a9866cfec1ce1f"
+  ],
+  "job_started_at": "2026-10-25T00:41:12Z",
+  "job_completed_at": "2026-10-25T00:44:27Z",
+  "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40147655339",
+  "pinned_toolchain_and_command_lines": [
+    "lampOS \u2014 clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-25T00:42:25.4945423Z info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu",
+    "lampOS \u2014 clippy, every crate and target (x86 Linux)\tRust 1.96.0\t2026-10-25T00:42:25.4997003Z   1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "lampOS \u2014 clippy, every crate and target (x86 Linux)\tformatting (whole workspace, pinned Rust)\t\ufeff2026-10-25T00:42:25.8916171Z ##[group]Run cargo +1.96.0 fmt --all --check",
+    "lampOS \u2014 clippy, every crate and target (x86 Linux)\tclippy (every crate and target, warnings as errors)\t\ufeff2026-10-25T00:43:36.5355769Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "pin_boundary": "Formatting explicitly invokes +1.96.0. Clippy invokes cargo without a + selector after the log records default toolchain 1.96.0-x86_64-unknown-linux-gnu."
+}

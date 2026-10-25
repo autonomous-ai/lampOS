@@ -1,5 +1,19 @@
 # Tests work log
 
+## 2026-10-25 07:52 — Cloud ready on current base
+
+Ready for lamp-voice: yes (#3410)
+
+Exact3bdc7c415 on162 passes originalARM40147655240 (1,216PASS/eight skipped) and Linux40147655339. Full current proof926b2779da binds all executed cases and exact authored/tested whole tree. Reviewer-two software/source/native READ-OK6391596551 has noP1/P2; the body now links current bindings and the PR is ready. Second current reader remains requested; merge belongs to the review/train lane. Mac composite1a39261709 keeps frozen2cf/efbf scope and all original failures/recoveries. No device/activation acceptance. Continuing Skills failed-full observer repair and Body Hand's queued controls without another compiler allocation.
+
+
+## 2026-10-25 07:49 — Cloud current-head native checks pass
+
+Ready for lamp-voice: no
+
+[Original current3bd native proof](verification/tests-cloud-3bd-native-20261025/) records ARM40147655240/job121032347873:1,216PASS/zero failures/eight skipped, and Linux40147655339/job121032348295 formatting/strict workspaceClippy pass. Both actual checkouts are2ea6b5e, parents162+3bd, complete tree97e1125bc equal to authored3bd and the original2cf preview. All1,216 executed binary/case/status pairs match original2cf; skipped counts match, but individual skipped names are unavailable. Full console renderings, complete run metadata and four selected GitHub commit/tree/parent projections (full response hashes retained; personal metadata omitted) are retained with hashes. Root checked every outer seal and actualhead/conclusions/previewparents/tree. No workflow rerun, local ARM build or extra test. Reviewer-two current source read6391553376 has noP1/P2; second/current native reads and readiness remain. Skills fixed candidate full failed518/1/9 though exactpassed; that failure is retained and its fixture repair is next after complete terminal evidence, while Body Hand still awaits a compiler lane.
+
+
 ## 2026-10-25 07:46 — Cloud current-tree carry and original native census
 
 Ready for lamp-voice: no

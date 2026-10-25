@@ -1,0 +1,13 @@
+{
+  "original run": 40146764957,
+  "current run": 40147655240,
+  "original case outcomes SHA-256": "5c2f1fe5474b1ea18e2b02a48e88246b5acf578f7ec2be87a4e18323fd0bb23e",
+  "current case outcomes SHA-256": "51bc092ac94f10d58539ca9c7d5d5501f8770b3ee19ddccba9c7ddec01ae52d3",
+  "complete executed binary/case/status multiset equal": true,
+  "executed cases each": 1216,
+  "added": [],
+  "removed": [],
+  "skipped count each": 8,
+  "skipped case names qualification": "Console summary reports 8 skipped; these renderings do not enumerate individual skipped names. No named skipped-set equality claimed.",
+  "timing and completion order equality claimed": false
+}

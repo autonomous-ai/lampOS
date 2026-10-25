@@ -1,0 +1,31 @@
+{
+  "head": "3bdc7c415717263697c25250294f2e2eca24d044",
+  "run": 40147655240,
+  "job": 121032347873,
+  "status": "completed",
+  "conclusion": "success",
+  "console_rendering_sha256": "11f6236c19a7b92fc224a52cb03612363a3fb13d2a39e633073f79262c31bbb4",
+  "console_bytes": 410912,
+  "checkout_lines": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T00:41:45.1119716Z HEAD is now at 2ea6b5e Merge 3bdc7c415717263697c25250294f2e2eca24d044 into 162216f82db66e642e0c8e3033a9866cfec1ce1f"
+  ],
+  "job_started_at": "2026-10-25T00:41:14Z",
+  "job_completed_at": "2026-10-25T00:45:02Z",
+  "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40147655240",
+  "selected": 1216,
+  "counts": {
+    "PASS": 1216
+  },
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T00:44:38.7700333Z      Summary [  32.606s] 1216 tests run: 1216 passed, 8 skipped"
+  ],
+  "starting": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T00:44:06.1639060Z     Starting 1216 tests across 16 binaries (8 tests and 165 binaries skipped)"
+  ],
+  "binary_counts": {
+    "lamp-cloud": 196,
+    "lamp-update": 397,
+    "lamp-voice-eval": 623
+  },
+  "negative_case_outcomes": []
+}
