@@ -121,6 +121,10 @@ Environment=LAMP_SECOND_PLAYOUT_START_MS=100
 # Policy acting on calls, the stop words). lamp-name's --near 0.5 is in lamp-name.service, for LAMP_NAME_NEAR.
 # The name: a line that is the lamp's name alone waits 2.5 s for the line after it, and carries to it.
 Environment=LAMP_SECOND_NAME_CARRIES=on
+# And the line just after a bare "Lamp." takes the turn at once, not let go by the answer wait (#3396). lamp-4ace's
+# A/Bs, 24 and 25 Oct (#3411): "Lamp, … tell me a joke" was answered as the bare call with it off (q09, q01, q10) and
+# whole every time with it on.
+Environment=LAMP_CALL_TAKES_NEXT_LINE=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
