@@ -1,5 +1,29 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Refuse nonregular local head-pair inputs without waiting (2026-10-26)
+
+V1's `scripts/provision/apply-overrides.py` checks that top-level override
+JSON is a regular non-symlink file, skips non-file rootfs inputs, and
+prepares reads and validation before writes. Keep the preflight-before-
+mutation boundary for install. V1 has no equivalent of V2's shared
+head-reader/pins pairing check, so these controls are not a V1 parity claim.
+
+Reuse Update's existing nonblocking-open and same-descriptor type check
+from `install::set_mode`, without its no-symlink policy: the head-pair
+reader already accepts links to regular files and systemd's null-device
+masks. Preserve those inputs and missing-file behavior. Read only regular
+file contents; recognize the actual null character device by device
+identity and return empty text without reading it. Other nonregular
+inputs refuse. No mode inference, retirement, product switch, microphone
+or runtime touch rule changes, and no dependency is added.
+
+The original install regression reached a FIFO reader and then exceeded a
+five-second child watchdog; the parent killed and reaped it before scratch
+cleanup. That watchdog is a diagnostic bound, not a product timeout. The
+implementation target is refusal without waiting for a FIFO writer. This
+does not establish a global filesystem deadline, pathname-race protection
+or physical touch latency; regular-file storage can still be slow.
+
 ## Require observed rest before factory head calibration (2026-10-26)
 
 V1's `hal/drivers/ttp223.py` probes driven lines transiently and measures

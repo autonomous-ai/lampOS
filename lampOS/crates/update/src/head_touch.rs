@@ -6,7 +6,13 @@ use crate::{
     manifest::{self, Setting},
     unit,
 };
-use std::{collections::BTreeMap, fs, io, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    io::{self, Read},
+    os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt},
+    path::Path,
+};
 
 pub(crate) const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
 const CONTROLS: &str = "lamp-controls.service";
@@ -16,11 +22,38 @@ const BODY: &str = "lamp-body.service";
 const BODY_ENV: &str = "/etc/lampOS/body/lamp.env";
 
 fn read(path: &Path) -> Result<Option<String>, String> {
-    match fs::read_to_string(path) {
-        Ok(text) => Ok(Some(text)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(format!("{}: {error}", path.display())),
+    let failed = |error: io::Error| format!("{}: {error}", path.display());
+    let flags = rustix::fs::OFlags::NONBLOCK | rustix::fs::OFlags::NOCTTY;
+    let mut file = match fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(flags.bits() as i32)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(failed(error)),
+    };
+    // Inspect the descriptor we will read. A FIFO must not wait for a writer;
+    // regular symlinks and systemd's actual null-device masks remain valid.
+    let meta = file.metadata().map_err(failed)?;
+    if !meta.is_file() {
+        if is_null_device(&meta) {
+            return Ok(Some(String::new()));
+        }
+        return Err(format!(
+            "{}: head touch needs a regular file or /dev/null mask",
+            path.display()
+        ));
     }
+    let mut text = String::new();
+    file.read_to_string(&mut text).map_err(failed)?;
+    Ok(Some(text))
+}
+
+fn is_null_device(meta: &fs::Metadata) -> bool {
+    meta.file_type().is_char_device()
+        && fs::metadata("/dev/null")
+            .is_ok_and(|null| null.file_type().is_char_device() && null.rdev() == meta.rdev())
 }
 
 fn service(text: &str) -> String {
@@ -458,4 +491,22 @@ pub(crate) fn verify(
         return Err("head pins do not match the installed readers; pair the units and pins, and refresh lamp-update-back with install if it predates this check".into());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn null_masks_do_not_admit_other_character_devices() {
+        // Inspect metadata only: an erroneous reader of /dev/zero could
+        // allocate without bound before a watchdog has time to stop it.
+        let null = fs::metadata("/dev/null").unwrap();
+        let zero = fs::metadata("/dev/zero").unwrap();
+        assert!(null.file_type().is_char_device());
+        assert!(zero.file_type().is_char_device());
+        assert_ne!(null.rdev(), zero.rdev());
+        assert!(is_null_device(&null));
+        assert!(!is_null_device(&zero));
+    }
 }
