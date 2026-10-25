@@ -92,6 +92,75 @@ runs cannot. [Actions string comparisons ignore case](https://docs.github.com/en
 so `ON` can enter the cold-build and protected publication job paths, but
 the helper rejects it before executing an artifact binary.
 
+### Selecting a published build for the stable feed
+
+The same ARM64 workflow accepts an optional `promote_sequence` manual input.
+With it empty, ordinary builds and publication keep their existing behavior.
+With it set, the workflow runs the separate Rust CI tool in
+`.github/tools/lampos-promote`; it does not rebuild or sign the selected
+product binaries. `full` and `promote_sequence` cannot be used together.
+
+Promotion is disabled unless repository variable `LAMPOS_STABLE_PROMOTION`
+is exactly `on`. The job uses the existing branch-restricted
+`lampos-update-publish` environment and its `LAMPOS_UPDATE_PUBLIC_KEY`
+variable: the base64 public half already provisioned to lamps, obtained
+through the trusted provisioning path. It never derives trust from a release
+asset and never reads the signing secret. Keep the switch off until the
+environment protection and public key have been checked. No environment,
+variable, key or lamp configuration is provisioned by this implementation.
+
+An authorized operator selects an already published sequence, for example:
+
+```sh
+gh workflow run lampos-arm64.yml --repo autonomous-ai/lampOS \
+  --ref lamp-voice -f promote_sequence=6819
+```
+
+The tool accepts only the public repository's `lamp-voice` manual workflow
+context. It verifies the selected immutable release, its recorded original
+ARM64 run and attempt, the successful build/publication jobs and source commit.
+It uses `lamp_update::manifest` to verify the signature with the trusted
+public key, schema and supported manifest fields, then checks the sequence,
+commit, immutable payload URL, plain manifest bytes and declared asset hashes
+and sizes. An unsupported manifest, updater level or enum value is refused.
+External model manifests are also refused: the tool does not fetch model
+URLs outside the selected release. Supported settings, image and reset-plan
+contents remain signed inline and use the updater's validation. A missing or
+ambiguous source, unsuccessful run, changed asset or unknown signing key
+cannot update the feed.
+
+The stable feed is
+`https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/lampos-manifest.json`.
+Its envelope is an exact copy of the selected release's signed bytes. The
+signed channel stays `lamp-voice`, and `files_url` still names the original
+immutable `lampos-lamp-voice-<sequence>` release. Stable is a selection feed,
+not a new signature or sequence namespace. A lamp pointed at it still uses
+`--channel lamp-voice`; changing the product unit's feed is a separate
+activation decision. This tool does not install anything on a lamp.
+
+The verified stable head can only advance. Repeating the same sequence and
+identical envelope is a no-op; a lower sequence or different bytes at the
+same sequence is refused. A corrective build needs a higher sequence.
+Lamps already ahead of the selected build keep their updater's normal
+anti-rollback rules; promotion cannot downgrade them.
+
+The tool downloads and checks a staged envelope before moving the previous
+canonical asset to a retained backup and renaming the candidate. Stage names
+include the promotion run and attempt; no upload uses `--clobber`. The job
+serializes stable promotions, rechecks the previous head before replacement,
+and attempts restoration after a failed rename or confirmation, including a
+lost response after a successful rename. Existing releases without a
+canonical envelope require repair; the tool does not guess after a killed
+runner. As with ordinary publication, the two renames are not atomic and a
+lost runner can leave the feed temporarily absent. The lamp keeps its build;
+the retained asset IDs and job receipt support repair. Other writers must
+not update this alias outside the serialized job.
+
+Offline Rust tests exercise verification, monotonic selection and failed
+promotion/recovery with a disposable key and simulated GitHub responses.
+The ARM64 workflow runs them; Linux Clippy also checks the standalone tool.
+These tests do not establish a real stable promotion or lamp acceptance.
+
 ### The build and its identity
 
 - The job checks out that run's `github.sha` and downloads
