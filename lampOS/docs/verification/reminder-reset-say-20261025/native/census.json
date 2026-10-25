@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "kind": "audit_of_completed_public_ci_logs",
+  "landed_commit": "1ee8cf7f09e6c9c6c7756f825a63640967c22634",
+  "complete_tree": "b33c85e51a2c840b3e22c866c6f89d9220668eec",
+  "runs": [
+    {
+      "scope": "original",
+      "pull_request": 3493,
+      "arm64_run": 40213653347,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40213653347",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "b2d24fc0317813b9e5544ed552eb38617ffc8591",
+      "actual_checkout": "7e41f778573a90404036dd7400235707b2bbedf1",
+      "complete_tree": "b33c85e51a2c840b3e22c866c6f89d9220668eec",
+      "full_log_sha256": "fa406f5f6768f137635ae40d181198171b4dc011276d1fbb340fce43afc54cb6",
+      "selected_execution_cases": 7437,
+      "unique_terminal_cases": 7437,
+      "execution_ordinals": {
+        "first": 1,
+        "last": 7437,
+        "all_present_once": true
+      },
+      "terminal_before_summary": {
+        "PASS": 7436,
+        "LEAK": 1
+      },
+      "failed": 0,
+      "selected_unrun": 0,
+      "skipped_tests": 53,
+      "selected_binaries": 67,
+      "skipped_binaries": 114,
+      "coordinator_reminder_pass": 28,
+      "leaks": [
+        "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      ],
+      "post_summary_echoed_pass_rows_excluded": 34,
+      "linux_run": 40213653364,
+      "linux_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40213653364",
+      "linux_attempt": 1,
+      "linux_status": "completed",
+      "linux_conclusion": "success"
+    },
+    {
+      "scope": "train",
+      "pull_request": 3494,
+      "arm64_run": 40213807332,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40213807332",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "82567f96b7c9ab17662719f3f82c90a859faf0ba",
+      "actual_checkout": "4dde3604cf7c4959ae0abfc2d6615749531a17d6",
+      "complete_tree": "b33c85e51a2c840b3e22c866c6f89d9220668eec",
+      "full_log_sha256": "0047efe4c4947889cb7e7b1bb257083c4f8b4e774a774e60e1b72a16dc67ea74",
+      "selected_execution_cases": 7437,
+      "unique_terminal_cases": 7437,
+      "execution_ordinals": {
+        "first": 1,
+        "last": 7437,
+        "all_present_once": true
+      },
+      "terminal_before_summary": {
+        "PASS": 7436,
+        "LEAK": 1
+      },
+      "failed": 0,
+      "selected_unrun": 0,
+      "skipped_tests": 53,
+      "selected_binaries": 67,
+      "skipped_binaries": 114,
+      "coordinator_reminder_pass": 28,
+      "leaks": [
+        "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      ],
+      "post_summary_echoed_pass_rows_excluded": 34,
+      "linux_run": 40213807350,
+      "linux_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40213807350",
+      "linux_attempt": 1,
+      "linux_status": "completed",
+      "linux_conclusion": "success"
+    }
+  ],
+  "parser_corrections": {
+    "applies_to_initial_attempts": "original constituent log only",
+    "initial_attempts": [
+      {
+        "result": "count assertion failed",
+        "reason": "ordinal padding was not accepted"
+      },
+      {
+        "result": "count assertion failed",
+        "reason": "34 post-summary echoed PASS rows were counted as additional observations"
+      }
+    ],
+    "final_method": "Parse only between the single Starting 7437 marker and its Summary. Require 7437 unique binary/name pairs, every ordinal 1..7437 exactly once, 7436 PASS plus 1 LEAK, and 28 coordinator reminder PASS rows. Exclude and separately reconcile 34 echoed PASS rows after Summary in each log.",
+    "new_test_executions": 0
+  },
+  "limits": [
+    "These are the PR affected-crate CI selections, not a whole-workspace test count.",
+    "The known journal LEAK remains a leaky pass, not leak-free execution.",
+    "The local full Voice 4053/0/21 stays on its original 56cacbddd execution; the e1 carry is not another full local run.",
+    "No combined execution with #3491 or device, acoustic, physical-latency or durable-Ack acceptance is claimed."
+  ]
+}

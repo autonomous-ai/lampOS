@@ -1,3 +1,17 @@
+## Current checkpoint: 2026-10-26 00:14 +07, reminder reset/say landed; unplug fixture resumed
+
+[#3493](https://github.com/autonomous-ai/lampOS/pull/3493) landed through train #3494 as `1ee8cf7f0`. Original ARM64 40213653347 and train ARM64 40213807332 both report **7,437 passed (1 leaky), 53 skipped**; all 28 coordinator reminder cases are literal PASS. Original Linux 40213653364 and train Linux 40213807350 are green. [Native evidence](verification/reminder-reset-say-20261025/native/README.md) binds both actual tested checkouts, original/train heads and landing to complete tree `b33c85e51a2c840b3e22c866c6f89d9220668eec`.
+
+The constituent-log census first failed on padded ordinals, then on 34 echoed post-summary PASS rows. The final parser reconciles all 7,437 unique cases and ordinals in each completed run; the repeated report rows are excluded. These are parser corrections, with no test rerun or changed outcome. The tracked journal LEAK remains explicit. The original local 0/1 reproduction and fixed full Voice **4,053/0/21** stay on `56cacbddd`; the unchanged-input e1 carry is not a second full local run. Reviewer-two owns the separate combined #3491/#3493 execution.
+
+[Taken on the Queue](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6400624277): resume the previously queued Body sample-gap fixture on `second/body-unplug-gap-recovery`. Open and merged PR checks found no duplicate, and current `unplug.rs` still matches the preserved proposal's baseline. Recovery uses the [corrected two-file source packet](verification/body-unplug-gap-source-20261025/candidate-with-live-worker/README.md), retaining the controlled phase timeline and separate enabled-Adapter lifecycle test. Positive qualification and the fixed five negative controls remain UNRUN. The temporary controller must be recovered with bounded process cleanup before execution; no historical failure is retried or relabelled.
+
+No Second compiler is active. The next single job remains requested after Reviewer-two's combined reminder check; source/controller preparation proceeds meanwhile. This is headless Body test work. The attended updater unplug and trusted-public-key/device release steps remain with their holders.
+
+The clean log branch was rebased onto `1ee8cf7f0`, preserving all 296 historical log commits and all 9,560 prior log-path blobs/modes before this additive checkpoint. Earlier checkpoint wording and evidence remain unchanged.
+
+---
+
 ## Current checkpoint: 2026-10-26 00:01 +07, reminder reset/say repair published
 
 [#3493](https://github.com/autonomous-ai/lampOS/pull/3493) is ready for review at `b2d24fc03`, based on current `e1c69457a`. A reset-invalidated reminder now answers its skill `Dropped("reminder_completion_unconfirmed")` instead of reporting `Spoken` while abandoning its receipt. The new check reads the local Complete settlement after the existing finalizer; it does not claim a durable Schedule acknowledgement. Ordinary say and sound behavior remains unchanged.

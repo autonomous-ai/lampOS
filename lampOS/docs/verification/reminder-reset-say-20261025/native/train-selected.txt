@@ -1,0 +1,32 @@
+2026-10-25T16:53:43.6981556Z 4dde3604cf7c4959ae0abfc2d6615749531a17d6
+2026-10-25T17:03:42.5498763Z     Starting 7437 tests across 67 binaries (53 tests and 114 binaries skipped)
+2026-10-25T17:05:15.6341995Z         PASS [   0.007s] (3546/7437) lamp-voice coordinator::tests::reminders::a_lamp_written_turn_s_phrase_asks_for_no_still
+2026-10-25T17:05:15.6863304Z         PASS [   0.028s] (3548/7437) lamp-voice coordinator::tests::reminders::a_pulse_held_back_keeps_the_time_it_was_owed_from
+2026-10-25T17:05:15.6924867Z         PASS [   0.006s] (3549/7437) lamp-voice coordinator::tests::reminders::a_pulse_switched_on_without_the_asleep_face_says_why_once
+2026-10-25T17:05:15.6992056Z         PASS [   0.007s] (3550/7437) lamp-voice coordinator::tests::reminders::a_reminder_a_skill_asked_for_is_answered_on_the_acknowledgements_own_proof
+2026-10-25T17:05:15.7152630Z         PASS [   0.081s] (3551/7437) lamp-voice coordinator::tests::reminders::a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule
+2026-10-25T17:05:15.7759538Z         PASS [   0.019s] (3553/7437) lamp-voice coordinator::tests::reminders::a_reminder_held_for_its_skill_keeps_other_unasked_speech_waiting_while_it_is_offered
+2026-10-25T17:05:15.7855893Z         PASS [   0.086s] (3554/7437) lamp-voice coordinator::tests::reminders::a_reminder_cancelled_while_muted_is_never_said
+2026-10-25T17:05:15.7913003Z         PASS [   0.006s] (3555/7437) lamp-voice coordinator::tests::reminders::a_stop_ends_the_asking_and_an_unclear_after_it_is_never_taken
+2026-10-25T17:05:15.7977886Z         PASS [   0.006s] (3556/7437) lamp-voice coordinator::tests::reminders::after_a_new_cycle_the_last_cycle_s_written_turn_number_spoken_asks_for_the_still
+2026-10-25T17:05:15.8032073Z         PASS [   0.005s] (3557/7437) lamp-voice coordinator::tests::reminders::an_answer_that_looks_something_up_takes_no_picture
+2026-10-25T17:05:15.8085201Z         PASS [   0.005s] (3558/7437) lamp-voice coordinator::tests::reminders::an_empty_sorry_owes_one_hm_and_a_said_one_or_another_silent_turn_none
+2026-10-25T17:05:15.8138900Z         PASS [   0.005s] (3559/7437) lamp-voice coordinator::tests::reminders::an_owed_reminder_pulses_under_the_switch_or_a_mute_and_never_asleep
+2026-10-25T17:05:15.8201459Z         PASS [   0.006s] (3560/7437) lamp-voice coordinator::tests::reminders::an_unclear_turn_is_asked_again_once_over_and_never_late_or_over_someone
+2026-10-25T17:05:15.8268687Z         PASS [   0.007s] (3561/7437) lamp-voice coordinator::tests::reminders::interruption_after_first_retirement_never_acknowledges_later_audio
+2026-10-25T17:05:15.8338599Z         PASS [   0.007s] (3562/7437) lamp-voice coordinator::tests::reminders::no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording
+2026-10-25T17:05:15.8455499Z         PASS [   0.130s] (3563/7437) lamp-voice coordinator::tests::reminders::a_reminder_due_while_muted_is_owed_once_and_no_turn_begins
+2026-10-25T17:05:15.8522686Z         PASS [   0.007s] (3564/7437) lamp-voice coordinator::tests::reminders::only_a_fenced_attempt_without_any_provider_pcm_can_retry
+2026-10-25T17:05:15.8579649Z         PASS [   0.006s] (3565/7437) lamp-voice coordinator::tests::reminders::only_the_switch_and_a_mute_let_an_owed_reminder_pulse
+2026-10-25T17:05:15.8643127Z         PASS [   0.006s] (3566/7437) lamp-voice coordinator::tests::reminders::privacy_revocation_after_partial_reminder_playback_drops_the_skill_ticket
+2026-10-25T17:05:15.8696149Z         PASS [   0.005s] (3567/7437) lamp-voice coordinator::tests::reminders::reminder_quiet_uses_current_admission_time_after_new_capture_arrived_in_loop
+2026-10-25T17:05:15.8886849Z         PASS [   0.019s] (3568/7437) lamp-voice coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire
+2026-10-25T17:05:15.9074359Z         PASS [   0.019s] (3569/7437) lamp-voice coordinator::tests::reminders::reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_terminal
+2026-10-25T17:05:15.9138523Z         PASS [   0.080s] (3570/7437) lamp-voice coordinator::tests::reminders::on_unmute_the_owed_reminder_is_offered_to_the_first_turn
+2026-10-25T17:05:15.9143183Z         PASS [   0.007s] (3571/7437) lamp-voice coordinator::tests::reminders::reset_or_playback_gap_cannot_be_relabeled_whole_reminder_completion
+2026-10-25T17:05:15.9195661Z         PASS [   0.006s] (3572/7437) lamp-voice coordinator::tests::reminders::stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_late
+2026-10-25T17:05:15.9256862Z         PASS [   0.006s] (3573/7437) lamp-voice coordinator::tests::reminders::whole_reminder_joins_two_real_retirements_and_successful_provider_terminal
+2026-10-25T17:05:15.9682214Z         PASS [   0.192s] (3574/7437) lamp-voice coordinator::tests::reminders::a_reminder_pending_at_a_start_is_owed_to_no_mute
+2026-10-25T17:05:16.0095246Z         PASS [   0.095s] (3577/7437) lamp-voice coordinator::tests::reminders::the_muted_wait_tells_the_asleep_face_a_reminder_is_owed_only_while_it_may_pulse
+2026-10-25T17:05:46.2873290Z         LEAK [   0.232s] (5220/7437) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+2026-10-25T17:06:18.1634905Z      Summary [ 155.633s] 7437 tests run: 7437 passed (1 leaky), 53 skipped
