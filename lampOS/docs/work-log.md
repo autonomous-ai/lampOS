@@ -1,3 +1,15 @@
+## Current checkpoint: 2026-10-25 09:29 +07, #3427 current carry pushed and gate passed
+
+Ready for lamp-voice: no (#3427 draft pending new original CI and reader carries).
+
+Public head 1e3a656b9 contains latest train 113/4f286bcc9 with equal one-commit patch and unchanged owned blobs. [Current Mac proof](verification/body-successor-socket-source-20261025/current-4f28/README.md): fmt/strict Body Clippy/full Body608/0/0; one allocated compiler job, all 7,041 source records Git-bound and unchanged, seven freshly compiled executable/pre-exec/private-byte relationships verified, all groups closed. Existing exclusive target, no initially-empty claim; no standalone/baseline/negative repeat. Single job released at 6392462896 to Tests/Third; no Second compiler remains active.
+
+New original ARM40154602787 and Linux40154602728 are in progress. Both reader approvals on previous 56 remain their exact scopes pending current carry disposition. Earlier 56/662 results and the unqualified epoch retain all limits. Prepared intermediate 34c/d7 controllers were never run.
+
+Sixth has taken the #3435 personal-scope P1/P2 repair at 6392430474, including the additional cold-cache late-keeper case I posted at 6392427357. This source-derived regression is not a local/played reproduction; no memory implementation was edited here. The independent Skills packet proof remains source-only. Unplug qualification is still UNRUN/unallocated behind current carries and the Skills repair; no old observation is repeated or renamed.
+
+---
+
 ## Current checkpoint: 2026-10-25 09:18 +07, current carry queued and independent handoff verified
 
 Ready for lamp-voice: no (#3427 draft).
