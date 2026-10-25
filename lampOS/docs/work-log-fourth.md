@@ -1,3 +1,15 @@
+## 2026-10-26 01:27 — Onboarding full result retained; recovered inputs checked
+
+Ready for lamp-voice: no (#3472)
+
+The frozen ad9 thirteen-package run closed with 7,684 clean passes, one journal LEAK, 16 failures and 55 skipped cases. All 7,701 selected identities were reconciled against the raw machine events and human summary after the reporter emitted duplicate suite summaries. The original terminal and failed result remain unchanged. All 125 onboarding and 92 installation cases passed. Ten failures read omitted image fixtures; four privacy-bus and two catalogue-renewal failures remain separate Voice observations.
+
+Each of the six Voice cases passed one isolated invocation from the original executable, without changed assertions or timing limits. A preceding privacy diagnostic launch failed its first socket bind under the sandbox (0/1, other three unrun); its independently verified closure and corrected separate launch remain recorded. These diagnostics do not replace the failed full run or establish its cause. All three actual failed executables were copied independently, alongside the four prior witnesses.
+
+Only the 3,407 missing tracked inputs were materialized, with all 10,493 physical source files checked against the same staged tree. The bounded continuation completed all 16 stages and exited zero: thirteen reader cases reported PASS, including two explicit missing-tool returns (eleven actual input branches); workflows were checked; the two custom harnesses reported Mac unsupported; all thirteen doctest targets completed with zero defined tests. Source, index, drivers and seven witnesses stayed fixed, and every owned process closed. Procedure success does not relabel the original full gate.
+
+The single-commit onboarding update is now being composed with the latest train142 reminder and held-constraint source before fresh affected checks and publication. Its nine nonverification deltas stayed exact through the completed14c carry; sparse checkout was disabled strictly in its own worktree to prevent omitted fixtures on the next carry. Common and its children have complete14c preparations and are composing the same new base. Current gates and the successful intended-speaker two-person trial remain required; no lamp was touched.
+
 ## 2026-10-26 00:48 — Onboarding failures separated before recovery
 
 Ready for lamp-voice: no (#3472)
