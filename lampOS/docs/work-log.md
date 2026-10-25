@@ -1,3 +1,13 @@
+## Current checkpoint: 2026-10-25 12:35 +07, latest Body head pushed and job returned
+
+Ready for lamp-voice: no (#3427 awaits original current-head CI and reader carries).
+
+Public `95b7a1eff` directly contains train119 `056a76132`, with equal two-file patch and owned blobs. [Mac proof](verification/body-successor-socket-source-20261025/current-056a/README.md): fmt, strict Body Clippy and full Body 608/0/0 pass. All 7,041 source records and seven pre-exec/compiler bindings verify, six qualified reused executables and one fresh; source unchanged and groups closed. Tests released the job at 6393924079; taken at 6393959208 and returned at 6393965654. No Second compiler is active.
+
+New original ARM40166028052 and Linux40166028050 are separate pending observations. Current-head reader carries and final latest-Main author readiness are pending. Prior epochs retain their source and failed/passed results. No physical or merge action.
+
+---
+
 ## Current checkpoint: 2026-10-25 12:24 +07, latest Body carry queued; report rounding found
 
 Ready for lamp-voice: no (#3427 draft; latest-base gate awaits actual compiler handoff).
