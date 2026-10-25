@@ -5,6 +5,44 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 20:51 — Parent carry pushed; Body enters train 130
+
+Ready for lamp-voice: yes (#3474, now in train 130; other pieces below are not ready).
+
+#3408 is pushed at `92511dc09` on `86416a0d3`, with original authored
+lines preserved and five proof files. Runtime `bfc7e70a3` passed native
+Mac fmt, strict Voice/Eval clippy, workspace build and full tests:
+**4,662/0/21**, 11 harness summaries, all three added controls passing.
+Original new ARM64 **40198533556** is active; Linux clippy **40198533501**
+is green. Reviewer-three gave READ-OK on the exact carry; Reviewer-two
+is reading and independently executing it. The PR remains draft.
+
+#3420 is now `9c7ef580c` on the published parent. Its full gate runs in
+the same owned build workspace after the parent finished, checked out
+detached at the exact child tree. Formatting, strict Voice/Eval clippy
+and workspace build pass; full tests are active. Its four-file authored
+patch remains exact. No active gate source was changed. #3355 remains
+prepared behind this gate, with no compiler or device claim.
+
+#3474 has two current READ-OKs, from Reviewer-two and Reviewer-three.
+Train 130 [#3476](https://github.com/autonomous-ai/lampOS/pull/3476) carries
+it with the scope, aside and docs pieces; its Linux clippy is green and
+original ARM64 **40198754945** is active. Train 129 closed without merging
+after a carried PR was held; its successful run is not this train's pass.
+Main remains `86416a0d3`.
+
+Took the Schedule owner's new reminder-delivery diagnosis from Queue
+6398391020. [Code trace](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6398449066):
+speaker retirement is serviced before candidate admission, while the whole
+reply join is later. Admission can cancel a settled reply before its receipt
+is completed. Drop abandons it; the consumer holds it in that session and
+intentionally retries after a later voice restart. The skill's appears
+trigger stays spent while pending stays positive; the explicit 10 s fallback
+accounts for 10 s of the reported 12 s, with the rest unattributed. This is
+a source finding, not a reproduction of the lamp's exact order. Planned
+regression and partial/reset/privacy negatives are recorded; no product
+change, extra compiler job, lamp access or weakened delivery proof.
+
 ## 2026-10-25 20:30 — Body original Linux gates green
 
 Ready for lamp-voice: yes (#3474; current carry reads gate the train).
