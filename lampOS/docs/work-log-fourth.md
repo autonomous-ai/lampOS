@@ -1,3 +1,9 @@
+## 2026-10-25 16:01 — Onboarding workspace build passed
+
+Ready for lamp-voice: no
+
+The narrow activation passed the ordinary workspace build on its fixed source: exit 0 in 2,104.6 s, with its process group closed. Formatting and strict workspace/all-target Clippy also passed. The full Voice test command has started; no Rust test count is claimed yet. The remaining affected/dependent suites and final build follow before the code commit and PR. The earlier broader interrupted run stays separate, and the physical two-person check remains with First to assign.
+
 ## 2026-10-25 15:45 — Onboarding release handoff prepared
 
 Ready for lamp-voice: no
