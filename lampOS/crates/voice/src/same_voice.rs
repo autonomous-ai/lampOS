@@ -230,6 +230,10 @@ impl Printer for Box<dyn Printer> {
 pub struct Prints {
     asked: mpsc::SyncSender<(u64, Vec<i16>)>,
     answers: mpsc::Receiver<(u64, Result<Vec<f32>, String>)>,
+    #[cfg(test)]
+    test_worker: Option<thread::JoinHandle<()>>,
+    #[cfg(test)]
+    test_done: Option<mpsc::Receiver<()>>,
 }
 
 impl Prints {
@@ -247,13 +251,26 @@ impl Prints {
     fn journaled(program: PathBuf, model: PathBuf, timing: Timing, journal: Journal) -> Self {
         let (asked, jobs) = mpsc::sync_channel(0);
         let (told, answers) = mpsc::channel();
+        #[cfg(test)]
+        let (finished, done) = mpsc::channel();
         let started = thread::Builder::new()
             .name("same-voice".into())
-            .spawn(move || keep(&program, &model, &jobs, &told, timing, &journal));
-        if let Err(error) = started {
+            .spawn(move || {
+                keep(&program, &model, &jobs, &told, timing, &journal);
+                #[cfg(test)]
+                let _ = finished.send(());
+            });
+        if let Err(error) = &started {
             eprintln!("lamp-voice provider: the same voice is not judged: {error}");
         }
-        Self { asked, answers }
+        Self {
+            asked,
+            answers,
+            #[cfg(test)]
+            test_worker: started.ok(),
+            #[cfg(test)]
+            test_done: Some(done),
+        }
     }
 
     /// The child installed beside the running executable.
@@ -1232,6 +1249,50 @@ mod tests {
         (journal, kept)
     }
 
+    /// The journal fixture owns the actual constructor's worker. A print
+    /// being journaled is not evidence that the worker's child was reaped.
+    struct JournalWorker {
+        prints: Option<Prints>,
+        done: mpsc::Receiver<()>,
+        worker: Option<thread::JoinHandle<()>>,
+    }
+
+    impl JournalWorker {
+        fn start(program: PathBuf, journal: Journal) -> Self {
+            let mut prints = Prints::journaled(program, "model".into(), QUICK, journal);
+            let worker = prints.test_worker.take();
+            let done = prints.test_done.take().unwrap();
+            Self {
+                prints: Some(prints),
+                done,
+                worker,
+            }
+        }
+
+        fn finish(&mut self) {
+            drop(self.prints.take());
+            self.done
+                .recv_timeout(Duration::from_secs(5))
+                .expect("same-voice journal worker did not finish after its channels closed");
+            self.worker.take().unwrap().join().unwrap();
+        }
+    }
+
+    impl Drop for JournalWorker {
+        fn drop(&mut self) {
+            drop(self.prints.take());
+            if let Some(worker) = self.worker.take() {
+                // Assertion failure or a completion timeout still owns this
+                // join. Rust cannot cancel a thread: a stuck OS spawn/reap
+                // needs the enclosing test-process watchdog, never detachment.
+                eprintln!("same-voice journal fixture: joining its worker during cleanup");
+                if worker.join().is_err() {
+                    eprintln!("same-voice journal fixture: its worker panicked");
+                }
+            }
+        }
+    }
+
     /// #1444: each of the check's three journal lines is said, word for
     /// word, through the journal it was given. Removing any of them fails
     /// here: the busy child's, the verdict's "judged without", and the
@@ -1272,8 +1333,8 @@ printf '{"request":1,"print":[1.0,0.0]}\n'
 exec sleep 30"#,
         );
         let (journal, kept) = kept_journal();
-        let mut prints = Prints::journaled(path, "model".into(), QUICK, journal);
-        ask_until(&mut prints, |answer| answer.is_ok());
+        let mut worker = JournalWorker::start(path, journal);
+        ask_until(worker.prints.as_mut().unwrap(), |answer| answer.is_ok());
         let timed: Vec<String> = kept.lock().unwrap().clone();
         assert_eq!(timed.len(), 1, "{timed:?}");
         assert!(
@@ -1281,6 +1342,7 @@ exec sleep 30"#,
                 && timed[0].ends_with(" ms after it was asked (0.01 s of sound)"),
             "{timed:?}"
         );
+        worker.finish();
     }
 
     /// The reviewer on #1030: a child that hangs after "ready" is killed
