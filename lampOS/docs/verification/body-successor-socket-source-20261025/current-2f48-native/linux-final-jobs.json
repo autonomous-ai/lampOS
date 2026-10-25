@@ -1,0 +1,121 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 121061940596,
+      "run_id": 40157508781,
+      "workflow_name": "lampOS clippy",
+      "head_branch": "second/body-successor-sockets",
+      "run_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40157508781",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOSxRYh88AAAAcL9qddA",
+      "head_sha": "66d923cf62d4f682a3155484a0daf20a41a94d93",
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/jobs/121061940596",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40157508781/job/121061940596",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-25T03:15:02Z",
+      "started_at": "2026-10-25T03:15:05Z",
+      "completed_at": "2026-10-25T03:18:26Z",
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-25T03:15:06Z",
+          "completed_at": "2026-10-25T03:15:07Z"
+        },
+        {
+          "name": "system packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-25T03:15:07Z",
+          "completed_at": "2026-10-25T03:15:34Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-25T03:15:34Z",
+          "completed_at": "2026-10-25T03:15:40Z"
+        },
+        {
+          "name": "Rust 1.96.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-25T03:15:40Z",
+          "completed_at": "2026-10-25T03:15:51Z"
+        },
+        {
+          "name": "formatting (whole workspace, pinned Rust)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-25T03:15:51Z",
+          "completed_at": "2026-10-25T03:16:01Z"
+        },
+        {
+          "name": "restore the cache",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-25T03:16:01Z",
+          "completed_at": "2026-10-25T03:16:59Z"
+        },
+        {
+          "name": "unchanged source files get the cached build's times back",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-25T03:16:59Z",
+          "completed_at": "2026-10-25T03:17:07Z"
+        },
+        {
+          "name": "clippy (every crate and target, warnings as errors)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-25T03:17:07Z",
+          "completed_at": "2026-10-25T03:18:24Z"
+        },
+        {
+          "name": "save the cache",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 9,
+          "started_at": "2026-10-25T03:18:24Z",
+          "completed_at": "2026-10-25T03:18:24Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-25T03:18:24Z",
+          "completed_at": "2026-10-25T03:18:24Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-25T03:18:24Z",
+          "completed_at": "2026-10-25T03:18:24Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-runs/121061940596",
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "runner_id": 1000081128,
+      "runner_name": "GitHub Actions 1000081128",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

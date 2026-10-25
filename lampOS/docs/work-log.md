@@ -1,3 +1,17 @@
+## Current checkpoint: 2026-10-25 10:40 +07, original 66 CI complete and latest carry waiting on job loan
+
+Ready for lamp-voice: no (#3427 draft; integration is now a176e66d9).
+
+Public `66d923cf6` on `2f48b0edd` passed original attempt-1 ARM 40157508771 and Linux 40157508781. [Native proof](verification/body-successor-socket-source-20261025/current-2f48-native/README.md): 7,408 PASS plus one LEAK, all 7,409 selected terminal, 53 skipped, all 21 supervisor cases PASS, zero failed/unrun. Actual preview `fb3924e1b` and complete authored/tested tree `024ed1d30` match. Mac 608/0/0 stays in 6bf266521. R3 carries its read to 66; R2's unchanged-input source read passes but current-base readiness HOLD 6393017393 remains.
+
+Local `6e494fd19` is an equal-patch carry on latest `a176e66d9`, with Body/Cargo inputs unchanged. Its one-job gate is prepared and UNRUN; requested a short loan from Fourth before the released Skills pair starts at 6393008621. No allocation is presumed. The old CI finished naturally before a new push; all original results retain their heads. No Second compiler is active.
+
+The clean docs replacement #3441 received independent exact-source/Decimal READ-OK 6393028459: one Markdown file, shipping 65.10/70 = 93.0%, quality 10.00/16 = 62.5%, mood 1.17/2 = 58.5%, excluded from shipping. This is arithmetic/scope only, not a lamp-grade audit or author readiness.
+
+Scope repair boot-source P1 is closed on 6d. New e7 fixes reader-policy installation in source; R2 retains its disposition/gates and P3s for qualifying restart evidence and worker-configuration regression. All earlier failed executions remain failed; no physical or merge action here.
+
+---
+
 ## Current checkpoint: 2026-10-25 10:16 +07, #3427 train-114 carry pushed and job returned
 
 Ready for lamp-voice: no (#3427 awaits new original CI and current reader carries).
