@@ -1,5 +1,15 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two masking-test source and native audit at 03:04 +07)
+
+#3506 original head 9a6d86118 directly parents current 409bf7268. Source/proof read 6402465173 finds P1/P2 none: exactly five private Engine tests append to the unchanged two original cases, with four verification files and no product delta. The real loader/Engine fixture holds a fresh topic through the two-second wait, reports exactly one refused event at logical second three, and takes no action, policy ask or queue. The typed two-face payload passes validation and remains below its five-second condition. Exact suffix, unique suffix and hidden-content assertions cover text/list/object/face masking. The existing short-word P3 is a separate policy question, not fixed by these tests.
+
+All three proof checksums and six exact input hashes match. Six author summaries total 522/0/9; the earlier full 517/5/9 and two focused 6/1 fixture failures remain separate from the two deliberately compiled controls, each 0/1 at the intended suffix assertion. Published artifact identities/counts are consistent, but private raw logs, mutated source inventories and restoration observations are not independently attested. My local Skills gate is prepared only, queued behind NoPause, and is not claimed as run.
+
+Original ARM64 40228167797 attempt 1 completes at preview e9b5154, combining 9a6 with 409: 11,313 PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped, all selected terminal cases unique, and all five new masking controls pass once. Strict Linux Clippy 40228167739 succeeds. Native read 6402509342 records this distinct evidence; retained raw log SHA-256 is 35da15fb16daf05ee7ae952e5c1a133dcc94c79c162aea81677271e4f91f6a71.
+
+NoPause full twelve-crate run remains active at frozen tree 6a9c713a2. Its 02:48 interim snapshot found the changed case and all six historically held cases each passing once, with no observed failure, but the full run was not terminal and no final or 3/3 claim followed. Prior failed full and qualification records remain retained. Source/target stay fixed until completion and executed artifacts are preserved before reuse. Queue3504 status6402443884 names the next masking review. Backlog triage confirms #3213 and #3248 are already delivered through later work and require no duplicate source review. Only this review log is committed/pushed; inherited pr.json is untouched, with no product/protected push or device action.
+
 ## 2026-10-26 (reviewer-two repaired image delivered and offered carry native at 02:46 +07)
 
 Current Queue is #3504, continued from full #3126 and initially published without the queue label. Its whole body/comments are read and the bounded watcher follows it explicitly, plus active NoPause #3404. In 6402198364 I correct First's stale ready-read request: #3450's old first-request finding is withdrawn, but unchanged 503 still has the distinct person-boundary HOLD; unchanged #3477 8e still has quoted-translation and constrained-scheduling findings. No new repair or clearance is inferred from the new Queue.
