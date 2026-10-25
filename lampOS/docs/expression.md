@@ -486,7 +486,7 @@ legacy observation age; it does not convert transcripts into audio timing.
 | The local time of day (not a topic) | `serve --zone system` or `--utc-offset-minutes N` itself, at start and every minute; `import` with either, from a recording's wall clock. Only sleep reads it |
 | `controls/touch`, `controls/touch_state` | Only with `serve --head-touch`: the head's Stroke, Hold and Tap, and whether that hand is still there (#711) |
 | `voice/mute` / `VoiceMute` | Only with `serve --head-touch`: asleep while the voice's mute says `sleep`, awake when it opens; muted (not `sleep`), a tap gets no look up, until it says open, however late; kept 3 s for sleep ([alive.md](alive.md), "The head"; #711) |
-| `voice/privacy` / `MicrophonePrivacy` | Only with `serve --head-touch`, read at each request from the head and at each step of a look up, never subscribed: the last lease said is the switch open only when it is valid and says `physical_muted: false`, or `no_slide` (a lamp with no slide has no switch to close); anything else, however late, is the privacy switch closed, and a tap gets no look up. Nothing ever said is open. Said only on the Controls privacy route (`LAMP_PRIVACY_CONTROLS=on` or `no-slide`) ([alive.md](alive.md); #711; [privacy-switch.md](privacy-switch.md)) |
+| `voice/privacy` / `MicrophonePrivacy` | With `serve --head-touch` or rest requests, read at intake and final planning, never subscribed: the last lease said is the switch open only when it is valid and says `physical_muted: false`, or `no_slide` (a lamp with no slide has no switch to close); anything else, however late, is the privacy switch closed, and a tap gets no look up. A successful read with nothing ever said is open; an envelope or I/O read error is closed, including at the final planning boundary. Said only on the Controls privacy route (`LAMP_PRIVACY_CONTROLS=on` or `no-slide`) ([alive.md](alive.md); #711; [privacy-switch.md](privacy-switch.md)) |
 | `light/command` | Actions: the user's lasting on/color/level setting. No light request is emitted before a valid setting is known |
 
 The existing `voice/state` does not carry the private BodyLink's pre-audio
@@ -1027,6 +1027,23 @@ The recent-level addendum does not establish how the 100 ms tail looks, or
 validate First's planned earlier Voice publication. Its normalized levels
 remain speaker-owner reports.
 
+## Privacy read failures at presentation boundaries
+
+Head taps and ordinary skill rests keep failed retained-envelope or I/O
+reads distinct from an absent privacy publisher. A failed read counts as
+closed at intake and at the final planning boundary. An active tap look
+uses the existing cancellation/ease-out path; an active ordinary rest is
+cancelled. A subsequent valid open lease permits a new input, but opening
+alone does not resume the cancelled work. Valid retained closed leases,
+malformed payloads and the no-slide rule retain their existing meaning.
+
+The correction adds no read, polling interval, sleep or retry. The target
+is refusal at the same planning boundary that observes the error; physical
+motion still follows the existing bounded ease-out and Body guards. Real-bus
+controls exercise closed, unreadable, valid-open recovery and in-flight
+cancellation, plus no automatic revival. These are injected-time planning
+checks, not physical latency or microphone-readiness measurements.
+
 ## Leased skill rest requests
 
 `LAMP_REST_REQUESTS=on` enables generic skill-owned rest intake. It is off
@@ -1083,7 +1100,12 @@ a retained Listening turn. The current Voice session/turn/request is pinned
 for the episode. A stronger reflex, ownership change, loss of fresh inputs,
 lease expiry or pause cancels it. A request-stream gap detected when the next
 valid request arrives also cancels it; silence or malformed traffic is bounded
-by the existing lease rather than a separate stream-gap notification. A routine cannot release hand
+by the existing lease rather than a separate stream-gap notification. A failed retained privacy read also closes this gate: it refuses a new
+ordinary rest and cancels one in flight. A later valid open read allows a
+new episode; reopening alone does not revive the cancelled one. The claimed
+night-sleep exception remains unchanged. A successful read with no privacy
+publisher retains the compatibility behavior of a lamp without this route.
+A routine cannot release hand
 or privacy sleep. Existing Body fold, pause, range and motor guards remain
 authoritative; Expression does not infer unfolding from joint angles.
 

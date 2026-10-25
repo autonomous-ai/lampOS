@@ -659,6 +659,10 @@ mod sleep_name {
         /// step.
         fn tap_with_switch(&mut self, closed: bool) {
             self.switch(closed);
+            self.tap();
+        }
+
+        fn tap(&mut self) {
             let at = self.now_us;
             let (taps, _) = self.head.as_mut().expect("with the head");
             let stamp = ClockStamp {
@@ -824,6 +828,93 @@ mod sleep_name {
             lamp.tap_with_switch(closed);
             let looked = (0..5).any(|_| has(&lamp.step(), "looking up at a tap"));
             assert_eq!(looked, !closed, "closed: {closed}");
+        }
+    }
+
+    #[test]
+    fn a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease() {
+        use lamp_msgs::MicrophonePrivacy;
+
+        let mut lamp = SleepingService::with_head(|service| service, true);
+        let bus = Bus::new(&lamp._root.0).unwrap();
+        for _ in 0..5 {
+            lamp.step();
+        }
+        let switch = |lamp: &mut SleepingService, closed: bool| {
+            let at = lamp.now_us;
+            let (_, publisher) = lamp.head.as_mut().unwrap();
+            let lease = MicrophonePrivacy {
+                stamp: ClockStamp {
+                    clock_id: "test".into(),
+                    at_us: at,
+                    sequence: publisher.totals().published + 1,
+                },
+                session_id: publisher.boot().to_owned(),
+                controller_boot: "0123456789abcdef0123456789abcdef".into(),
+                microphone_generation: 1,
+                observed_us: at,
+                expires_at_us: at + 50_000,
+                permitted: !closed,
+                physical_muted: Some(closed),
+                no_slide: false,
+            };
+            lease.check().unwrap();
+            publisher.publish_json(at, &lease).unwrap();
+            let message = bus.latest(MicrophonePrivacy::TOPIC).unwrap().unwrap();
+            assert_eq!(message.header.boot, lease.session_id);
+            assert_eq!(message.header.seq, lease.stamp.sequence);
+            assert_eq!(message.header.at_us, at);
+            assert_eq!(message.parse::<MicrophonePrivacy>().unwrap(), lease);
+        };
+
+        switch(&mut lamp, true);
+        lamp.tap();
+        assert!(!has(&lamp.step(), "looking up at a tap"));
+
+        // The retained envelope cannot be read. This is an actual Bus error,
+        // distinct from no publisher or a parseable envelope with a bad payload.
+        fs::write(lamp._root.0.join("voice/privacy/latest"), b"broken\n").unwrap();
+        assert_eq!(
+            bus.latest(MicrophonePrivacy::TOPIC).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidData
+        );
+        lamp.tap();
+        for _ in 0..5 {
+            assert!(
+                !has(&lamp.step(), "looking up at a tap"),
+                "a privacy read error must not reopen the tap's look-up"
+            );
+        }
+
+        switch(&mut lamp, false);
+        lamp.tap();
+        assert!(
+            (0..5).any(|_| has(&lamp.step(), "looking up at a tap")),
+            "a new tap works after a valid open lease replaces the unreadable envelope"
+        );
+
+        // No new tap: an unreadable envelope during that accepted look must
+        // end it with the same bounded ease-out as a valid closed lease.
+        fs::write(lamp._root.0.join("voice/privacy/latest"), b"broken\n").unwrap();
+        assert_eq!(
+            bus.latest(MicrophonePrivacy::TOPIC).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidData
+        );
+        let steps = (0..20)
+            .position(|_| !has(&lamp.step(), "looking up at a tap"))
+            .expect("the unreadable privacy envelope ends the active look");
+        // The valid-close control below has this same bound: half a second
+        // to ease out, well before the uninterrupted look's two seconds.
+        assert!(
+            steps <= 4,
+            "privacy read error left the look up for {steps} steps"
+        );
+        switch(&mut lamp, false);
+        for _ in 0..5 {
+            assert!(
+                !has(&lamp.step(), "looking up at a tap"),
+                "reopening privacy without a new tap must not revive the cancelled look"
+            );
         }
     }
 

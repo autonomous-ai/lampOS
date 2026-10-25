@@ -1,0 +1,18 @@
+{
+  "base": "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+  "command": "cargo +1.96.0 test --offline --locked -p lamp-expression --test it rest_requests::live_privacy_read_error_refuses_rest_until_a_valid_open_lease -- --exact --test-threads=1",
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "failure": "step 2: unreadable privacy envelope admits Resting rather than Refused; valid closed precondition and explicit InvalidData assertion passed",
+  "started": "2026-10-25T20:06:22Z",
+  "finished": "2026-10-25T20:06:24Z",
+  "raw_log_sha256": "c500347975de6777db334a075bd400117efcc640fe85540dd6c93799ab389535",
+  "binary_sha256": "1117ede69ae30723e9ab50b88b368b50203bc8656f3f483c97c8edceecb6f9d7",
+  "source_sha256": {
+    "lampOS/crates/expression/src/runtime.rs": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+    "lampOS/crates/expression/tests/runtime.rs": "7ba4470c544843d9baac0d88474a83b72771b66af8f54093ca5cbcac60ac00cb",
+    "lampOS/crates/expression/tests/it/rest_requests.rs": "de88407d77189a0bc90ba1ba0c402d897eb1615e16b31bee31aaeb498b7305cb"
+  },
+  "earlier_attempts": "Initial compile-only closure typing failure; first typed rest test read a retained Idle receipt before its 200 ms publish cadence; corrected fixture sandbox run failed Unix socket bind before execution. All raw attempts retained separately; none is credited as the defect reproduction."
+}
