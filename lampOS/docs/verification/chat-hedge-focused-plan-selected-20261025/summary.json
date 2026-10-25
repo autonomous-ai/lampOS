@@ -1,0 +1,27 @@
+{
+  "reviewed_at_utc": "2026-10-25T01:19:41.353731+00:00",
+  "state": "ROOT_REVIEWED_NOT_GRANTED",
+  "seal_sha256": "bd2f632abb2d9678bbee6b0ea6007b6604400a449b43a8ec0af53ac05aaf6396",
+  "pure_checks_exit": 0,
+  "pure_checks_passed": 73,
+  "preparation_report_sha256": "cf1d673c6059f1778746e77913192ae414bbc3cb9124a8da69b8dbc51581d3c4",
+  "zero_actual_case_observations": true,
+  "reviewed": [
+    "six exact libtest cases once: four positives and two selective negatives",
+    "direct same-directory native1.96 toolchain, no rustup selector",
+    "source/index/other45 inputs and dependency profile parity",
+    "exact target identity and prior terminal/retirement receipts",
+    "negative construction boundary distinct from wire transmission",
+    "owned process/container closure, bounded deadline, final Voice-only invalidation",
+    "no full Voice/capture timing or extra Skills sample"
+  ],
+  "compiler_lane_granted": false,
+  "target_writer_granted": false,
+  "source_heads": {
+    "positive": "905d6f2713f60a7ee883243403b479bec2b50824",
+    "near_only_negative": "948d7900be73f3cadc28ac3b9e5d67efa33865dc",
+    "relay_only_negative": "3893fd96a9033ba3f4b99259e75d62e43e4a7769"
+  },
+  "private_mutants_never_pushed": true,
+  "historical_parent_qualification_transferred": false
+}

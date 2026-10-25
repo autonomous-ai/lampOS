@@ -1,3 +1,9 @@
+## 2026-10-25 08:20 — Chat hedge focused controls prepared
+
+Ready for lamp-voice: no
+
+Independently reran 73 static/synthetic checks on the frozen six-observation hedge plan; all passed, zero actual cases. Corrected prelaunch exact-target and direct-toolchain bindings. The two private selective mutants remain local. [Selected preparation evidence](verification/chat-hedge-focused-plan-selected-20261025/) states the body-construction boundary and all current-base, parent, privacy, native and acoustic limits. No execution grant: the released lane goes to the already-queued current-base gate and readers first.
+
 ## 2026-10-25 08:06 — Skills fixed schedule terminal
 
 Ready for lamp-voice: no
