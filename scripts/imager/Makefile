@@ -192,10 +192,26 @@ build-v2:
 	-e VARIANT=$(VARIANT) \
 	-e COMPRESS=$(COMPRESS) \
 	-e LAMPOS_CHANNEL_URL=$(LAMPOS_CHANNEL_URL) \
+	-e OUT_IMG_SIZE=$(OUT_IMG_SIZE) \
 	-e AP_BAND=$(AP_BAND) \
 	-e COUNTRY_CODE=$(COUNTRY_CODE) \
 	pi-builder /work/build-orangepi-v2.sh
-	@if [ -f output/lamp-v2/lamp-os-v2.img.xz ]; then mv -f output/lamp-v2/lamp-os-v2.img.xz output/$(V2_IMG_FILE); echo "==> Built image: output/$(V2_IMG_FILE)"; else echo "==> Built raw image: output/lamp-v2/lamp-os-v2.img"; fi
+	@$(MAKE) --no-print-directory v2-image-output
+
+# Report only the format produced by this invocation. A previous compressed
+# image must not be relabelled as the result of a new COMPRESS=0 build.
+.PHONY: v2-image-output
+v2-image-output:
+	@if [ "$(COMPRESS)" = "0" ]; then \
+	  [ -s output/lamp-v2/lamp-os-v2.img ] || { echo "ERROR: raw V2 image missing" >&2; exit 1; }; \
+	  echo "==> Built raw image: output/lamp-v2/lamp-os-v2.img"; \
+	else \
+	  [ -s output/lamp-v2/lamp-os-v2.img.xz ] || { echo "ERROR: compressed V2 image missing" >&2; exit 1; }; \
+	  if [ "lamp-v2/lamp-os-v2.img.xz" != "$(V2_IMG_FILE)" ]; then \
+	    mv -f output/lamp-v2/lamp-os-v2.img.xz "output/$(V2_IMG_FILE)" || exit 1; \
+	  fi; \
+	  echo "==> Built image: output/$(V2_IMG_FILE)"; \
+	fi
 
 sd-card-list:
 	diskutil list

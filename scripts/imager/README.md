@@ -118,6 +118,13 @@ the A733 overlays, resize-once); the payload is lampOS's **signed** build, put o
 installer, `lamp-update install --setup on` (`lampOS/docs/install.md`, "The install
 command"). `build-orangepi.sh` is unchanged and still builds V1.
 
+Before downloading or executing the bootstrap updater, the build host verifies
+the envelope's Ed25519 signature over the exact decoded manifest bytes with the
+supplied public key. A checksum from an unauthenticated manifest is insufficient.
+Both installer attempts read that same staged envelope, including when the
+remote channel advances during the build; its signed `files_url` still selects
+the payloads. The final recorded sequence and commit must match that manifest.
+
 ```bash
 make build-v2 LAMPOS_UPDATE_KEY=<key.pub>                              # the product channel
 make build-v2 LAMPOS_UPDATE_KEY=<key.pub> LAMPOS_CHANNEL_DIR=<folder>  # a signed channel folder
@@ -128,7 +135,7 @@ make sd-card-flash-raw DEVICE_TYPE=lamp-v2 DISK=N
 
 | Variable | Default | Effect |
 |---|---|---|
-| `LAMPOS_UPDATE_KEY` | **(required)** | The update key's public half, baked as `/etc/lampOS/update/key.pub`. `install` checks the build with it, and so does every later update |
+| `LAMPOS_UPDATE_KEY` | **(required)** | The update key's public half, used by the host to authenticate the bootstrap manifest before execution, then baked as `/etc/lampOS/update/key.pub`. `install` and every later update verify with it again |
 | `LAMPOS_CHANNEL_DIR` | *(unset)* | A channel folder (`lampos-manifest.json` signed by that key, and the build's files, `files_url` `file:///var/tmp/lampos-channel/`), read at build and not left on the image. Unset: the build is read from `LAMPOS_CHANNEL_URL` |
 | `LAMPOS_MODELS_DIR` | *(unset)* | The models release's files (`gh release download models-2026-10-16 -R autonomous-ai/lampOS -D <dir>`). `install` fetches each model in `lampOS/deploy/product/models.json` itself; one it cannot (that release is still a draft, so its public links answer 404) is placed from here by the same size and SHA-256 checks, and a second `install` records it. Without it, a model install could not fetch fails the build |
 | `LAMPOS_CHANNEL_URL` | `https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/` | The product channel, the one `lamp-update.service` follows on the lamp |
@@ -147,14 +154,37 @@ Phase 3    the image's own files: exactly the paths shipped.json names for VARIA
            robots/lamp/rootfs and overrides/<variant>/rootfs, each refused unless its SHA-256
            is one shipped.json knows. V1's files in that tree (HAL's .env, led-boot,
            led-shutdown, hal.service.d) are not copied
-Phase 4    key.pub; lamp-update from the build, checked against the manifest; then, in the
+Phase 4    key.pub; host signature verification, then lamp-update checked against that manifest; in the
            chroot, lamp-update install --setup on: every part, the product units and settings,
            the models, setup's two settings, enabled and not started; any model it could not
-           fetch placed from LAMPOS_MODELS_DIR and install run again. Then read back: a build
-           recorded in state.json, setup's settings, no setup marker, no lamp.env, and none of
+           fetch placed from LAMPOS_MODELS_DIR and install run again with the same staged envelope.
+           Then read back: that exact build recorded in state.json, setup's settings, no setup marker, no lamp.env, and none of
            V1's units or binaries (hal, os-server, bootstrap, openclaw, led-boot, ...)
 Phase 5-6  resize-once, fake-hwclock seeded, e2fsck, xz
 ```
+
+With `COMPRESS=0`, only the newly built raw image is reported. A compressed
+image left by an earlier build stays under its old name. A compressed build
+requires its compressed output and renames it for a nonstandard variant;
+a missing selected output fails instead of reporting the other format.
+`OUT_IMG_SIZE` is forwarded to the build container; unset keeps the script's
+8G default. Standard images remove an inherited hardware-profile marker, as
+V1 does; nonstandard images write the selected variant.
+
+The source-level checks run without Docker, mounts, network access or a lamp:
+
+```bash
+bash scripts/imager/tests/test_lampos_envelope.sh
+bash scripts/imager/tests/test_lampos_image_bootstrap.sh
+bash scripts/imager/tests/test_v2_image_output.sh
+bash scripts/imager/tests/test_v2_image_inputs.sh
+```
+
+These use ephemeral signing keys and mocked platform commands. They do not
+qualify a real signed image, flash, first boot or setup on hardware.
+The image-builder job in `.github/workflows/ci.yml` runs them on Ubuntu 24.04,
+the builder container's base, together with the existing image-integrity and
+unprivileged ext4-resize tests.
 
 At first boot the lamp has no `/var/lib/lampos-setup/done`, so `lamp-setup` raises the hotspot
 `lamp-xxxx` and its own page at `http://192.168.100.1/`; the lamp's parts start once setup

@@ -59,7 +59,7 @@ trap cleanup EXIT
 log() { echo "==> $*"; }
 err() { echo "ERROR: $*" >&2; exit 1; }
 
-for bin in losetup parted resize2fs e2fsck qemu-aarch64-static xz growpart jq sha256sum base64; do
+for bin in losetup parted resize2fs e2fsck qemu-aarch64-static xz growpart jq sha256sum base64 openssl; do
   command -v "$bin" >/dev/null || err "missing tool: $bin (check Dockerfile)"
 done
 [ -s "${V2_INPUT}/key.pub" ] || err "no update key at ${V2_INPUT}/key.pub — build via 'make build-v2 LAMPOS_UPDATE_KEY=...'"
@@ -406,6 +406,8 @@ done
 if [ "$VARIANT" != standard ]; then
   mkdir -p "${MNT}/etc/autonomous"
   printf '%s\n' "$VARIANT" > "${MNT}/etc/autonomous/hardware-profile"
+else
+  rm -f "${MNT}/etc/autonomous/hardware-profile"
 fi
 
 # Phase 4: lampOS, from one signed build, by its own installer (docs/install.md, "The install command").
@@ -415,25 +417,32 @@ rm -rf "${MNT}${CHROOT_CHANNEL}"
 mkdir -p "${MNT}${CHROOT_CHANNEL}"
 if [ -d "${V2_INPUT}/channel" ]; then
   cp -a "${V2_INPUT}/channel/." "${MNT}${CHROOT_CHANNEL}/"
-  INSTALL_URL="file://${CHROOT_CHANNEL}/"
-  log "Channel: the folder given (${INSTALL_URL})"
+  log "Channel: the folder given"
 else
-  INSTALL_URL="${LAMPOS_CHANNEL_URL}"
-  log "Channel: ${INSTALL_URL}"
-  curl -fsSL -o "${MNT}${CHROOT_CHANNEL}/lampos-manifest.json" "${INSTALL_URL%/}/lampos-manifest.json"
+  log "Channel: ${LAMPOS_CHANNEL_URL}"
+  curl -fsSL -o "${MNT}${CHROOT_CHANNEL}/lampos-manifest.json" "${LAMPOS_CHANNEL_URL%/}/lampos-manifest.json"
 fi
-# The manifest's own files_url and lamp-update's SHA-256; install checks the signature itself.
-MANIFEST_JSON=$(jq -r '.manifest' "${MNT}${CHROOT_CHANNEL}/lampos-manifest.json" | base64 -d)
-UPDATE_SHA=$(jq -r '.files[] | select(.name == "lamp-update") | .sha256' <<<"$MANIFEST_JSON")
-[ -n "$UPDATE_SHA" ] || err "the build carries no lamp-update"
+# Authenticate with the image's trusted key before selecting or executing any
+# downloaded updater. The updater cannot establish its own authenticity.
+VERIFIED_MANIFEST="${MNT}${CHROOT_CHANNEL}/verified-manifest.json"
+bash "$(dirname "${BASH_SOURCE[0]}")/lib/verify_lampos_envelope.sh" \
+  "${V2_INPUT}/key.pub" "${MNT}${CHROOT_CHANNEL}/lampos-manifest.json" "$VERIFIED_MANIFEST"
+jq -e --arg channel "$LAMPOS_CHANNEL" '.channel == $channel' "$VERIFIED_MANIFEST" >/dev/null \
+  || err "the signed build is not of channel ${LAMPOS_CHANNEL}"
+UPDATE_SHA=$(jq -er '[.files[] | select(.name == "lamp-update")] |
+  select(length == 1) | .[0].sha256 | select(type == "string" and test("^[0-9a-f]{64}$"))' "$VERIFIED_MANIFEST") \
+  || err "the signed build must carry exactly one lamp-update SHA-256"
 if [ ! -f "${MNT}${CHROOT_CHANNEL}/lamp-update" ]; then
-  FILES_URL=$(jq -r '.files_url' <<<"$MANIFEST_JSON")
+  FILES_URL=$(jq -er '.files_url | select(type == "string")' "$VERIFIED_MANIFEST")
   curl -fsSL -o "${MNT}${CHROOT_CHANNEL}/lamp-update" "${FILES_URL%/}/lamp-update"
 fi
 echo "${UPDATE_SHA}  ${MNT}${CHROOT_CHANNEL}/lamp-update" | sha256sum -c - >/dev/null \
   || err "lamp-update is not the build's (SHA-256 differs from the manifest)"
 chmod 0755 "${MNT}${CHROOT_CHANNEL}/lamp-update"
 
+# Both install attempts read this exact staged envelope. Its signed files_url
+# still selects the payloads; a moving channel cannot mix two builds here.
+INSTALL_URL="file://${CHROOT_CHANNEL}/"
 run_install() {
   chroot "${MNT}" "${CHROOT_CHANNEL}/lamp-update" install \
     --channel-url "${INSTALL_URL}" --channel "${LAMPOS_CHANNEL}" \
@@ -473,11 +482,13 @@ if grep -q 'could not be had' /work/install-1.log; then
   run_install /work/install-2.log
   ! grep -q 'could not be had' /work/install-2.log || err "a model is still missing after placing models/"
 fi
-rm -rf "${MNT}${CHROOT_CHANNEL}"
-
 # What install left, read back: the build it recorded, setup's settings, no marker, no V1 part.
 STATE="${MNT}/var/lib/lampos-update/state.json"
 [ -s "$STATE" ] || err "install wrote no state.json"
+jq -e --slurpfile expected "$VERIFIED_MANIFEST" \
+  '.installed.sequence == $expected[0].sequence and .installed.commit == $expected[0].commit' "$STATE" >/dev/null \
+  || err "install recorded a different build from the verified bootstrap manifest"
+rm -rf "${MNT}${CHROOT_CHANNEL}"
 INSTALLED=$(jq -r '.installed | select(. != null) | "build \(.sequence) (\(.commit))"' "$STATE")
 [ -n "$INSTALLED" ] || err "state.json records no installed build"
 [ "$(jq -r '.systemd_owed // false' "$STATE")" = false ] || err "install still owes systemd its enable"
