@@ -1,0 +1,6 @@
+2026-10-25T19:31:02.8515010Z 80c20ab7e1e2ad74f8fc3698c0d271b3eac86e2c
+2026-10-25T19:33:13.0942656Z     Starting 11308 tests across 179 binaries (106 tests and 2 binaries skipped)
+2026-10-25T19:36:25.1973314Z         PASS [   0.006s] (10001/11308) lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata
+2026-10-25T19:36:41.7904425Z      Summary [ 208.696s] 11308 tests run: 11308 passed, 106 skipped
+2026-10-25T19:36:51.1457381Z relay_signals: ok
+2026-10-25T19:36:55.6963792Z test result: 12 passed; 0 failed

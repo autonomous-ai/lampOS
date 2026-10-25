@@ -1,0 +1,88 @@
+{
+  "audit_time_plus07": "2026-10-26T02:42:30+07:00",
+  "run_id": 40226335838,
+  "attempt": 1,
+  "run_conclusion": "success",
+  "run_updated_at": "2026-10-25T19:37:06Z",
+  "train_pr": 3505,
+  "merged_at": "2026-10-25T19:37:12Z",
+  "identities": {
+    "checkout": {
+      "sha": "80c20ab7e1e2ad74f8fc3698c0d271b3eac86e2c",
+      "tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+      "parents": [
+        "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+        "20c049127d5ae444c720d98d2d82afaeb1465add"
+      ]
+    },
+    "landing": {
+      "sha": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+      "tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+      "parents": [
+        "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb"
+      ]
+    },
+    "train_head": {
+      "sha": "20c049127d5ae444c720d98d2d82afaeb1465add",
+      "tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+      "parents": [
+        "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb"
+      ]
+    }
+  },
+  "repaired_constituent_head": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+  "tree_equals_repaired_constituent": true,
+  "all_nine_repair_blobs_and_modes_preserved": true,
+  "public_lamp_voice_at_check": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+  "raw_log": {
+    "bytes": 2712991,
+    "sha256": "e4693eedde0990fff9a5c775ee144f3bed3cf7b1b1450b00d3419a283416c297"
+  },
+  "nextest": {
+    "selected": 11308,
+    "announced_binaries": 179,
+    "skipped_tests": 106,
+    "skipped_binaries": 2,
+    "literal_terminal_counts": {
+      "PASS": 11308,
+      "LEAK": 0,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "SKIP": 0
+    },
+    "unique_cases": 11308,
+    "unique_ordinals": 11308,
+    "ordinal_min": 1,
+    "ordinal_max": 11308,
+    "all_ordinals_exactly_once": true,
+    "selected_unrun": 0,
+    "terminal_binary_labels": 153,
+    "post_summary_echoes_excluded": 35,
+    "echo_status_counts": {
+      "PASS": 35
+    },
+    "all_echoes_duplicate_counted_cases": true,
+    "start_literal": "2026-10-25T19:33:13.0942656Z     Starting 11308 tests across 179 binaries (106 tests and 2 binaries skipped)",
+    "summary_literal": "2026-10-25T19:36:41.7904425Z      Summary [ 208.696s] 11308 tests run: 11308 passed, 106 skipped",
+    "formerly_failing_case": {
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 10001,
+      "total": 11308,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "line": 10822
+    }
+  },
+  "separate_doc_and_custom_tests": {
+    "doc_summary_count": 46,
+    "doc_passed": 4,
+    "doc_failed": 0,
+    "doc_ignored": 0,
+    "relay_signals_literal": "2026-10-25T19:36:51.1457381Z relay_signals: ok",
+    "process_literal_unique_pass_rows": 12,
+    "process_summary_literal": "2026-10-25T19:36:55.6963792Z test result: 12 passed; 0 failed"
+  },
+  "audit_correction": "The first parser completed the nextest census but rejected custom process rows because their literal ok suffix includes milliseconds. The parser was corrected to accept that actual format; no CI or test rerun occurred.",
+  "limits": "The prior constituent attempt-1 failure and unknown early cause remain separate evidence. Native CPU test timings are not physical lamp acceptance."
+}

@@ -1,4 +1,14 @@
-Ready for lamp-voice: yes (#3503); Skills masking controls remain unqualified while their full gate runs.
+Ready for lamp-voice: image repair landed; Skills masking controls are still qualifying.
+
+## Current checkpoint: 2026-10-26 02:46 +07, complete image repair landed; Skills fixtures corrected
+
+[#3503](https://github.com/autonomous-ai/lampOS/pull/3503) landed through train #3505 as `409bf7268`. The actual train checkout and landing both equal the complete repaired tree, including all nine repair paths. [The train packet](verification/v2-image-bootstrap-20261026/native-train145/README.md) reconciles **11,308 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**, excludes 35 report echoes, and retains separate doctest, relay and process results. Linux Clippy is green. The constituent attempt-1 failure remains separate and its exact early cause remains unknown. The merge and counts are posted on the current Queue #3504 and the PR.
+
+The initial Skills full gate exposed a fixture error that the source read missed: all five new cases lacked their required policy declaration. Its **517 existing passes, five failures and nine ignored** remain retained. After adding the policy and valid dim action, focused runs exposed an invalid `present = false` condition and then its timed-description expectation. The final fixture uses valid `present = true` for five seconds; the chance expires at three seconds with the exact face-count and duration explanation. All seven focused module tests now pass. Formatting, strict all-target Skills Clippy and compilation pass on current `409bf7268`; the full serial suite is active. The two deliberate-fault controls are prepared and remain unrun. Runtime and the two original test cases remain unchanged.
+
+The log rebase preserved **13,980** prior verification blobs and modes. Four base-owned image verification files now deliberately match the repaired Main versions; their earlier bytes remain in the prior log commit. The single compiler allocation returned by Tests is still occupied by the Skills gate. No lamp, release or real-key action ran, and no owner input is needed.
+
+---
 
 ## Current checkpoint: 2026-10-26 02:33 +07, image repair ready; Skills gate running
 

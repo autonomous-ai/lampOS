@@ -1,0 +1,24 @@
+{
+  "checkout": {
+    "sha": "80c20ab7e1e2ad74f8fc3698c0d271b3eac86e2c",
+    "tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "parents": [
+      "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+      "20c049127d5ae444c720d98d2d82afaeb1465add"
+    ]
+  },
+  "landing": {
+    "sha": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+    "tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "parents": [
+      "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb"
+    ]
+  },
+  "train_head": {
+    "sha": "20c049127d5ae444c720d98d2d82afaeb1465add",
+    "tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "parents": [
+      "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb"
+    ]
+  }
+}
