@@ -1,0 +1,44 @@
+[
+  {
+    "file": "arm64-official.json",
+    "original_sha256": "56ca4c50658372ed9f4c4314e6efc509e65383509d32aac74dd3bfcebcc9c355",
+    "published_sha256": "56ca4c50658372ed9f4c4314e6efc509e65383509d32aac74dd3bfcebcc9c355",
+    "bytes": 5232
+  },
+  {
+    "file": "arm64-final-jobs.json",
+    "original_sha256": "c4e24b66438bf0c743c4b6e35d21ae07f6c8e3bb708e67f263d647e3196203a3",
+    "published_sha256": "c4e24b66438bf0c743c4b6e35d21ae07f6c8e3bb708e67f263d647e3196203a3",
+    "bytes": 9747
+  },
+  {
+    "file": "linux-final-jobs.json",
+    "original_sha256": "0732a1c8940545e272dea0908cf964956e5e6d4b1bb9b24916e6b4a2c8c6f1d1",
+    "published_sha256": "0732a1c8940545e272dea0908cf964956e5e6d4b1bb9b24916e6b4a2c8c6f1d1",
+    "bytes": 4040
+  },
+  {
+    "file": "linux-selected.txt",
+    "original_sha256": "7c7bcf8e382b8c4b7500798348a24030e601f7267b7475e5aec2d231fea9bb29",
+    "published_sha256": "7c7bcf8e382b8c4b7500798348a24030e601f7267b7475e5aec2d231fea9bb29",
+    "bytes": 854
+  },
+  {
+    "file": "arm64-selected.txt",
+    "original_sha256": "5f59257ef9d6a80411e356e965098499537313af492981be2ecf9fde6fd4b06e",
+    "published_sha256": "5f59257ef9d6a80411e356e965098499537313af492981be2ecf9fde6fd4b06e",
+    "bytes": 5316
+  },
+  {
+    "file": "receipt.json",
+    "original_sha256": "1565e6c0b5bb5e346469bff16a1348756482fd0f336bda96a6b4de800fd2b602",
+    "published_sha256": "1565e6c0b5bb5e346469bff16a1348756482fd0f336bda96a6b4de800fd2b602",
+    "bytes": 7847
+  },
+  {
+    "file": "linux-official.json",
+    "original_sha256": "3ca4a05db90edf6297ce2d61d1771040d3e31fa92916833f393b93a16b5e1d12",
+    "published_sha256": "3ca4a05db90edf6297ce2d61d1771040d3e31fa92916833f393b93a16b5e1d12",
+    "bytes": 2297
+  }
+]

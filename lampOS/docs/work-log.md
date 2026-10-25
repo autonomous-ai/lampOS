@@ -1,3 +1,11 @@
+## Current checkpoint: 2026-10-25 12:50 +07, latest Body original CI audited green
+
+Ready for lamp-voice: no (#3427 awaits current-head reader dispositions and final Main guard).
+
+[Original train119 native proof](verification/body-successor-socket-source-20261025/current-056a-native/README.md): `95b7a1eff` on `056a76132` passes original attempt-1 ARM40166028052 and Linux40166028050. Census 7,408 PASS plus one LEAK, all 7,409 selected terminal, 53 skipped, no failed/unrun; all 21 supervisor cases literal PASS. Actual preview `649cb1672` and complete authored/tested tree `9b0d455ef` match. Mac 608/0/0 stays in 95ce4b657. Current reader carry requested on PR6394104303 and Queue6394108097; older actual executions retain their scopes. No Second compiler is active; the returned job is now Tests’ declared single.
+
+---
+
 ## Current checkpoint: 2026-10-25 12:35 +07, latest Body head pushed and job returned
 
 Ready for lamp-voice: no (#3427 awaits original current-head CI and reader carries).
