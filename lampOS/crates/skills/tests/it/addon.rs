@@ -611,6 +611,14 @@ fn only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted() {
 /// dropped by the judge first or not decided at all, then the four's
 /// trigger again: what the fifth did, in the journal.
 fn a_fifth_say(drop_the_four: bool) -> String {
+    use std::io::Read;
+
+    #[derive(Debug)]
+    struct Completion {
+        skill: String,
+        why: String,
+    }
+
     let dir = tempfile::Builder::new()
         .prefix("ad")
         .tempdir_in("/tmp")
@@ -626,7 +634,6 @@ fn a_fifth_say(drop_the_four: bool) -> String {
     );
     let bus = Bus::new(root.join("bus")).unwrap();
     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
-    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
     for (flag, path) in [
         ("--dir", root.join("skills")),
@@ -659,30 +666,67 @@ fn a_fifth_say(drop_the_four: bool) -> String {
     // The probe budget is shorter than the unchanged ten-second proposal
     // limit and starts before any of the first four can be admitted.
     let completion_deadline = Instant::now() + Duration::from_secs(8);
+    // This cursor belongs to all phases. A completed phase consumes its
+    // journal lines before the next voice publication can start another.
+    let mut journal_seen = Vec::<u8>::new();
+    let mut journal_cursor = 0;
     let mut completed = |names: &[&str], phase: &str| {
-        let mut seen = Vec::<SkillEvent>::new();
+        let mut seen = Vec::<Completion>::new();
         while seen.len() < names.len() {
             let left = completion_deadline.saturating_duration_since(Instant::now());
             let status = running.0.try_wait().unwrap();
             assert!(
                 !left.is_zero() && status.is_none(),
                 "waiting for {phase}: child {status:?}, completions {seen:?}; journal:\n{}",
-                std::fs::read_to_string(root.join("stderr")).unwrap()
+                String::from_utf8_lossy(&journal_seen)
             );
-            if let Some(message) = events.recv(left.min(Duration::from_millis(100))).unwrap() {
-                let event = message.parse::<SkillEvent>().unwrap();
-                if event.stage == lamp_msgs::SkillStage::Done
-                    && names.contains(&event.skill.as_str())
-                    && !seen.iter().any(|old| old.skill == event.skill)
+            let mut journal = Vec::new();
+            std::fs::File::open(root.join("stderr"))
+                .unwrap()
+                .take(1_048_577)
+                .read_to_end(&mut journal)
+                .unwrap();
+            assert!(
+                journal.len() <= 1_048_576,
+                "the fixture journal exceeded 1 MiB"
+            );
+            assert!(
+                journal.starts_with(&journal_seen),
+                "the fixture journal stopped being append-only during {phase}"
+            );
+            journal_seen = journal;
+            while let Some(end) = journal_seen[journal_cursor..]
+                .iter()
+                .position(|byte| *byte == b'\n')
+            {
+                let end = journal_cursor + end + 1;
+                let line = std::str::from_utf8(&journal_seen[journal_cursor..end - 1])
+                    .expect("complete fixture journal lines are UTF-8");
+                journal_cursor = end;
+                if let Some((skill, why)) = line
+                    .strip_prefix("lamp-skills: ")
+                    .and_then(|line| line.split_once(" Done: "))
+                    && names.contains(&skill)
+                    && !seen.iter().any(|old| old.skill == skill)
                 {
-                    seen.push(event);
+                    seen.push(Completion {
+                        skill: skill.to_owned(),
+                        why: why.to_owned(),
+                    });
                 }
+            }
+            if seen.len() < names.len() {
+                std::thread::sleep(
+                    completion_deadline
+                        .saturating_duration_since(Instant::now())
+                        .min(Duration::from_millis(10)),
+                );
             }
         }
         assert!(
             Instant::now() < completion_deadline,
             "the completion budget expired during {phase}; journal:\n{}",
-            std::fs::read_to_string(root.join("stderr")).unwrap()
+            String::from_utf8_lossy(&journal_seen)
         );
         seen
     };
@@ -755,7 +799,7 @@ fn a_fifth_say(drop_the_four: bool) -> String {
     voice
         .publish_json(3, &serde_json::json!({ "state": "resting" }))
         .unwrap();
-    // The program writes each journal line before publishing its Done.
+    // Only new complete lines from this final trigger can finish this phase.
     completed(&names, "the final four refusals");
     let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
     match fifth {
