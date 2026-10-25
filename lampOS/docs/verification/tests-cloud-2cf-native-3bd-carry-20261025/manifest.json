@@ -1,0 +1,65 @@
+{
+  "copied files": [
+    {
+      "file": "raw/40146764803/console.txt",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/40146764803/console.txt",
+      "bytes": 73291,
+      "SHA-256": "46f31f270dac1ec74e1a9cabff9194c2153f8df3993792cb6d5e91f05f0c2912"
+    },
+    {
+      "file": "raw/40146764803/receipt.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/40146764803/receipt.json",
+      "bytes": 516,
+      "SHA-256": "c76e39a3982c2324f1822d337faa2b9bab40af0debfcba63133603a8bc649a59"
+    },
+    {
+      "file": "raw/40146764803/run.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/40146764803/run.json",
+      "bytes": 2320,
+      "SHA-256": "f6a70e5d93663639a65b481f3c79c564f7199040da94e682071ef24efce726f7"
+    },
+    {
+      "file": "raw/40146764957/case-outcomes.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/40146764957/case-outcomes.json",
+      "bytes": 262826,
+      "SHA-256": "5c2f1fe5474b1ea18e2b02a48e88246b5acf578f7ec2be87a4e18323fd0bb23e"
+    },
+    {
+      "file": "raw/40146764957/console.txt",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/40146764957/console.txt",
+      "bytes": 412720,
+      "SHA-256": "6bfd28f91e140d0beebf0622510cb797fc5e1b22936c60677d65812797fa03d7"
+    },
+    {
+      "file": "raw/40146764957/receipt.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/40146764957/receipt.json",
+      "bytes": 839,
+      "SHA-256": "7f4b1ec7c04db104a2ca7ffb8abeb67fef32e7807b0241e742affb9cd5af955e"
+    },
+    {
+      "file": "raw/40146764957/run.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/40146764957/run.json",
+      "bytes": 5255,
+      "SHA-256": "34e5a3a7209837341251f3fa8c65bdc72fb7409f7bcc5365d39732c18126b09a"
+    },
+    {
+      "file": "raw/current-base-tree-binding.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/current-base-tree-binding.json",
+      "bytes": 666,
+      "SHA-256": "7197da452ffbba05db5cd94b4b29bd52e3f9a052ef9ca1489a13bb43e210f3cb"
+    },
+    {
+      "file": "raw/preview-tree.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/preview-tree.json",
+      "bytes": 199,
+      "SHA-256": "b5ab9519e8f67b0473147372788569c233aabb3c3c453a5dcdfd8223f2153d48"
+    },
+    {
+      "file": "raw/prior-e993-case-comparison.json",
+      "source file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-2cf-native/prior-e993-case-comparison.json",
+      "bytes": 59,
+      "SHA-256": "be8d88ea847649575ea65e98335712073b8a4ef15d17c7d046e7bde847cb87ad"
+    }
+  ],
+  "copied file count": 10
+}

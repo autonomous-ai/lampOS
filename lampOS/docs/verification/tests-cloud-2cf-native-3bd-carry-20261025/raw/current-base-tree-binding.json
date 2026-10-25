@@ -1,0 +1,16 @@
+{
+  "parents": [
+    "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+    "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2"
+  ],
+  "sha": "5e8816d29705fa59bf490b24b0713b2e5b4f43d9",
+  "tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "rebased_authored_head": "3bdc7c415717263697c25250294f2e2eca24d044",
+  "rebased_authored_tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "whole_tree_equal_to_original_tested_preview": true,
+  "original_runs": [
+    40146764957,
+    40146764803
+  ],
+  "scope": "Exact complete source tree qualification from original 2cf CI preview; those remain original 2cf runs, not new-head runs. New-head original CI/readiness remains separate."
+}

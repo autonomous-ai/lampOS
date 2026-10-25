@@ -1,0 +1,23 @@
+{
+  "head": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2",
+  "run": 40146764957,
+  "status": "completed",
+  "conclusion": "success",
+  "console_rendering_sha256": "6bfd28f91e140d0beebf0622510cb797fc5e1b22936c60677d65812797fa03d7",
+  "console_bytes": 412720,
+  "checkout_lines": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T00:28:06.1719747Z HEAD is now at 5e8816d Merge 2cfbabbc9b4f43212c5d5c6c93de693ac213bca2 into 162216f82db66e642e0c8e3033a9866cfec1ce1f"
+  ],
+  "selected": 1216,
+  "counts": {
+    "PASS": 1216
+  },
+  "summary": [
+    "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T00:37:45.5813712Z      Summary [  30.015s] 1216 tests run: 1216 passed, 8 skipped"
+  ],
+  "binary_counts": {
+    "lamp-cloud": 196,
+    "lamp-update": 397,
+    "lamp-voice-eval": 623
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "original authored head": "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2",
+  "original tested preview": "5e8816d29705fa59bf490b24b0713b2e5b4f43d9",
+  "original tested preview parents": [
+    "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+    "2cfbabbc9b4f43212c5d5c6c93de693ac213bca2"
+  ],
+  "original tested preview tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "current authored head": "3bdc7c415717263697c25250294f2e2eca24d044",
+  "current authored tree": "97e1125bc483490f62180c28817ac2615d49a093",
+  "whole tree equal according to supplied object receipts": true,
+  "original ARM64 run": 40146764957,
+  "original ARM64 result": {
+    "passed": 1216,
+    "failed": 0,
+    "skipped": 8
+  },
+  "original ARM64 package counts": {
+    "lamp-cloud": 196,
+    "lamp-update": 397,
+    "lamp-voice-eval": 623
+  },
+  "original Linux formatting and Clippy run": 40146764803,
+  "original Linux conclusion": "success",
+  "new current-head ARM64 run": 40147655240,
+  "new current-head Linux run": 40147655339,
+  "new current-head run status": "Pending according to root handoff; not queried or relabeled by this packet.",
+  "verification": {
+    "original console SHA-256 and sizes": "Both equal supplied receipts.",
+    "run metadata": "Both completed successfully; original authored head equals receipts.",
+    "console checkout": "Both name original preview 5e8816d and authored/base parents.",
+    "ARM64 case rows": "All 1,216 raw rows independently parsed and exactly equal case-outcomes.json; indices complete, binary/case pairs unique, all PASS.",
+    "ARM64 summary": "One recorded summary: 1,216 passed, 8 skipped.",
+    "tree proof boundary": "Supplied preview-tree.json and current-base-tree-binding.json are internally consistent; no Git commands or independent object reconstruction performed.",
+    "prior e993 comparison boundary": "Raw comparison retained as context; its external e993 inputs were not revalidated in this packet."
+  },
+  "skipped ARM64 jobs": [
+    {
+      "name": "report-full-run-failure",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "conclusion": "skipped"
+    }
+  ],
+  "issues": "No console hash, case census, or receipt consistency discrepancies found. Pending new-head CI remains separate."
+}

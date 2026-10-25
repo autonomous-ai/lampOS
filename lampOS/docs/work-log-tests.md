@@ -1,5 +1,12 @@
 # Tests work log
 
+## 2026-10-25 07:46 — Cloud current-tree carry and original native census
+
+Ready for lamp-voice: no
+
+#3410 is pushed as 3bdc7c415 on current162, with equal one-commit range-diff from2cf. [Original native and complete-tree proof](verification/tests-cloud-2cf-native-3bd-carry-20261025/) preserves original2cf ARM40146764957:1,216PASS/zero failures/eight skipped and green Linux40146764803. The actual tested5e8816d preview has parents162+2cf and exactly equals the current3bd whole tree; Root independently verified preview parents/tree via GitHub and the authored tree locally. Original runs retain their own heads. All1,216 raw unique outcomes reconcile; the prior e993 census comparison shows no case/status change. The complete local composite is separately accepted by Reviewer-two6391527612; its Mac196/0/4 remains frozen2cf/efbf. New3bd ARM40147655240/Linux40147655339 and current reads remain required before ready. No new local Cargo, control or ARM build. Third/Fourth retain allocated compiler lanes; Hand controls remain queued and the Supervisor source read proceeds meanwhile.
+
+
 ## 2026-10-25 07:32 — Cloud local checks complete; source carry pushed
 
 Ready for lamp-voice: no
