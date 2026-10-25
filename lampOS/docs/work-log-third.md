@@ -6,6 +6,25 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 17:10 — Store delivered through train 125
+
+Ready for lamp-voice: yes (#3459 delivered by #3462, source PR closed).
+
+Train #3462 merged as `a786e0454` on `83509fd04`. Its original
+[ARM64 40181761938](https://github.com/autonomous-ai/lampOS/actions/runs/40181761938)
+and [Linux clippy 40181761952](https://github.com/autonomous-ai/lampOS/actions/runs/40181761952)
+are green. The train head `9e8f537a4`, merged head and local carry
+`ee0b2ac24` share tree `325b3cf149529f31329aeeb5c558d412465b9623`.
+All 19 Store input hashes match. The extra carry was not pushed and its
+queued gate is unnecessary. No device activation or real-key acceptance.
+
+Next: Body carry #3449, fmt/strict clippy/workspace build and full Body
+**608/0/0** passed on `640198b2c`; 11 dependent crates remain in the
+one-job gate. Source P2 posted on #3463: a positive keep sentence followed
+by an explicit withdrawal still forces remember. Reviewer-two independently
+found it too; First owns the fix. #3461 received a source-only read, no
+P1/P2 found and no independent execution claimed.
+
 ## 2026-10-25 16:38 — Taking the stalled Body build carry
 
 Ready for lamp-voice: no (carry of #3449, gates running).
