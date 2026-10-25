@@ -1,3 +1,13 @@
+## Current checkpoint: 2026-10-25 09:51 +07, #3427 original current native checks pass
+
+Ready for lamp-voice: no (author ready transition follows fresh Main check).
+
+Current public1e3a656b9/4f has [original native evidence](verification/body-successor-socket-source-20261025/current-4f28-native/README.md): ARM40154602787 7,408 PASS plus one LEAK, all7,409 selected terminal,53skip,all21supervisor literalPASS; Linux40154602728 green. Actual preview f84fa20e5 and complete authored/tested tree 29d09e39d match. Prior counts keep their heads.
+
+Current Mac fmt/strict Body Clippy/full608/0/0 and source/executable proof823e744c0 pass. Current carry READ-OKs are R2 6392535062 and R3 6392467542, with their older actual execution scopes explicit. Next is the latest-Main/head/finding check and ready transition, then queued unplug/source/read work. No compiler allocation, device action, CI rerun or manual merge.
+
+---
+
 ## Current checkpoint: 2026-10-25 09:29 +07, #3427 current carry pushed and gate passed
 
 Ready for lamp-voice: no (#3427 draft pending new original CI and reader carries).
