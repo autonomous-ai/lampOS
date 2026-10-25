@@ -12,7 +12,9 @@
 //! Run again, it changes nothing that is as it should be, and says so.
 //! It never writes what is one lamp's own (`/etc/lampOS/body/lamp.env`) or
 //! what setup writes, and leaves a unit's other drop-ins alone: only the
-//! reserved `exit-note.conf` is always install's. Store's `store.conf` is
+//! reserved `exit-note.conf` is always install's. An exact historical
+//! regular-file template in `RETIRED_DROP_INS` is removed once its lines
+//! live in the product unit; local edits and links stay. Store's `store.conf` is
 //! installed as a setting and keeps a lamp's edits. A product setting
 //! changed on the lamp since an install wrote it is the lamp's own too, and
 //! is kept ([`settings`]). A kept drop-in or setting that turns a product
@@ -296,11 +298,13 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-voice.service",
     "lamp-waking.service",
 ];
-/// Drop-ins an older build's hand steps placed that a product unit now
-/// holds itself, removed by install so a lamp never names the same lines
-/// twice: the voice's own keys (#2094), in `lamp-voice.service` since #2846.
-/// Each folder goes too only once nothing else is in it.
-pub const RETIRED_DROP_INS: &[&str] = &["lamp-voice.service.d/own-keys.conf"];
+/// Drop-ins whose exact old template is now held by a product unit. Only
+/// regular files with those bytes are retired; a lamp's edits and links
+/// stay. Each folder goes too only once nothing else is in it.
+pub const RETIRED_DROP_INS: &[(&str, &[u8])] = &[(
+    "lamp-voice.service.d/own-keys.conf",
+    include_bytes!("retired-own-keys-voice.conf"),
+)];
 
 /// The existing recorder command: local bounded notes, never a cloud send.
 pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf");
@@ -1357,11 +1361,13 @@ pub fn install(
         }))
         .chain([(TMPFILES_PATH.to_owned(), TMPFILES.as_bytes())])
         .collect();
-    let retired: Vec<String> = RETIRED_DROP_INS
-        .iter()
-        .map(|name| format!("{UNITS}{name}"))
-        .filter(|path| fs::symlink_metadata(config.on(path)).is_ok())
-        .collect();
+    let mut retired = Vec::new();
+    for &(name, bytes) in RETIRED_DROP_INS {
+        let path = format!("{UNITS}{name}");
+        if retired_drop_in_matches(config, &path, bytes)? {
+            retired.push((path, bytes));
+        }
+    }
     if !state.systemd_owed
         && (!retired.is_empty()
             || for_systemd
@@ -1377,9 +1383,15 @@ pub fn install(
         put(config, path, bytes, 0o644, &mut changed)
             .map_err(|why| format!("units not all written: {why}"))?;
     }
-    for path in &retired {
+    for (path, bytes) in &retired {
+        // Product writes may have taken time: keep a candidate whose
+        // bytes or kind changed since the reload debt was recorded.
+        if !retired_drop_in_matches(config, path, bytes)? {
+            continue;
+        }
         let at = config.on(path);
         fs::remove_file(&at).map_err(|error| format!("{}: {error}", at.display()))?;
+        sync_parent(&at).map_err(|error| format!("{}: {error}", at.display()))?;
         changed.push(format!("removed {path}"));
         // Its folder only once empty: a lamp's own drop-ins stay.
         if let Some(folder) = at.parent()
@@ -2318,6 +2330,46 @@ fn put(
     Ok(())
 }
 
+/// Whether an old drop-in is a regular file containing its exact template.
+/// Links and other file kinds are kept, and at most one byte beyond the
+/// template is read even if the file grows after its metadata was checked.
+fn retired_drop_in_matches(config: &Install, path: &str, bytes: &[u8]) -> Result<bool, String> {
+    let at = config.on(path);
+    let failed = |error: io::Error| format!("{path}: {error}");
+    let meta = match fs::symlink_metadata(&at) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(failed(error)),
+    };
+    if !meta.is_file() || meta.len() != bytes.len() as u64 {
+        return Ok(false);
+    }
+    let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
+    let file = match fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(flags.bits() as i32)
+        .open(&at)
+    {
+        Ok(file) => file,
+        Err(error)
+            if error.kind() == io::ErrorKind::NotFound
+                || error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) =>
+        {
+            return Ok(false);
+        }
+        Err(error) => return Err(failed(error)),
+    };
+    let meta = file.metadata().map_err(failed)?;
+    if !meta.is_file() || meta.len() != bytes.len() as u64 {
+        return Ok(false);
+    }
+    let mut now = Vec::new();
+    file.take(bytes.len() as u64 + 1)
+        .read_to_end(&mut now)
+        .map_err(failed)?;
+    Ok(now == bytes)
+}
+
 /// Gives install's file at `path` `mode` when it has another and still
 /// holds exactly `bytes`: the bytes alone do not make it install's as
 /// written (the first builder on #705, 12:13). It is opened once, never
@@ -2901,6 +2953,74 @@ fn saved_zone(config: &Install) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn retired_drop_in_test_config(root: &Path) -> Install {
+        Install {
+            root: root.to_owned(),
+            channel: String::new(),
+            channel_url: String::new(),
+            key: [0; 32],
+            records: String::new(),
+            setup: false,
+            models: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn retired_drop_in_matcher_preserves_a_directory() {
+        use std::os::unix::fs::MetadataExt;
+
+        let root = tempfile::TempDir::new().unwrap();
+        let config = retired_drop_in_test_config(root.path());
+        let (relative, bytes) = RETIRED_DROP_INS[0];
+        let path = format!("{UNITS}{relative}");
+        let directory = config.on(&path);
+        fs::create_dir_all(&directory).unwrap();
+        let child = directory.join("kept.conf");
+        fs::write(&child, b"kept directory contents\n").unwrap();
+        let before = fs::symlink_metadata(&directory).unwrap();
+
+        assert!(!retired_drop_in_matches(&config, &path, bytes).unwrap());
+
+        let after = fs::symlink_metadata(&directory).unwrap();
+        assert!(after.is_dir());
+        assert_eq!(
+            (after.dev(), after.ino(), after.mode()),
+            (before.dev(), before.ino(), before.mode())
+        );
+        assert_eq!(fs::read(&child).unwrap(), b"kept directory contents\n");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn retired_drop_in_matcher_preserves_a_fifo() {
+        use std::os::unix::fs::{FileTypeExt, MetadataExt};
+
+        let root = tempfile::TempDir::new().unwrap();
+        let config = retired_drop_in_test_config(root.path());
+        let (relative, bytes) = RETIRED_DROP_INS[0];
+        let path = format!("{UNITS}{relative}");
+        let fifo = config.on(&path);
+        fs::create_dir_all(fifo.parent().unwrap()).unwrap();
+        rustix::fs::mkfifoat(
+            rustix::fs::CWD,
+            &fifo,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        )
+        .unwrap();
+        let before = fs::symlink_metadata(&fifo).unwrap();
+
+        // Exercise only cleanup's matcher: install's earlier preflight has
+        // a separate reader, so this does not claim whole-install handling.
+        assert!(!retired_drop_in_matches(&config, &path, bytes).unwrap());
+
+        let after = fs::symlink_metadata(&fifo).unwrap();
+        assert!(after.file_type().is_fifo());
+        assert_eq!(
+            (after.dev(), after.ino(), after.mode()),
+            (before.dev(), before.ino(), before.mode())
+        );
+    }
 
     /// The first builder's P3 4 on #2617: install never lists the Wi-Fi
     /// helper (`lamp-setup-wifi.socket`, `lamp-setup-wifi@.service`)
