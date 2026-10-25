@@ -1,0 +1,28 @@
+{
+  "kind": "reminder",
+  "head": "e7daf9b20db475d24132ed3df79fac8950995f0c",
+  "offered_head_before_carry": "948c7217a4cd1fc5560d13c9c58e2c47a2f6b8f5",
+  "base": "14c64a8db1578ca3b5095b056463fbbf5aaebb3c",
+  "old_base": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "tree": "237ea579f86a00ea265d9040a3981e814ffc1386",
+  "base_changed_paths": [
+    "lampOS/crates/body/src/unplug.rs",
+    "lampOS/docs/realtime-tests.md",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/README.md",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/SHA256SUMS",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/census.json",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/selected-outcomes.txt"
+  ],
+  "body_tree": "55d6c37301400e47df02ed2e43a92af8733ddfe8",
+  "range_diff": "1:  db9e8d895 = 1:  878147ae0 lampOS: complete retired reminders before admitting the next line\n2:  c911bc1ca = 2:  0733c6416 lampOS: record reminder qualification on the landed release base\n3:  019024216 = 3:  de83735fe lampOS: record reminder gates on the current workflow base\n4:  2f1c88a19 = 4:  4eec7bc2e lampOS: qualify reminder carry on the current Body fixture base\n5:  948c7217a = 5:  e7daf9b20 lampOS: record qualified reminder composition on the release base",
+  "qualified_head": "e7daf9b20db475d24132ed3df79fac8950995f0c",
+  "tracked_source_records": 7099,
+  "source_map_sha256": "b266eba841c1f75296461119c3b50d3c4bfc318dde3f573d8503b35f4ba99bb3",
+  "body_production_prefix_unchanged": true,
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-body.log": "968a817e2a4bc8667261692f2419057d3d647d353a49b00a540aaf8ab31fd3c2"
+  }
+}
