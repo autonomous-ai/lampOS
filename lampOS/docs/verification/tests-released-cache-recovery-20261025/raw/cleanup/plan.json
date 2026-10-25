@@ -1,0 +1,100 @@
+{
+  "schema": "root-old-cargo-cache-cleanup-only-v1",
+  "execution_enabled": false,
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+  "source_root": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events",
+  "source_identity": "Root-verified authored Cloud3bd/tree97e; filesystem guard below excludes only .git and lampOS/target, not a Git tracked-file attestation.",
+  "backup": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/executable-backup",
+  "lease": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/.root-old-cargo-cache-retirement.lock",
+  "old_owner_lock": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/.no-pause-canonical-fullgate-exclusive.lock",
+  "expected_executable_paths": 321,
+  "root_target_identity": {
+    "device": 16777222,
+    "inode": 468626375,
+    "mode": 493,
+    "mtime_ns": 1792855819503049595
+  },
+  "source_guard_paths": 10460,
+  "libc": "/usr/lib/libSystem.B.dylib",
+  "symbol": "clonefile",
+  "argtypes": [
+    "const char *",
+    "const char *",
+    "uint32_t"
+  ],
+  "restype": "int",
+  "flags": 0,
+  "clone_contract_inputs": [
+    {
+      "path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/clonefile.h",
+      "sha256": "1efe4ef4241c360905ecc40092245334725a9f1b208be8886ce87e2538b89cbd"
+    },
+    {
+      "path": "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/share/man/man2/clonefile.2",
+      "sha256": "4d782d64dc79326de302ee78d7fdb631f260df28e379aee3b20d47ebce09bd74"
+    }
+  ],
+  "no_copy_fallback": true,
+  "cargo_tools": [
+    {
+      "path": "/Users/autonomous/.cargo/bin/cargo",
+      "resolved_path": "/Users/autonomous/.cargo/bin/rustup",
+      "binding": {
+        "mode": 493,
+        "device": 16777222,
+        "inode": 392948626,
+        "bytes": 12945744,
+        "mtime_ns": 1791604389684037174,
+        "link_count": 1,
+        "symlink": false,
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3"
+      }
+    },
+    {
+      "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo",
+      "resolved_path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo",
+      "binding": {
+        "mode": 493,
+        "device": 16777222,
+        "inode": 392888320,
+        "bytes": 34365184,
+        "mtime_ns": 1791604158098993625,
+        "link_count": 1,
+        "symlink": false,
+        "sha256": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad"
+      }
+    }
+  ],
+  "preflight_argv": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "--version"
+  ],
+  "cleanup_argv": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "clean",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target"
+  ],
+  "cleanup_cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+  "cleanup_timeout_seconds": 1200,
+  "cleanup_only_disk_decision": "Supported clean of the exact retired cache may run below5GiB only after root execution grant; no compile/test/build or cleanup of other targets. Future build/test reserve remains5368709120 bytes.",
+  "future_build_test_reserve_bytes": 5368709120,
+  "preflight_does_not_clone_or_clean": true,
+  "lease_grant_requires": [
+    "All prior target owners closed.",
+    "All future live-target reader/restore expectations explicitly retired.",
+    "No new consumers until cleanup terminal."
+  ],
+  "inputs": {
+    "target-executable-inventory.json": "013ba9eb241cbbd7e2d79d15c59321d01955348bfe6cfb33361470ce76371bf3",
+    "cloud-source-guard.json": "646fb0cd77fb81c01dc2887e97e2e092d5edac035de55abca4e8f8f9ef2807d8",
+    "external-99-bindings.json": "78a4b26b4fa0cb9caa1018c50222bee4cc1ca01c68ef364908d4531dba1ffa92",
+    "support.py": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d"
+  },
+  "clone_phase_maximum_seconds_between_bounded_file_checks": 900,
+  "source_filesystem_guard_scope": "All10,460 current Cloud WT file/symlink paths excluding .git and lampOS/target; includes full modes/mtime/inode and bytes. Not a Git tracked-index reconstruction."
+}

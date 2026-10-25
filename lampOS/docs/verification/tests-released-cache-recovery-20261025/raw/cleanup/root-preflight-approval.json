@@ -1,0 +1,8 @@
+{
+  "authorized": true,
+  "phase": "preflight",
+  "controller_sha256": "351402cf3231df70d6059a546049e097b776bcb5f00ae203879f2953bb5c6db9",
+  "plan_sha256": "7dc7035aa3be752ae67309bfaa4023c3dd4a5744b90b784034fca44faeedb6c1",
+  "exact_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+  "scope": "Root reviewed controller/deltas/plan. Version/import/native symbol binding/source and witness guards only; no clone, clean, build, metadata or test."
+}

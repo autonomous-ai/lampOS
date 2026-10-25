@@ -1,0 +1,89 @@
+{
+  "phase": "cleanup",
+  "success": true,
+  "cleanup_launched": true,
+  "source_before": {
+    "paths": 10460,
+    "guard_sha256": "646fb0cd77fb81c01dc2887e97e2e092d5edac035de55abca4e8f8f9ef2807d8"
+  },
+  "native_call_binding": {
+    "library": "/usr/lib/libSystem.B.dylib",
+    "symbol": "clonefile",
+    "argtypes": [
+      "const char *",
+      "const char *",
+      "uint32_t"
+    ],
+    "flags": 0,
+    "no_fallback": true
+  },
+  "consumer_check": {
+    "target_references": [],
+    "raw_commands_or_environment_saved": false,
+    "scope": "Snapshot only; root exclusive retirement lease provides no-new-consumer boundary."
+  },
+  "external_before": {
+    "verified_count": 99,
+    "bindings_sha256": "78a4b26b4fa0cb9caa1018c50222bee4cc1ca01c68ef364908d4531dba1ffa92"
+  },
+  "backup_before_clean": {
+    "verified_paths": 321
+  },
+  "target_before_clean": 321,
+  "external_before_clean": {
+    "verified_count": 99,
+    "bindings_sha256": "78a4b26b4fa0cb9caa1018c50222bee4cc1ca01c68ef364908d4531dba1ffa92"
+  },
+  "source_before_clean": {
+    "paths": 10460,
+    "guard_sha256": "646fb0cd77fb81c01dc2887e97e2e092d5edac035de55abca4e8f8f9ef2807d8"
+  },
+  "cleanup": {
+    "command": [
+      "/Users/autonomous/.cargo/bin/cargo",
+      "+1.96.0",
+      "clean",
+      "--offline",
+      "--locked",
+      "--target-dir",
+      "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+    "started_at": "2026-10-25T01:11:12.119549+00:00",
+    "timeout_seconds": 1200,
+    "stdout": "absolute-pinned-clean-only.stdout.txt",
+    "stderr": "absolute-pinned-clean-only.stderr.txt",
+    "timeout_cleanup": [],
+    "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+    "owned_pid": 78954,
+    "owned_process_group": 78954,
+    "timed_out": false,
+    "exit_code": 0,
+    "unexpected_residual_group_after_normal_exit": false,
+    "direct_status_before_cleanup": 0,
+    "owned_group_present_before_cleanup": false,
+    "direct_wait_status": 0,
+    "owned_group_absent_after_cleanup": true,
+    "wall_seconds": 7.689987,
+    "finished_at": "2026-10-25T01:11:19.809501+00:00",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 0,
+    "stderr_sha256": "76b835553e0391e92618d87d0e429093440ed705907abab771ba5f6e1f4cad88",
+    "stderr_bytes": 39
+  },
+  "backup_after_clean": {
+    "verified_paths": 321
+  },
+  "external_after_clean": {
+    "verified_count": 99,
+    "bindings_sha256": "78a4b26b4fa0cb9caa1018c50222bee4cc1ca01c68ef364908d4531dba1ffa92"
+  },
+  "source_after": {
+    "paths": 10460,
+    "guard_sha256": "646fb0cd77fb81c01dc2887e97e2e092d5edac035de55abca4e8f8f9ef2807d8"
+  },
+  "target_absent_or_empty": true,
+  "available_bytes_after": 33881370624,
+  "retirement_lease_released": true,
+  "finished_at": "2026-10-25T01:11:28.296749+00:00"
+}

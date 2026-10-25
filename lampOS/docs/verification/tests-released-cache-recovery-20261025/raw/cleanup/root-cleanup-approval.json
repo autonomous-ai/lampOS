@@ -1,0 +1,14 @@
+{
+  "authorized": true,
+  "phase": "cleanup",
+  "controller_sha256": "351402cf3231df70d6059a546049e097b776bcb5f00ae203879f2953bb5c6db9",
+  "plan_sha256": "7dc7035aa3be752ae67309bfaa4023c3dd4a5744b90b784034fca44faeedb6c1",
+  "exact_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+  "preflight_terminal_sha256": "2cd2f841a34961d37033e4705bc64afad38c440798f14eb4dcb33f713a5ba0c1",
+  "retirement_lease_accepted": true,
+  "all_future_live_readers_and_restores_retired": true,
+  "root_reviewed": true,
+  "original_owner_release_sha256": "58b9ff006b3115332bae7ed16c93c275f124ca2f91309bb0012f8fb32bad78c4",
+  "scope": "Exactly one cleanup-only allocation: direct clonefile backup ALL321 current executable paths and verify original/new bindings plus99 external historical witnesses/source guards, then one supported absolute pinned clean of exact retired target. Original209 groups closed; all Root future readers use frozen external witnesses/fresh other targets. No compile, test, metadata, source, other-target or raw deletion. Clone failure stops without fallback. Future5GiB build/test reserve unchanged.",
+  "actual_free_bytes_before_grant": 28023017472
+}

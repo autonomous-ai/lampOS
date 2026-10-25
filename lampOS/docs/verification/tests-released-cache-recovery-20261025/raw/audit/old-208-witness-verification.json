@@ -1,0 +1,699 @@
+{
+  "verified external saved bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/7863023f75ddc4e33df6c39997b21908ed6d8acffe90e1a354f53d057454f47f-lamp_cloud-5a32893ab71db8d7",
+      "SHA-256": "7863023f75ddc4e33df6c39997b21908ed6d8acffe90e1a354f53d057454f47f",
+      "full mode": 365,
+      "bytes": 1019800,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b0fa67aa8d13822d082056355488dc862fc0d15cd59d0cf063046c0492aac023-it-d42eb1c7e5987252",
+      "SHA-256": "b0fa67aa8d13822d082056355488dc862fc0d15cd59d0cf063046c0492aac023",
+      "full mode": 365,
+      "bytes": 19596848,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/455757ea4d64bdb688aa66d55a62c875c3b42fc452d1e6b27dcf2a74a24d5241-lamp_peek-73600315bdd6f294",
+      "SHA-256": "455757ea4d64bdb688aa66d55a62c875c3b42fc452d1e6b27dcf2a74a24d5241",
+      "full mode": 365,
+      "bytes": 1019784,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/c8ce01d37231b606780136c45abc71d00cddb8555c4ca74d1ef06df0e745d80d-peek-f1e8827be703642e",
+      "SHA-256": "c8ce01d37231b606780136c45abc71d00cddb8555c4ca74d1ef06df0e745d80d",
+      "full mode": 365,
+      "bytes": 8860608,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/a3b51fb131f1039602f81802c9bf8ae16b22398a02e50dc2683eae4215180a6a-lamp-peek",
+      "SHA-256": "a3b51fb131f1039602f81802c9bf8ae16b22398a02e50dc2683eae4215180a6a",
+      "full mode": 365,
+      "bytes": 7804456,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/44d3b019d4dddb4185103dd07dbad884ed3728bdede96859583ae3b20ec064b6-lamp-cloud",
+      "SHA-256": "44d3b019d4dddb4185103dd07dbad884ed3728bdede96859583ae3b20ec064b6",
+      "full mode": 365,
+      "bytes": 29559464,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/40d8339d04e2c809f6f832f77b39e65c8d0b650c1c5b953bb07d52d9997e0aaa-release_pair-92f8243e031a1e05",
+      "SHA-256": "40d8339d04e2c809f6f832f77b39e65c8d0b650c1c5b953bb07d52d9997e0aaa",
+      "full mode": 365,
+      "bytes": 3094176,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/552f0a770ae10c1d9633a3e4c26cf33726383bcba11f10698e34d458c6e2ee69-lamp_voice_eval-09c0422b7d9af692",
+      "SHA-256": "552f0a770ae10c1d9633a3e4c26cf33726383bcba11f10698e34d458c6e2ee69",
+      "full mode": 365,
+      "bytes": 7866856,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/6714ad73be779ec43199098974af22b6ceee38573afece024373fc26bf555f75-lamp-voice-eval",
+      "SHA-256": "6714ad73be779ec43199098974af22b6ceee38573afece024373fc26bf555f75",
+      "full mode": 365,
+      "bytes": 36403624,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/2717bf424f1c48a284e747e4918fb5cdc1b8b15b7cfba5c3518267d89853b27e-turn_end_replay",
+      "SHA-256": "2717bf424f1c48a284e747e4918fb5cdc1b8b15b7cfba5c3518267d89853b27e",
+      "full mode": 365,
+      "bytes": 91252752,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b6bb2cecc531e56cb0614384fa54b21925b77bc0fbb4c166fbf00ec4c983888a-same_voice_pairs",
+      "SHA-256": "b6bb2cecc531e56cb0614384fa54b21925b77bc0fbb4c166fbf00ec4c983888a",
+      "full mode": 365,
+      "bytes": 91400768,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b42eeccdd2278aa553d62fc2de75cdaf0641883e5f14a6061075e2c4ae859149-it-6b946a5e051ef7a4",
+      "SHA-256": "b42eeccdd2278aa553d62fc2de75cdaf0641883e5f14a6061075e2c4ae859149",
+      "full mode": 365,
+      "bytes": 20330488,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/79263e8da1481c6dc4c4cde79d0932ebd5cac2ad88e9f736a5220b199e3b09d7-admission_latency",
+      "SHA-256": "79263e8da1481c6dc4c4cde79d0932ebd5cac2ad88e9f736a5220b199e3b09d7",
+      "full mode": 365,
+      "bytes": 1087904,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/503528f16dd08e62b34250354655eee0f667a417cffc4d89075bbe70bcfb5c7d-stop_words_stt_replay-5bdbc6c296f69050",
+      "SHA-256": "503528f16dd08e62b34250354655eee0f667a417cffc4d89075bbe70bcfb5c7d",
+      "full mode": 365,
+      "bytes": 3568656,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/1ba6a437a7a1483b87b45f4f1b3284dc7a55830820a8ed7f4aa4254a3b7305fb-render_relaxing_music",
+      "SHA-256": "1ba6a437a7a1483b87b45f4f1b3284dc7a55830820a8ed7f4aa4254a3b7305fb",
+      "full mode": 365,
+      "bytes": 642856,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/a2e552c62888ee31208a0249eafeb28998af8eeb2ae270e1f86b2eb34abdf410-voice_forget_about-f18de9cac46c9fa5",
+      "SHA-256": "a2e552c62888ee31208a0249eafeb28998af8eeb2ae270e1f86b2eb34abdf410",
+      "full mode": 365,
+      "bytes": 11584888,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/53928fd58868bb9f2702b95af7a61002ec59ae93a128e741cb247d4b712c7541-head_qualification_operator",
+      "SHA-256": "53928fd58868bb9f2702b95af7a61002ec59ae93a128e741cb247d4b712c7541",
+      "full mode": 365,
+      "bytes": 1865080,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/1a286d760b6f6b4cbbd8186ba197220943521aaefc1962e972eaf51717e2a630-self_process_cuts-584367f7ea7a7bb2",
+      "SHA-256": "1a286d760b6f6b4cbbd8186ba197220943521aaefc1962e972eaf51717e2a630",
+      "full mode": 365,
+      "bytes": 543328,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/7044564d289cc3af2e6c8fc576d0dc01ed7addfcddf47e0ef9a2d17bb3875912-release_pair-99d83a658939f458",
+      "SHA-256": "7044564d289cc3af2e6c8fc576d0dc01ed7addfcddf47e0ef9a2d17bb3875912",
+      "full mode": 365,
+      "bytes": 6058816,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/6e82b3ebdc2ce5773a864d508d9e05b57df132e7ae61ca1825d21dea3433b6f6-voice_follows_face-1dd593594e591dfb",
+      "SHA-256": "6e82b3ebdc2ce5773a864d508d9e05b57df132e7ae61ca1825d21dea3433b6f6",
+      "full mode": 365,
+      "bytes": 11824904,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/d1bd4cfe99af2679fd0f42ca5d6dd32e5912e68c5de107a340c497b75f7d2d02-duplex_lab",
+      "SHA-256": "d1bd4cfe99af2679fd0f42ca5d6dd32e5912e68c5de107a340c497b75f7d2d02",
+      "full mode": 365,
+      "bytes": 3710208,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b9c031223501f4c4ce7043ce28a369a1b07d268d0dcfeeb598db9a010f6b1aab-voice_forget-d4cb7fec5c0c3e47",
+      "SHA-256": "b9c031223501f4c4ce7043ce28a369a1b07d268d0dcfeeb598db9a010f6b1aab",
+      "full mode": 365,
+      "bytes": 12096616,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/f0b7a1f609d0d9051498960ba954b15198e1d8f7d8463445b3ec2650a69c09a9-lamp_memory-83413b99be0ca219",
+      "SHA-256": "f0b7a1f609d0d9051498960ba954b15198e1d8f7d8463445b3ec2650a69c09a9",
+      "full mode": 365,
+      "bytes": 9612096,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/0d76ff0b527ac19034ec6bbc6fad4a67d43ecf1498647fce5e31f749712f5e48-forget_person-0deddd938b7bacb2",
+      "SHA-256": "0d76ff0b527ac19034ec6bbc6fad4a67d43ecf1498647fce5e31f749712f5e48",
+      "full mode": 365,
+      "bytes": 9764600,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/4e8a070891bb8581a73475e6d86fcb0044fcf03aa81ddc3498e85c64b098c36b-lamp_voice_eval-079f2fa93fdefee3",
+      "SHA-256": "4e8a070891bb8581a73475e6d86fcb0044fcf03aa81ddc3498e85c64b098c36b",
+      "full mode": 365,
+      "bytes": 30623808,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/7985bdc2f006169b51d593abf293385aa1709d457540eaedaf0685babfb649fe-lamp_skills-1307f9b251c59b00",
+      "SHA-256": "7985bdc2f006169b51d593abf293385aa1709d457540eaedaf0685babfb649fe",
+      "full mode": 365,
+      "bytes": 17388264,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/2ab7bbe080897b8ae9670031fd151f13aab8a82d9b448c872c41610b16d1f714-lamp_memory-0af22b32a7e8fee0",
+      "SHA-256": "2ab7bbe080897b8ae9670031fd151f13aab8a82d9b448c872c41610b16d1f714",
+      "full mode": 365,
+      "bytes": 12186352,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/ab530b28866a15390ba95102d62c84fa27a98724191fa13f7b58713d9bda0105-lamp_memory_eval-f5db972ba691a95b",
+      "SHA-256": "ab530b28866a15390ba95102d62c84fa27a98724191fa13f7b58713d9bda0105",
+      "full mode": 365,
+      "bytes": 2171856,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/8c9faeee6f42de2ff3ac68e8dc2c8c2dd586687152f246c2178b440f48b5fbc0-lamp_update-848e77ac6440879c",
+      "SHA-256": "8c9faeee6f42de2ff3ac68e8dc2c8c2dd586687152f246c2178b440f48b5fbc0",
+      "full mode": 365,
+      "bytes": 14109528,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/ac10fcab9693a8770101cf1fcb61beb339516a09d646c1dd9924d293ad3e6043-paraphrase_fixture-48401515e5a149f1",
+      "SHA-256": "ac10fcab9693a8770101cf1fcb61beb339516a09d646c1dd9924d293ad3e6043",
+      "full mode": 365,
+      "bytes": 1750208,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b33fa53aa6dc679d4fa0c8a115332088e731d735dfdb2b55c2cbda0f338f8178-it-03d8e125c34f2f16",
+      "SHA-256": "b33fa53aa6dc679d4fa0c8a115332088e731d735dfdb2b55c2cbda0f338f8178",
+      "full mode": 365,
+      "bytes": 26210128,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/15bad3058db555885dedb28bf709e26eb28b1dbd29a56478754cf7e843551280-probe_handover",
+      "SHA-256": "15bad3058db555885dedb28bf709e26eb28b1dbd29a56478754cf7e843551280",
+      "full mode": 365,
+      "bytes": 16058616,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/1d6f9805ccab21570d829b6a138735c321a1db6b057b86867e2391da696cebb4-release_pair-4c330c26cfcb0f6b",
+      "SHA-256": "1d6f9805ccab21570d829b6a138735c321a1db6b057b86867e2391da696cebb4",
+      "full mode": 365,
+      "bytes": 4419336,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/67f99be5b0c666fb4b9b897ee649edb757a5d012176b38560b2ae52c30265b6b-lamp_cloud-3b3a9a4f82d4ebc1",
+      "SHA-256": "67f99be5b0c666fb4b9b897ee649edb757a5d012176b38560b2ae52c30265b6b",
+      "full mode": 365,
+      "bytes": 36630760,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/ef30b2ded9993c6b2e421819680793c737ecabbef12fc6435787f12011b5132b-self_cli_exec-f64b721a3e4209eb",
+      "SHA-256": "ef30b2ded9993c6b2e421819680793c737ecabbef12fc6435787f12011b5132b",
+      "full mode": 365,
+      "bytes": 546936,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/99f0197c3cd3cde8f71a6b680bfd6e067932e699682daa71fe95dda617e3a788-it-f00b0d167c98c106",
+      "SHA-256": "99f0197c3cd3cde8f71a6b680bfd6e067932e699682daa71fe95dda617e3a788",
+      "full mode": 365,
+      "bytes": 1996232,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/9606faa5da05d30b7c5d0f4ced39db8c3b6a77f86a66aa9e6421f837bce1c5b0-voice_forget_named-71edb0837cf0037a",
+      "SHA-256": "9606faa5da05d30b7c5d0f4ced39db8c3b6a77f86a66aa9e6421f837bce1c5b0",
+      "full mode": 365,
+      "bytes": 11698928,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365-it-b864a5069c6d724f",
+      "SHA-256": "8701ededa673df219c488d8f663c127c9e973749da3259b1737c2a0ab2b50365",
+      "full mode": 365,
+      "bytes": 18573480,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/bde9dcdfdccb9b44b036b784a5c0dff88b9702183297de9836ca9bc0e7c7b4b9-lamp_skills-8d31d51df6f14a95",
+      "SHA-256": "bde9dcdfdccb9b44b036b784a5c0dff88b9702183297de9836ca9bc0e7c7b4b9",
+      "full mode": 365,
+      "bytes": 16643816,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/2a06436a6f9b40041d7b6df832b1757b065491d0857625655f0a0e1cede1f8b0-health_control-a47aa33374660f52",
+      "SHA-256": "2a06436a6f9b40041d7b6df832b1757b065491d0857625655f0a0e1cede1f8b0",
+      "full mode": 365,
+      "bytes": 2465456,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/c2f2eebb2f08ea6d7ba02338d797846b5385fb78f5811a0f4ff24b477fbb14ae-lamp_update-37e912ef505f9124",
+      "SHA-256": "c2f2eebb2f08ea6d7ba02338d797846b5385fb78f5811a0f4ff24b477fbb14ae",
+      "full mode": 365,
+      "bytes": 1019856,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/1aaa453ebc1e2d4272ce6e6f3e11aa98054668be297e488942252ffad9f4305e-voice_early_words-177a409ed98660a5",
+      "SHA-256": "1aaa453ebc1e2d4272ce6e6f3e11aa98054668be297e488942252ffad9f4305e",
+      "full mode": 365,
+      "bytes": 11896536,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/aa8a1010882815cefcf5e0ce1ee4174d6ac3c134b138712ab9d4489ca3736ef1-release_pair-1cffc6d9d32163c9",
+      "SHA-256": "aa8a1010882815cefcf5e0ce1ee4174d6ac3c134b138712ab9d4489ca3736ef1",
+      "full mode": 365,
+      "bytes": 3493336,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/00947507f77c54aa5e3b48f996c04a5963cf201bb08cc3e14a400c8f428f1388-ring_process_probe",
+      "SHA-256": "00947507f77c54aa5e3b48f996c04a5963cf201bb08cc3e14a400c8f428f1388",
+      "full mode": 365,
+      "bytes": 7273984,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/c5505d4aec047e3d9cb956ab149942b93d7de4158355f1256fcc77e5eb2fd212-render_line_second-b9b52812b570e84b",
+      "SHA-256": "c5505d4aec047e3d9cb956ab149942b93d7de4158355f1256fcc77e5eb2fd212",
+      "full mode": 365,
+      "bytes": 1700064,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/574c187aeb9b8f7330996bc2d5044301b8f1b24e02dc5c841a84a4669bec6a8c-forget_shared_exchange-4c78b7cb5f42ec18",
+      "SHA-256": "574c187aeb9b8f7330996bc2d5044301b8f1b24e02dc5c841a84a4669bec6a8c",
+      "full mode": 365,
+      "bytes": 6725184,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b0c7d5980b85de261e90e7e09af4250f8e249d099b83bac6e45ab73e9f5bc43c-hearing_replay",
+      "SHA-256": "b0c7d5980b85de261e90e7e09af4250f8e249d099b83bac6e45ab73e9f5bc43c",
+      "full mode": 365,
+      "bytes": 2054112,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/bbe9d03045fe351d7cf5f84dd0b360d5ace591e8582f16017e2bbc40efd56149-lamp_voice-b6dc78794ec93371",
+      "SHA-256": "bbe9d03045fe351d7cf5f84dd0b360d5ace591e8582f16017e2bbc40efd56149",
+      "full mode": 365,
+      "bytes": 1257424,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/261914fb9b31a2e1575c02f895b9b8d54c265f72f04f097415d5aab425818fc3-it-73635c91cd8b88a3",
+      "SHA-256": "261914fb9b31a2e1575c02f895b9b8d54c265f72f04f097415d5aab425818fc3",
+      "full mode": 365,
+      "bytes": 115441568,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/e20298e0e12dcf10742f298c7a394351f1e2994f313590ba414a21de35c42aef-voice_link_used-05a182028a521157",
+      "SHA-256": "e20298e0e12dcf10742f298c7a394351f1e2994f313590ba414a21de35c42aef",
+      "full mode": 365,
+      "bytes": 11787496,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/73f9e5aa2bc453c0ce012b0741a326db221063f247fbdc2a6c3db2958689025b-lamp-voice",
+      "SHA-256": "73f9e5aa2bc453c0ce012b0741a326db221063f247fbdc2a6c3db2958689025b",
+      "full mode": 365,
+      "bytes": 50541104,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/cba8be07eb58ded646c2eb16f69c9f1da5890faa71cdce97aa11b0f22e44caba-install-50bf62de40b53745",
+      "SHA-256": "cba8be07eb58ded646c2eb16f69c9f1da5890faa71cdce97aa11b0f22e44caba",
+      "full mode": 365,
+      "bytes": 16624448,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b5ddf53671dd890ab02f6774241dd7826ab894a2de0701540876a9a6911f3948-forgot-fd6638675ad23908",
+      "SHA-256": "b5ddf53671dd890ab02f6774241dd7826ab894a2de0701540876a9a6911f3948",
+      "full mode": 365,
+      "bytes": 5195888,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/7b7cd14ed9d7a907819625a0659ab9b1f46e2246580445d1b60d24dbaa625c2c-functions-f833487a161d2a87",
+      "SHA-256": "7b7cd14ed9d7a907819625a0659ab9b1f46e2246580445d1b60d24dbaa625c2c",
+      "full mode": 365,
+      "bytes": 22859192,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/bd34510987177c3d22abfab41794d837fa89441bc97ac115df97142da183b84b-lamp-skills",
+      "SHA-256": "bd34510987177c3d22abfab41794d837fa89441bc97ac115df97142da183b84b",
+      "full mode": 365,
+      "bytes": 25545536,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/9b6e54670544238ab1c3654968a01eab6e834133d714b22795323afb4de97718-voice_observe-8fca32d650057c26",
+      "SHA-256": "9b6e54670544238ab1c3654968a01eab6e834133d714b22795323afb4de97718",
+      "full mode": 365,
+      "bytes": 10765672,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/a1092ca477e9cb925101441cb98c8ddd8bdee63c83ecab3f276cb7cf9b2f5cdb-reference_pace",
+      "SHA-256": "a1092ca477e9cb925101441cb98c8ddd8bdee63c83ecab3f276cb7cf9b2f5cdb",
+      "full mode": 365,
+      "bytes": 5005736,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/43eb7a3139fc8cb30c94751d01d41b56e15ca9a2d23a0afd144908c7f1f63a44-release_pair-6a7b383b0db4d353",
+      "SHA-256": "43eb7a3139fc8cb30c94751d01d41b56e15ca9a2d23a0afd144908c7f1f63a44",
+      "full mode": 365,
+      "bytes": 4663720,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/44267a07a94902b2736e8ddc90bb573fda444ed9bc469d04294eb5d56553aed7-round-11a459c39bb76aa7",
+      "SHA-256": "44267a07a94902b2736e8ddc90bb573fda444ed9bc469d04294eb5d56553aed7",
+      "full mode": 365,
+      "bytes": 20543840,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/2e7c1fca57888beef559fb2bd7e7a185a3257d154177c8ef63141c1f1e1da978-voice_since_until-28f83169b6275560",
+      "SHA-256": "2e7c1fca57888beef559fb2bd7e7a185a3257d154177c8ef63141c1f1e1da978",
+      "full mode": 365,
+      "bytes": 11594560,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/4b82d5ac765e411221c4a90e3ad16e1d06fd4e4ad05126f1c0a7fabeecf81f90-requested_audio-7f311165d6904c49",
+      "SHA-256": "4b82d5ac765e411221c4a90e3ad16e1d06fd4e4ad05126f1c0a7fabeecf81f90",
+      "full mode": 365,
+      "bytes": 16362944,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/c4fab8121f5b5cb904c4357f8d4dd8935856ada6fe77956e07c22635c8bac500-wake-1817e6f65533e377",
+      "SHA-256": "c4fab8121f5b5cb904c4357f8d4dd8935856ada6fe77956e07c22635c8bac500",
+      "full mode": 365,
+      "bytes": 1814184,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/457014cda9823909f98c4e5741daa4f1069a27353a5d07b296b9158100b52353-it-671b21cade528fe0",
+      "SHA-256": "457014cda9823909f98c4e5741daa4f1069a27353a5d07b296b9158100b52353",
+      "full mode": 365,
+      "bytes": 15804128,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/09daf593574656211bab0b6cd49be428e5bc306648c2ad6419d04a1cfcfcb565-lamp-setup",
+      "SHA-256": "09daf593574656211bab0b6cd49be428e5bc306648c2ad6419d04a1cfcfcb565",
+      "full mode": 365,
+      "bytes": 19788584,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/73cfbd12d38a3eca01d46fdc895ce9dc588f8380fa3100bf9ec69cb7484bcd98-lamp_setup-0420e7dbd0bdd7fb",
+      "SHA-256": "73cfbd12d38a3eca01d46fdc895ce9dc588f8380fa3100bf9ec69cb7484bcd98",
+      "full mode": 365,
+      "bytes": 1019800,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/6a68247b753c8e4d203dd00b2cb0103f8428398bb800f4e93c3953f3f6ba99bf-lamp_setup-84cf96c59d18cc85",
+      "SHA-256": "6a68247b753c8e4d203dd00b2cb0103f8428398bb800f4e93c3953f3f6ba99bf",
+      "full mode": 365,
+      "bytes": 13591280,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/968ac04a8dce58719dae8d24f4a5d62e148e209916649e3ae3bf933b95779e1d-lamp_peek-5be1f9fb099b24a7",
+      "SHA-256": "968ac04a8dce58719dae8d24f4a5d62e148e209916649e3ae3bf933b95779e1d",
+      "full mode": 365,
+      "bytes": 4221568,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/beafb21309043f51e1a56b4ebbeb7ce92ba6229160e00d142b774641b3da1a6b-lamp-memory-eval",
+      "SHA-256": "beafb21309043f51e1a56b4ebbeb7ce92ba6229160e00d142b774641b3da1a6b",
+      "full mode": 365,
+      "bytes": 5035328,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/c4fe63d335e1f77cc983969b65e139edc00797f12ba877a4a22fd17291d677e1-lamp-memory-fixture",
+      "SHA-256": "c4fe63d335e1f77cc983969b65e139edc00797f12ba877a4a22fd17291d677e1",
+      "full mode": 365,
+      "bytes": 9696232,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/ad0451d66fd5ea29257d8103d4e13161f330edd447ff6ef7f4764b453e3789cf-lamp-memory",
+      "SHA-256": "ad0451d66fd5ea29257d8103d4e13161f330edd447ff6ef7f4764b453e3789cf",
+      "full mode": 365,
+      "bytes": 9339576,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/39d2562c9d51f31322ba5257713b51f690a41ea1bab8749aef28bb170586ca2f-lamp_lean-332a9af8170ca045",
+      "SHA-256": "39d2562c9d51f31322ba5257713b51f690a41ea1bab8749aef28bb170586ca2f",
+      "full mode": 365,
+      "bytes": 1186664,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/7f53d15ea2cc1e136f1a8092699e99b31042d08ebd7f886da6fea2f4f627fc34-recent_playout_cost",
+      "SHA-256": "7f53d15ea2cc1e136f1a8092699e99b31042d08ebd7f886da6fea2f4f627fc34",
+      "full mode": 365,
+      "bytes": 4992544,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/620a979a5919a3d0ccef903016cf1d40c181e48f21f787c27bc7a61f3082563d-lamp-expression",
+      "SHA-256": "620a979a5919a3d0ccef903016cf1d40c181e48f21f787c27bc7a61f3082563d",
+      "full mode": 365,
+      "bytes": 10784680,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/40ec0e5b162bea86990f36811ccdd6d02a940fd695c951d7922756f83680faa7-it-ea6f93305b6d7f2a",
+      "SHA-256": "40ec0e5b162bea86990f36811ccdd6d02a940fd695c951d7922756f83680faa7",
+      "full mode": 365,
+      "bytes": 3905664,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/a0bcd59344edcb658b056f24d55f033487403a78156098d9ffe2ad44eb1953e3-replay_cost",
+      "SHA-256": "a0bcd59344edcb658b056f24d55f033487403a78156098d9ffe2ad44eb1953e3",
+      "full mode": 365,
+      "bytes": 4962952,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/3a2858d85eaa503709a1e3e71c9aa559816b91e215ad943c89b878f46c71969d-it-d8575dda435eb43e",
+      "SHA-256": "3a2858d85eaa503709a1e3e71c9aa559816b91e215ad943c89b878f46c71969d",
+      "full mode": 365,
+      "bytes": 15829912,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/680306236bf12db94e6e81e6e3cdae0444d9aa9849ff53dd0a1ca8fb3a70f7ff-rest_cost",
+      "SHA-256": "680306236bf12db94e6e81e6e3cdae0444d9aa9849ff53dd0a1ca8fb3a70f7ff",
+      "full mode": 365,
+      "bytes": 4997432,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50-runtime-b52f6baa2e80330c",
+      "SHA-256": "1dc1d7489f551a62e34bff7d7ae68ac160310725ecd2d51ec7d0f476523d0a50",
+      "full mode": 365,
+      "bytes": 8327464,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/a837f15002a35f94699cc0bb8fd24c1b8d4ff2464505a1d3bdc80c7c6b6393bc-lamp_expression-f768989f9c233433",
+      "SHA-256": "a837f15002a35f94699cc0bb8fd24c1b8d4ff2464505a1d3bdc80c7c6b6393bc",
+      "full mode": 365,
+      "bytes": 2890224,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/03c9251d81bb9e67869430a051b94d73364086792cbc411d5dd16335d90ab845-check",
+      "SHA-256": "03c9251d81bb9e67869430a051b94d73364086792cbc411d5dd16335d90ab845",
+      "full mode": 365,
+      "bytes": 2768176,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/975f1bb9b5809389710592e8ebf919a57452a7d220974b98a625d9c7bfbcc554-lamp_body-6aa8d283b7d2353f",
+      "SHA-256": "975f1bb9b5809389710592e8ebf919a57452a7d220974b98a625d9c7bfbcc554",
+      "full mode": 365,
+      "bytes": 3107096,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/e68404a159f9e22d86151329ad2cfba8681226b2a5ca40e32d628c8119f7c411-lamp-body",
+      "SHA-256": "e68404a159f9e22d86151329ad2cfba8681226b2a5ca40e32d628c8119f7c411",
+      "full mode": 365,
+      "bytes": 1134744,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/785843c171a73181933159667325a010b97b34767dc07082f0b7bf77762d36cf-lamp_body_mood-9d0446e9a36c0d5e",
+      "SHA-256": "785843c171a73181933159667325a010b97b34767dc07082f0b7bf77762d36cf",
+      "full mode": 365,
+      "bytes": 1163208,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/6b2897cf8f83294cc1bbce95cd172fe80515d714bb67aa5a11400d5a4b8f3487-lamp_body_worker-9e6c54d8d16d8b9d",
+      "SHA-256": "6b2897cf8f83294cc1bbce95cd172fe80515d714bb67aa5a11400d5a4b8f3487",
+      "full mode": 365,
+      "bytes": 1329856,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/6943aebbac42c3ccf87374765aa10c007527eb3d134eb351d71decf2db380587-lamp-body-worker",
+      "SHA-256": "6943aebbac42c3ccf87374765aa10c007527eb3d134eb351d71decf2db380587",
+      "full mode": 365,
+      "bytes": 730064,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/9ff8138c65419b79cee135ea13999fff02108a639451b3134d2079c0dc7723cd-it-bda9dd473807073f",
+      "SHA-256": "9ff8138c65419b79cee135ea13999fff02108a639451b3134d2079c0dc7723cd",
+      "full mode": 365,
+      "bytes": 7125032,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/b6408e01899ca2a80102dead42fa387a8ca59244b1c1ddcd803434f5e7d37bf7-lamp-body-mood",
+      "SHA-256": "b6408e01899ca2a80102dead42fa387a8ca59244b1c1ddcd803434f5e7d37bf7",
+      "full mode": 365,
+      "bytes": 547208,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/42a360028bf2fea31630d9edf1332903471fcac544dde5bc550f055038f7e296-lamp_body_inspect-786b5ad8d2a0a7e5",
+      "SHA-256": "42a360028bf2fea31630d9edf1332903471fcac544dde5bc550f055038f7e296",
+      "full mode": 365,
+      "bytes": 1324824,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/a9990f223d637665e56c7e9d7d263b511d4490031274e72041016774706aa1c5-lamp-body-inspect",
+      "SHA-256": "a9990f223d637665e56c7e9d7d263b511d4490031274e72041016774706aa1c5",
+      "full mode": 365,
+      "bytes": 677512,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/dad5edbb57acad05ce3008bfddc91c77e379a7269c99352f47ec70e8a3380858-lamp-body-measure",
+      "SHA-256": "dad5edbb57acad05ce3008bfddc91c77e379a7269c99352f47ec70e8a3380858",
+      "full mode": 365,
+      "bytes": 925536,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/46a2607e822bae7546d01e51fc8dc3b1f17a738219b50cc8f1c85744150382f1-head_plan",
+      "SHA-256": "46a2607e822bae7546d01e51fc8dc3b1f17a738219b50cc8f1c85744150382f1",
+      "full mode": 365,
+      "bytes": 1764520,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/9eaec5e6dd2128a4f7866fd7989c5e5de8f5081ad6b92ed13c0016e264fe6995-lamp_body_measure-160bb32b216afa14",
+      "SHA-256": "9eaec5e6dd2128a4f7866fd7989c5e5de8f5081ad6b92ed13c0016e264fe6995",
+      "full mode": 365,
+      "bytes": 1515648,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/6cd5349821cf62c8677603acf02b4af52351da9df3ce80803996bdd24460691a-lamp_expression-87834248cbd87140",
+      "SHA-256": "6cd5349821cf62c8677603acf02b4af52351da9df3ce80803996bdd24460691a",
+      "full mode": 365,
+      "bytes": 7554296,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/2ec55e1d7cca95bc65d2f6bf1a92d101dc13c8cccadeabb85aa74eaa301389a9-expression_ask",
+      "SHA-256": "2ec55e1d7cca95bc65d2f6bf1a92d101dc13c8cccadeabb85aa74eaa301389a9",
+      "full mode": 365,
+      "bytes": 1581520,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/4fb8703c28e72edcc720f00df2d92b13c66feb74fe1887eb884092f4c586087e-lamp-update",
+      "SHA-256": "4fb8703c28e72edcc720f00df2d92b13c66feb74fe1887eb884092f4c586087e",
+      "full mode": 365,
+      "bytes": 13562456,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/908eab89b2d1314fcea98736cbc89ed7396f054eb37a3468eeb6625d46c90b91-lamp_keeper-17c84dccfff326fb",
+      "SHA-256": "908eab89b2d1314fcea98736cbc89ed7396f054eb37a3468eeb6625d46c90b91",
+      "full mode": 365,
+      "bytes": 2039592,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/477c8ac1513c6bc05579fbdd09dcf6db2508bb37d78dfdec2d1189ebcb9b80ce-lamp_body-e3e309ea1afce98d",
+      "SHA-256": "477c8ac1513c6bc05579fbdd09dcf6db2508bb37d78dfdec2d1189ebcb9b80ce",
+      "full mode": 365,
+      "bytes": 143955992,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/a3d1fdb9e2dd471a9b6feab60de305b2ee9aa529c098e953e21b371fbebd088a-lamp_voice-a9b95286b805e668",
+      "SHA-256": "a3d1fdb9e2dd471a9b6feab60de305b2ee9aa529c098e953e21b371fbebd088a",
+      "full mode": 365,
+      "bytes": 139854296,
+      "outside target": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/tests/frozen-executables/6eb50713fbdb1304c3069d3fcf40147b7daf9d011c9e814fee510639dc2fe7a6-lamp_keeper-b90bc9f7ee259680",
+      "SHA-256": "6eb50713fbdb1304c3069d3fcf40147b7daf9d011c9e814fee510639dc2fe7a6",
+      "full mode": 365,
+      "bytes": 3276656,
+      "outside target": true
+    }
+  ],
+  "count": 99,
+  "bindings source SHA-256": "78a4b26b4fa0cb9caa1018c50222bee4cc1ca01c68ef364908d4531dba1ffa92"
+}

@@ -1,0 +1,2022 @@
+{
+  "native_session": 23013,
+  "native_terminal_exit_code": 1,
+  "all8stages_completed": true,
+  "all_gates_passed": false,
+  "standard_Rust_totals": {
+    "passed": 7265,
+    "failed": 49,
+    "ignored": 52,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "complete_actual_targets": 79,
+  "original49failures": [
+    {
+      "package": "lamp-body",
+      "target": "lamp_body",
+      "case": "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets"
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp_body",
+      "case": "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began"
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp_body",
+      "case": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails"
+    },
+    {
+      "package": "lamp-cloud",
+      "target": "lamp_cloud",
+      "case": "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp_expression",
+      "case": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp_expression",
+      "case": "runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp_expression",
+      "case": "runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp_expression",
+      "case": "runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "it",
+      "case": "recent_playout_runtime::real_bus_expired_header_is_refused_even_when_the_recent_window_would_accept_payload"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "it",
+      "case": "recent_playout_runtime::real_bus_tracks_successive_ended_levels_and_shadow_never_publishes_actuators"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "it",
+      "case": "rest_replay::real_service_subscribes_to_exactly_one_complete_voice_protocol"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "it",
+      "case": "rest_requests::live_bus_request_uses_the_existing_writer_and_publishes_only_a_planning_receipt"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "it",
+      "case": "rest_requests::live_bus_keeps_the_original_receipt_after_a_stale_renewal_error"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "enabled_output_uses_a_new_session_and_expires_after_input_loss"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "slow_input_draining_does_not_make_old_joints_fresh"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "sleep_name::the_switch_closed_mid_look_ends_it"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "without_a_pause_said_expression_asks_exactly_as_before"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "case": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "health::a_newer_database_is_set_aside_and_health_says_so_while_memory_serves"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "health::forgetting_everything_removes_a_set_aside_database_and_health_stops_warning"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "health::sqlite_reports_retained_counts_and_stays_well_after_caller_refusals"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "health::the_environment_alone_does_not_enable_reporting_or_create_bus_data"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::a_remembered_fact_links_later_journal_echoes_and_forgetting_removes_them"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::deletion_invalidates_a_frozen_note_and_linked_writes_never_fall_back_to_plain_append"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::a_held_real_store_costs_only_the_note_and_call_deadlines_and_cleans_a_late_note"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::forget_that_right_after_a_follow_up_forgets_the_entry_it_was_about"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_people::days_a_rule_is_taken_back_by_its_number_and_never_by_default"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_name::a_told_name_against_each_way_a_run_of_turns_ends"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_people::days_a_rule_is_told_in_the_next_session_to_that_person_only_until_it_is_forgotten"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_people::days_a_rule_kept_without_its_acknowledgement_lets_nothing_unlinked_be_journalled"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_people::days_every_rule_kept_is_told_and_a_rule_past_the_most_is_refused"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_people::days_rules_kept_at_once_never_pass_the_most"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_people::days_an_answer_under_a_rule_is_journalled_and_goes_when_the_rule_is_forgotten"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice_people::days_two_known_people_and_the_room_are_never_answered_from_each_other"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest"
+    }
+  ],
+  "changed_case": [
+    {
+      "package": "lamp-expression",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "runtime",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/no-pause/lampOS/crates/expression/tests/runtime.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "name": "without_a_pause_said_expression_asks_exactly_as_before",
+      "status": "FAILED"
+    }
+  ],
+  "custom_harness_actual_counts_already_in_standard_totals": [
+    {
+      "package": "lamp-update",
+      "target": "self-cli-exec",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "test_rows": [
+        [
+          "actual_cli_exec_confirms_before_the_next_round",
+          "ignored, requires Linux ARM64/x86-64 ptrace"
+        ]
+      ]
+    },
+    {
+      "package": "lamp-update",
+      "target": "self-process-cuts",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "test_rows": [
+        [
+          "persisted_self_switches_survive_sigkill",
+          "ignored, requires Linux syscall tracing"
+        ]
+      ]
+    }
+  ],
+  "lineage": {
+    "clippy": {
+      "records": 140,
+      "fresh_false": 140,
+      "same_command_exact_reuse": 0,
+      "unresolved": 0
+    },
+    "tests": {
+      "records": 136,
+      "fresh_false": 136,
+      "same_command_exact_reuse": 0,
+      "unresolved": 0
+    },
+    "workspace-build": {
+      "records": 96,
+      "fresh_false": 96,
+      "same_command_exact_reuse": 0,
+      "unresolved": 0
+    }
+  },
+  "source_guards": {
+    "canonical": "e40b78ce78eb78aee9618f6e4b8401a772eb363a6888ae7b93be155c037817d7"
+  },
+  "source_guards_equal": true,
+  "frozen_witnesses": 99,
+  "all_saved_witness_hashes_fullmodes_verified": true,
+  "all_owned_command_streams_and_group_absence_verified": true,
+  "owned_commands": [
+    {
+      "record": "clean-before-workspace-build/clean-before-workspace-build.json",
+      "sha256": "b263610eddc048b817f822f0a244907c843f47edc6374b05a7ca4f32a836fd28",
+      "pid": 23382,
+      "pgid": 23382,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "fmt/fmt.json",
+      "sha256": "13ee9da57261a745d0de607e715347727f43f9cc94ea43016e6fe209e27a2a20",
+      "pid": 10449,
+      "pgid": 10449,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/tests.json",
+      "sha256": "4ff1e30938c1e8807839a4f75f801347edbc2148568c5df01db226fc8fa2d9ee",
+      "pid": 29293,
+      "pgid": 29293,
+      "exit": 101,
+      "group_absent": true
+    },
+    {
+      "record": "diff-check/diff-check.json",
+      "sha256": "8901a92dcb6ec048fd49bf24a0950a302553c5800ac6f2dd91255add017a1da6",
+      "pid": 44673,
+      "pgid": 44673,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "clippy/clippy.json",
+      "sha256": "93e4720089e359fe85d61677cd87f52fb3b105c3a4244d7d9a91416f71ce0661",
+      "pid": 12921,
+      "pgid": 12921,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "clean-before-clippy/clean-before-clippy.json",
+      "sha256": "f81e04ee85fe110f71243e1c12c815edbeff31e1b8b2d16e0e62929b4bb3dbd0",
+      "pid": 12375,
+      "pgid": 12375,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "workspace-build/workspace-build.json",
+      "sha256": "8f6e55af4eebf524189ca8ceb9e5821c5cc1edc348064698839030b557213e9f",
+      "pid": 24066,
+      "pgid": 24066,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "clean-before-tests/clean-before-tests.json",
+      "sha256": "dca19204c03adba4a263fb11bab6a2b069c6b76d8978814bebcf3f8e3a5974c9",
+      "pid": 27424,
+      "pgid": 27424,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-lamp_peek-968ac04a8d/file.json",
+      "sha256": "9c7d5522298c15fe335046e99b96e0b124a2f2d3ae8baa6fbc692af58e62beb6",
+      "pid": 23048,
+      "pgid": 23048,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-lamp_peek-968ac04a8d/ignored.json",
+      "sha256": "c235ee61b5198fb48aeda8a436dfe32b20f5f4e6a1dc898d4074d6d07a8ba344",
+      "pid": 23053,
+      "pgid": 23053,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-lamp_peek-968ac04a8d/all.json",
+      "sha256": "fb81a6e42cd615c92bff48d52d0c29857503d831d4ac26fc2d197e4c5ae2dc16",
+      "pid": 23051,
+      "pgid": 23051,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-it-457014cda9/file.json",
+      "sha256": "e2ed508b79d2be0cc2f318907b29d94e334a3b6d891c610454b34e42b7082461",
+      "pid": 23010,
+      "pgid": 23010,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-it-457014cda9/ignored.json",
+      "sha256": "88e915fc37930b3810367f56a60e05fbbeb0e68858912ffc7975a9d7bdba028d",
+      "pid": 23012,
+      "pgid": 23012,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-it-457014cda9/all.json",
+      "sha256": "0229349557321551612e6f323796fcb668bbd64a806ec11f6f1cbca9b4608d4e",
+      "pid": 23011,
+      "pgid": 23011,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-lamp_update-8c9faeee6f/file.json",
+      "sha256": "bf30f6eb944baac352fb8af8c35df760d5ff6c89c6f3d5222e3645c0e7e7668c",
+      "pid": 22738,
+      "pgid": 22738,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-lamp_update-8c9faeee6f/ignored.json",
+      "sha256": "7bcf4e5b96636976ec303d9294a133907d86d04ffbe8f229cfbe644fa6e4e29e",
+      "pid": 22750,
+      "pgid": 22750,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-lamp_update-8c9faeee6f/all.json",
+      "sha256": "0cc6c867c88b733deedba660fbe650446a225fc30e1ab03f833efb0c7023f126",
+      "pid": 22749,
+      "pgid": 22749,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-release_pair-aa8a101088/file.json",
+      "sha256": "2ad61e8d843a591f44aa641118d6ba46d736b4206cbaf46fd330e9f0d6c5c52d",
+      "pid": 22882,
+      "pgid": 22882,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-release_pair-aa8a101088/ignored.json",
+      "sha256": "940ce45973dd68de5d67958c1697e652070b6271db6aeb1c0cf769286361bd69",
+      "pid": 22887,
+      "pgid": 22887,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-release_pair-aa8a101088/all.json",
+      "sha256": "7d2f0f1f5977c2a1f94f6f377582d5f5ae439cba420f8f797c735252d11b559c",
+      "pid": 22883,
+      "pgid": 22883,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp-memory-eval-ab530b2886/file.json",
+      "sha256": "3f10a4c869df210ca5bd78bfac0b490312a1e5f557d4cb582a7e9f3b346276c5",
+      "pid": 22726,
+      "pgid": 22726,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp-memory-eval-ab530b2886/ignored.json",
+      "sha256": "adc837c74bab8714b65b7ff3226635f5a9ae759b684ca7fb288709fe068f928d",
+      "pid": 22729,
+      "pgid": 22729,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp-memory-eval-ab530b2886/all.json",
+      "sha256": "ac5a52ce01e9c5b4d70641ed674b5a3d4450fce1a461daa4d69c54f4e801f4ee",
+      "pid": 22727,
+      "pgid": 22727,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-it-261914fb9b/file.json",
+      "sha256": "7d41d96550330556e14847dc809c48e116bb6a470ba01c23796c0e1e8c5f54e0",
+      "pid": 22913,
+      "pgid": 22913,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-it-261914fb9b/ignored.json",
+      "sha256": "a2af9c551faa96a52a95d90073f6e7a6696e5dd5fbd204e4555ce5a6e9d16c80",
+      "pid": 22915,
+      "pgid": 22915,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-it-261914fb9b/all.json",
+      "sha256": "c55e07d23e24099fdf99014297ed7d5834d361c21360aefa5891cff7e63288ec",
+      "pid": 22914,
+      "pgid": 22914,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget_about-a2e552c628/file.json",
+      "sha256": "233767a95e5425f54bbce0b67237977459b6af6e1d806cfc21fe04c5a2fffb33",
+      "pid": 22140,
+      "pgid": 22140,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget_about-a2e552c628/ignored.json",
+      "sha256": "a7dc7fadc15b9c2f8aa66c65926434a118c25fce183e4f1f1f5080a7e122f089",
+      "pid": 22150,
+      "pgid": 22150,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget_about-a2e552c628/all.json",
+      "sha256": "1cd1ad90e8dfc15e1d257f0395bdbc5d55610c687f8c8bb8264a57616c81df7d",
+      "pid": 22141,
+      "pgid": 22141,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-functions-7b7cd14ed9/file.json",
+      "sha256": "620f44b55f9613a327955a4618729d27325ed75a3d7cf6d7204b455175bac478",
+      "pid": 22929,
+      "pgid": 22929,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-functions-7b7cd14ed9/ignored.json",
+      "sha256": "55ab6ab7a673d9c6eadbcbda75df4b52d9aec72a309b55f5cccee8ec1083e533",
+      "pid": 22931,
+      "pgid": 22931,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-functions-7b7cd14ed9/all.json",
+      "sha256": "4c7872eae20a03fee451919dfac477473700cb7eaa6b7721ad3def0e6194a208",
+      "pid": 22930,
+      "pgid": 22930,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-mood-785843c171/file.json",
+      "sha256": "c58707afd29403efc0c49377ee3c6a237b42b09828101017774c1ae87963d0e4",
+      "pid": 23100,
+      "pgid": 23100,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-mood-785843c171/ignored.json",
+      "sha256": "541e66482a478fc142d7b933df036ac5ecd20a2c7826f85709964c52bb2a7695",
+      "pid": 23104,
+      "pgid": 23104,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-mood-785843c171/all.json",
+      "sha256": "53b35f72804de83b462b455f8d397fb0373fb4562033e179f856924d7ad23dcb",
+      "pid": 23101,
+      "pgid": 23101,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp_memory-2ab7bbe080/file.json",
+      "sha256": "03b89737a9138c47b020926c48e29b60e7552f4990a3afa9fe83f79e1c3f99a4",
+      "pid": 22717,
+      "pgid": 22717,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp_memory-2ab7bbe080/ignored.json",
+      "sha256": "5ee8ee9934565cba6c93ccc6b5700c45354422ea7c235e7be41b44b8ffbb3b13",
+      "pid": 22720,
+      "pgid": 22720,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp_memory-2ab7bbe080/all.json",
+      "sha256": "bb3ed05c792ad6e78c10b24ca33b147ef631d4665a09ae547b26b682cf8eb848",
+      "pid": 22718,
+      "pgid": 22718,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-release_pair-7044564d28/file.json",
+      "sha256": "4fe702667265fffffad5f4e658b84a9cd6f55609c05ba5cacbb878c97e9ac34b",
+      "pid": 22155,
+      "pgid": 22155,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-release_pair-7044564d28/ignored.json",
+      "sha256": "e9db1387b98522b41784051879db296259b02e6275cba9688f3c152b20de3b06",
+      "pid": 22157,
+      "pgid": 22157,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-release_pair-7044564d28/all.json",
+      "sha256": "5269c59c8dd66b97dc8e07208b6c6f4b612e2518a57e5734cf0d717a153a9b48",
+      "pid": 22156,
+      "pgid": 22156,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-it-8701ededa6/file.json",
+      "sha256": "d49ded0659abc8260707218db1e38e4cb2a9d0a15bb2d6a04b2dad92119aa65c",
+      "pid": 22859,
+      "pgid": 22859,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-it-8701ededa6/ignored.json",
+      "sha256": "a4f53fa99d4bb2396c1b716c0fe584202454f2b7dd966bd1b51ec3a4750a7beb",
+      "pid": 22863,
+      "pgid": 22863,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-it-8701ededa6/all.json",
+      "sha256": "1f10177264a6f283c5e8f5d7fd1c6d16f0bf63b7659de848ee153952d9bb4488",
+      "pid": 22861,
+      "pgid": 22861,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-self-process-cuts-1a286d760b/file.json",
+      "sha256": "66c6bd820cf6d08e88175e791a47d48d2d8304605d530db6bbd4cb49444649b8",
+      "pid": 22151,
+      "pgid": 22151,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-self-process-cuts-1a286d760b/ignored.json",
+      "sha256": "9ec46c4b0b2df5eba825b72fde182ff0f9e9e0e9ade83a5f2480a389377599d3",
+      "pid": 22153,
+      "pgid": 22153,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-self-process-cuts-1a286d760b/all.json",
+      "sha256": "b8e1a874a3f8e053495120d951fcfc9b0de92e34d575a4bfc0c7a04305dd9c93",
+      "pid": 22152,
+      "pgid": 22152,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget-b9c0312235/file.json",
+      "sha256": "0e8803acee2c23694544c63afeab32f3cf5ef028c419abffdf75cdda7d6ed9b1",
+      "pid": 22166,
+      "pgid": 22166,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget-b9c0312235/ignored.json",
+      "sha256": "17e1dc8bb1d1112cc8143bd963cddfcae07542e6d54e722cbfdd3f2e8e262762",
+      "pid": 22168,
+      "pgid": 22168,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget-b9c0312235/all.json",
+      "sha256": "c69acdd30a0837a412bf47aaa52996032d3f1f63d53c220cea0e0e0b16ace0ef",
+      "pid": 22167,
+      "pgid": 22167,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-stop_words_stt_replay-503528f16d/file.json",
+      "sha256": "37ce1f3bc9c84051c0b56074bee72255f5953ce43fc3d2e815a80e285eee4f64",
+      "pid": 22135,
+      "pgid": 22135,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-stop_words_stt_replay-503528f16d/ignored.json",
+      "sha256": "b91b1d87a88a237fc89159dd2de68787c9d7bcc988eaa24f4da104e7c5f7d1c5",
+      "pid": 22137,
+      "pgid": 22137,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-stop_words_stt_replay-503528f16d/all.json",
+      "sha256": "3ca9f2d2cd98ace2bd60688f627815ad288cc674923dc51f67f41e9802b21b12",
+      "pid": 22136,
+      "pgid": 22136,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget_named-9606faa5da/file.json",
+      "sha256": "6c7695d233620d5c0da1bd4ddb3c90a207917097b1aa50777f79b1fd4f09057b",
+      "pid": 22852,
+      "pgid": 22852,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget_named-9606faa5da/ignored.json",
+      "sha256": "9d33869ea31ce9b38b6dac7fe9948726fd53c39c763438241af21bcf96d560ba",
+      "pid": 22858,
+      "pgid": 22858,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_forget_named-9606faa5da/all.json",
+      "sha256": "a3bc8a1b779cff5a56485d8e51be32f74a1c75da3dde3256527adfbf5fe3c559",
+      "pid": 22853,
+      "pgid": 22853,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-release_pair-1d6f9805cc/file.json",
+      "sha256": "2d431a67626a75bf6a2a3a29ce962379ea6d88018eb2ad7d5e9424cb60dd2f3a",
+      "pid": 22823,
+      "pgid": 22823,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-release_pair-1d6f9805cc/ignored.json",
+      "sha256": "147d575b17f27581035de58350ebe45eb70e6ee7660c49227827ca2c882c8ecb",
+      "pid": 22827,
+      "pgid": 22827,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-release_pair-1d6f9805cc/all.json",
+      "sha256": "647568a1051b15257bbcc3a52ac2e6b380f2aec428c0c6656955c973aa72d205",
+      "pid": 22825,
+      "pgid": 22825,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-keeper-lamp_keeper-6eb50713fb/file.json",
+      "sha256": "66cd55501fec85c87f10688487be33fa6e2be0cf56c9f37fbcc900789ba992de",
+      "pid": 23199,
+      "pgid": 23199,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-keeper-lamp_keeper-6eb50713fb/ignored.json",
+      "sha256": "e0f4e2048ac9b486215fc88c89150df899d34c86b1503e9ecb3840ca79a96511",
+      "pid": 23205,
+      "pgid": 23205,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-keeper-lamp_keeper-6eb50713fb/all.json",
+      "sha256": "1ae7aab9f568bcd9692c27ae663e596dcfede098099552bccdb476e39e6518a6",
+      "pid": 23200,
+      "pgid": 23200,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-runtime-1dc1d7489f/file.json",
+      "sha256": "3cbf71748140f60735caa54ad19ad9af785a79acd3c5df46496fb143b76e0137",
+      "pid": 23076,
+      "pgid": 23076,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-runtime-1dc1d7489f/ignored.json",
+      "sha256": "9f972439266d527d2652009186bd7056ccaa3e312cf3a1199d445f15ce01bbe7",
+      "pid": 23080,
+      "pgid": 23080,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-runtime-1dc1d7489f/all.json",
+      "sha256": "8179e79bbe36fedd7dff12eff1eaab59f3e28cc896216236b710c287d45e6788",
+      "pid": 23077,
+      "pgid": 23077,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-lamp-voice-bbe9d03045/file.json",
+      "sha256": "669f9ea9003a1f834f542c2cbe09c22b895b12f0956964e46b96f6c4674af106",
+      "pid": 22904,
+      "pgid": 22904,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-lamp-voice-bbe9d03045/ignored.json",
+      "sha256": "255ab1e3f249e7d401bca0823073b90690863ebb349d949f4a0c94cc836d5d80",
+      "pid": 22908,
+      "pgid": 22908,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-lamp-voice-bbe9d03045/all.json",
+      "sha256": "945cb614cc45fadabde86cce95bba2989927fc20f830a9602a9f881967b9179a",
+      "pid": 22906,
+      "pgid": 22906,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-lamp-update-c2f2eebb2f/file.json",
+      "sha256": "1a75a1ae71e9ffafc9d468c9008f1463c885e9e4c62a34a7ed4b8460fe36f44f",
+      "pid": 22870,
+      "pgid": 22870,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-lamp-update-c2f2eebb2f/ignored.json",
+      "sha256": "c8f7fd408e5da399d78c86c74a78f46dc4fcf7ba5e53a829c09b7466f59ca48d",
+      "pid": 22872,
+      "pgid": 22872,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-lamp-update-c2f2eebb2f/all.json",
+      "sha256": "19cccc76920696b2c62a3eb755abebf1c13801cefb804e18b4cc203cf0169435",
+      "pid": 22871,
+      "pgid": 22871,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-lamp-expression-a837f15002/file.json",
+      "sha256": "4543499c630584c1b47e6bbc45297a48d3c628d0e89dd0b24cfded9c05dc2efb",
+      "pid": 23081,
+      "pgid": 23081,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-lamp-expression-a837f15002/ignored.json",
+      "sha256": "7980c54f64e7e47c8787dadc13ad857bf3cff403e4368ba672f53e3a4f18eafa",
+      "pid": 23086,
+      "pgid": 23086,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-lamp-expression-a837f15002/all.json",
+      "sha256": "de7b20848adce7d585f32e64b8d351cf6fe38bd98ca5d67ba7f16a6369de04b6",
+      "pid": 23082,
+      "pgid": 23082,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_follows_face-6e82b3ebdc/file.json",
+      "sha256": "b93b37bc12d74d6ab37cb42028e9579b4847ca56606a9814dea2339058701264",
+      "pid": 22163,
+      "pgid": 22163,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_follows_face-6e82b3ebdc/ignored.json",
+      "sha256": "054025b3f614c3567922c726e5d2e4dcd2307a0da5766974522a8dd9c1e4c1ac",
+      "pid": 22165,
+      "pgid": 22165,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_follows_face-6e82b3ebdc/all.json",
+      "sha256": "2667986b4af578bb5828fb5f393e622a0ecad5dd80986fab34fd4645be511173",
+      "pid": 22164,
+      "pgid": 22164,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-lean-it-40ec0e5b16/file.json",
+      "sha256": "da9b03a8d8a3151fbdb9803c7b04ad70cd888262c2ce5c35ce1576f4a1beb48a",
+      "pid": 23061,
+      "pgid": 23061,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-lean-it-40ec0e5b16/ignored.json",
+      "sha256": "95f1845b7d9f05520b7924630ec9a2f2da6facb6a15dff601cb85ba92e31d57c",
+      "pid": 23063,
+      "pgid": 23063,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-lean-it-40ec0e5b16/all.json",
+      "sha256": "5a5efb7f9f277451b4d75088d5a12e8da71231792a624c5bd13beafce9dfd0b6",
+      "pid": 23062,
+      "pgid": 23062,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-wake-c4fab8121f/file.json",
+      "sha256": "fc5b4713f23660ca2232af0a484ad27aec1fa0867a42ad63d5ca5f719b91bda9",
+      "pid": 22995,
+      "pgid": 22995,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-wake-c4fab8121f/ignored.json",
+      "sha256": "c7b9559b031f8585b7b66439d8c4183ab802bccb630969ef8fc81e836fcefa53",
+      "pid": 23005,
+      "pgid": 23005,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-wake-c4fab8121f/all.json",
+      "sha256": "65c678978fcda669600dd61c65f7269bd9cc06d567181c419e1d15f7de6a976a",
+      "pid": 22996,
+      "pgid": 22996,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp_body-477c8ac151/file.json",
+      "sha256": "f926fbcc210c47476e8dd8e093a936d90623e460e9b42a01f244c620fe848bf4",
+      "pid": 23184,
+      "pgid": 23184,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp_body-477c8ac151/ignored.json",
+      "sha256": "1523e8c43cb3a2e432ebe42d570db9c9a5fed30b69135f6343d1aa54f76d256b",
+      "pid": 23188,
+      "pgid": 23188,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp_body-477c8ac151/all.json",
+      "sha256": "ccd63dc3cee40ef5ed8ee3377042c791af4466ae7b6459df7347bb857bab631d",
+      "pid": 23186,
+      "pgid": 23186,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-lamp_setup-6a68247b75/file.json",
+      "sha256": "4622bee5be3675cf8490a4b0e0975abb3a46a816b966e76ee2bad466f165d6c1",
+      "pid": 23026,
+      "pgid": 23026,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-lamp_setup-6a68247b75/ignored.json",
+      "sha256": "d02849764e0c753b627780423e21e0795b056875b706a52d84784d1b2fd48939",
+      "pid": 23043,
+      "pgid": 23043,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-lamp_setup-6a68247b75/all.json",
+      "sha256": "6124cb397e87ecdc001a1989ff9957587adeaa89891cc78da6eb79d5048bb803",
+      "pid": 23027,
+      "pgid": 23027,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-lamp_voice_eval-4e8a070891/file.json",
+      "sha256": "ff82f5a2fc310b4793e04312509de24e0c677bd780e27cdfabb8e529e1ca972e",
+      "pid": 22649,
+      "pgid": 22649,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-lamp_voice_eval-4e8a070891/ignored.json",
+      "sha256": "dd181a2ec10e7f539dcb1795c288414ec2ca151f1a881f7476a5f1c5ed42bfee",
+      "pid": 22663,
+      "pgid": 22663,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-lamp_voice_eval-4e8a070891/all.json",
+      "sha256": "41ce7c159e20b038d33fed1d84225b3c92fea3024cd075856d38d7e96d24d907",
+      "pid": 22652,
+      "pgid": 22652,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_observe-9b6e546705/file.json",
+      "sha256": "111b12f8f41d9c8303811fdc822d4f1fa584f36d5ec69142050edd9b3622835e",
+      "pid": 22944,
+      "pgid": 22944,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_observe-9b6e546705/ignored.json",
+      "sha256": "b7b998ec59371410aab3ff4fb200a0d4abb382b35e298af7b7e0f69e300a4459",
+      "pid": 22964,
+      "pgid": 22964,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_observe-9b6e546705/all.json",
+      "sha256": "3d3d6e522ef18f43cfede86220b4c45a23614984314314c0d678edab77ec4b19",
+      "pid": 22945,
+      "pgid": 22945,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-release_pair-40d8339d04/file.json",
+      "sha256": "9601b653df6c357cd67ca623143928a89a5d48ac4714d0a06e158e011f6d0478",
+      "pid": 22122,
+      "pgid": 22122,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-release_pair-40d8339d04/ignored.json",
+      "sha256": "013d80b9b422ad42976b467b3b62d5008e5d3255db007476ff4aecca0560fc02",
+      "pid": 22127,
+      "pgid": 22127,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-release_pair-40d8339d04/all.json",
+      "sha256": "e54961d121273edc467064184e65182b8637aa8024a29ff7affa24066259d688",
+      "pid": 22123,
+      "pgid": 22123,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-lamp-skills-bde9dcdfdc/file.json",
+      "sha256": "47edcb19af716c71e9573ac737664d91d320180f87b8c5358701ef671669a8fb",
+      "pid": 22864,
+      "pgid": 22864,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-lamp-skills-bde9dcdfdc/ignored.json",
+      "sha256": "a8e4a405a4c86b667a1d0c5254cdd567a04640fe58808a62bff3e42f9dec761b",
+      "pid": 22866,
+      "pgid": 22866,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-lamp-skills-bde9dcdfdc/all.json",
+      "sha256": "8926a7eb461158a95ad1b1db06289f78b63068eea349f1c5ea945520f3fae21d",
+      "pid": 22865,
+      "pgid": 22865,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-it-b33fa53aa6/file.json",
+      "sha256": "6fda3e53244a6740ee6790b629d3a952c97274a3cbdbc827f632aab4e8b95a0e",
+      "pid": 22811,
+      "pgid": 22811,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-it-b33fa53aa6/ignored.json",
+      "sha256": "ab0a1d08b2e02850d1eab23b486027f6bad741715360ac36767417b63b201533",
+      "pid": 22815,
+      "pgid": 22815,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-it-b33fa53aa6/all.json",
+      "sha256": "09e36ff9fe7a41869509f4d79c45fd15a769dd33f816d7392716416d6b6eba5e",
+      "pid": 22813,
+      "pgid": 22813,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-it-99f0197c3c/file.json",
+      "sha256": "ba8de7f9cd1303d7ba81bbd4765c900a05617b0d5ce18233cd04bcbd85933c5c",
+      "pid": 22849,
+      "pgid": 22849,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-it-99f0197c3c/ignored.json",
+      "sha256": "f290a86947cdebafa1e7b1e1f7d598fb417d312c6653d74af98d8807cf0343ab",
+      "pid": 22851,
+      "pgid": 22851,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-it-99f0197c3c/all.json",
+      "sha256": "8cb3a91a9b6b65a655ccd0dbe07d41ff450c54deef3a36a0c5d8911db93fdfb7",
+      "pid": 22850,
+      "pgid": 22850,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp_cloud-67f99be5b0/file.json",
+      "sha256": "0862256035407bea9751263fedb6c66ec0c067fbd11541c5ec506a6a05db0e20",
+      "pid": 22836,
+      "pgid": 22836,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp_cloud-67f99be5b0/ignored.json",
+      "sha256": "e9c52526571ed9b9c29cd3559c6bc1868dd8cc1033d065a9a418a8ea3d7e2019",
+      "pid": 22845,
+      "pgid": 22845,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp_cloud-67f99be5b0/all.json",
+      "sha256": "ba7226d68216761acd8adf65d1229c1222d1583d34480df290b85e118d504778",
+      "pid": 22837,
+      "pgid": 22837,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp-memory-f0b7a1f609/file.json",
+      "sha256": "6c0a80b0874a1608e1cdd1cf1c2a7ce56a6aaaa055442230b02c10e74eb6f19b",
+      "pid": 22176,
+      "pgid": 22176,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp-memory-f0b7a1f609/ignored.json",
+      "sha256": "6c0e027c977f80da94a33c42be0810552f48ed6fc874f1d8e496811fc5d5103d",
+      "pid": 22192,
+      "pgid": 22192,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-lamp-memory-f0b7a1f609/all.json",
+      "sha256": "1d0f1c051352bfca851aa89c976af7b8495afaaf1cded54951ab6ebf21e5fb3b",
+      "pid": 22177,
+      "pgid": 22177,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-it-b0fa67aa8d/file.json",
+      "sha256": "51791a78d96889d64b8c9ed802423393aec30fd4521061fde4a523f3d3e55b4c",
+      "pid": 22072,
+      "pgid": 22072,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-it-b0fa67aa8d/ignored.json",
+      "sha256": "fa070bab2f1a4a2ecbe26b12949fbc45d70f72d1eee4a7d17c80b63bb6693c78",
+      "pid": 22076,
+      "pgid": 22076,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-it-b0fa67aa8d/all.json",
+      "sha256": "57cddae07e85ce8ee316d443c495a5917bedbffc0c6180e3ccf9297538b647cd",
+      "pid": 22073,
+      "pgid": 22073,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-it-3a2858d85e/file.json",
+      "sha256": "d55ba0044e3c40553f2867fef8b2483c241cb4a73a9830371a9ad98602f145ef",
+      "pid": 23064,
+      "pgid": 23064,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-it-3a2858d85e/ignored.json",
+      "sha256": "c15fe8e4d093eeca3b4fbd75ebd533da5ce3c2764b2265c16004db28da7e374f",
+      "pid": 23075,
+      "pgid": 23075,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-it-3a2858d85e/all.json",
+      "sha256": "aaabcd70a5623958ad85c0e9a0a9ccdb23dc68df5efb1ebd28d10e1fc31c184a",
+      "pid": 23070,
+      "pgid": 23070,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp-cloud-7863023f75/file.json",
+      "sha256": "ec4ec74637018874eaf9e1fb9c1b78342559bc378e7f07043ef52d93cf619ffd",
+      "pid": 22068,
+      "pgid": 22068,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp-cloud-7863023f75/ignored.json",
+      "sha256": "c05aeb001b070c12cf1dbea802c4e62264b7bdaecf799c9723d3d310e4e02ee2",
+      "pid": 22071,
+      "pgid": 22071,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-cloud-lamp-cloud-7863023f75/all.json",
+      "sha256": "736fffc9287a90d751d2c8beb4f3c5f8e4061f61add9811662b586ef4b89cca3",
+      "pid": 22069,
+      "pgid": 22069,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forget_shared_exchange-574c187aeb/file.json",
+      "sha256": "a14b6ed16a647d7f3f1a624e7d9132af59e1b0b0f39136a5d546f24923fc0f94",
+      "pid": 22891,
+      "pgid": 22891,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forget_shared_exchange-574c187aeb/ignored.json",
+      "sha256": "411b4e25f9b10b0386a44f33074c7133ca3cde25b471c4bee0ef4fec9c395f91",
+      "pid": 22897,
+      "pgid": 22897,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forget_shared_exchange-574c187aeb/all.json",
+      "sha256": "3e3ff7eb5b0ed206f54ca1845b7499a945f50e1f0968d336511d5aadc47fe3f2",
+      "pid": 22893,
+      "pgid": 22893,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-it-9ff8138c65/file.json",
+      "sha256": "303c8b1e702290b0158c6d2088e59070c472ba60c74bf596e7fcd05cdec23eaf",
+      "pid": 23131,
+      "pgid": 23131,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-it-9ff8138c65/ignored.json",
+      "sha256": "508c691e56f69e17f9ab3978d5d37828272e11960aeeb87e1b4f565d132c9f4a",
+      "pid": 23143,
+      "pgid": 23143,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-it-9ff8138c65/all.json",
+      "sha256": "524760df39ac15eac63b80082ab0ec80c1cb7793e002410fd00016fe2a7b9cd3",
+      "pid": 23132,
+      "pgid": 23132,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-measure-9eaec5e6dd/file.json",
+      "sha256": "f81fae5d2d3a366200ac062ddd62cf978c8f4f36f060c068709ba5958b6e9a34",
+      "pid": 23156,
+      "pgid": 23156,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-measure-9eaec5e6dd/ignored.json",
+      "sha256": "066c88403f517c7d69c58872bc92876235d7a3736ef5842d14895db538bf5723",
+      "pid": 23158,
+      "pgid": 23158,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-measure-9eaec5e6dd/all.json",
+      "sha256": "0d7e15fc535ce589a5f28411f324e76b241f157cb1adc96aa885c38505284c85",
+      "pid": 23157,
+      "pgid": 23157,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-render_line_second-c5505d4aec/file.json",
+      "sha256": "8e69371c2f3442ae54eb3446ba94e6a04226d2b8cf2582e08d177d53615abfc2",
+      "pid": 22888,
+      "pgid": 22888,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-render_line_second-c5505d4aec/ignored.json",
+      "sha256": "0babb8397708fea4621cd5ef2747e571c7f485294d5ccc2d0f9aba7c07ab5d8a",
+      "pid": 22890,
+      "pgid": 22890,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-render_line_second-c5505d4aec/all.json",
+      "sha256": "eabaacd8f9043c17dad7ec8c2ce6da62381b5f2a4febf1028a0a35159ce40239",
+      "pid": 22889,
+      "pgid": 22889,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-lamp_expression-6cd5349821/file.json",
+      "sha256": "a20a93f1213b568bdc18d0521e5c7ff8848cd59a8259b1985ca2f0199bba605d",
+      "pid": 23160,
+      "pgid": 23160,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-lamp_expression-6cd5349821/ignored.json",
+      "sha256": "c0bf23c180bf61a56100874b14c1e83168fe25c57417e784cf03ddf24ac8fa6c",
+      "pid": 23163,
+      "pgid": 23163,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-expression-lamp_expression-6cd5349821/all.json",
+      "sha256": "46e8295bb4b7c3b67b124060572d7ee1db18fe00c7fff42acf37dabc95cde9f0",
+      "pid": 23162,
+      "pgid": 23162,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-lamp_voice-a3d1fdb9e2/file.json",
+      "sha256": "82b97eae4067f3955f8d1f26446fd1a6ef515224511f5db961e2e3f502737161",
+      "pid": 23194,
+      "pgid": 23194,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-lamp_voice-a3d1fdb9e2/ignored.json",
+      "sha256": "0e364e392ecd41984917f44cd613ce02925af56ca5a6c695125c6fea7a075940",
+      "pid": 23196,
+      "pgid": 23196,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-lamp_voice-a3d1fdb9e2/all.json",
+      "sha256": "b9324e461a44fea7cf9de2dbfcf54754185bbd1f38773193903b0a1b8f88faae",
+      "pid": 23195,
+      "pgid": 23195,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-lean-lamp_lean-39d2562c9d/file.json",
+      "sha256": "4daf66762f3813030e195b5afb4d36d4003d10f954bbd8dfaf4b3ee24521ee4f",
+      "pid": 23058,
+      "pgid": 23058,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-lean-lamp_lean-39d2562c9d/ignored.json",
+      "sha256": "7aac1868180d2f547405346c93963afdebd4d417b61f82c9ae3e5afb85dd3061",
+      "pid": 23060,
+      "pgid": 23060,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-lean-lamp_lean-39d2562c9d/all.json",
+      "sha256": "b15dce03ad0e4d42c9c01df320beac31997c55a8f0fb13a93d82d35ff0981b3f",
+      "pid": 23059,
+      "pgid": 23059,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-install-cba8be07eb/file.json",
+      "sha256": "892d08066746fe1aa8363522d8708dbbbca88d7c99b1a401a811e998b7b7d2cb",
+      "pid": 22921,
+      "pgid": 22921,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-install-cba8be07eb/ignored.json",
+      "sha256": "4104e61a31fb1c6f39c59da8b7c11dafd954724d737c170d345dcab2504507f2",
+      "pid": 22924,
+      "pgid": 22924,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-install-cba8be07eb/all.json",
+      "sha256": "4e5eeada4205e0789f60327790872ddcbe81149bd12eb125a83226aec22dd112",
+      "pid": 22923,
+      "pgid": 22923,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-lamp-voice-eval-552f0a770a/file.json",
+      "sha256": "bc2d515c6f6bb3a0fafbdb6c3463a64ad6d704cf2762af7c59f26ff24f45a414",
+      "pid": 22129,
+      "pgid": 22129,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-lamp-voice-eval-552f0a770a/ignored.json",
+      "sha256": "c34ec78775c74e71cc2608a65c457cb4d88daa3017125519f876e0657f716115",
+      "pid": 22131,
+      "pgid": 22131,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-lamp-voice-eval-552f0a770a/all.json",
+      "sha256": "a30c791ddd1f0a7db7ccaee03279e985421650a615b4f27f65051ee9d87b4493",
+      "pid": 22130,
+      "pgid": 22130,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-lamp-setup-73cfbd12d3/file.json",
+      "sha256": "04e9fc9ca5d9deb831541dd5f99a9a6f03c00a072c1dcd9234d48801c0f3eb4b",
+      "pid": 23017,
+      "pgid": 23017,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-lamp-setup-73cfbd12d3/ignored.json",
+      "sha256": "94e7ef57f5ddf035759e2c471d867ea3fa81c991ddbbe3856f81eb5ac4dc76fa",
+      "pid": 23025,
+      "pgid": 23025,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-setup-lamp-setup-73cfbd12d3/all.json",
+      "sha256": "815016082cbb9c678fe071ae563cbdc021d689f042711b3a6ee4bb970ccf4aad",
+      "pid": 23019,
+      "pgid": 23019,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-health_control-2a06436a6f/file.json",
+      "sha256": "df342283abda731f78bfc53363e7b470ecf3d4983c6bb54da86703005577c2c9",
+      "pid": 22867,
+      "pgid": 22867,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-health_control-2a06436a6f/ignored.json",
+      "sha256": "6ddc09a7e8d0439afd8daf5a95b1c02389816277d77509711361db851e1961e0",
+      "pid": 22869,
+      "pgid": 22869,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-health_control-2a06436a6f/all.json",
+      "sha256": "7dec58b91e8c3671ca36a1c9fec2fb3818216fa3930929bc36e5fec15a89c784",
+      "pid": 22868,
+      "pgid": 22868,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-release_pair-43eb7a3139/file.json",
+      "sha256": "4783da907a39f81552a67fdb4fd6ca04841ea16724d0bda6f0f2e094ef3a58a9",
+      "pid": 22965,
+      "pgid": 22965,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-release_pair-43eb7a3139/ignored.json",
+      "sha256": "0018f656afdd24be430248bbba99d238920120bfa63daa35c3c8589c6bed4b84",
+      "pid": 22967,
+      "pgid": 22967,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-release_pair-43eb7a3139/all.json",
+      "sha256": "7885b92da30e549343ef36d2ea5804c3a05cc73d3d8f2877337ebe3650ce3b26",
+      "pid": 22966,
+      "pgid": 22966,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-keeper-lamp-keeper-908eab89b2/file.json",
+      "sha256": "3f14444897a40cc3c535d780fc55f0e050889fedbef6654c3b2bd8889edad0f4",
+      "pid": 23164,
+      "pgid": 23164,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-keeper-lamp-keeper-908eab89b2/ignored.json",
+      "sha256": "b97860acdc4d5c2781ff51451bc943cb71acba6055d39302ccc06f4ee7e97867",
+      "pid": 23174,
+      "pgid": 23174,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-keeper-lamp-keeper-908eab89b2/all.json",
+      "sha256": "e5831aa0bd69150a9f8eae4fb8a4cdb9719da4bb7c30b1f3b67e6c789e41752e",
+      "pid": 23165,
+      "pgid": 23165,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-peek-c8ce01d372/file.json",
+      "sha256": "7f42aa0fd06b9621c656e094151b1a30bd9b2a026892fb243ecf5ab4f1049c8d",
+      "pid": 22109,
+      "pgid": 22109,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-peek-c8ce01d372/ignored.json",
+      "sha256": "8bd2d56e2175a185dca18cd2a2930bddd54c00abfba1292321e695306f8ca05f",
+      "pid": 22116,
+      "pgid": 22116,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-peek-c8ce01d372/all.json",
+      "sha256": "7e03967293a2fc3c13fb3365068b6e03f93838e96ed80e4e3bc8cca95705aefe",
+      "pid": 22110,
+      "pgid": 22110,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forgot-b5ddf53671/file.json",
+      "sha256": "7011484b423f2dc4ab1fb30e3dde533c2e3f6a6e9f64643a9989f33cb7697cda",
+      "pid": 22925,
+      "pgid": 22925,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forgot-b5ddf53671/ignored.json",
+      "sha256": "d63edfc5203da3b0401168e0e556dcb1d27e3a53410c5ddfe402870430e8c197",
+      "pid": 22927,
+      "pgid": 22927,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forgot-b5ddf53671/all.json",
+      "sha256": "fc512e3f8c37a31467f0bba905d5fea1d173729451917a1e8de421df7ad18cf1",
+      "pid": 22926,
+      "pgid": 22926,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_since_until-2e7c1fca57/file.json",
+      "sha256": "adcbd97af81a4e11aeffb930e8172cf0371dda16b00fa55863abff434ffe9e55",
+      "pid": 22975,
+      "pgid": 22975,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_since_until-2e7c1fca57/ignored.json",
+      "sha256": "4f1c437e217188941cee733b9df7b163f7215938114f8656cb27cb128a149bb8",
+      "pid": 22985,
+      "pgid": 22985,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_since_until-2e7c1fca57/all.json",
+      "sha256": "59e179905fb9bd286b4a645d3134b3f7cfdeaea7738caa766b550d5e424d5f01",
+      "pid": 22976,
+      "pgid": 22976,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-round-44267a07a9/file.json",
+      "sha256": "6fad0bcbdf567050e5792bad55409d947a98e77466600c5bec0d8f6e32e1448f",
+      "pid": 22970,
+      "pgid": 22970,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-round-44267a07a9/ignored.json",
+      "sha256": "9f9967798f0e0b48ebaa8b88f434289bc0a5b144ff91772e1bca77106d6be512",
+      "pid": 22973,
+      "pgid": 22973,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-round-44267a07a9/all.json",
+      "sha256": "8a25a019fdd3ee500fe39f6029d7cc9a9a596a687c02a3b51ec5cdc8895179eb",
+      "pid": 22971,
+      "pgid": 22971,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-requested_audio-4b82d5ac76/file.json",
+      "sha256": "055be77b5a3248f5e5ae4142ea2a435cd68f534c242a2682e3f82b86956c4dfe",
+      "pid": 22986,
+      "pgid": 22986,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-requested_audio-4b82d5ac76/ignored.json",
+      "sha256": "571a8268313d92a94198f825f34dba2e5079356c5eb06c8cb5d3512a08360871",
+      "pid": 22994,
+      "pgid": 22994,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-requested_audio-4b82d5ac76/all.json",
+      "sha256": "541ae42b17823edb757dc81153f33d9d6320f91793b540109736e3b9db54814b",
+      "pid": 22987,
+      "pgid": 22987,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-self-cli-exec-ef30b2ded9/file.json",
+      "sha256": "17e2c5a827e075139105cc476fbe24b7ec6d04e06487af25e807514e1d41583a",
+      "pid": 22846,
+      "pgid": 22846,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-self-cli-exec-ef30b2ded9/ignored.json",
+      "sha256": "f497f051509b5fdd1963e6c6350132d833aaf8638cd2c3f23640f9f434a854f7",
+      "pid": 22848,
+      "pgid": 22848,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-update-self-cli-exec-ef30b2ded9/all.json",
+      "sha256": "ff1c2052023dfed7a99a65866d8019d435fc36bc8279c65b7e9eb2ff4134ed5f",
+      "pid": 22847,
+      "pgid": 22847,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-lamp_skills-7985bdc2f0/file.json",
+      "sha256": "83de0cfacec5e56b8c5191bc5768d474c2a4c85b4a236acb3cb75af1cdf7e43e",
+      "pid": 22675,
+      "pgid": 22675,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-lamp_skills-7985bdc2f0/ignored.json",
+      "sha256": "d896e138aed2b52593565a6381a90668540ab5409a603773a2599fece2babc3e",
+      "pid": 22695,
+      "pgid": 22695,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-skills-lamp_skills-7985bdc2f0/all.json",
+      "sha256": "292d6b139c93ba466270918fc89c329454390ea55165c91647af375ca753515b",
+      "pid": 22676,
+      "pgid": 22676,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-it-b42eeccdd2/file.json",
+      "sha256": "7d0cf4c6dd93038e1e9e58bf0ebbf6c7cb51198727eac2d3faae73ec003985d8",
+      "pid": 22132,
+      "pgid": 22132,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-it-b42eeccdd2/ignored.json",
+      "sha256": "045109f0a6e0ac47d6540f426b5026c0349ca6b87f01c79cc1d02ef9d17d2317",
+      "pid": 22134,
+      "pgid": 22134,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-voice-eval-it-b42eeccdd2/all.json",
+      "sha256": "9caf04e77e78b53d01f57559fb192d8f042241b95a9faeeb6e009ff568753925",
+      "pid": 22133,
+      "pgid": 22133,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-worker-6b2897cf8f/file.json",
+      "sha256": "0faac3c6087e54eb32418ea497154e5a1c0946ee36f45a0b2170bde3d1e8059f",
+      "pid": 23107,
+      "pgid": 23107,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-worker-6b2897cf8f/ignored.json",
+      "sha256": "16d74dbb2f02b59f1e3ec5c9d3c6dd452a3fd838a55e8106696375ebdb09af11",
+      "pid": 23119,
+      "pgid": 23119,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-worker-6b2897cf8f/all.json",
+      "sha256": "3334544b72e6e15f3bbd20fd9c510b05526e34726e3e16715498d8f9a28e5010",
+      "pid": 23108,
+      "pgid": 23108,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_early_words-1aaa453ebc/file.json",
+      "sha256": "9e7f9a2003d07c7062ccbf358e8718440ce64d6b2f2dcf632c54e88e4806dd7f",
+      "pid": 22873,
+      "pgid": 22873,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_early_words-1aaa453ebc/ignored.json",
+      "sha256": "2c3b8c401c09614f247b8f5ff1f5dca5c13f6fbe6304b286bf5d6807f4dc4f0f",
+      "pid": 22880,
+      "pgid": 22880,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_early_words-1aaa453ebc/all.json",
+      "sha256": "e87414910d4e049cd545f24795bfec9b4e75ec4ef381e2e76f9afbb677c3d70c",
+      "pid": 22874,
+      "pgid": 22874,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-paraphrase_fixture-ac10fcab96/file.json",
+      "sha256": "b359adc20184407b56a74e655bbfd2e0d2c21b5c542700a3f2059df040b1a212",
+      "pid": 22752,
+      "pgid": 22752,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-paraphrase_fixture-ac10fcab96/ignored.json",
+      "sha256": "36f8a368f29750ef8e2129ff184b338126a2a91e8c792940b155a5bda6bafcb8",
+      "pid": 22786,
+      "pgid": 22786,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-paraphrase_fixture-ac10fcab96/all.json",
+      "sha256": "9c1c0ee4ef9e084cf28b82a40abf71ba1e9c4a8dfa23f9c407ce4a5992a92d48",
+      "pid": 22762,
+      "pgid": 22762,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-975f1bb9b5/file.json",
+      "sha256": "1e4bff49ed58e68b88fad3fccf98eefd623abf65fa1cf769192ae9877bdfb3e3",
+      "pid": 23089,
+      "pgid": 23089,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-975f1bb9b5/ignored.json",
+      "sha256": "40c8a71383b7998c89beca7345b49f8fa508806dee9fbab3bc0eda1f41bb067b",
+      "pid": 23095,
+      "pgid": 23095,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-975f1bb9b5/all.json",
+      "sha256": "0f2c173b89020a87fbb1ae69707793d353608328bd90bc7810b5d5c4c30bacc4",
+      "pid": 23090,
+      "pgid": 23090,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-lamp-peek-455757ea4d/file.json",
+      "sha256": "1c03b52d990991dea7538537e807ae5f518a5bd3a39e8b1c88212f76def48ecf",
+      "pid": 22084,
+      "pgid": 22084,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-lamp-peek-455757ea4d/ignored.json",
+      "sha256": "0de685b943220132914116d287d79f8b800ff310cee599b12323ec05f995aa37",
+      "pid": 22099,
+      "pgid": 22099,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-peek-lamp-peek-455757ea4d/all.json",
+      "sha256": "53b567364e8b861393bb5654f2ba545b4538247bacc8f0941d49ef4dc890d97b",
+      "pid": 22085,
+      "pgid": 22085,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_link_used-e20298e0e1/file.json",
+      "sha256": "59a03faf7a597f2dcc9879d093072e8206f34026a5cf781abb0ebc8ea0e6f112",
+      "pid": 22916,
+      "pgid": 22916,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_link_used-e20298e0e1/ignored.json",
+      "sha256": "00459c7e795accab721eeb6c1e0b01a50110d1fc9944e77b9eca5494228c85b2",
+      "pid": 22920,
+      "pgid": 22920,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-voice_link_used-e20298e0e1/all.json",
+      "sha256": "2e1867f8a7fedac30570ad0ef8eb616be2238ad93f4b2a4717284582d1cf900e",
+      "pid": 22919,
+      "pgid": 22919,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forget_person-0d76ff0b52/file.json",
+      "sha256": "5da384e4d2ce45b71e2098fc6220b8f9695926e54611183b823c078ef5f14d31",
+      "pid": 22198,
+      "pgid": 22198,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forget_person-0d76ff0b52/ignored.json",
+      "sha256": "f8a80ef6a281bfda0f282ad844b839f85a701b3e88aa8792cfe4e795ee24e207",
+      "pid": 22216,
+      "pgid": 22216,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-memory-forget_person-0d76ff0b52/all.json",
+      "sha256": "58fc37d8847ce8927937b97029435ea4fd796add99c5e690c2637fa9b58aab0a",
+      "pid": 22199,
+      "pgid": 22199,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-inspect-42a360028b/file.json",
+      "sha256": "9c8276e51be8f91036e50d9c6a566f1402a5079331ad29ba17bc821fbe732566",
+      "pid": 23145,
+      "pgid": 23145,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-inspect-42a360028b/ignored.json",
+      "sha256": "770e3f181fdabf7b97d6980177befe6a00de99c77421cd24d063e8af9c64a4b1",
+      "pid": 23153,
+      "pgid": 23153,
+      "exit": 0,
+      "group_absent": true
+    },
+    {
+      "record": "tests/compiled-census/lamp-body-lamp-body-inspect-42a360028b/all.json",
+      "sha256": "77940b3f2fcb9cbade714432dea49c2b179b3301413d7f35b3b09b8d6d48fb07",
+      "pid": 23147,
+      "pgid": 23147,
+      "exit": 0,
+      "group_absent": true
+    }
+  ],
+  "no_extra_observation_or_retry": true,
+  "global_load_or_cause_claim": false,
+  "historical_source_epoch": "20874923d on4270083a; not public8db carry qualification"
+}

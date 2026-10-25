@@ -1,0 +1,150 @@
+{
+  "scope": "Evidence plans/approvals/receipts/releases/terminal/results JSON only; no .git or user directories",
+  "references": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/results.json",
+      "SHA-256": "b7a85c2ac08bb62e79c38149ebdf853259dedab8dacc3df969eed791a89a9e73",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": true,
+      "status": "all stages completed; actual test failures retained, not green",
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/plan.json",
+      "SHA-256": "ca6de9a30817b7c22fd7c1213dddec07d600f5549d3f6575d950949789622e31",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/results.json",
+      "SHA-256": "a1dd03ff40cfe70acfcad2cb9998079ce8d745b1727a6c24d2c5fadf85b4e7b9",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": true,
+      "status": "all stages completed; actual test failures retained, not green",
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/CPU-target-release.json",
+      "SHA-256": "a3a3356399dbbe880fe25e80470dccee44738783b30c61a1d0e3d49b52edb608",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/plan.json",
+      "SHA-256": "2b415f7a9874b45aadeb1eaf68137d78180383379f1e3cea40ca3dd3f3211d7e",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/run-2026-10-24T152956.123386+0000/root-release-receipt.json",
+      "SHA-256": "e94e9f660ee268eb782cd17d158aaf30f8fd3d27fe1ff9a0a71f7574e2659601",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-setup-order-prep/applied-43ac6c843/controller/plan.json",
+      "SHA-256": "28bad2d1e762060aabed81e8f822ab71ac4487c26dd7aa3e0695d2a5d7e5b8a3",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleeping-service-source-design/reproduction-prep/applied-43ac6c843/controller/plan.json",
+      "SHA-256": "4860766a04be36de031529d9890729d8957da20af1792ecda5d7efa147017d3e",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleeping-service-source-design/reproduction-prep/applied-43ac6c843/shared-target-control/plan.json",
+      "SHA-256": "f176b21bd3f6c629f00e87307cacb77e54bd825d26ab8265e37b025e23e8a0a1",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/planned-nine-standalones/plan.json",
+      "SHA-256": "e1a00d94a75dce69231572bef618fdbc61f874b5eb23e23a497d17a08ca37bba",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-publication-private/tests-no-pause-qualification-20261024/source-and-plan/plan.json",
+      "SHA-256": "2b415f7a9874b45aadeb1eaf68137d78180383379f1e3cea40ca3dd3f3211d7e",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-canonical-fullgate-prep/run-2026-10-24T163223.939807+0000/CPU-target-release.json",
+      "SHA-256": "9dd4c364927b9c7954f06524a0c3e836b1faa43fc2487380f3f2889eaae0eec6",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-publication-private/tests-no-pause-qualification-20261024/nine/frozen-case-plan.json",
+      "SHA-256": "e1a00d94a75dce69231572bef618fdbc61f874b5eb23e23a497d17a08ca37bba",
+      "execution authorized field": false,
+      "source only field": true,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": true
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-publication-private/tests-no-pause-qualification-20261024/full/CPU-target-release.json",
+      "SHA-256": "9dd4c364927b9c7954f06524a0c3e836b1faa43fc2487380f3f2889eaae0eec6",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": null,
+      "status": null,
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-publication-private/tests-no-pause-qualification-20261024/full/results.json",
+      "SHA-256": "a1dd03ff40cfe70acfcad2cb9998079ce8d745b1727a6c24d2c5fadf85b4e7b9",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": true,
+      "status": "all stages completed; actual test failures retained, not green",
+      "current target not read or needed": null
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-fc31-current-publication-prep/historical-full-failed/results.json",
+      "SHA-256": "b7a85c2ac08bb62e79c38149ebdf853259dedab8dacc3df969eed791a89a9e73",
+      "execution authorized field": null,
+      "source only field": null,
+      "terminal": true,
+      "status": "all stages completed; actual test failures retained, not green",
+      "current target not read or needed": null
+    }
+  ],
+  "not exhaustive": "Dynamic/environment-only consumers cannot be ruled out by text search."
+}

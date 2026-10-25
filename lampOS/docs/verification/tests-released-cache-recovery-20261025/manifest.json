@@ -1,0 +1,155 @@
+{
+  "copied files": [
+    {
+      "packet file": "raw/cleanup/plan.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/plan.json",
+      "bytes": 4508,
+      "SHA-256": "7dc7035aa3be752ae67309bfaa4023c3dd4a5744b90b784034fca44faeedb6c1"
+    },
+    {
+      "packet file": "raw/cleanup/target-executable-inventory.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/target-executable-inventory.json",
+      "bytes": 104694,
+      "SHA-256": "013ba9eb241cbbd7e2d79d15c59321d01955348bfe6cfb33361470ce76371bf3"
+    },
+    {
+      "packet file": "raw/cleanup/cloud-source-guard.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cloud-source-guard.json",
+      "bytes": 3484762,
+      "SHA-256": "646fb0cd77fb81c01dc2887e97e2e092d5edac035de55abca4e8f8f9ef2807d8"
+    },
+    {
+      "packet file": "raw/cleanup/external-99-bindings.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/external-99-bindings.json",
+      "bytes": 230996,
+      "SHA-256": "78a4b26b4fa0cb9caa1018c50222bee4cc1ca01c68ef364908d4531dba1ffa92"
+    },
+    {
+      "packet file": "raw/cleanup/root-preflight-approval.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/root-preflight-approval.json",
+      "bytes": 516,
+      "SHA-256": "b00e3373f964377fb3f780b42703b035fc243c7cadb3198b7a7fcaaebc588c6b"
+    },
+    {
+      "packet file": "raw/cleanup/root-cleanup-approval.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/root-cleanup-approval.json",
+      "bytes": 1225,
+      "SHA-256": "054847947741716ae5cf85ba672d7b772cbbbd820057b0b921115475b5d2aef8"
+    },
+    {
+      "packet file": "raw/cleanup/preflight-consumed.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/preflight-consumed.json",
+      "bytes": 168,
+      "SHA-256": "000a028cb7823dad81108f5aca08d250e61ac8ee5f9162b86fd0f64eec183c90"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-consumed.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-consumed.json",
+      "bytes": 166,
+      "SHA-256": "0dcbc66dc861581b2891258289d80c218e408b22984c5024fcee34ee877e5517"
+    },
+    {
+      "packet file": "raw/cleanup/preflight-terminal.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/preflight-terminal.json",
+      "bytes": 2027,
+      "SHA-256": "2cd2f841a34961d37033e4705bc64afad38c440798f14eb4dcb33f713a5ba0c1"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-terminal.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-terminal.json",
+      "bytes": 3073,
+      "SHA-256": "139538fa670cdbf80d5157cdcae993efa722cad1a937cff78ff3604d88edce9b"
+    },
+    {
+      "packet file": "raw/cleanup/preflight-records/pinned-cargo-version.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/preflight-records/pinned-cargo-version.json",
+      "bytes": 1159,
+      "SHA-256": "24b3b191f9956164bb36035ee067057c3bd390be899eabc7f6cd52f605946120"
+    },
+    {
+      "packet file": "raw/cleanup/preflight-records/pinned-cargo-version.stdout.txt",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/preflight-records/pinned-cargo-version.stdout.txt",
+      "bytes": 36,
+      "SHA-256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068"
+    },
+    {
+      "packet file": "raw/cleanup/preflight-records/pinned-cargo-version.stderr.txt",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/preflight-records/pinned-cargo-version.stderr.txt",
+      "bytes": 0,
+      "SHA-256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-records/absolute-pinned-clean-only.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-records/absolute-pinned-clean-only.json",
+      "bytes": 1336,
+      "SHA-256": "759c9cf028f209b3969c58149d0fdcd8d5f1d3ad47c7ac5ea29f7c875a489f86"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-records/absolute-pinned-clean-only.stdout.txt",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-records/absolute-pinned-clean-only.stdout.txt",
+      "bytes": 0,
+      "SHA-256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-records/absolute-pinned-clean-only.stderr.txt",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-records/absolute-pinned-clean-only.stderr.txt",
+      "bytes": 39,
+      "SHA-256": "76b835553e0391e92618d87d0e429093440ed705907abab771ba5f6e1f4cad88"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-records/cleanup-only-disk-decision.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-records/cleanup-only-disk-decision.json",
+      "bytes": 323,
+      "SHA-256": "8f26f764952b973dada3c7cb6851d3152e5ac3881b0ae2faf3747e59ee781a5d"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-records/consumer-check-safe.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-records/consumer-check-safe.json",
+      "bytes": 172,
+      "SHA-256": "e815bf93ca77d4818db19d28cbd1d62e6f1da6b7025cd0d6351f58e21d2a9001"
+    },
+    {
+      "packet file": "raw/cleanup/cleanup-records/all-321-clone-bindings.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-cleanup-prep/cleanup-records/all-321-clone-bindings.json",
+      "bytes": 383676,
+      "SHA-256": "2dfe3faa81372b397e8ca5d446659f07c9606120837c76bc5585acebfc582d09"
+    },
+    {
+      "packet file": "raw/audit/assessment.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-release-audit/assessment.json",
+      "bytes": 3624,
+      "SHA-256": "85d22c468712e577f35884e08dc9d18424decf45257737bbf6afe3b7a5984826"
+    },
+    {
+      "packet file": "raw/audit/process-census-safe.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-release-audit/process-census-safe.json",
+      "bytes": 402,
+      "SHA-256": "07112451b0ddae695c67b92e3f7a53bf881e46d1ce00c2a1baf0f04c969f135e"
+    },
+    {
+      "packet file": "raw/audit/reference-scan.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-release-audit/reference-scan.json",
+      "bytes": 8050,
+      "SHA-256": "ad0dd2f689257d48d69451cb68ea45b0fb69103ca8958028009006a6e4a22aa4"
+    },
+    {
+      "packet file": "raw/audit/old-208-witness-verification.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/root-old-cargo-cache-release-audit/old-208-witness-verification.json",
+      "bytes": 48148,
+      "SHA-256": "58939590e9785b5cf6781eb43036fd134766df235f39a96a31e43eab7eed1bad"
+    },
+    {
+      "packet file": "raw/previous-owner/CPU-target-release.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/CPU-target-release.json",
+      "bytes": 578,
+      "SHA-256": "58b9ff006b3115332bae7ed16c93c275f124ca2f91309bb0012f8fb32bad78c4"
+    },
+    {
+      "packet file": "raw/previous-owner/closed-run-review.json",
+      "original file": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/closed-run-review.json",
+      "bytes": 66607,
+      "SHA-256": "73802220aabca0bbc797ef3c482e143f6099b777f06d744fa9599fe673630463"
+    }
+  ],
+  "copied file count": 25
+}

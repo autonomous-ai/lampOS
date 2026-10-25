@@ -1,0 +1,59 @@
+{
+  "phase": "preflight",
+  "success": true,
+  "cleanup_launched": false,
+  "source_before": {
+    "paths": 10460,
+    "guard_sha256": "646fb0cd77fb81c01dc2887e97e2e092d5edac035de55abca4e8f8f9ef2807d8"
+  },
+  "native_call_binding": {
+    "library": "/usr/lib/libSystem.B.dylib",
+    "symbol": "clonefile",
+    "argtypes": [
+      "const char *",
+      "const char *",
+      "uint32_t"
+    ],
+    "flags": 0,
+    "no_fallback": true
+  },
+  "version": {
+    "command": [
+      "/Users/autonomous/.cargo/bin/cargo",
+      "+1.96.0",
+      "--version"
+    ],
+    "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cloud-ack-events/lampOS",
+    "started_at": "2026-10-25T01:09:40.870106+00:00",
+    "timeout_seconds": 60,
+    "stdout": "pinned-cargo-version.stdout.txt",
+    "stderr": "pinned-cargo-version.stderr.txt",
+    "timeout_cleanup": [],
+    "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+    "owned_pid": 71227,
+    "owned_process_group": 71227,
+    "timed_out": false,
+    "exit_code": 0,
+    "unexpected_residual_group_after_normal_exit": false,
+    "direct_status_before_cleanup": 0,
+    "owned_group_present_before_cleanup": false,
+    "direct_wait_status": 0,
+    "owned_group_absent_after_cleanup": true,
+    "wall_seconds": 0.045988,
+    "finished_at": "2026-10-25T01:09:40.916174+00:00",
+    "stdout_sha256": "b6ef6807dd96d18b833474ad68e7a23a29e562a29c67afa71a59fb9a73df0068",
+    "stdout_bytes": 36,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0
+  },
+  "source_after": {
+    "paths": 10460,
+    "guard_sha256": "646fb0cd77fb81c01dc2887e97e2e092d5edac035de55abca4e8f8f9ef2807d8"
+  },
+  "target_unchanged": true,
+  "external_witnesses": {
+    "verified_count": 99,
+    "bindings_sha256": "78a4b26b4fa0cb9caa1018c50222bee4cc1ca01c68ef364908d4531dba1ffa92"
+  },
+  "finished_at": "2026-10-25T01:09:51.346554+00:00"
+}

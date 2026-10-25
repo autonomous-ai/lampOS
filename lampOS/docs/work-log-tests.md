@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-25 08:28 — Released cache recovered; Hand controls complete
+
+Ready for lamp-voice: no for the current repairs
+
+[Closed cache recovery proof](verification/tests-released-cache-recovery-20261025/) preserves all321 current executable snapshots by no-fallback Darwinclonefile, with original/new bytes/modes/inodes/mtimes and readonlybindings. All99 external original witnesses and10,460sourcepaths verify before/after; oldowner209groups wereclosed, futurelivecacheexpectations explicitlyretired. ExactCargo clean native24124 exited0 in7.689987s, ownedgroupabsent/leasegone. Free26.098GiB already existed atgrant, so earlier recovery is not credited to this clean; postclean31.554GiB is a time-bound observation, not isolated reclamation. Rawstreams/commands/grants/terminals/consolidated321bindings arepublished; redundantindividualcloneJSONs, binaries and scriptbodies are omitted explicitly. No test/compiler/source/other-target cleanup occurred; protectedNoPause/debug2 remains.
+
+Hand’s fixed2observations passedonceeach, baseline1/0 andcandidate1/0, matching440caseinventories. Root verified13commands/26streams, selectedfresh:false/profiletesttrue, distinctfrozenexecutables, dependency/profile/outputparity andclosedsource-restoration/cleanup. Earlierfc31 0/3 is not reproduced; no cause/speed/waiver. Fullrawpacket preparation continues while the candidate is carried before literal12packagegates. Skills journal source is nowseparatelypreparedoncurrent0ee atREC/skills-addon-journal: source15db11e184, docs9cc69d24b6, exactfileformatcheck0 afteroneassertreflow; priorWT remainsunchanged. No new Skills compile/test. BodyHand retains its released2joblane; Second/readers retain the otherlane.
+
+
 ## 2026-10-25 08:01 — Cloud landed; Skills observer repair prepared
 
 Ready for lamp-voice: yes (#3410, landed through train #3429)

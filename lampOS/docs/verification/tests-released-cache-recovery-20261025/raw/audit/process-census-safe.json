@@ -1,0 +1,7 @@
+{
+  "process census exit": 0,
+  "target reference processes": [],
+  "Rust tool processes safe projection": [],
+  "raw command lines or environments saved": false,
+  "limitation": "Single snapshot only; target selection may be inherited through environment/cwd and absence of literal path does not prove no consumer. Exclusive no-new-consumer lease and known owned allocation closure still required."
+}

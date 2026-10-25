@@ -1,0 +1,34 @@
+{
+  "status": "No clean/copy grant exercised. Release is conditional on a new exclusive lease and verified clone backup.",
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target",
+  "target is symlink": false,
+  "canonical owner lock absent": true,
+  "last reviewed owner": {
+    "native session": 23013,
+    "terminal exit": 1,
+    "owned command groups closed": 209,
+    "release receipt": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/no-pause-current-20874923d-fullgate-prep/run-2026-10-24T181802.216070+0000/CPU-target-release.json",
+    "release receipt SHA-256": "58b9ff006b3115332bae7ed16c93c275f124ca2f91309bb0012f8fb32bad78c4"
+  },
+  "executable path count": 321,
+  "executable logical bytes": 1986637448,
+  "unique executable inode count": 321,
+  "hardlink count one for every inventoried executable": true,
+  "99 prior current-208 external witnesses independently SHA/full-mode verified": true,
+  "evidence and target same filesystem device": true,
+  "no-race limitation": "One privacy-filtered process snapshot found no literal target consumers and no Cargo/Rustc/Clippy/rustfmt. This is not a global absence claim or future no-consumer guarantee. Root must hold the exact target no-new-consumer lease throughout snapshot/backup/verification/clean.",
+  "required before clean": [
+    "Root confirms all planned current/future readers use frozen external witnesses or fresh other targets, and supersedes any old target-restoration expectation explicitly.",
+    "Acquire the exact old-target exclusive lease; verify no known owner allocation or target restoration is active, with existing closure receipts. Do not clean or inspect protected pr-head/debug2 targets.",
+    "Back up all 321 current executable paths outside target, preserving every relative path plus source SHA-256, full mode, device/inode/link count, bytes and mtime. Before/after source identity checks must reject any change.",
+    "Use a same-filesystem clone operation with verified no-copy-fallback behavior; do not assume cp -c exit success or distinct inode proves copy-on-write. Abort on unsupported clone, space failure or any source/destination mismatch; no silent fallback.",
+    "Verify every copied executable hash/full mode and path count against the sealed inventory before supported Cargo clean. Preserve original and saved modes separately if copies are made read-only.",
+    "Bind all old raw streams/source maps/consumptions/release receipts and the 99 already-external witnesses; only this reconstructible target is deleted. Backup is of current post-workspace bytes, not reconstructed original test CLIs.",
+    "Authorize separately supported absolute pinned Cargo clean --offline --locked --target-dir <exact target>, with bounded owned cleanup. The generic 5GiB build/test reserve must not be lowered for future builds; if its guard refuses cleanup, preserve the refusal and use a reviewed cleanup-only decision as for Cloud.",
+    "Retain backup and receipt after clean, verify target outcome, no owned group remains, free space and unchanged source/raw/witness guards. No new test or compiler execution follows without a fresh grant."
+  ],
+  "commands proposed only": [
+    "/Users/autonomous/.cargo/bin/cargo +1.96.0 clean --offline --locked --target-dir /Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/cargo-target"
+  ],
+  "mutations performed": "Private text evidence only. No target/source/Git mutation, copying, Cargo or executable test launch."
+}

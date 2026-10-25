@@ -1,0 +1,6 @@
+{
+  "scope": "Supported clean of the exact retired cache may run below5GiB only after root execution grant; no compile/test/build or cleanup of other targets. Future build/test reserve remains5368709120 bytes.",
+  "approved": true,
+  "future_build_test_reserve_bytes": 5368709120,
+  "actual_available_bytes": 27566317568
+}
