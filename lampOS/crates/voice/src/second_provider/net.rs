@@ -153,12 +153,56 @@ async fn post(
     auth: (&'static str, &str),
     body: &serde_json::Value,
 ) -> Result<reqwest::Response> {
+    post_guarded(
+        client,
+        url,
+        auth,
+        body,
+        None,
+        #[cfg(test)]
+        None,
+    )
+    .await?
+    .ok_or(Error::Transport("request permission"))
+}
+
+/// Serialization completes before the final authority check. Pending keeps this
+/// exact request; cancellation drops it, and no body/declaration is rebuilt.
+async fn post_guarded(
+    client: &reqwest::Client,
+    url: &str,
+    auth: (&'static str, &str),
+    body: &serde_json::Value,
+    permitted: Option<&super::services::ChatPermission>,
+    #[cfg(test)] first_send_poll: Option<&std::sync::atomic::AtomicUsize>,
+) -> Result<Option<reqwest::Response>> {
     let request = client
         .post(url)
         .header(auth.0, auth.1)
         .header("content-type", "application/json")
         .body(body.to_string());
-    let response = tokio::time::timeout(CONNECT + STALL, request.send())
+    if let Some(permitted) = permitted
+        && !super::services::wait_permitted(permitted).await
+    {
+        return Ok(None);
+    }
+    let sending = request.send();
+    #[cfg(test)]
+    let sending = {
+        use std::future::Future;
+        let mut sending = Box::pin(sending);
+        let mut first = true;
+        std::future::poll_fn(move |cx| {
+            if first {
+                first = false;
+                if let Some(count) = first_send_poll {
+                    count.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+                }
+            }
+            sending.as_mut().poll(cx)
+        })
+    };
+    let response = tokio::time::timeout(CONNECT + STALL, sending)
         .await
         .map_err(|_| Error::Timeout("request"))?
         .map_err(|error| {
@@ -184,7 +228,7 @@ async fn post(
         }
         return Err(Error::Status(status));
     }
-    Ok(response)
+    Ok(Some(response))
 }
 
 /// The most of a refusal's body [`refusal_head`] reads, and how long it waits.

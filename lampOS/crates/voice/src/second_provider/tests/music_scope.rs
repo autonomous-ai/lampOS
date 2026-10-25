@@ -12,6 +12,8 @@ const WITHIN: Duration = Duration::from_secs(3);
 fn context_for(person: Option<&str>) -> Told {
     match person {
         Some(person) => Told {
+            requires_speaker: false,
+            pending_private_context: false,
             text: format!("personal context for {person}"),
             after: Some("Private preference: the quiet recording.".into()),
             history: vec![
@@ -268,7 +270,9 @@ async fn prepared_music_for(speaker: &str, revoke: bool) {
         // Inspect the raw queue too: the final output filter must not hide
         // an offer incorrectly enqueued by a revoked answer.
         let mut outputs: Vec<_> = engine.urgent.drain(..).collect();
-        outputs.extend(std::iter::from_fn(|| engine.output.try_recv().ok()));
+        outputs.extend(std::iter::from_fn(|| {
+            engine.output.try_recv().ok().map(|queued| queued.event)
+        }));
         no_answer(&outputs);
         assert_eq!(script.asked.lock().unwrap().len(), before_reply);
         assert_eq!(script.chats.lock().unwrap().len(), 1);

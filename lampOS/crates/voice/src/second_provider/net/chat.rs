@@ -1,7 +1,7 @@
 //! A streamed OpenAI-compatible chat completion with function tools: text
 //! as it is written, then the tool calls the model asked for. The caller
 //! runs the tools and sends their results back as `tool` messages.
-use super::{Error, Result, chat_client, chunk, openai_base, post};
+use super::{Error, Result, chat_client, chunk, openai_base, post_guarded};
 use crate::second_config::SecondConfig;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -541,6 +541,26 @@ impl Chat {
         only: Option<&[&str]>,
         without: &[&str],
     ) -> Result<ChatStream> {
+        self.send_without_guarded(
+            messages,
+            only,
+            without,
+            None,
+            #[cfg(test)]
+            None,
+        )
+        .await?
+        .ok_or(Error::Transport("request permission"))
+    }
+
+    pub(crate) async fn send_without_guarded(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+        without: &[&str],
+        permitted: Option<&crate::second_provider::services::ChatPermission>,
+        #[cfg(test)] first_send_poll: Option<&std::sync::atomic::AtomicUsize>,
+    ) -> Result<Option<ChatStream>> {
         let body = self.body_without(messages, only, without);
         let asked = std::time::Instant::now();
         let before = self
@@ -554,13 +574,19 @@ impl Chat {
             .lock()
             .ok()
             .and_then(|mut last| last.replace(prefix));
-        let response = post(
+        let Some(response) = post_guarded(
             &self.client,
             &self.url,
             ("authorization", &self.auth),
             &body,
+            permitted,
+            #[cfg(test)]
+            first_send_poll,
         )
-        .await?;
+        .await?
+        else {
+            return Ok(None);
+        };
         // What was asked and how soon the service began to answer, without
         // words (#1712, the first builder at 18:26: the chat's first event
         // came in 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe).
@@ -572,7 +598,7 @@ impl Chat {
                 before.map(|at| asked.duration_since(at))
             ) + &prefix_told(prefix, prefix_before)
         );
-        Ok(ChatStream {
+        Ok(Some(ChatStream {
             response,
             lines: Lines::default(),
             deltas: Deltas::default(),
@@ -580,7 +606,7 @@ impl Chat {
             done: false,
             asked,
             first: None,
-        })
+        }))
     }
 }
 
