@@ -1,0 +1,28 @@
+{
+  "kind": "held",
+  "head": "e12583bfe7490a32c62f054b5b908a4bf87d7740",
+  "offered_head_before_carry": "c8be4d3375e71c8886073b3cc3f99971ff38d3a0",
+  "base": "14c64a8db1578ca3b5095b056463fbbf5aaebb3c",
+  "old_base": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "tree": "25475154f7bd4ea20c00ec8b3c78858c4c41b321",
+  "base_changed_paths": [
+    "lampOS/crates/body/src/unplug.rs",
+    "lampOS/docs/realtime-tests.md",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/README.md",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/SHA256SUMS",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/census.json",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/selected-outcomes.txt"
+  ],
+  "body_tree": "55d6c37301400e47df02ed2e43a92af8733ddfe8",
+  "range_diff": "1:  8baa7f573 = 1:  8a5b1180c lampOS: retain held voice constraints for each caller\n2:  cf86ded4a = 2:  da7d58075 lampOS: record current held-constraint carry gates\n3:  1926a5ca2 = 3:  6798530e2 lampOS: record held constraints on the landed parent\n4:  c4f16fbc9 = 4:  e3231bd33 lampOS: qualify held constraints on the current Body fixture base\n5:  c8be4d337 = 5:  e12583bfe lampOS: qualify held constraints with the landed reminder guard",
+  "qualified_head": "e12583bfe7490a32c62f054b5b908a4bf87d7740",
+  "tracked_source_records": 7097,
+  "source_map_sha256": "44d4c24847fb71d9874086a5bf080229467c90c2aca92e8f8f3013f8f91b5fed",
+  "body_production_prefix_unchanged": true,
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-body.log": "c8da9a753457c94e2c075fabb3d2bed1289c5ee39f140d5f6aa56496e83b4ece"
+  }
+}
