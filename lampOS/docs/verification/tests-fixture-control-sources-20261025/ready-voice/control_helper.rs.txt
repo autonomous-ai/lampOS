@@ -1,0 +1,93 @@
+    // Private control root: reserve exclusively, and never remove a replacement.
+    struct ConstructionRoot(Option<(std::path::PathBuf, u64, u64)>);
+    impl ConstructionRoot {
+        fn reserve(root: std::path::PathBuf) -> Self {
+            use std::os::unix::fs::MetadataExt;
+            fs::create_dir(&root).expect("exclusive diagnostic fixture root");
+            let metadata = fs::symlink_metadata(&root).expect("owned root identity");
+            assert!(metadata.is_dir() && !metadata.file_type().is_symlink());
+            eprintln!("READY-CONTROL root_reserved root={root:?} dev={} ino={}", metadata.dev(), metadata.ino());
+            Self(Some((root, metadata.dev(), metadata.ino())))
+        }
+        fn cleanup(&mut self) {
+            use std::os::unix::fs::MetadataExt;
+            if let Some((root, dev, ino)) = self.0.take() {
+                match fs::symlink_metadata(&root) {
+                    Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() && metadata.dev() == dev && metadata.ino() == ino => {
+                        let removed = fs::remove_dir_all(&root);
+                        eprintln!("READY-CONTROL root_cleanup root={root:?} dev={dev} ino={ino} identity_equal=true removed={removed:?} absent={}", !root.exists());
+                    }
+                    other => eprintln!("READY-CONTROL root_cleanup root={root:?} dev={dev} ino={ino} identity_equal=false no_removal=true actual={other:?}"),
+                }
+            }
+        }
+    }
+    impl Drop for ConstructionRoot {
+        fn drop(&mut self) { self.cleanup(); }
+    }
+    // Private diagnostic overlay, invoked only by the one selected existing case.
+    thread_local! {
+        static READY_CONTROL: std::cell::RefCell<Option<Vec<String>>> = const { std::cell::RefCell::new(None) };
+    }
+    pub(crate) fn control_record(value: impl FnOnce() -> String) {
+        READY_CONTROL.with(|slot| {
+            if let Some(rows) = slot.borrow_mut().as_mut() { rows.push(value()); }
+        });
+    }
+    struct ReadyControl {
+        cancel: Option<std::sync::mpsc::Sender<()>>,
+        worker: Option<std::thread::JoinHandle<()>>,
+        release: std::sync::mpsc::Receiver<std::time::Instant>,
+        entered: std::time::Instant,
+    }
+    impl ReadyControl {
+        fn begin() -> Self {
+            static ONCE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+            assert!(!ONCE.swap(true, Ordering::AcqRel), "one gate per process; no repetition");
+            READY_CONTROL.with(|slot| { assert!(slot.borrow().is_none()); *slot.borrow_mut() = Some(Vec::new()); });
+            let (cancel_tx, cancel_rx) = std::sync::mpsc::channel();
+            let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+            let (release_tx, release_rx) = std::sync::mpsc::channel();
+            let worker = std::thread::Builder::new().name("ready-setup-control".into()).spawn(move || {
+                let entered = std::time::Instant::now();
+                if entered_tx.send(entered).is_err() { return; }
+                // A deliberate intervention, never a test-completion condition.
+                let deadline = entered + Duration::from_millis(1100);
+                match cancel_rx.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now())) {
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => { let _ = release_tx.send(std::time::Instant::now()); }
+                    Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
+                }
+            }).unwrap();
+            let mut owned = Self { cancel: Some(cancel_tx), worker: Some(worker), release: release_rx, entered: std::time::Instant::now() };
+            // Construct RAII owner before any fallible receive.
+            owned.entered = entered_rx.recv_timeout(Duration::from_secs(5)).expect("controlled gate entered");
+            owned
+        }
+        fn hold(&mut self) {
+            let released = self.release.recv_timeout(Duration::from_secs(5)).expect("controlled gate released");
+            let held = released.duration_since(self.entered);
+            assert!(held >= Duration::from_millis(1100), "invalid intervention: {held:?}");
+            control_record(|| format!("gate held_us={} release_wall_ms={}", held.as_micros(), unix_ms()));
+            self.worker.take().unwrap().join().expect("gate worker joined");
+            self.cancel.take();
+        }
+        fn finish(&self, fixture: &Fixture, output: &Output, wall: u64) {
+            control_record(|| format!("step wall_ms={wall} counts accepted={} refused={} input_errors={} output_errors={} steps={} state={:?} light={:?} body={:?}", fixture.service.counts.accepted, fixture.service.counts.refused, fixture.service.counts.input_errors, fixture.service.counts.output_errors, fixture.service.counts.steps, output.state, output.light, output.body));
+            for input in &fixture.service.inputs {
+                control_record(|| format!("subscriber topic={} received={} expired={} repeated={} malformed={} wrong_type={}",input.topic(),input.statistics().received,input.expired(),input.repeated(),input.malformed(),input.wrong_type()));
+            }
+            // Post-step inspection does not consume a Subscriber or refresh a lease.
+            for topic in [VoiceTiming::TOPIC,lamp_body::unplug::REQUEST_TOPIC,lamp_body::unplug::STATE_TOPIC,"expression/unplug_state"] {
+                control_record(|| format!("retained topic={topic} inspected_wall_ms={} message={:?}",unix_ms(),fixture.bus.latest(topic)));
+            }
+            READY_CONTROL.with(|slot| if let Some(rows) = slot.borrow_mut().as_mut() { for row in rows.drain(..) { eprintln!("READY-CONTROL {row}"); } });
+        }
+    }
+    impl Drop for ReadyControl {
+        fn drop(&mut self) {
+            if let Some(cancel) = self.cancel.take() { let _ = cancel.send(()); }
+            let joined = self.worker.take().map(|worker| worker.join().is_ok()).unwrap_or(true);
+            eprintln!("READY-CONTROL cleanup worker_joined={joined} fixture_owned_by_original_Drop=true");
+            READY_CONTROL.with(|slot| { if let Some(rows) = slot.borrow_mut().take() { for row in rows { eprintln!("READY-CONTROL panic_or_final_flush {row}"); } } });
+        }
+    }

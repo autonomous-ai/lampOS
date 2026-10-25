@@ -1,0 +1,37 @@
+{
+  "old_planning_label": "d7ca8b1b230119515161ca56d8982003362efe93",
+  "execution_source_binding": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "selected_case": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+  "source_only_p3_rebinding": true,
+  "READ_OK_or_execution_qualification_claim": false,
+  "actual_baseline_bindings": [
+    {
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "actual_baseline_head": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+      "actual_baseline_git_blob": "6fe2dc265f24a5209c9e09a357c5971b7501d92a",
+      "gitshow_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "saved_original_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "saved_original_byte_equal": true,
+      "old_d7_planning_source_sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732",
+      "old_d7_original_byte_equal_to_4f": true
+    },
+    {
+      "path": "lampOS/crates/expression/src/unplug.rs",
+      "actual_baseline_head": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+      "actual_baseline_git_blob": "a497d6abdb4505f818684a23fd5fb4b73586a169",
+      "gitshow_sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459",
+      "saved_original_sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459",
+      "saved_original_byte_equal": true,
+      "old_d7_planning_source_sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459",
+      "old_d7_original_byte_equal_to_4f": true
+    }
+  ],
+  "actual_candidate_source": "Captured private2dirty fixture/docs correction in REC/expression-ready-voice-last at4f; candidate runtime SHA frozen in source-bindings.json, no inference from d7 source label",
+  "helper_and_overlay_packet_root_manifest": "608a9f6dcd4ed252f25d23b21eec50d1bb3f9b3ffc75956709bcbd33039ee997",
+  "plan_sha256": "2367ed2a66070116107b096056dcf614a65dc3ed72dd929f43064fcb542580db",
+  "normal_product_clock_API_change": false,
+  "execution_authorized": false,
+  "compiled": false,
+  "observed": false,
+  "limits": "Rebinding source identities resolves planning label ambiguity only; neither compiler validation nor runtime outcomes nor review acceptance follows."
+}

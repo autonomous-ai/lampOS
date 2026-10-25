@@ -1,0 +1,8 @@
+{
+  "base": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "Git blob": "19208ae8bef3651c29b448275ef7f5c19d6e296a",
+  "SHA-256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8",
+  "exact equality to derived baseline snapshot": false,
+  "exact equality to final baseline snapshot": true,
+  "initial reconstructed equality was false and is retained as superseded": true
+}

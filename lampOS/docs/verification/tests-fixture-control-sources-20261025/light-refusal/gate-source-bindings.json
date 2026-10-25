@@ -1,0 +1,28 @@
+{
+  "base": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "branch": "tests/1806-light-refusal-clock",
+  "claim": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6392503431",
+  "actual submitted source SHA-256": "d0980ef240b6f8d977ca690c0ea9faad569b83865c742a236e540124de77dbb4",
+  "baseline derived by": "Actual unmodified4f source fetched via GitHub contents API and Git blob verified; exact actual-base-source.rs.txt bytes.",
+  "original elapsed assert retained": "assert!(saved.elapsed() < SHOWN_WITHIN + Duration::from_millis(500));",
+  "helper SHA-256": "a2ffcc5735b82410edbe57c288f17640eb71c259baae35fb29fc26d300cb10cf",
+  "private controlled source assertion tails byte identical": true,
+  "controlled variant differences": "Only saved Instant declaration moved; helper/gate/RAII bytes exactly equal both variants.",
+  "variant files": {
+    "baseline": {
+      "source SHA-256": "f39c21248d06434ca2f6528a5a17a8049b970ed3a74fff0e40b51e6ca0e32c39",
+      "expected elapsed assert line": 1358
+    },
+    "candidate": {
+      "source SHA-256": "afb3b2c8c40b097a07b1b236f076820933b0df3d72f1a30e71f76eecfb1e3d80",
+      "expected elapsed assert line": 1358
+    }
+  },
+  "source worktree unchanged": true,
+  "baseline original source SHA-256": "ff76a474dcad919061933d0bced1bf701d1f17b536f3bcbea648468288a1b8a8",
+  "superseded preparation correction": "Initial reconstruction misplaced saved after the dropped Light constructor; actual4f has saved before it. Original wrong snapshot/patch retained as superseded, never executed. Final baseline now byte-equal to actual GitHub4f.",
+  "final private format check": "Pinned rustfmt +1.96.0 --edition2024 both controlled snapshot files, exit0; no original/WT file passed to formatter.",
+  "final ownership refinement": "Atomically reserve fresh /tmp/lcl-light-control-PID before any fixture setup; preexistence fails without delete. Normal places wrapper unchanged in behavior, extracted places_in does setup only. Selected case uses reserved path and removes no root directly; Root Drop alone checks device/inode and removes it. Changed/vanished identity records error and refuses removal.",
+  "final verification": "Two authorized pinned rustfmt invocations on private controlled snapshots only, both exit0: initial ownership refinement, then final completion-marker refinement. No original/WT source formatted. Normalized final variants differ only the timer declaration; all original selected-case assert tokens unchanged.",
+  "final root cleanup scope": "Fresh atomic create_dir at control-only name, no preexisting-root deletion. Guard armed before places_in setup. Only Root Drop deletes selected root after device/inode/type check; changed/vanished identity is error, not success. No original unguarded selected-case cleanup remains in overlay."
+}

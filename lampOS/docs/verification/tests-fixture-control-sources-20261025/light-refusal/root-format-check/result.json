@@ -1,0 +1,26 @@
+{
+  "command": [
+    "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustfmt",
+    "--check",
+    "--edition",
+    "2024",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/baseline-control-source.rs.txt",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/candidate-control-source.rs.txt"
+  ],
+  "started_at": "2026-10-25T03:56:33.252444+00:00",
+  "finished_at": "2026-10-25T03:56:33.338954+00:00",
+  "exit_code": 0,
+  "source_before": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/baseline-control-source.rs.txt": "f39c21248d06434ca2f6528a5a17a8049b970ed3a74fff0e40b51e6ca0e32c39",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/candidate-control-source.rs.txt": "afb3b2c8c40b097a07b1b236f076820933b0df3d72f1a30e71f76eecfb1e3d80"
+  },
+  "source_after": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/baseline-control-source.rs.txt": "f39c21248d06434ca2f6528a5a17a8049b970ed3a74fff0e40b51e6ca0e32c39",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/candidate-control-source.rs.txt": "afb3b2c8c40b097a07b1b236f076820933b0df3d72f1a30e71f76eecfb1e3d80"
+  },
+  "source_unchanged": true,
+  "formatter_sha256": "e0d4e3ba5e00cf354d17cc1e58973e8ead1b67dd5968254baabe950ecbf2461f",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "scope": "private source formatter check only; no Rust compilation or test observation"
+}

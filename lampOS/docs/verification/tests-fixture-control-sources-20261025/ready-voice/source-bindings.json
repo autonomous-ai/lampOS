@@ -1,0 +1,66 @@
+{
+  "head": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "worktree_read_only": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/expression-ready-voice-last",
+  "bindings": [
+    {
+      "variant": "baseline",
+      "kind": "original",
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "snapshot": "snapshots/baseline/original/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732"
+    },
+    {
+      "variant": "baseline",
+      "kind": "controlled",
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "snapshot": "snapshots/baseline/controlled/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "a0d12259c2636e5eb40c21b83a917489c2fb75f131f47be47f367bc107a2e155"
+    },
+    {
+      "variant": "baseline",
+      "kind": "original",
+      "path": "lampOS/crates/expression/src/unplug.rs",
+      "snapshot": "snapshots/baseline/original/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459"
+    },
+    {
+      "variant": "baseline",
+      "kind": "controlled",
+      "path": "lampOS/crates/expression/src/unplug.rs",
+      "snapshot": "snapshots/baseline/controlled/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb"
+    },
+    {
+      "variant": "candidate",
+      "kind": "original",
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "snapshot": "snapshots/candidate/original/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "249a30c8dd8ef4f67c30b8888d9fc4f44d2ced5d550b4c4fbb852087fd1fc1b7"
+    },
+    {
+      "variant": "candidate",
+      "kind": "controlled",
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "snapshot": "snapshots/candidate/controlled/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "5e7e16362bb3ca9f3c85971a171361b2ac82098d6722359b0c46a7ba02b4d6fd"
+    },
+    {
+      "variant": "candidate",
+      "kind": "original",
+      "path": "lampOS/crates/expression/src/unplug.rs",
+      "snapshot": "snapshots/candidate/original/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459"
+    },
+    {
+      "variant": "candidate",
+      "kind": "controlled",
+      "path": "lampOS/crates/expression/src/unplug.rs",
+      "snapshot": "snapshots/candidate/controlled/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb"
+    }
+  ],
+  "all_existing_assertions_byte_identical": true,
+  "normal_product_source_unapplied": true,
+  "shared_gate_helper_sha256": "7e26cf906fc74fcf4fec79c476e3c4d74fb9b1d467ff508583b24f4cf888d7c7",
+  "baseline_independent_gitshow_verification": "independent-baseline-gitshow-verification.json"
+}

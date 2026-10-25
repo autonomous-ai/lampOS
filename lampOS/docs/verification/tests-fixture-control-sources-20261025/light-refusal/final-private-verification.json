@@ -1,0 +1,30 @@
+{
+  "execution": "Only permitted private rustfmt parsing/formatting; no compiler/test/import/target/source/Git/public operation.",
+  "formatter argv": [
+    "/Users/autonomous/.cargo/bin/rustfmt",
+    "+1.96.0",
+    "--edition",
+    "2024",
+    "baseline-control-source.rs.txt",
+    "candidate-control-source.rs.txt"
+  ],
+  "formatter invocations": [
+    {
+      "epoch": "fresh-root ownership correction",
+      "exit": 0
+    },
+    {
+      "epoch": "receipt completion marker refinement",
+      "exit": 0
+    }
+  ],
+  "original snapshots byte unchanged": true,
+  "worktree Rust and docs byte unchanged": true,
+  "formatted control variants differ only authored Instant move": true,
+  "all original assertion tokens equal and original join unwrap retained": true,
+  "control root reservation": "create_dir fails on preexistence without removal; receipt and completion-marker preexistence fail before reservation.",
+  "identity change": "Drop refuses remove unless directory device/inode matches the reserved original; missing path is diagnostic error, not a claimed removal.",
+  "panic preservation": "Root/Ring Drop have no unwrap/assert. Root writes only its owned receipt/marker and suppresses I/O errors, so original elapsed panic is not replaced. Missing/partial completion marker makes any diagnostic write/sync failure invalid in the outer controller.",
+  "counter failure rejection": "Strict bool/int trace field validation, nonempty errors or cancellation rejected, both monotonic durations>=1700ms and internally ordered. Complete-marker requirement plus exact original elapsed panic source line/condition prevents arbitrary diagnostic failure from qualifying the baseline negative.",
+  "limits": "Rustfmt validates parsing/formatting, not types/Send or runtime cleanup; those remain unexecuted until root review/grants. A stuck syscall/forced kill can prevent Drop completion; outer120s group watchdog plus required receipts rejects that outcome."
+}

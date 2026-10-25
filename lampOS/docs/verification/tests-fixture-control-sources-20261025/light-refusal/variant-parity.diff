@@ -1,0 +1,15 @@
+--- baseline-control
++++ candidate-control
+@@ -1349,11 +1349,11 @@
+         let after = lamp_ipc::monotonic_us();
+         assert_eq!(lamp.set_light(&blue), Ok(blue.clone()));
+         assert_eq!(lamp.light(), Ok(blue.clone()));
+-        let saved = Instant::now();
+         let dropped = Light::new(true, "red", 2).unwrap();
+         stop.store(true, std::sync::atomic::Ordering::Relaxed);
+         let requests = ringing.join().unwrap();
+         // A ring that has stopped shows nothing asked of it: said in time.
++        let saved = Instant::now();
+         assert!(lamp.set_light(&dropped).is_err());
+         assert!(saved.elapsed() < SHOWN_WITHIN + Duration::from_millis(500));
+         assert_eq!(requests.len(), 2, "{requests:?}");

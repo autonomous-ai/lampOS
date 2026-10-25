@@ -1,0 +1,30 @@
+--- a/lampOS/crates/expression/src/unplug.rs
++++ b/lampOS/crates/expression/src/unplug.rs
+@@ -56,6 +56,14 @@
+         }
+         let request = request?;
+         let state = self.bus.latest(STATE_TOPIC).ok().flatten()?;
++        #[cfg(test)]
++        crate::runtime::unplug_tests::control_record(|| {
++            format!(
++                "ready_apply request_id={} request_frame={:?} state_frame={state:?} step_at_us={at_us} wall_ms={wall_ms}",
++                request.request,
++                message.as_ref()
++            )
++        });
+         if !ready(
+             &request.request,
+             message.as_ref()?.header.at_us,
+@@ -63,8 +71,12 @@
+             at_us,
+             wall_ms,
+         ) {
++            #[cfg(test)]
++            crate::runtime::unplug_tests::control_record(|| "ready_apply admitted=false".into());
+             return None;
+         }
++        #[cfg(test)]
++        crate::runtime::unplug_tests::control_record(|| "ready_apply admitted=true".into());
+         // Privacy authority is independent of voice and is never forged for sleep.
+         let privacy = self.bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC).ok()?;
+         if crate::runtime::privacy_muted_in(privacy) {

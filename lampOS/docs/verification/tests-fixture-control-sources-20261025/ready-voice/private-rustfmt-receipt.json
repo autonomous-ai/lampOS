@@ -1,0 +1,24 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/rustup",
+    "run",
+    "1.96.0",
+    "rustfmt",
+    "--edition",
+    "2024",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/runtime.rs",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/unplug.rs",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/runtime.rs",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/unplug.rs"
+  ],
+  "exit_code": 0,
+  "observed_tool_wall_seconds": 0.02380015,
+  "compiler_test_or_Cargo_execution": false,
+  "scope": "Only four private controlled snapshots; no WT source formatted",
+  "formatted_snapshot_sha256": {
+    "snapshots/baseline/controlled/lampOS/crates/expression/src/runtime.rs": "a0d12259c2636e5eb40c21b83a917489c2fb75f131f47be47f367bc107a2e155",
+    "snapshots/baseline/controlled/lampOS/crates/expression/src/unplug.rs": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb",
+    "snapshots/candidate/controlled/lampOS/crates/expression/src/runtime.rs": "5e7e16362bb3ca9f3c85971a171361b2ac82098d6722359b0c46a7ba02b4d6fd",
+    "snapshots/candidate/controlled/lampOS/crates/expression/src/unplug.rs": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb"
+  }
+}

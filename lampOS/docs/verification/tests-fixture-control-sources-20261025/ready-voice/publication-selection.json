@@ -1,0 +1,85 @@
+{
+  "selection_scope": "Private text selection, no public copy/commit/post",
+  "root_source_packet": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep",
+  "selected_unchanged_files": [
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/baseline-runtime.rs.UNAPPLIED.patch",
+      "publication_path": "baseline-runtime.rs.UNAPPLIED.patch",
+      "sha256": "ae5c3e8fc1bb4d057d2d4153d862112eb688ef67800ca104d3ebcddb6e1492aa",
+      "bytes": 11717,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/candidate-runtime.rs.UNAPPLIED.patch",
+      "publication_path": "candidate-runtime.rs.UNAPPLIED.patch",
+      "sha256": "10ea286f9316bfcb63f8b9f39334f9b2af2569c50e196afac7623a47d3edf827",
+      "bytes": 11745,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/baseline-unplug.rs.UNAPPLIED.patch",
+      "publication_path": "baseline-unplug.rs.UNAPPLIED.patch",
+      "sha256": "286bf25ae7064bafaf8bea92ee8ca645d41a73f50410733a2fab1caf8370dff7",
+      "bytes": 1215,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/candidate-unplug.rs.UNAPPLIED.patch",
+      "publication_path": "candidate-unplug.rs.UNAPPLIED.patch",
+      "sha256": "286bf25ae7064bafaf8bea92ee8ca645d41a73f50410733a2fab1caf8370dff7",
+      "bytes": 1215,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/control_helper.rs.txt",
+      "publication_path": "control_helper.rs.txt",
+      "sha256": "7e26cf906fc74fcf4fec79c476e3c4d74fb9b1d467ff508583b24f4cf888d7c7",
+      "bytes": 6292,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/plan.json",
+      "publication_path": "plan.json",
+      "sha256": "2367ed2a66070116107b096056dcf614a65dc3ed72dd929f43064fcb542580db",
+      "bytes": 9970,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/source-bindings.json",
+      "publication_path": "source-bindings.json",
+      "sha256": "972e4484f8ef75368217d1a0e42efda49f8a99c9a3c76b67a1bf4ace8d0043db",
+      "bytes": 2907,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/independent-baseline-gitshow-verification.json",
+      "publication_path": "independent-baseline-gitshow-verification.json",
+      "sha256": "314fba100e1e34d19b9056d85a0a42f3a0a144ed9b40bde7c94da23b090b981a",
+      "bytes": 660,
+      "copied_primary_bytes_unchanged": true
+    },
+    {
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/private-rustfmt-receipt.json",
+      "publication_path": "private-rustfmt-receipt.json",
+      "sha256": "21a28d2dba7bb6d149e3c79b9eb8048f4003d89dd14378d5f30739f4ea1c5d68",
+      "bytes": 1799,
+      "copied_primary_bytes_unchanged": true
+    }
+  ],
+  "derived_files": [
+    "README.md",
+    "explicit-4f-rebinding-receipt.json",
+    "original-assertion-tail-proof.json",
+    "publication-selection.json",
+    "SHA256SUMS"
+  ],
+  "omitted": [
+    "support.py",
+    "census.py",
+    "all Python/shell bodies",
+    "all binaries",
+    "full source snapshots",
+    "original source-packet README superseded by coherent selected README"
+  ],
+  "primary_bytes_unchanged": true
+}

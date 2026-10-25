@@ -1,0 +1,30 @@
+{
+  "status": "Static source review plus pinned rustfmt parsing/formatting only; no import/compiler/observation.",
+  "RAII ownership": [
+    "Root atomically reserves a fresh control-only directory before places_in setup; existing directory or preexisting receipt/marker fails without deletion. Root Drop runs after Ring/Real locals.",
+    "Ring owner is armed before either controller spawn or fallible ring subscription/publisher setup; a startup panic drops the armed owner.",
+    "Normal original stop.store and ringing.join().unwrap remain. Ring joins actual thread then controller and validates gate before returning original Vec.",
+    "Every owned-ring Drop with outstanding handles sends stop, entry cancel, hold cancel and release cancel, then joins ring and controller; channel sends do not wait for capacity.",
+    "Only Root Drop removes selected fixture root after device/inode/type match. Changed or vanished identity records error and refuses removal. Drop writes its owned trace; only successful write+sync can produce required completion marker. No Drop assert/unwrap masks original panic."
+  ],
+  "finite bounds": {
+    "entry channel": "20 seconds; independently wakeable by explicit Entry::Cancel.",
+    "hold": "One absolute monotonic deadline entered+1700ms; recv_timeout waits remaining duration and explicit cancel wakes immediately; not renewed.",
+    "ring release": "30-second finite receive; release/cancel channels wake it.",
+    "existing ring loop": "Original5ms receive and nonblocking bus publication; finite final request drain with no later test request until join.",
+    "outer": "Reviewed f40 one owned process group,120-second exact-case watchdog plus bounded TERM/KILL/wait. This bounds blocking Rust joins if OS I/O stalls.",
+    "limits": "Rust JoinHandle::join has no intrinsic timeout; no claim Drop always finishes under a stuck kernel or forced process kill. Missing receipt, cancellation, errors or residual group invalidates the observation."
+  },
+  "negative-only predicate": [
+    "Raw test must exit101, exactly the selected case failed and original source line/unchanged elapsed condition appears.",
+    "Entered/release receipts present; controller_release_ns and actual_held_ns both>=1700000000.",
+    "ring_joined/controller_joined/root_removed true; cancelled false/errors empty; root cleanup occurred while original test unwound.",
+    "No other panic, earlier assertion, timeout or missing cleanup can be accepted as the negative witness.",
+    "Required complete marker, strict Boolean/integer trace types and controller_release_ns<=actual_held_ns reject counter/diagnostic failure."
+  ],
+  "candidate predicate": "Raw exit0 with original assertions, same valid gate evidence, joined threads/root removed and no panicking root cleanup. Actual set_light call still satisfies unchanged1.5s bound.",
+  "observations": "Exactly baseline1 then candidate1; no warmup, unchanged repeat, extra mutant, resampling or threshold adjustment. An invalid negative/setup/cleanup stops before remaining observation. Raw0/101 and consumed/unrun remain explicit.",
+  "trace timing": "Entered and release-sent wall milliseconds are diagnostic timestamps; mathematical hold qualification uses recorded monotonic durations, not wall clock.",
+  "metadata and publication privacy": "Actual future metadata stays private if it contains author fields; publish only raw SHA and safe graph/target context. Helpers/scripts and executable bodies never public.",
+  "worktree source SHA guards verified unchanged": true
+}

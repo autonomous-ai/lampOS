@@ -1,0 +1,135 @@
+{
+  "identity": "expression-ready-voice-one-old-one-new-1100ms-PROPOSAL",
+  "execution_ready": false,
+  "execution_authorized": false,
+  "base": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "selected_case": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+  "package": "lamp-expression",
+  "target": "lib:lamp_expression",
+  "schedule": [
+    "baseline",
+    "candidate"
+  ],
+  "repetitions_each": 1,
+  "case_argv_suffix": [
+    "--exact",
+    "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+    "--nocapture"
+  ],
+  "outer_timeout_seconds": 120,
+  "minimum_free_bytes": 5368709120,
+  "same_gate": "one entered/release pair; thread holds its own monotonic1100ms deadline; caller cancellation wakes channel; finite5s entered/released receives; RAII joins worker then original Fixture Drop removes owned tmp root; no fixture/system children",
+  "source_variants": "4f baseline HEAD source vs exact current dirty fixture correction, each plus identical private helper and diagnostic hooks. Baseline retains original constructor Voice. Candidate suppresses constructor Voice only for existing exact case and publishes original single Speaking payload last. No republish/seq2.",
+  "remaining_prerequisites": [
+    "root reviews private cfg(test) runtime and unplug diagnostic overlay; no normal API or default semantic changes",
+    "separately allocated frozen variants, actual metadata/profile2/features and cfgtest fresh:false/source closure/executable/inventory hashes",
+    "root source/resource/target grant for compile then separate exactly2 observation schedule",
+    "actual complete source/mode/mtime guards and same runtime env per variant; no environment control values"
+  ],
+  "valid_negative": "Old fails original light.unwrap/Resting assertion, old consumed Voice absent with Subscriber expired increment, actual Ready request/state fresh and admitted. Record other phases as unexpected; no retry.",
+  "valid_candidate": "All original light Resting/asleep/body/ack/500ms assertions pass; exact one Speaking accepted and no other input refusals; Ready admitted. Original result remains actual even if intervention invalid.",
+  "diagnostics": "record buffered actual received Message headers+payloads, typed clock tuple, observed_wall/received_us/accepted result; Subscriber received/expired/repeated/malformed/wrongtype; actual Unplug.apply request/state frames+logical/wall boundaries+ready admitted; after-step retained Voice/Ready/ack; counts/state/output. Diagnostic allocations introduce load and post-Ready bookkeeping can age inputs, reported as a limitation, never retry.",
+  "compile_future": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-expression",
+    "--lib",
+    "--no-run",
+    "--jobs",
+    "2",
+    "--message-format=json"
+  ],
+  "profile": "test=true opt0 debuginfo2 default absent CARGO_PROFILE_*; inherited runtime CARGO_BUILD_JOBS4; actual features must match between variants",
+  "compiled_child_scope": "selected case in-process Bus/Service with one owned control thread; no spawned executables/system programs. Outer owned process group does not claim arbitrary detached descendants.",
+  "controls_are_not_completion_sleep": true,
+  "all_original_assertions_preserved": true,
+  "ttl_ms": 500,
+  "future_grace_ms": 50,
+  "gate_ms": 1100,
+  "predicted_historical_cause": false,
+  "input_bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/README.md",
+      "sha256": "6d06878bacb9b589fd945784195fc7aaa3ef46e5b4f139282185c0de50c54c1e"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/baseline-runtime.rs.UNAPPLIED.patch",
+      "sha256": "ae5c3e8fc1bb4d057d2d4153d862112eb688ef67800ca104d3ebcddb6e1492aa"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/baseline-unplug.rs.UNAPPLIED.patch",
+      "sha256": "286bf25ae7064bafaf8bea92ee8ca645d41a73f50410733a2fab1caf8370dff7"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/candidate-runtime.rs.UNAPPLIED.patch",
+      "sha256": "10ea286f9316bfcb63f8b9f39334f9b2af2569c50e196afac7623a47d3edf827"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/candidate-unplug.rs.UNAPPLIED.patch",
+      "sha256": "286bf25ae7064bafaf8bea92ee8ca645d41a73f50410733a2fab1caf8370dff7"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/census.py",
+      "sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/control_helper.rs.txt",
+      "sha256": "7e26cf906fc74fcf4fec79c476e3c4d74fb9b1d467ff508583b24f4cf888d7c7"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/independent-baseline-gitshow-verification.json",
+      "sha256": "314fba100e1e34d19b9056d85a0a42f3a0a144ed9b40bde7c94da23b090b981a"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/private-rustfmt-receipt.json",
+      "sha256": "21a28d2dba7bb6d149e3c79b9eb8048f4003d89dd14378d5f30739f4ea1c5d68"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "a0d12259c2636e5eb40c21b83a917489c2fb75f131f47be47f367bc107a2e155"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/original/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "0227019579cd7194d2cac559297e6db49d42e76735565ac1f9dbfd1299417732"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/original/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "5e7e16362bb3ca9f3c85971a171361b2ac82098d6722359b0c46a7ba02b4d6fd"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/original/lampOS/crates/expression/src/runtime.rs",
+      "sha256": "249a30c8dd8ef4f67c30b8888d9fc4f44d2ced5d550b4c4fbb852087fd1fc1b7"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/original/lampOS/crates/expression/src/unplug.rs",
+      "sha256": "419f2d5309d3aeed4bcae105452b869c83834e10b97d74bc1d6e75c3e4a34459"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/source-bindings.json",
+      "sha256": "972e4484f8ef75368217d1a0e42efda49f8a99c9a3c76b67a1bf4ace8d0043db"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/support.py",
+      "sha256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d"
+    }
+  ],
+  "constructor_cleanup": "Private overlay create_dir exclusive reservation; record dev+ino before Bus construction. Guard retained in complete Fixture. On constructor unwind and Fixture Drop, remove only same directory dev+ino, never preexisting/replacement/symlink path; record actual cleanup or identity mismatch. SIGKILL can skip RAII: outer process cleanup must preserve exact identity-limited evidence.",
+  "diagnostic_panic_flush": "finish drains buffered rows; Drop flushes any remaining rows on unexpected early panic and joins worker. Original assertion panic cannot suppress earlier actual diagnostics.",
+  "format_validation": "Pinned rustup run1.96.0 rustfmt --edition2024 on four private controlled source snapshots returned0; this parses/formats, does not compile or execute. Baseline original snapshots untouched and independently gitshow-byte-equal."
+}

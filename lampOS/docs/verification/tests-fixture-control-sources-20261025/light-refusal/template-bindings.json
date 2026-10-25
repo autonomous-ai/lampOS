@@ -1,0 +1,9 @@
+{
+  "reviewed Hand controller": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-efbf-control-prep/run-controls.py",
+    "SHA-256": "ba496fcef1c38e91db10c3be4d8fa48bcb2cae61c16c0c7e345774934a3344a3"
+  },
+  "support SHA-256": "f40ec130a493647cb1571f7357b4edfcdc97678ffdb4a0cf37c154912d4af03d",
+  "census SHA-256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+  "submitted source identity receipt SHA-256": "1166863db523961529a09e6b547dc63a7b736a8ae1648e54781438a137fc9151"
+}

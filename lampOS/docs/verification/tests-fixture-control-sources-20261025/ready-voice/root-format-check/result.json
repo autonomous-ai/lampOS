@@ -1,0 +1,32 @@
+{
+  "command": [
+    "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustfmt",
+    "--check",
+    "--edition",
+    "2024",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/runtime.rs",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/unplug.rs",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/runtime.rs",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/unplug.rs"
+  ],
+  "started_at": "2026-10-25T03:54:09.476220+00:00",
+  "finished_at": "2026-10-25T03:54:09.535776+00:00",
+  "exit_code": 0,
+  "source_before": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/runtime.rs": "a0d12259c2636e5eb40c21b83a917489c2fb75f131f47be47f367bc107a2e155",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/unplug.rs": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/runtime.rs": "5e7e16362bb3ca9f3c85971a171361b2ac82098d6722359b0c46a7ba02b4d6fd",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/unplug.rs": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb"
+  },
+  "source_after": {
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/runtime.rs": "a0d12259c2636e5eb40c21b83a917489c2fb75f131f47be47f367bc107a2e155",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/baseline/controlled/lampOS/crates/expression/src/unplug.rs": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/runtime.rs": "5e7e16362bb3ca9f3c85971a171361b2ac82098d6722359b0c46a7ba02b4d6fd",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-prep/snapshots/candidate/controlled/lampOS/crates/expression/src/unplug.rs": "e072a58bfda793ba91bc3e8a7c4e9d0268c3f8281264e3121f2b1c178628dccb"
+  },
+  "source_unchanged": true,
+  "formatter_sha256": "e0d4e3ba5e00cf354d17cc1e58973e8ead1b67dd5968254baabe950ecbf2461f",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "scope": "private source formatter check only; no Rust compilation or test observation"
+}

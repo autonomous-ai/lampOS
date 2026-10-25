@@ -4504,3 +4504,9 @@ Ready for lamp-voice: no
 Ready for lamp-voice: no
 
 Frozen 34c plus the two-file Hand fixture completed formatting, strict all-target Clippy for twelve reverse-dependency packages, workspace build and diff checks. Full parallel tests: 7,316 passed / 20 failed / 52 ignored, all 79 targets bound; the changed Hand case and all 440 Body library tests passed. The full gate remains failed. [Raw result and complete failure names](verification/tests-body-hand-canonical-34c-20261025/) retain the original outcomes, source/CLI identities, closure and independent witness audits. One unchanged-base full-context control is being prepared; no baseline outcome, cause, speed, ARM64, device or readiness claim. Next: discriminate those failures and finish the separately claimed fixture controls.
+
+## 2026-10-25 03:58 UTC — concrete fixture control source and explicit 4f binding
+
+Ready for lamp-voice: no
+
+[Controlled old/new source](verification/tests-fixture-control-sources-20261025/) now includes both cancellable gates, identity-owned cleanup, strict original-assertion acceptance and consumed-frame diagnostics. The Ready receipt explicitly binds the old d7 planning label to actual 4f originals and separately captured candidate source. Root pinned formatter checks on all six private controlled snapshots passed with raw streams retained; no compiler or test ran. The overlays remain unapplied and disabled pending whole-source/artifact/resource grants. The Hand baseline controller is reviewed and unstarted, with its PATH-only context difference explicit and all 146 witnesses and 653 registry unit bindings checked. Next: the unchanged-base full-context run when two jobs are actually released; no full-environment, cause or readiness claim.

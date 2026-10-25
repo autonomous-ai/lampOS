@@ -1,0 +1,10 @@
+{
+  "purpose": "Preserve original source and valid unified-patch context byte-for-byte; only these literal primaries are excluded from publication whitespace checking. All primaries are hash-verified.",
+  "paths": [
+    "lampOS/docs/verification/tests-fixture-control-sources-20261025/light-refusal/baseline-gate.UNAPPLIED.patch",
+    "lampOS/docs/verification/tests-fixture-control-sources-20261025/light-refusal/candidate-gate.UNAPPLIED.patch",
+    "lampOS/docs/verification/tests-fixture-control-sources-20261025/light-refusal/private-gate-helper.rs.txt",
+    "lampOS/docs/verification/tests-fixture-control-sources-20261025/ready-voice/baseline-runtime.rs.UNAPPLIED.patch",
+    "lampOS/docs/verification/tests-fixture-control-sources-20261025/ready-voice/candidate-runtime.rs.UNAPPLIED.patch"
+  ]
+}

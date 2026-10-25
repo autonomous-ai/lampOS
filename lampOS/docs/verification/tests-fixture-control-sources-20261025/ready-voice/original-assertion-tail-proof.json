@@ -1,0 +1,16 @@
+[
+  {
+    "variant": "baseline",
+    "original_tail_sha256": "6e089f17fb90590492e0ce500c1912269396d0f753ec173a828725906e16ebfb",
+    "controlled_tail_sha256": "6e089f17fb90590492e0ce500c1912269396d0f753ec173a828725906e16ebfb",
+    "byte_equal": true,
+    "assertion_tail": "        assert_eq!(output.light.unwrap().face, ExpressionFace::Resting);\n        assert!(output.state.behaviours.contains(&\"asleep\".into()));\n        assert!(output.body.is_none());\n        let ack = fixture\n            .bus\n            .latest(\"expression/unplug_state\")\n            .unwrap()\n            .unwrap();\n        assert_eq!(ack.header.expires_ms, Some(500));\n        assert_eq!(\n            ack.parse::<serde_json::Value>().unwrap(),\n            serde_json::json!({\"request\":\"r1\",\"asleep\":true})\n        );"
+  },
+  {
+    "variant": "candidate",
+    "original_tail_sha256": "6e089f17fb90590492e0ce500c1912269396d0f753ec173a828725906e16ebfb",
+    "controlled_tail_sha256": "6e089f17fb90590492e0ce500c1912269396d0f753ec173a828725906e16ebfb",
+    "byte_equal": true,
+    "assertion_tail": "        assert_eq!(output.light.unwrap().face, ExpressionFace::Resting);\n        assert!(output.state.behaviours.contains(&\"asleep\".into()));\n        assert!(output.body.is_none());\n        let ack = fixture\n            .bus\n            .latest(\"expression/unplug_state\")\n            .unwrap()\n            .unwrap();\n        assert_eq!(ack.header.expires_ms, Some(500));\n        assert_eq!(\n            ack.parse::<serde_json::Value>().unwrap(),\n            serde_json::json!({\"request\":\"r1\",\"asleep\":true})\n        );"
+  }
+]

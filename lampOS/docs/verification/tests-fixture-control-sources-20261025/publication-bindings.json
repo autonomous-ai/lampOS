@@ -1,0 +1,199 @@
+{
+  "primaries": [
+    {
+      "path": "ready-voice/README.md",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/README.md",
+      "sha256": "6dd5b34a9077bd61f76db55449aaeb140fac9cb464a3aa68db49296154416e9f",
+      "bytes": 3807
+    },
+    {
+      "path": "ready-voice/SHA256SUMS",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/SHA256SUMS",
+      "sha256": "2563380f37535349d3eef535ac0253e92104425faed6a8d28eebece864c83343",
+      "bytes": 1238
+    },
+    {
+      "path": "ready-voice/baseline-runtime.rs.UNAPPLIED.patch",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/baseline-runtime.rs.UNAPPLIED.patch",
+      "sha256": "ae5c3e8fc1bb4d057d2d4153d862112eb688ef67800ca104d3ebcddb6e1492aa",
+      "bytes": 11717
+    },
+    {
+      "path": "ready-voice/baseline-unplug.rs.UNAPPLIED.patch",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/baseline-unplug.rs.UNAPPLIED.patch",
+      "sha256": "286bf25ae7064bafaf8bea92ee8ca645d41a73f50410733a2fab1caf8370dff7",
+      "bytes": 1215
+    },
+    {
+      "path": "ready-voice/candidate-runtime.rs.UNAPPLIED.patch",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/candidate-runtime.rs.UNAPPLIED.patch",
+      "sha256": "10ea286f9316bfcb63f8b9f39334f9b2af2569c50e196afac7623a47d3edf827",
+      "bytes": 11745
+    },
+    {
+      "path": "ready-voice/candidate-unplug.rs.UNAPPLIED.patch",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/candidate-unplug.rs.UNAPPLIED.patch",
+      "sha256": "286bf25ae7064bafaf8bea92ee8ca645d41a73f50410733a2fab1caf8370dff7",
+      "bytes": 1215
+    },
+    {
+      "path": "ready-voice/control_helper.rs.txt",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/control_helper.rs.txt",
+      "sha256": "7e26cf906fc74fcf4fec79c476e3c4d74fb9b1d467ff508583b24f4cf888d7c7",
+      "bytes": 6292
+    },
+    {
+      "path": "ready-voice/explicit-4f-rebinding-receipt.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/explicit-4f-rebinding-receipt.json",
+      "sha256": "d64b5d93cdaf72a391d938014df26e4cedc15661756bf340a3bd1ba51d907ed5",
+      "bytes": 2281
+    },
+    {
+      "path": "ready-voice/independent-baseline-gitshow-verification.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/independent-baseline-gitshow-verification.json",
+      "sha256": "314fba100e1e34d19b9056d85a0a42f3a0a144ed9b40bde7c94da23b090b981a",
+      "bytes": 660
+    },
+    {
+      "path": "ready-voice/original-assertion-tail-proof.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/original-assertion-tail-proof.json",
+      "sha256": "f56d52b05a0b56929bd6ab561d8dc3722e949c084d606fccd978e547849092e7",
+      "bytes": 1642
+    },
+    {
+      "path": "ready-voice/plan.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/plan.json",
+      "sha256": "2367ed2a66070116107b096056dcf614a65dc3ed72dd929f43064fcb542580db",
+      "bytes": 9970
+    },
+    {
+      "path": "ready-voice/private-rustfmt-receipt.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/private-rustfmt-receipt.json",
+      "sha256": "21a28d2dba7bb6d149e3c79b9eb8048f4003d89dd14378d5f30739f4ea1c5d68",
+      "bytes": 1799
+    },
+    {
+      "path": "ready-voice/publication-selection.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/publication-selection.json",
+      "sha256": "815c5fc2af9a05c48973e79098652527e48830c24e341b110584e3ba81cb1dab",
+      "bytes": 4400
+    },
+    {
+      "path": "ready-voice/source-bindings.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-voice-control-publication-prep/source-bindings.json",
+      "sha256": "972e4484f8ef75368217d1a0e42efda49f8a99c9a3c76b67a1bf4ace8d0043db",
+      "bytes": 2907
+    },
+    {
+      "path": "light-refusal/README.md",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/README.md",
+      "sha256": "ad2230c80b8a9297bf97a6dc8c68c8dab2bc0b87c3606497fd53648d8e3b0a28",
+      "bytes": 6430
+    },
+    {
+      "path": "light-refusal/private-gate-helper.rs.txt",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/private-gate-helper.rs.txt",
+      "sha256": "a2ffcc5735b82410edbe57c288f17640eb71c259baae35fb29fc26d300cb10cf",
+      "bytes": 11813
+    },
+    {
+      "path": "light-refusal/baseline-gate.UNAPPLIED.patch",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/baseline-gate.UNAPPLIED.patch",
+      "sha256": "3275653f9aa5917e2b7e9f1699e606a54db23930ab43b275c0f9feb87406839a",
+      "bytes": 15004
+    },
+    {
+      "path": "light-refusal/candidate-gate.UNAPPLIED.patch",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/candidate-gate.UNAPPLIED.patch",
+      "sha256": "3275653f9aa5917e2b7e9f1699e606a54db23930ab43b275c0f9feb87406839a",
+      "bytes": 15004
+    },
+    {
+      "path": "light-refusal/gate-source-bindings.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/gate-source-bindings.json",
+      "sha256": "46b33c68b5861aba11db0556879d5b908bf888945ecbc47f032eb6f8f7f74c55",
+      "bytes": 2820
+    },
+    {
+      "path": "light-refusal/original-base-binding.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/original-base-binding.json",
+      "sha256": "632253f1de801262f646b8c757ba25c5b651a40d28ef9f2e84c118a8262e71f8",
+      "bytes": 387
+    },
+    {
+      "path": "light-refusal/proposal-plan.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/proposal-plan.json",
+      "sha256": "f47d6c7b3f2cd3630312c0170bccb54e8f85327e1714878fe2dc5f39035aded4",
+      "bytes": 4275
+    },
+    {
+      "path": "light-refusal/cleanup-and-cancel-review.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/cleanup-and-cancel-review.json",
+      "sha256": "5374d6ff2ebf1878d2c509b9a20eae69fe7b70b1ab6689475f63112e91f2aa88",
+      "bytes": 3550
+    },
+    {
+      "path": "light-refusal/final-private-verification.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/final-private-verification.json",
+      "sha256": "335a034e55ece3a237a45921c3367464448941382f21fdb75de20579e2cde345",
+      "bytes": 1962
+    },
+    {
+      "path": "light-refusal/template-bindings.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/template-bindings.json",
+      "sha256": "a942fbcf9f49a1e456d264bc1209c7ab9b586c854baef64ff082ad80170df2eb",
+      "bytes": 576
+    },
+    {
+      "path": "light-refusal/variant-parity.diff",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-control-prep/variant-parity.diff",
+      "sha256": "2b03a97169e6246127a1b9314a7319509f1f7a502ba10deac36b5b52dccff75b",
+      "bytes": 742
+    },
+    {
+      "path": "ready-voice/root-format-check/result.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-root-format-check/result.json",
+      "sha256": "705b7d3f15308fe30d6a70dcc0efa1235cb84985314c2c2043b329b731a44b63",
+      "bytes": 3840
+    },
+    {
+      "path": "ready-voice/root-format-check/stderr.txt",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-root-format-check/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "ready-voice/root-format-check/stdout.txt",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/expression-ready-root-format-check/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "light-refusal/root-format-check/result.json",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-root-format-check/result.json",
+      "sha256": "ffae28be98fb9e1cf1bbdcafba688631cb831bccc2705acabeebb213f2968a6d",
+      "bytes": 2023
+    },
+    {
+      "path": "light-refusal/root-format-check/stderr.txt",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-root-format-check/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "light-refusal/root-format-check/stdout.txt",
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/cloud-light-refusal-root-format-check/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ],
+  "count": 31,
+  "execution_authorized": false,
+  "test_observations": 0,
+  "omissions": [
+    "Python implementation bodies",
+    "binary witnesses",
+    "full source snapshots",
+    "superseded private preparations"
+  ]
+}

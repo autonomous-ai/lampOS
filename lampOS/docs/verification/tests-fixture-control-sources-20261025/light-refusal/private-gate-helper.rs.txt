@@ -1,0 +1,267 @@
+    // Private control overlay only; never submitted with the clock-scope fix.
+    mod shutdown_control {
+        use super::*;
+        use std::os::unix::fs::MetadataExt;
+        use std::sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, Ordering},
+            mpsc,
+        };
+        use std::thread::{self, JoinHandle};
+
+        #[derive(Default, serde::Serialize)]
+        struct Trace {
+            entered: bool,
+            entered_unix_ms: Option<u128>,
+            release_sent: bool,
+            release_sent_unix_ms: Option<u128>,
+            cancelled: bool,
+            actual_held_ns: u128,
+            controller_release_ns: u128,
+            ring_joined: bool,
+            controller_joined: bool,
+            root_removed: bool,
+            test_panicking_at_root_cleanup: bool,
+            errors: Vec<String>,
+        }
+        fn wall_ms() -> u128 {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        }
+        type Shared = Arc<Mutex<Trace>>;
+        fn edit(trace: &Shared, f: impl FnOnce(&mut Trace)) {
+            f(&mut trace.lock().unwrap_or_else(|error| error.into_inner()));
+        }
+        enum Entry {
+            Entered(Instant),
+            Cancel,
+        }
+        enum Release {
+            Released,
+            Cancel,
+        }
+
+        pub(super) struct Root {
+            path: PathBuf,
+            identity: (u64, u64),
+            trace: Shared,
+            receipt: PathBuf,
+        }
+        impl Root {
+            pub(super) fn reserve() -> Self {
+                let path = PathBuf::from(format!("/tmp/lcl-light-control-{}", std::process::id()));
+                let receipt = PathBuf::from(
+                    std::env::var_os("LAMP_CLOUD_SHUTDOWN_RECEIPT")
+                        .expect("the private control requires its owned receipt path"),
+                );
+                assert!(!receipt.starts_with(&path));
+                assert!(!receipt.exists() && !receipt.is_symlink());
+                let complete = receipt.with_extension("complete");
+                assert!(!complete.exists() && !complete.is_symlink());
+                // Atomic reservation: never remove a preexisting directory.
+                std::fs::create_dir(&path).expect("private control root must not preexist");
+                let metadata = std::fs::symlink_metadata(&path).unwrap();
+                assert!(metadata.is_dir() && !metadata.file_type().is_symlink());
+                Self {
+                    path,
+                    identity: (metadata.dev(), metadata.ino()),
+                    trace: Arc::new(Mutex::new(Trace::default())),
+                    receipt,
+                }
+            }
+            pub(super) fn path(&self) -> &std::path::Path {
+                &self.path
+            }
+            pub(super) fn ring(&self, bus: &Bus, stop: Arc<AtomicBool>) -> Ring {
+                let (entered_tx, entered_rx) = mpsc::sync_channel(2);
+                let (cancel_tx, cancel_rx) = mpsc::channel();
+                let (release_tx, release_rx) = mpsc::channel();
+                // Arm ownership before either spawn or fallible bus setup.
+                let mut owned = Ring {
+                    stop: stop.clone(),
+                    ringing: None,
+                    controller: None,
+                    entered: entered_tx,
+                    cancel: cancel_tx,
+                    release: release_tx,
+                    trace: self.trace.clone(),
+                };
+                let controller_release = owned.release.clone();
+                let trace = self.trace.clone();
+                owned.controller = Some(thread::spawn(move || {
+                    let entered = match entered_rx.recv_timeout(Duration::from_secs(20)) {
+                        Ok(Entry::Entered(at)) => at,
+                        Ok(Entry::Cancel) => {
+                            edit(&trace, |t| t.cancelled = true);
+                            return;
+                        }
+                        Err(error) => {
+                            edit(&trace, |t| t.errors.push(format!("entered: {error}")));
+                            return;
+                        }
+                    };
+                    let deadline = entered + Duration::from_millis(1700);
+                    loop {
+                        let left = deadline.saturating_duration_since(Instant::now());
+                        if left.is_zero() {
+                            break;
+                        }
+                        match cancel_rx.recv_timeout(left) {
+                            Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => {
+                                edit(&trace, |t| t.cancelled = true);
+                                let _ = controller_release.send(Release::Cancel);
+                                return;
+                            }
+                            Err(mpsc::RecvTimeoutError::Timeout) => {}
+                        }
+                    }
+                    let held = entered.elapsed().as_nanos();
+                    match controller_release.send(Release::Released) {
+                        Ok(()) => edit(&trace, |t| {
+                            t.release_sent = true;
+                            t.release_sent_unix_ms = Some(wall_ms());
+                            t.controller_release_ns = held;
+                        }),
+                        Err(error) => edit(&trace, |t| t.errors.push(format!("release: {error}"))),
+                    }
+                }));
+                let trace = self.trace.clone();
+                let ring_entered = owned.entered.clone();
+                owned.ringing = Some(super::ring_with_return(bus, stop.clone(), move || {
+                    let at = Instant::now();
+                    edit(&trace, |t| {
+                        t.entered = true;
+                        t.entered_unix_ms = Some(wall_ms());
+                    });
+                    if let Err(error) = ring_entered.try_send(Entry::Entered(at)) {
+                        edit(&trace, |t| t.errors.push(format!("ring entered: {error}")));
+                        return;
+                    }
+                    match release_rx.recv_timeout(Duration::from_secs(30)) {
+                        Ok(Release::Released) => {
+                            edit(&trace, |t| t.actual_held_ns = at.elapsed().as_nanos())
+                        }
+                        Ok(Release::Cancel) => edit(&trace, |t| t.cancelled = true),
+                        Err(error) => {
+                            edit(&trace, |t| t.errors.push(format!("ring release: {error}")))
+                        }
+                    }
+                }));
+                owned
+            }
+        }
+        impl Drop for Root {
+            fn drop(&mut self) {
+                let removed = match std::fs::symlink_metadata(&self.path) {
+                    Ok(m) if m.is_dir() && (m.dev(), m.ino()) == self.identity => {
+                        std::fs::remove_dir_all(&self.path).map_err(|e| e.to_string())
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        Err("owned fixture root vanished before cleanup".into())
+                    }
+                    _ => Err("fixture root identity changed; not removed".into()),
+                };
+                edit(&self.trace, |t| {
+                    t.test_panicking_at_root_cleanup = thread::panicking();
+                    match removed {
+                        Ok(()) => t.root_removed = true,
+                        Err(e) => t.errors.push(e),
+                    }
+                });
+                // Never replace the original assertion panic with a cleanup panic.
+                let trace = self.trace.lock().unwrap_or_else(|error| error.into_inner());
+                if let Ok(bytes) = serde_json::to_vec_pretty(&*trace) {
+                    use std::io::Write;
+                    let written = std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&self.receipt)
+                        .and_then(|mut file| {
+                            file.write_all(&bytes)?;
+                            file.sync_all()
+                        });
+                    // A missing/partial completion marker invalidates diagnostics.
+                    // Only a complete, successfully synced trace can get a marker.
+                    if written.is_ok() {
+                        if let Ok(mut marker) = std::fs::OpenOptions::new()
+                            .write(true)
+                            .create_new(true)
+                            .open(self.receipt.with_extension("complete"))
+                        {
+                            let _ = marker.write_all(b"receipt-complete\n");
+                        }
+                    }
+                }
+            }
+        }
+        pub(super) struct Ring {
+            stop: Arc<AtomicBool>,
+            ringing: Option<JoinHandle<Vec<LightRequest>>>,
+            controller: Option<JoinHandle<()>>,
+            entered: mpsc::SyncSender<Entry>,
+            cancel: mpsc::Sender<()>,
+            release: mpsc::Sender<Release>,
+            trace: Shared,
+        }
+        impl Ring {
+            fn cancel(&self) {
+                self.stop.store(true, Ordering::Relaxed);
+                let _ = self.entered.try_send(Entry::Cancel);
+                let _ = self.cancel.send(());
+                let _ = self.release.send(Release::Cancel);
+            }
+            fn join_controller(&mut self) {
+                if let Some(controller) = self.controller.take() {
+                    let result = controller.join();
+                    edit(&self.trace, |t| {
+                        t.controller_joined = true;
+                        if result.is_err() {
+                            t.errors.push("controller thread panicked".into());
+                        }
+                    });
+                }
+            }
+            pub(super) fn join(&mut self) -> thread::Result<Vec<LightRequest>> {
+                let result = self.ringing.take().expect("ring joined only once").join();
+                edit(&self.trace, |t| t.ring_joined = true);
+                if result.is_err() {
+                    self.cancel();
+                }
+                self.join_controller();
+                if result.is_err() {
+                    return result;
+                }
+                let trace = self.trace.lock().unwrap_or_else(|error| error.into_inner());
+                if !trace.errors.is_empty()
+                    || trace.cancelled
+                    || !trace.entered
+                    || !trace.release_sent
+                    || trace.actual_held_ns < 1_700_000_000
+                    || trace.controller_release_ns < 1_700_000_000
+                {
+                    return Err(Box::new("private shutdown gate invalid".to_owned()));
+                }
+                result
+            }
+        }
+        impl Drop for Ring {
+            fn drop(&mut self) {
+                if self.ringing.is_some() || self.controller.is_some() {
+                    self.cancel();
+                    if let Some(ringing) = self.ringing.take() {
+                        let result = ringing.join();
+                        edit(&self.trace, |t| {
+                            t.ring_joined = true;
+                            if result.is_err() {
+                                t.errors.push("ring thread panicked during cleanup".into());
+                            }
+                        });
+                    }
+                    self.join_controller();
+                }
+            }
+        }
+    }
+
