@@ -54,6 +54,7 @@ use std::{
 };
 use unicode_normalization::UnicodeNormalization;
 
+pub mod asked;
 pub mod heard;
 pub mod needs_face;
 pub mod noted;
