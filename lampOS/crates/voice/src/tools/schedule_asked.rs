@@ -77,6 +77,29 @@ const DOUBT: &[&str] = &[
     "whichever",
     "either",
     "or",
+    "ignore",
+    "skip",
+    "scrap",
+    "changed",
+    "mind",
+    // Another operation, or a constraint the ask's time doesn't carry: a
+    // repeat ("every day", repeat_reminder's), a later start ("starting at
+    // noon"), a window (Third's P2s on `463b13972`).
+    "every",
+    "each",
+    "daily",
+    "weekly",
+    "weekday",
+    "weekdays",
+    "weekend",
+    "weekends",
+    "starting",
+    "from",
+    "until",
+    "till",
+    "between",
+    "before",
+    "after",
 ];
 
 /// Words that may stand between the ask and its time ("remind me tomorrow
@@ -104,69 +127,92 @@ const AFTER_A_TIME: &[&str] = &[
 /// ([`crate::remember::asked::withdrawn`]). It errs toward not forcing.
 pub fn asks_to_set(said: &str) -> Option<&'static str> {
     let said = said.replace('\u{2019}', "'");
-    if crate::remember::asked::withdrawn(&said)
+    // Quoted or measured words ("Translate: \u{201c}Remind me …\u{201d}", "at 10%")
+    // are not an ask to the lamp; the tokenizer would drop the marks.
+    if said.contains(['"', '\u{201c}', '\u{201d}', '%'])
+        || crate::remember::asked::withdrawn(&said)
         || lower_words(&said)
             .iter()
             .any(|word| DOUBT.contains(&word.as_str()))
     {
         return None;
     }
-    let (words, timer) = said
+    // One sentence, the ask, beside at most greetings ("Lamp.", "Hey Lamp."):
+    // a second one may take it back ("Ignore that.", "I changed my mind.")
+    // or frame it (a translation), so it leaves the line to the model.
+    let mut sentences = said
         .split_inclusive(['.', '!', '?', ';'])
-        .find_map(|sentence| {
-            let words = lower_words(sentence);
-            let mut at = 0;
-            while words
-                .get(at)
-                .is_some_and(|word| BEFORE.contains(&word.as_str()))
-            {
-                at += 1;
-            }
+        .filter(|sentence| {
+            !lower_words(sentence)
+                .iter()
+                .all(|word| BEFORE.contains(&word.as_str()))
+        });
+    let (Some(sentence), None) = (sentences.next(), sentences.next()) else {
+        return None;
+    };
+    let (words, timer) = {
+        let words = lower_words(sentence);
+        let mut at = 0;
+        while words
+            .get(at)
+            .is_some_and(|word| BEFORE.contains(&word.as_str()))
+        {
+            at += 1;
+        }
+        if words.get(at).is_some_and(|word| word == "please") {
+            at += 1;
+        }
+        let asking = words
+            .get(at)
+            .is_some_and(|word| ASKING.contains(&word.as_str()))
+            && words.get(at + 1).is_some_and(|word| word == "you");
+        if asking {
+            at += 2;
             if words.get(at).is_some_and(|word| word == "please") {
                 at += 1;
             }
-            let asking = words
-                .get(at)
-                .is_some_and(|word| ASKING.contains(&word.as_str()))
-                && words.get(at + 1).is_some_and(|word| word == "you");
-            if asking {
-                at += 2;
-                if words.get(at).is_some_and(|word| word == "please") {
-                    at += 1;
+        }
+        if sentence.trim_end().ends_with('?') && !asking {
+            return None;
+        }
+        ASKS.iter().find_map(|(phrase, timer)| {
+            (words.len() > at + phrase.len()
+                && words[at..at + phrase.len()]
+                    .iter()
+                    .zip(phrase.iter())
+                    .all(|(word, ask)| word == ask))
+            .then(|| {
+                // "timer for" ends with its own "for": the length follows it.
+                let mut from = at + phrase.len() - usize::from(phrase.last() == Some(&"for"));
+                while words
+                    .get(from)
+                    .is_some_and(|word| BETWEEN.contains(&word.as_str()))
+                {
+                    from += 1;
                 }
-            }
-            if sentence.trim_end().ends_with('?') && !asking {
-                return None;
-            }
-            ASKS.iter().find_map(|(phrase, timer)| {
-                (words.len() > at + phrase.len()
-                    && words[at..at + phrase.len()]
-                        .iter()
-                        .zip(phrase.iter())
-                        .all(|(word, ask)| word == ask))
-                .then(|| {
-                    // "timer for" ends with its own "for": the length follows it.
-                    let mut from = at + phrase.len() - usize::from(phrase.last() == Some(&"for"));
-                    while words
-                        .get(from)
-                        .is_some_and(|word| BETWEEN.contains(&word.as_str()))
-                    {
-                        from += 1;
-                    }
-                    (words[from..].to_vec(), *timer)
-                })
+                (words[from..].to_vec(), *timer)
             })
-        })?;
+        })?
+    };
     let number = |word: &String| word.chars().all(|c| c.is_ascii_digit()) || is_a_number(word);
     // A length right after the ask: "in"/"for" (a timer's only), a number,
     // and its unit within the next two words ("in half an hour").
+    // "a"/"an" only right before its unit ("in an hour"), so "in a few
+    // minutes" is no length (the reviewer-lead's P3 on `463b13972`).
+    let article = words.get(1).is_some_and(|word| word == "a" || word == "an");
     let duration = words
         .first()
         .is_some_and(|lead| lead == "in" || (timer && lead == "for"))
         && words.get(1).is_some_and(number)
-        && words[2..words.len().min(4)]
-            .iter()
-            .any(|word| UNITS.contains(&word.as_str()));
+        && if article {
+            words
+                .get(2)
+                .is_some_and(|word| UNITS.contains(&word.as_str()))
+        } else {
+            words[2..words.len().min(4)]
+                .iter()
+                .any(|word| UNITS.contains(&word.as_str()))
+        };
     // A clock time right after the ask that stands as one: "at" and a time
     // ("9", "6 30" as "6:30" is read, "nine"), then the line's end or a word
     // of [`AFTER_A_TIME`]; or "at noon", "at midnight".
@@ -265,11 +311,9 @@ mod tests {
                 "Remind me in ten minutes to exercise for twenty minutes.",
                 TIMER,
             ),
-            (
-                "My train got in at nine. Remind me in an hour to call home.",
-                TIMER,
-            ),
             ("Remind me in half an hour to check the oven.", TIMER),
+            ("Hey Lamp. Remind me in ten minutes to stretch.", TIMER),
+            ("Remind me at 9 pm to lock the door.", REMINDER),
         ] {
             assert_eq!(asks_to_set(said), Some(name), "{said}");
         }
@@ -303,6 +347,22 @@ mod tests {
             "Set a timer for ten minutes. Can you cancel the timer?",
             "Remind me to tell a colleague I got home at nine.",
             "Remind me to call Mom at nine.",
+            // Readers' on `463b13972`/`8a385c639`: a second sentence, a
+            // withdrawal word, another operation, a later constraint,
+            // quoted words, a measure, no real length.
+            "Set a timer for ten minutes. Ignore that.",
+            "Set a timer for ten minutes. Oh, skip it.",
+            "Remind me in five minutes to call Mom. Scrap that.",
+            "Remind me at nine to call Mom. Leave it.",
+            "Set a timer for ten minutes. I changed my mind.",
+            "Set a timer for ten minutes. Please ignore that request.",
+            "Remind me at nine to take my pills every day.",
+            "Set a timer for ten minutes starting at noon.",
+            "Translate this sentence into French. 'Remind me in ten minutes to stretch.'",
+            "Say \u{201c}remind me in ten minutes\u{201d} in French.",
+            "Remind me at 10% to charge my phone.",
+            "Remind me in a few minutes.",
+            "My train got in at nine. Remind me in an hour to call home.",
         ] {
             assert_eq!(asks_to_set(said), None, "{said}");
         }
@@ -366,6 +426,9 @@ mod tests {
             "Remind me to tell a colleague I got home at nine.",
             "Remind me in five minutes to call Mom. Actually no, don't.",
             "Remind me to check the oven, it needs 20 minutes at 180 degrees.",
+            "Set a timer for ten minutes. Ignore that.",
+            "Remind me at nine to take my pills every day.",
+            "Translate this sentence into French. 'Remind me in ten minutes to stretch.'",
         ] {
             assert_eq!(choice(said), None, "{said}");
         }
