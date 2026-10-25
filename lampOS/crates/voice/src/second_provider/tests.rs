@@ -9254,6 +9254,25 @@ async fn only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words() {
     );
 }
 
+/// A line marked as only the lamp's name (`Called`) whose words came back
+/// as a whole line is asked as it is, without the call's note (lamp-4ace,
+/// 25 Oct: "Nice. And what was my sister's name again?" was told it was only
+/// the name and answered "May."). The name, or one word for it misheard, is
+/// still told it was a call.
+#[tokio::test]
+async fn a_called_line_with_more_words_than_the_name_is_not_told_it_was_only_the_name() {
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    let words = "Nice. And what was my sister's name again?";
+    let whole = asked_with(words, |engine| engine, start(1), true, false).await;
+    assert!(!whole[0].contains(&called), "{:?}", whole[0]);
+    assert_eq!(whole[0].last(), Some(&Message::user(words)));
+    for one in ["Life.", "Hey Lamp."] {
+        let call = asked_with(one, |engine| engine, start(1), true, false).await;
+        assert_eq!(call[0][call[0].len() - 2], called, "{one}: {:?}", call[0]);
+        assert_eq!(call[0].last(), Some(&Message::user(one)));
+    }
+}
+
 /// #1712, item 4, with `LAMP_SECOND_PREPARED`: a chat begun on a cut-in's
 /// early words is asked with its note, so it is kept, not dropped as "a
 /// note goes beside the words"; a note known only at the End (`Called`)
@@ -11264,7 +11283,11 @@ async fn called_fallback_does_not_supply_words_for_a_music_identity() {
         ));
         let asked = script.asked.lock().unwrap();
         assert_eq!(asked.len(), 2);
-        assert!(asked[0].contains(&Message::system(crate::provider_worker::CALLED_NOTE)));
+        // Whole words with the mark are no call ([`super::whole_already`]).
+        assert_eq!(
+            asked[0].contains(&Message::system(crate::provider_worker::CALLED_NOTE)),
+            !authorized
+        );
         assert_eq!(
             asked[0].last(),
             Some(&Message::user(if authorized {
@@ -11593,6 +11616,14 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
             ));
         };
         let words = "Please play a quiet recording.";
+        // A Called mark on a whole line is no call ([`super::whole_already`]);
+        // on one heard without its sentence's end it still is, and its note,
+        // known only at the End, drops the prepared chat.
+        let heard_words = if mode == "cut-in-called" {
+            "Please play a quiet recording"
+        } else {
+            words
+        };
         let began = Arc::new(tokio::sync::Notify::new());
         let mut early = vec![net::Early::Words(words.into())];
         if mode == "resumed" {
@@ -11603,7 +11634,7 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
                 [Ok(if mode == "changed" {
                     "Never mind."
                 } else {
-                    words
+                    heard_words
                 }
                 .into())]
                 .into(),
@@ -11786,7 +11817,7 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
                 mode == "cut-in-called"
             );
             if mode == "cut-in-called" {
-                assert_eq!(asked[1].last(), Some(&Message::user(words)));
+                assert_eq!(asked[1].last(), Some(&Message::user(heard_words)));
                 assert!(
                     asked[1]
                         .iter()
@@ -11942,11 +11973,10 @@ async fn carried_words_answered_for_a_held_request_have_no_new_music_identity() 
                 "Please play a quiet recording."
             }))
         );
-        assert_eq!(
-            script.asked.lock().unwrap()[1]
+        assert!(
+            !script.asked.lock().unwrap()[1]
                 .contains(&Message::system(crate::provider_worker::CALLED_NOTE)),
-            called,
-            "the carried prefix stays ineligible even with the Called note"
+            "a whole carried line is no call, with the Called mark or without"
         );
         engine.submit(start(3));
         engine.submit(audio(3, 1));
