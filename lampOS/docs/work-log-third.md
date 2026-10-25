@@ -5,6 +5,32 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 02:07 — Expression privacy read-error boundary taken
+
+Ready for lamp-voice: no (new source finding, not yet reproduced).
+
+Claimed on Queue comment 6401420193 before code, on own branch
+third/privacy-read-error at a6ccb1aa3. Expression converts an error reading
+the retained voice/privacy envelope into the same absence as a topic never
+published. Its four presentation checks can therefore clear the privacy
+gate after a read error. This source finding concerns tap looks and skill
+rests; it does not establish a microphone reopening.
+
+Open/merged PR and current Queue checks found no owner. Delivered #1282
+and #1301 cover deliberately retained valid privacy values and malformed
+payloads, not an invalid retained envelope or read error. First reproduce
+with the real Bus, preserve the distinct no-publisher compatibility case,
+then fix only Expression's error handling. Fresh valid privacy data must
+restore the existing behavior. No hardware, provider or product activation.
+
+In parallel, Reviewer-two's exact public #3486 abc composition passed full
+Voice/Eval 4,691/0/21 and all 19 combined controls once (6401813997). Latest
+public a5+a6 tree b065415c4 matches the frozen author tree afa2d7981 except
+four non-build-read proof files. Latest-delta fmt/clippy/workspace build and
+same-voice checks are requested; the earlier full remains scoped to abc.
+Controls' original full 14-crate gate is still progressing on frozen abc;
+no final full result is claimed yet.
+
 ## 2026-10-26 01:59 — Scheduling reread confirms remaining constrained asks
 
 Ready for lamp-voice: no (#3477 source HOLD remains with its author;
