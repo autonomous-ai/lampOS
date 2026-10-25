@@ -5,6 +5,24 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 03:22 — Factory baseline native gate passes
+
+Ready for lamp-voice: yes for #3507 at 65403e535 on current 409bf7268.
+
+Original ARM64 **40229200159** and Linux clippy **40229200161**, both
+attempt 1, pass. Actual preview 476df43ae has parents 409/654 and exactly
+the offered tree 8ad3f50a7. **11,314 PASS, zero leaks/failures/timeouts,
+106 skipped**; all six new calibration controls pass once. The
+[audited receipt](verification/head-rest-coverage-20261026/native-40229200159.json)
+binds source and raw-log identities. Two current READ-OKs (6402553037,
+6402653536) and the lead's no-finding read are posted. Reviewer-two also
+independently ran 84 factory stand-ins, zero failures; that does not claim
+execution of the changed Rust binary or physical calibration.
+
+#3486 is ready and nominated in Queue 6402697902. Both PRs retain their
+original native results and exact-current-base reads. Expression's full
+serial gate continues; no device or activation action.
+
 ## 2026-10-26 03:19 — Current two-face native gate passes
 
 Ready for lamp-voice: yes for #3486 at d4db9378a on current 409bf7268.
