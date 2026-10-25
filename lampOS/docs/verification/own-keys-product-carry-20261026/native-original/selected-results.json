@@ -1,0 +1,65 @@
+[
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_directory",
+    "ordinal": 6236,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_fifo",
+    "ordinal": 6237,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again",
+    "ordinal": 6325,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+    "ordinal": 6361,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_off_drop_in_without_reloading",
+    "ordinal": 6362,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_symlink_to_the_exact_template",
+    "ordinal": 6363,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_preflight_refuses_a_directory_at_the_retired_own_keys_path",
+    "ordinal": 6366,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest",
+    "ordinal": 6375,
+    "status": "PASS",
+    "total": 11329
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "the_product_takes_a_persons_own_keys",
+    "ordinal": 6397,
+    "status": "PASS",
+    "total": 11329
+  }
+]

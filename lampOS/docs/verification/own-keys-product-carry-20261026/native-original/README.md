@@ -1,0 +1,11 @@
+# Own-keys carry: original PR native qualification
+
+PR #3510 authored head `d71a423ca0437524dcafb1cb3556a37169da3032` is based on `3d9722f38817a4dd1601fac051d36ac9f2292969`. Both original jobs checked out merge preview `64fe39e119a2dcf61d5d34c5c4b183fd5b5df826`. Its complete tree `f68da3e713a5b8a74dc58ceeb081daff2d6995e8` equals the authored head tree, with the exact base/head as its parents. [identities.json](identities.json) records the original run, job and artifact metadata.
+
+[ARM64 run 40236471814, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40236471814/attempts/1) succeeds: **11,329 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**, in 208.978 seconds. All ordinals 1–11,329 reconcile exactly once; 35 identical report echoes are excluded. All nine selected installer, matcher and product controls pass once, including Linux-only `retired_drop_in_matcher_preserves_a_fifo` at ordinal 6,237. [selected-results.json](selected-results.json) gives their exact case names and ordinals.
+
+The two excluded own-harness binaries run separately: relay signals succeeds and 12 process tests pass. Workspace doctests contribute four passes across 46 summaries. The separate stable-promotion tool workspace reports 22 passes. These scopes are not added to the nextest count. [census.json](census.json) preserves the distinct counts and raw-log hashes.
+
+[Linux Clippy run 40236471838, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40236471838/attempts/1) succeeds, including pinned workspace formatting and strict workspace/all-target Clippy, plus the separate stable-promotion tool formatting and Clippy. Neither original job was rerun for this audit. Promotion, signing and failure-report jobs were skipped, not passed.
+
+Raw logs and API receipts remain retained privately. The published artifact metadata is bound to this authored head; its archive was not downloaded or executed by this audit. The FIFO result exercises only cleanup's private matcher, not whole-install FIFO handling. Product activation remains HOLD for #2094 and fresh current-base lamp acceptance. This is evidence for the original head only; later amendments require their own qualification. No provider, real key, systemd installation, physical lamp or latency acceptance is claimed.

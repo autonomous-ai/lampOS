@@ -1,4 +1,16 @@
-Own-keys current carry published as draft; music trace full gate active.
+Own-keys original native qualification retained; review documentation and music controls active.
+
+## Current checkpoint: 2026-10-26 06:44 +07, own-keys native evidence and music full gate
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) original `d71a423ca` is qualified by [its original native packet](verification/own-keys-product-carry-20261026/native-original/README.md): ARM64 **40236471814**, attempt 1, reports **11,329 unique PASS, zero failures/leaks/timeouts, 106 skipped**, all nine selected controls once including the Linux-only FIFO matcher. Linux Clippy **40236471838** passes. Actual preview `64fe39e119` and authored head have identical complete trees. Thirty-five identical report echoes are excluded; doctests and the separate custom harnesses retain their own counts. No artifact was executed locally and no activation was accepted.
+
+Reviewer-three's source READ-OK and Reviewer-lead's activation HOLD remain separate. The draft cannot merge before explicit acceptance for #2094 and fresh current-base lamp checks. Two documentation findings are being fixed: describe the branch's actual on settings separately from the merge prerequisite, and explain that a retained voice-only off override leaves setup/app storage enabled while Voice ignores keys. The census reader is queued after the active music controls; runtime units are unchanged.
+
+Music's full frozen Mac Voice gate completed **4,068 passed / 0 failed / 21 ignored**, with formatting, strict all-target Clippy and compilation passing, all 7,132 source entries unchanged. All three direct baseline controls pass. The first deliberate mutation, removing the refused field, compiles and fails the intended record equality assertion **0/1**, exit 101. The remaining controls and final restoration are still running, so no complete mutation-campaign or ready-PR claim is made.
+
+No lamp, provider, real-key or release action ran. The earlier own-keys full-run failure and unknown cause remain unchanged in their original proof.
+
+---
 
 ## Current checkpoint: 2026-10-26 04:40 +07, own-keys draft #3510 and current local qualification
 
