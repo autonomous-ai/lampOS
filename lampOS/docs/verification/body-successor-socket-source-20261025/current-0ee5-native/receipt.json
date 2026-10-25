@@ -1,0 +1,178 @@
+{
+  "head": "56f968fa33c59cb3c22f3d1748d1005b622e89f2",
+  "authored_base": "0ee5ebd2a78f3825847a69e197d3f6b4433e4962",
+  "actual_preview": "a4af9227e4756950cc70baee7ba0e22404f73f3e",
+  "whole_trees": {
+    "56f968fa33c59cb3c22f3d1748d1005b622e89f2": "a8a52ffab88097cca99d4615dfcd4ddd3d8fd9ff",
+    "a4af9227e4756950cc70baee7ba0e22404f73f3e": "a8a52ffab88097cca99d4615dfcd4ddd3d8fd9ff"
+  },
+  "whole_trees_equal": true,
+  "runs": {
+    "arm64": 40150561482,
+    "linux": 40150561456
+  },
+  "census": {
+    "PASS": 7407,
+    "LEAK": 1,
+    "selected_terminal": 7408,
+    "failed": 0,
+    "unrun": 0,
+    "skipped": 53,
+    "primary_terminal_lines": 7442,
+    "identical_echoes": 34
+  },
+  "required_case_count": 21,
+  "required_cases": {
+    "runtime::supervisor::tests::abrupt_parent_channel_loss_expires_authority_in_real_child": {
+      "status": "PASS",
+      "index": 399,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::abrupt_parent_channel_loss_expires_authority_in_real_child"
+    },
+    "runtime::supervisor::tests::actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement": {
+      "status": "PASS",
+      "index": 400,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement"
+    },
+    "runtime::supervisor::tests::audit_crashed_child_does_not_leak_owned_ipc_directory": {
+      "status": "PASS",
+      "index": 401,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::audit_crashed_child_does_not_leak_owned_ipc_directory"
+    },
+    "runtime::supervisor::tests::audit_failed_privacy_send_inhibits_supervisor_immediately": {
+      "status": "PASS",
+      "index": 402,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::audit_failed_privacy_send_inhibits_supervisor_immediately"
+    },
+    "runtime::supervisor::tests::crashed_child_is_reaped_without_a_successful_shutdown_claim": {
+      "status": "PASS",
+      "index": 403,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::crashed_child_is_reaped_without_a_successful_shutdown_claim"
+    },
+    "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets": {
+      "status": "PASS",
+      "index": 404,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets"
+    },
+    "runtime::supervisor::tests::failed_control_before_connection_revokes_admission_and_retains_owned_child": {
+      "status": "PASS",
+      "index": 405,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::failed_control_before_connection_revokes_admission_and_retains_owned_child"
+    },
+    "runtime::supervisor::tests::hung_owned_child_is_killed_and_reaped_after_missing_inhibit": {
+      "status": "PASS",
+      "index": 406,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::hung_owned_child_is_killed_and_reaped_after_missing_inhibit"
+    },
+    "runtime::supervisor::tests::identity_and_cleanup_receipts_fail_closed": {
+      "status": "PASS",
+      "index": 407,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::identity_and_cleanup_receipts_fail_closed"
+    },
+    "runtime::supervisor::tests::inert_child": {
+      "status": "PASS",
+      "index": 408,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::inert_child"
+    },
+    "runtime::supervisor::tests::inert_child_stop_timing_samples_are_host_ipc_only": {
+      "status": "PASS",
+      "index": 409,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::inert_child_stop_timing_samples_are_host_ipc_only"
+    },
+    "runtime::supervisor::tests::inhibition_measurement_must_be_between_spawn_and_publication": {
+      "status": "PASS",
+      "index": 410,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::inhibition_measurement_must_be_between_spawn_and_publication"
+    },
+    "runtime::supervisor::tests::malformed_peer_cannot_bypass_expired_watch_or_keep_child_alive": {
+      "status": "PASS",
+      "index": 411,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::malformed_peer_cannot_bypass_expired_watch_or_keep_child_alive"
+    },
+    "runtime::supervisor::tests::no_peer_cleanup_before_observed_reap_even_after_owned_kill": {
+      "status": "PASS",
+      "index": 412,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::no_peer_cleanup_before_observed_reap_even_after_owned_kill"
+    },
+    "runtime::supervisor::tests::partial_child_bind_is_cleaned_after_reap_without_waiting_for_second_socket": {
+      "status": "PASS",
+      "index": 413,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::partial_child_bind_is_cleaned_after_reap_without_waiting_for_second_socket"
+    },
+    "runtime::supervisor::tests::qualification_rejects_wrong_supervisor_before_any_channel_dispatch": {
+      "status": "PASS",
+      "index": 414,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::qualification_rejects_wrong_supervisor_before_any_channel_dispatch"
+    },
+    "runtime::supervisor::tests::real_core_fault_receipts_are_accepted_by_supervisor_without_restamping_stop": {
+      "status": "PASS",
+      "index": 415,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::real_core_fault_receipts_are_accepted_by_supervisor_without_restamping_stop"
+    },
+    "runtime::supervisor::tests::replacing_directory_does_not_remove_original_or_replacement_contents": {
+      "status": "PASS",
+      "index": 416,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::replacing_directory_does_not_remove_original_or_replacement_contents"
+    },
+    "runtime::supervisor::tests::serial_cleanup_failure_and_stalled_teardown_never_become_clean_exit": {
+      "status": "PASS",
+      "index": 417,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::serial_cleanup_failure_and_stalled_teardown_never_become_clean_exit"
+    },
+    "runtime::supervisor::tests::socket_mode_transition_waits_without_accepting_nonprivate_or_wrong_type_peer": {
+      "status": "PASS",
+      "index": 418,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::socket_mode_transition_waits_without_accepting_nonprivate_or_wrong_type_peer"
+    },
+    "runtime::supervisor::tests::socket_replacement_is_retained_and_cleanup_failure_blocks_replacement": {
+      "status": "PASS",
+      "index": 419,
+      "total": 7408,
+      "test": "lamp-body runtime::supervisor::tests::socket_replacement_is_retained_and_cleanup_failure_blocks_replacement"
+    }
+  },
+  "leaky_cases": [
+    {
+      "status": "LEAK",
+      "index": 5209,
+      "total": 7408,
+      "test": "lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+    }
+  ],
+  "summary_literal": [
+    "7408",
+    "7408 passed (1 leaky), 53 skipped"
+  ],
+  "primary_renderings": {
+    "arm64": {
+      "sha256": "776ad3a4965015a4a8ce424a1b9a6e71349104a6dba2038b919798373483c133",
+      "bytes": 1832809,
+      "representation": "gh run view --log rendering, not raw Actions ZIP or API job-log"
+    },
+    "linux": {
+      "sha256": "d3f1ffc208c5b7531e9c65e3b8f7f8498393889f25e818f2a3885de9fd7cebbc",
+      "bytes": 77859,
+      "representation": "gh run view --log rendering, not raw Actions ZIP or API job-log"
+    }
+  },
+  "scope": "Original successor-source native CI read only: all 21 supervisor cases must be literal PASS, complete selected census and authored/actual-preview tree verified. No rerun, local Linux build, timing, physical or historical-cause claim."
+}

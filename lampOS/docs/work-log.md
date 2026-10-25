@@ -1,3 +1,15 @@
+## Current checkpoint: 2026-10-25 08:50 +07, #3427 carry onto train 111 prepared
+
+Ready for lamp-voice: no (#3427 remains draft).
+
+Public 56f968fa3 on 0ee passes its [current Mac gate](verification/body-successor-socket-source-20261025/current-0ee5/README.md), fmt/strict Body Clippy/full Body 608/0/0, and [original native CI](verification/body-successor-socket-source-20261025/current-0ee5-native/README.md): ARM 7,407 PASS plus one LEAK, all 7,408 selected terminal, 53 skipped, all 21 supervisor cases PASS; Linux green. The authored/tested whole tree matches. Older results retain their scope. Reviewer-three carries its actual earlier read to 56 at 6391942608; Reviewer-two's fresh independent Body gate remains in progress, so no formal second current reader is inferred.
+
+Main advanced to train 111, 34c8b517c. The clean local own-branch carry is 1162f2f82, equal range-diff and unchanged owned blobs; upstream changes touch Skills, Update and skill definitions, not Body or Cargo manifests/lock. Its scoped Mac gate is prepared but UNRUN while the Hand and reader lanes are allocated. No Second compiler is active. Push/new original CI follow the allocated passing gate; old 56 results are not renamed.
+
+The separate unplug-gap candidate is carried to 34c with the same two dirty own files; corrected source P2/P3 remain closed, but its gate and all five declared controls are UNRUN. It follows current own-PR/read priorities. No lamp, key, deployment or manual merge action.
+
+---
+
 ## Current checkpoint: 2026-10-25 08:16 +07, #3427 green on old head and current carry queued
 
 Own PR #3427 is public at 6620b73f3/162, draft. Its [qualified fresh Mac gate](verification/body-successor-socket-source-20261025/fresh-162/README.md)
