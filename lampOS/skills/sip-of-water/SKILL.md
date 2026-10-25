@@ -1,14 +1,14 @@
 ---
 name: sip-of-water
-description: After someone has sat at the desk an hour and a half, the lamp turns to them and its light breathes once, a slow cool blue, a wordless hint to drink some water; it never speaks.
+description: After someone has sat at the desk an hour and a half, the lamp turns to them and its light breathes once, a slow cool blue, a hint to drink some water, with one short, friendly line suggesting a sip.
 ---
 
 # A sip of water
 
 When you have been at your desk for an hour and a half without getting up,
 between 10:00 and 17:00, the lamp turns to you and its light breathes once,
-slowly, a cool blue, for about six seconds: a hint to have a sip of water.
-Then the light is as it was.
+slowly, a cool blue, for about six seconds, and says one short, friendly
+line suggesting a sip of water. Then the light is as it was.
 
 What it says and when:
 

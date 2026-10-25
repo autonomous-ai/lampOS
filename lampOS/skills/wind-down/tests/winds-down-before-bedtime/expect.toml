@@ -16,6 +16,12 @@ call = "light"
 args = { dim = 1, until = "ends" }
 
 [[expect]]
+at = "20m"
+within = "1m"
+call = "say"
+args = { note = "It is late in the evening and they are still at the desk. In one short, gentle line, suggest starting to wind down for the night." }
+
+[[expect]]
 at = "42m"
 within = "1m"
 call = "ends"

@@ -3,7 +3,7 @@
 # talks to it"). Speech is the voice's, from its air facts, never this
 # skill's. Written to lamp-skills' schema (docs/skills.md, "The schema, as
 # lamp-skills reads it").
-needs = ["air", "body", "light"]
+needs = ["air", "body", "light", "voice"]
 # Comes with the lamp and is always there (docs/skills.md, "Core and
 # installable skills"): on a lamp whose sensor doesn't answer it does
 # nothing.
@@ -11,8 +11,9 @@ kind = "core"
 version = "1.0.0"
 
 # What it may read and use, and nothing more: the air, the voice's state,
-# the droop and a shade of dim. It never speaks.
+# the droop and a shade of dim. It says one short line, worded by the voice (the owner, 25 Oct).
 [permissions]
+speak = true             # one short line, worded by the voice (the owner, 25 Oct: a lamp that talks to you, not only hints)
 topics = ["air/state", "voice/state"]
 light = true
 body = true
@@ -26,10 +27,17 @@ gap = "1m"                # one reading under the line does not end the spell
 rearm = { below = 1000, for = "10m" }   # once a spell; again only after 10 minutes of good air
 wait = "10m"              # talking when the ten minutes come: it droops once the talk ends, within ten minutes (#1089)
 
+[[while]]                 # the lamp itself has not spoken for 30 s: not on top of its own last words
+topic = "voice/state"
+field = "state"
+not_equals = "speaking"
+for = "30s"
+
 [[while]]                 # never while someone is talking to the lamp
 topic = "voice/state"
 field = "state"
 equals = "resting"
+for = "5s"                # nothing heard or said for 5 s, as Welcome back waits (#1140)
 
 [quiet]                   # never at night, by the lamp's local time
 from = "22:00"
@@ -41,3 +49,4 @@ policy = "nudge"
 [[do]]
 body = { gesture = "sleepy" }          # a slow droop
 light = { dim = 1, until = "ends" }    # a shade dimmer, given back when the air is under 1,200 again
+say = "The air at the desk has turned stuffy. In one short line, suggest letting some fresh air in, such as opening a window or a door."
