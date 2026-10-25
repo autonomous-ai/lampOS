@@ -1,3 +1,15 @@
+## Current checkpoint: 2026-10-25 10:57 +07, #3427 train-115 head pushed and borrowed job returned
+
+Ready for lamp-voice: no (new original ARM and current reader carries pending).
+
+Public `6e494fd19` directly contains `a176e66d9`; patch and both owned blobs are unchanged. [Current Mac proof](verification/body-successor-socket-source-20261025/current-a176/README.md) passes fmt, strict Body Clippy and full Body 608/0/0. All 7,041 committed source rows and seven compiler/pre-exec/private-byte relationships verify; six reused executables match qualified 66, one compiled fresh. Sources unchanged and groups closed. Fourth's short job was returned at 6393152732 before its experiment; no Second compiler is active.
+
+New original ARM 40159849529 is watched; Linux 40159849605 is terminal green. Prepared collection binds exact head/base/original attempt 1 and the case census; it is UNRUN until terminal native evidence. The new guarded readiness body will be bound to this head before use. Previous 66 original CI finished naturally and is retained in 29bc91c70, not transferred or cancelled.
+
+Current work continues with exact-head reader carry, native audit and new source findings; unplug qualification remains UNRUN/unallocated after current priorities. No device or manual merge.
+
+---
+
 ## Current checkpoint: 2026-10-25 10:40 +07, original 66 CI complete and latest carry waiting on job loan
 
 Ready for lamp-voice: no (#3427 draft; integration is now a176e66d9).
