@@ -6,6 +6,28 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 18:00 — Independent Store limits and memory recheck
+
+Ready for lamp-voice: no (Body's dependent gate remains active).
+
+Store is delivered through train #3462; the independent reader's later
+Mac result on original `34d3b8832` is **1,110/0/19** changed crates and
+**6,228/2/33** dependents, exit 101. Keeper's directory-group control
+explains that fixture's 0770/2770 difference. Voice's pushed-search
+watchdog also fails alone in the actual failed binary and remains on
+#1569. [Scope and controls](https://github.com/autonomous-ai/lampOS/pull/3459#issuecomment-6396715572).
+No new Store source P1/P2 was found. This is the reader's result, not a
+Third execution, and the original failures and green native train keep
+their separate identities. The PR body now records this limitation.
+
+Re-read #3463 at `aa533296e`: the original examples and worker census
+are fixed, but `Remember that I like it. Don't save that.` still forces
+a keep because punctuation removal makes the prior sentence's `it`
+exempt the withdrawal. [Current P2](https://github.com/autonomous-ai/lampOS/pull/3463#issuecomment-6396736270),
+independently corroborated by reviewer-two. First owns the repair.
+Body remains on frozen `640198b2c` with its original dependent command
+active; the current-base carry follows its terminal result.
+
 ## 2026-10-25 17:37 — Explicit-memory release hold verified
 
 Ready for lamp-voice: no (Body carry gates continue; #3463 is First's repair).
