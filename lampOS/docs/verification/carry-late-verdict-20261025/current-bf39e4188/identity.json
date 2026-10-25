@@ -1,0 +1,50 @@
+{
+  "head": "2aca8150f2651d0f68c650fa2efc3e58269f319b",
+  "tree": "76f068c08167f5827d80695d3e17bb720575e758",
+  "base": "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+  "full_gate_source": "8b9debb804876c1df38db048ef9c73e177adda95",
+  "base_delta": [
+    "lampOS/crates/actions/src/schedule.rs",
+    "lampOS/crates/actions/tests/it/schedule.rs"
+  ],
+  "range_diff": "1:  860ede9c9 = 1:  9284bae60 lampOS: preserve owner evidence when applying late carry verdicts\n2:  8b9debb80 = 2:  2aca8150f lampOS: record current late-verdict carry gates",
+  "scope": "The only new base change is Actions schedule clock output and its tests. Voice links Actions only in dev-dependencies. Voice tools schedule integration and probe/catalog readers are re-executed, alongside all Actions schedule tests and Eval switch census. Full Voice/Eval execution remains explicitly on 8b9debb80 / 0ddd07377. Original full Linux CI will qualify the final offered composition.",
+  "full_gate_identity": {
+    "head": "8b9debb804876c1df38db048ef9c73e177adda95",
+    "tree": "f03a52cbf540da90c0dafa8d5c122d5a1d363ba6",
+    "base": "0ddd073778a8cc214939528323837cdebc33b1c1",
+    "previous_offered_head": "92511dc092d46ccb40ca156d7ba3dc41d7975e2e",
+    "range_diff": "1:  bfc7e70a3 = 1:  860ede9c9 lampOS: preserve owner evidence when applying late carry verdicts\n2:  92511dc09 = 2:  8b9debb80 lampOS: record current late-verdict carry gates",
+    "environment": {
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0"
+    }
+  },
+  "full_gate_source_check": {
+    "head": "8b9debb804876c1df38db048ef9c73e177adda95",
+    "tree": "f03a52cbf540da90c0dafa8d5c122d5a1d363ba6",
+    "source_stayed_clean": true,
+    "new_control_pass_counts": {
+      "a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner": 1,
+      "a_late_window_keeps_the_same_voice_sign_for_going_on_same_one": 1,
+      "a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry": 1
+    },
+    "raw_log_sha256": {
+      "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test-voice-eval.log": "5b121fc7b02a726e4c3613edaa1fb3454f2a4f8746628993ab8824724b3be839"
+    }
+  },
+  "current_source_clean_after_gate": true,
+  "environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "RUST_TEST_THREADS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  }
+}
