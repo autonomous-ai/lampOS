@@ -1,0 +1,39 @@
+test-memory
+test result: ok. 96 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 44.94s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.95s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.77s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 167 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 319.17s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.01s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.29s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.12s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.70s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.37s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.36s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.51s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.61s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+test-second-worker
+test result: ok. 173 passed; 0 failed; 0 ignored; 0 measured; 3610 filtered out; finished in 23.23s
+
+test-reminders
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 3754 filtered out; finished in 9.59s
+
+test-provider-terminal
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 3770 filtered out; finished in 0.80s
+
+test-reminder-roundtrip
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3779 filtered out; finished in 3.17s
+
+test-voice-eval
+test result: ok. 378 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.43s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.24s
+test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 78.80s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
