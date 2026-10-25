@@ -1,0 +1,17 @@
+{
+  "inputs": "only published commits, public prose resolution and authored status-header patch; local target commits not used",
+  "results": [
+    {
+      "label": "618",
+      "result_tree": "21d7db4e321b08ac94f370d749fb5c49c4fa1911",
+      "all_vectors_and_expectations_passed": true
+    },
+    {
+      "label": "fabd",
+      "result_tree": "e22f5070ae0fabfd031dddc72cf3e565e6bd5e9d",
+      "all_vectors_and_expectations_passed": true
+    }
+  ],
+  "compilation_or_test_observation": false,
+  "repository_source_index_refs_unchanged": true
+}

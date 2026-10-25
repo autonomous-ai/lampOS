@@ -1,0 +1,23 @@
+{
+  "at_utc": "2026-10-25T02:55:32.569641+00:00",
+  "repository_public": true,
+  "commits": [
+    {
+      "commit": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+      "GitHub_commit_endpoint_verified": true
+    },
+    {
+      "commit": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "GitHub_commit_endpoint_verified": true
+    },
+    {
+      "commit": "0ee5ebd2a78f3825847a69e197d3f6b4433e4962",
+      "GitHub_commit_endpoint_verified": true
+    },
+    {
+      "commit": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+      "GitHub_commit_endpoint_verified": true
+    }
+  ],
+  "responses_projected_to_SHA_only": true
+}

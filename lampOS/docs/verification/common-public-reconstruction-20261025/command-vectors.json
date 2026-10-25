@@ -1,0 +1,475 @@
+{
+  "cases": [
+    {
+      "expected_result_tree": "21d7db4e321b08ac94f370d749fb5c49c4fa1911",
+      "label": "618",
+      "public_inputs": {
+        "public_authored_parent": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+        "public_base": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+        "public_feature": "e9d00f935029a6d5054ddf35b0203fb8546f7995"
+      },
+      "steps": [
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "merge-tree",
+            "--write-tree",
+            "--messages",
+            "--merge-base=2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+            "da57072b2e6420ae25cf6779f1ee1756178ce724",
+            "e9d00f935029a6d5054ddf35b0203fb8546f7995"
+          ],
+          "assert_first_line": "8e6f980246dfffdc7e37ea287dc80281a12a8677",
+          "assert_only_conflict_path": "lampOS/docs/reuse-decisions.md",
+          "expected_exit": 1,
+          "stdout": "${CASE}/merge.stdout"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "show",
+            "da57072b2e6420ae25cf6779f1ee1756178ce724:lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/ours.md"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "show",
+            "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd:lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/ancestor.md"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "show",
+            "e9d00f935029a6d5054ddf35b0203fb8546f7995:lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/feature.md"
+        },
+        {
+          "argv": [
+            "git",
+            "merge-file",
+            "--union",
+            "--stdout",
+            "${CASE}/ours.md",
+            "${CASE}/ancestor.md",
+            "${CASE}/feature.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/union.md"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "read-tree",
+            "8e6f980246dfffdc7e37ea287dc80281a12a8677"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "hash-object",
+            "-w",
+            "${CASE}/union.md"
+          ],
+          "assert_stdout": "118d236bc49a10dd2e8e70741627cc997fab8b51",
+          "expected_exit": 0,
+          "stdout": "${CASE}/union-blob.txt"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "update-index",
+            "--cacheinfo",
+            "100644",
+            "118d236bc49a10dd2e8e70741627cc997fab8b51",
+            "lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "apply",
+            "--cached",
+            "--whitespace=error-all",
+            "${ARTIFACTS}/reuse-decisions-spacing.patch"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "write-tree"
+          ],
+          "assert_stdout": "191d164a8e8bfaaefca311a89e4cb5be32b3ea94",
+          "expected_exit": 0,
+          "stdout": "${CASE}/pre-header-tree.txt"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "apply",
+            "--cached",
+            "--whitespace=error-all",
+            "${ARTIFACTS}/verification-status-header.patch"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "write-tree"
+          ],
+          "assert_stdout": "21d7db4e321b08ac94f370d749fb5c49c4fa1911",
+          "expected_exit": 0,
+          "stdout": "${CASE}/result-tree.txt"
+        }
+      ]
+    },
+    {
+      "expected_result_tree": "e22f5070ae0fabfd031dddc72cf3e565e6bd5e9d",
+      "label": "fabd",
+      "public_inputs": {
+        "public_authored_parent": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+        "public_base": "0ee5ebd2a78f3825847a69e197d3f6b4433e4962",
+        "public_feature": "e9d00f935029a6d5054ddf35b0203fb8546f7995"
+      },
+      "steps": [
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "merge-tree",
+            "--write-tree",
+            "--messages",
+            "--merge-base=2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+            "0ee5ebd2a78f3825847a69e197d3f6b4433e4962",
+            "e9d00f935029a6d5054ddf35b0203fb8546f7995"
+          ],
+          "assert_first_line": "4eec76ee195da2cb72e5ae46710481d998d61ce2",
+          "assert_only_conflict_path": "lampOS/docs/reuse-decisions.md",
+          "expected_exit": 1,
+          "stdout": "${CASE}/merge.stdout"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "show",
+            "0ee5ebd2a78f3825847a69e197d3f6b4433e4962:lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/ours.md"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "show",
+            "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd:lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/ancestor.md"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "show",
+            "e9d00f935029a6d5054ddf35b0203fb8546f7995:lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/feature.md"
+        },
+        {
+          "argv": [
+            "git",
+            "merge-file",
+            "--union",
+            "--stdout",
+            "${CASE}/ours.md",
+            "${CASE}/ancestor.md",
+            "${CASE}/feature.md"
+          ],
+          "expected_exit": 0,
+          "stdout": "${CASE}/union.md"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "read-tree",
+            "4eec76ee195da2cb72e5ae46710481d998d61ce2"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "hash-object",
+            "-w",
+            "${CASE}/union.md"
+          ],
+          "assert_stdout": "118d236bc49a10dd2e8e70741627cc997fab8b51",
+          "expected_exit": 0,
+          "stdout": "${CASE}/union-blob.txt"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "update-index",
+            "--cacheinfo",
+            "100644",
+            "118d236bc49a10dd2e8e70741627cc997fab8b51",
+            "lampOS/docs/reuse-decisions.md"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "apply",
+            "--cached",
+            "--whitespace=error-all",
+            "${ARTIFACTS}/reuse-decisions-spacing.patch"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "write-tree"
+          ],
+          "assert_stdout": "5e3384a3eb6158af9bbe78645770cd7af4d7aee9",
+          "expected_exit": 0,
+          "stdout": "${CASE}/pre-header-tree.txt"
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "apply",
+            "--cached",
+            "--whitespace=error-all",
+            "${ARTIFACTS}/verification-status-header.patch"
+          ],
+          "expected_exit": 0
+        },
+        {
+          "argv": [
+            "git",
+            "--git-dir=${SCRATCH}/repo.git",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-c",
+            "core.autocrlf=false",
+            "-c",
+            "merge.renormalize=false",
+            "write-tree"
+          ],
+          "assert_stdout": "e22f5070ae0fabfd031dddc72cf3e565e6bd5e9d",
+          "expected_exit": 0,
+          "stdout": "${CASE}/result-tree.txt"
+        }
+      ]
+    }
+  ],
+  "environment": "Start with no inherited GIT_* variables; then use exactly the listed Git environment. No worktree/shared index/refs are written. All created objects and indexes live in SCRATCH.",
+  "git_environment": {
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES": "${PUBLIC_REPOSITORY_OBJECTS}",
+    "GIT_ATTR_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_DIR": "${SCRATCH}/repo.git",
+    "GIT_INDEX_FILE": "${CASE}/index",
+    "GIT_NO_REPLACE_OBJECTS": "1",
+    "GIT_OPTIONAL_LOCKS": "0"
+  },
+  "git_version_used": "git version 2.50.1 (Apple Git-155)",
+  "initialization": [
+    {
+      "argv": [
+        "git",
+        "init",
+        "--bare",
+        "--quiet",
+        "--template=",
+        "${SCRATCH}/repo.git"
+      ],
+      "expected_exit": 0
+    }
+  ],
+  "no_build_tests_or_qualification": true,
+  "no_private_runtime_blob_source": true,
+  "not_inputs": [
+    "fabd87bb2b1e408ebd39ee2dfdc9e1fdbdc6a1a2",
+    "618158e68667aa2ddcc8f541cbf59fac3defca38"
+  ],
+  "patches": {
+    "reuse-decisions-spacing.patch": {
+      "bytes": 615,
+      "sha256": "80c1f55fd454a91dfaa6e8d61f3400b9ee6fd6772f217991cccd0c98199c12c4"
+    },
+    "verification-status-header.patch": {
+      "bytes": 1930,
+      "sha256": "94583be3a3bdc1cf7545dc8c5a57f69e65ba6d3cd26a0a4d35ed037fa9c1a8fa"
+    }
+  },
+  "placeholders": {
+    "ARTIFACTS": "directory containing the two reviewed prose patches",
+    "CASE": "new separate scratch directory per case",
+    "PUBLIC_REPOSITORY_OBJECTS": "absolute objects directory of the public repository",
+    "SCRATCH": "new private scratch directory"
+  },
+  "precondition": "A public repository object directory containing the three listed public commits for each case. Public visibility is supplied by the repository owner; this local audit performs no network visibility check.",
+  "version": 1
+}

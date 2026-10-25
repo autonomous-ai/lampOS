@@ -1,0 +1,12 @@
+diff --git a/lampOS/docs/reuse-decisions.md b/lampOS/docs/reuse-decisions.md
+index 118d236bc49a10dd2e8e70741627cc997fab8b51..1100206a49eda669346d3a266ab7838a28b74a53 100644
+--- a/lampOS/docs/reuse-decisions.md
++++ b/lampOS/docs/reuse-decisions.md
+@@ -1670,6 +1670,7 @@
+ or playback authority is added. Target: no additional I/O or scheduling
+ on the confirmation path. Model wording and acoustic latency remain lamp
+ acceptance, not established by prompt-context assertions.
++
+ ### Request speaker continuity and short lines (23 October 2026, #3064)
+ 
+ V1 inspected: `hal/drivers/voice/_internal/realtime_turn.py`,

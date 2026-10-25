@@ -1,0 +1,46 @@
+{
+  "618-two-sided-36-path-map.csv": {
+    "bytes": 9583,
+    "sha256": "b7b1a91fdc93d4aee0eca88073a35269b7860323fc90935fe146ec1b537315cd"
+  },
+  "618-two-sided-36-path-map.json": {
+    "bytes": 30551,
+    "sha256": "3be831e880832fa8e27e280005685f9e10f64824da807515ffa749067b22648a"
+  },
+  "REPRODUCTION.md": {
+    "bytes": 3230,
+    "sha256": "79adc9e1abe277ea986ebc1ca48abcd0d7033513087b596fc4de23a94046cac5"
+  },
+  "command-vectors.json": {
+    "bytes": 14150,
+    "sha256": "a585cdf4457405734feef06834c31915b04ad1502b3b420493a0dcedf3b9550e"
+  },
+  "fabd-two-sided-36-path-map.csv": {
+    "bytes": 9583,
+    "sha256": "e7d21911405e092f37cf79dd2086598ec7df8c1290e5e261574fd71cf4da8a88"
+  },
+  "fabd-two-sided-36-path-map.json": {
+    "bytes": 30551,
+    "sha256": "4e948a32a69f9bd86d5f202c020c1c29ca76c225b2e9c913c0fab337fc0a9593"
+  },
+  "public-object-availability.json": {
+    "bytes": 618,
+    "sha256": "554302cd39f847722fdf8bba9743830c6f720b5bd8ac2bc3a83163ec46278b45"
+  },
+  "result-bindings.json": {
+    "bytes": 2751,
+    "sha256": "61b0ab399bc2a6defdf541e0116dcdadc02a194d396923e6b15e627f28c4d46b"
+  },
+  "reuse-decisions-spacing.patch": {
+    "bytes": 615,
+    "sha256": "80c1f55fd454a91dfaa6e8d61f3400b9ee6fd6772f217991cccd0c98199c12c4"
+  },
+  "root-replay-selected.json": {
+    "bytes": 544,
+    "sha256": "9ed27d04aed612a3588322515b9fd6a5c9b0f6ed351187c0654ce04e88e0ed93"
+  },
+  "verification-status-header.patch": {
+    "bytes": 1930,
+    "sha256": "94583be3a3bdc1cf7545dc8c5a57f69e65ba6d3cd26a0a4d35ed037fa9c1a8fa"
+  }
+}

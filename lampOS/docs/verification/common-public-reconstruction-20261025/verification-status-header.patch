@@ -1,0 +1,29 @@
+diff --git a/lampOS/docs/verification/common-checking-20261023/README.md b/lampOS/docs/verification/common-checking-20261023/README.md
+index 423f418ab8fef6b5bf6908f08917fef43339b8c2..1729b1371bfdc6c538d2b15795c3d78415a9e3cc 100644
+--- a/lampOS/docs/verification/common-checking-20261023/README.md
++++ b/lampOS/docs/verification/common-checking-20261023/README.md
+@@ -1,6 +1,23 @@
+ # Common private-context Checking correction, 23 October 2026
+ 
+-## Current conflicting-carry qualification, 24 October
++> Provisional train-106 carry, 25 October: the Common delta from
++> `d89f36b3027f18b602b1767e7158b81baf7d7690` is composed onto exact base
++> `da57072b2e6420ae25cf6779f1ee1756178ce724`, keeping the upstream soft-start
++> unit settings and documentation. This new source has not run formatting,
++> compilation or tests and inherits no READ-OK or qualification. The fc31,
++> train-103 and intervening source-only preparations remain historical/unrun.
++> The older bcb-pinned 9df Linux full gate remains failed (101), only Skills:
++> 518 passed / 1 failed / 9 ignored. Each of its first three isolated Skills
++> observations also failed (101); the separate observer repair is uncompiled
++> and is not included here. The older 9df Mac full epoch completed successfully
++> on its own frozen source; it does not qualify this changed composition.
++> Earlier f5d remains a failed full gate (101; Voice 4,127 / 12 / 21 ignored);
++> its 36 isolated passes satisfy only the local failure condition, with the
++> full qualification rule false. Interrupted 08ed and all records below remain
++> historical. No old proof transfers, no failure is waived or assigned a cause,
++> and no physical, readiness or activation claim is made.
++
++## Historical conflicting-carry qualification, 24 October
+ 
+ Frozen tested tree `778e51d10695f37e5d4e05250f9814ea022edf26` on base
+ `2e2eee360c47f352dfe94f3d2bfe3d69db7048bd` passes all eight required stages

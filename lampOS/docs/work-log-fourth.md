@@ -1,3 +1,9 @@
+## 2026-10-25 09:59 — Common reproducible source inputs
+
+Ready for lamp-voice: no
+
+Published [Common reconstruction inputs](verification/common-public-reconstruction-20261025/) for the source-verifiability P3. Public e9d plus each public base, one public prose conflict resolution and a count/hash/status-only header patch reconstruct both exact frozen trees. Root independently replayed all vectors and verified the four public commit endpoints. Complete two-sided 36-path maps are included. This supplies reproducible source, with no runtime test, current-base pass or privacy/parent/physical waiver. The current Skills final-source validation remains prepared and unrun pending a declared compiler handoff.
+
 ## 2026-10-25 08:36 — Common current-source carry
 
 Ready for lamp-voice: no

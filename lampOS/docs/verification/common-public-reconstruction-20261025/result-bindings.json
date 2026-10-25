@@ -1,0 +1,48 @@
+{
+  "construction_uses_no_local_candidate_commit_or_runtime_blob_inputs": true,
+  "git_version": "git version 2.50.1 (Apple Git-155)",
+  "no_gate_readiness_or_source_clearance_claim": true,
+  "only_nonpublic_content_input_is_reviewable_count_hash_prose_header_patch": true,
+  "results": {
+    "618": {
+      "all_35_non_verification_README_added_removed_multisets_exact": true,
+      "all_36_modes_blobs_equal_comparison": true,
+      "expected_tree": "21d7db4e321b08ac94f370d749fb5c49c4fa1911",
+      "local_comparison_commit_used_only_after_build": "618158e68667aa2ddcc8f541cbf59fac3defca38",
+      "only_conflicted_path": "lampOS/docs/reuse-decisions.md",
+      "outside_36_exact_base": 10435,
+      "public_authored_parent": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "public_base": "da57072b2e6420ae25cf6779f1ee1756178ce724",
+      "public_feature": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+      "public_merge_tree": "8e6f980246dfffdc7e37ea287dc80281a12a8677",
+      "public_union_blob": "118d236bc49a10dd2e8e70741627cc997fab8b51",
+      "reconstructed_tree": "21d7db4e321b08ac94f370d749fb5c49c4fa1911",
+      "resolved_pre_header_tree": "191d164a8e8bfaaefca311a89e4cb5be32b3ea94",
+      "resolved_public_doc_blob": "1100206a49eda669346d3a266ab7838a28b74a53",
+      "source_files": 10471,
+      "verification_header_after_blob": "1729b1371bfdc6c538d2b15795c3d78415a9e3cc",
+      "verification_header_before_blob": "423f418ab8fef6b5bf6908f08917fef43339b8c2",
+      "whole_tree_hash_exact": true
+    },
+    "fabd": {
+      "all_35_non_verification_README_added_removed_multisets_exact": true,
+      "all_36_modes_blobs_equal_comparison": true,
+      "expected_tree": "e22f5070ae0fabfd031dddc72cf3e565e6bd5e9d",
+      "local_comparison_commit_used_only_after_build": "fabd87bb2b1e408ebd39ee2dfdc9e1fdbdc6a1a2",
+      "only_conflicted_path": "lampOS/docs/reuse-decisions.md",
+      "outside_36_exact_base": 10435,
+      "public_authored_parent": "2e2eee360c47f352dfe94f3d2bfe3d69db7048bd",
+      "public_base": "0ee5ebd2a78f3825847a69e197d3f6b4433e4962",
+      "public_feature": "e9d00f935029a6d5054ddf35b0203fb8546f7995",
+      "public_merge_tree": "4eec76ee195da2cb72e5ae46710481d998d61ce2",
+      "public_union_blob": "118d236bc49a10dd2e8e70741627cc997fab8b51",
+      "reconstructed_tree": "e22f5070ae0fabfd031dddc72cf3e565e6bd5e9d",
+      "resolved_pre_header_tree": "5e3384a3eb6158af9bbe78645770cd7af4d7aee9",
+      "resolved_public_doc_blob": "1100206a49eda669346d3a266ab7838a28b74a53",
+      "source_files": 10471,
+      "verification_header_after_blob": "1729b1371bfdc6c538d2b15795c3d78415a9e3cc",
+      "verification_header_before_blob": "423f418ab8fef6b5bf6908f08917fef43339b8c2",
+      "whole_tree_hash_exact": true
+    }
+  }
+}
