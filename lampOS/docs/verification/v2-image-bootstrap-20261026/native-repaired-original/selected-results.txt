@@ -1,0 +1,21 @@
+ARM64 run 40222685198 (original repaired head; attempt 1)
+2026-10-25T18:45:05.9274041Z 000f71af11cbf7fe5357c42001f599fea5dddfd5
+2026-10-25T18:54:52.4992216Z     Starting 11308 tests across 179 binaries (106 tests and 2 binaries skipped)
+2026-10-25T18:58:24.3504916Z      Summary [ 211.851s] 11308 tests run: 11308 passed, 106 skipped
+
+Imager job 121257468751 in run 40222685128 (same checkout; attempt 1)
+2026-10-25T18:44:43.6504394Z 000f71af11cbf7fe5357c42001f599fea5dddfd5
+2026-10-25T18:44:54.7829328Z Tests: 31 passed, 0 failed
+2026-10-25T18:44:54.9621256Z PASS current/attacker: exit=1, installs=0
+2026-10-25T18:44:55.2209623Z PASS current/mutable-retry: exit=0, installs=2
+2026-10-25T18:44:55.4336084Z PASS current/wrong-record: exit=1, installs=1
+2026-10-25T18:44:55.5947671Z PASS current/tampered: exit=1, installs=0
+2026-10-25T18:44:55.8068422Z PASS current/local: exit=0, installs=1
+2026-10-25T18:44:55.8831851Z 8 passed; 0 failed
+2026-10-25T18:44:55.9009685Z PASS: explicit_size_is_forwarded
+2026-10-25T18:44:55.9098256Z PASS: empty_size_keeps_8G_default
+2026-10-25T18:44:55.9183639Z PASS: stale-standard
+2026-10-25T18:44:55.9234433Z PASS: fresh-standard
+2026-10-25T18:44:55.9303262Z PASS: selected-pro
+2026-10-25T18:44:55.9303730Z 5 passed; 0 failed
+2026-10-25T18:44:56.4922013Z 31 passed in 0.26s

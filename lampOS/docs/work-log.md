@@ -1,4 +1,18 @@
-Ready for lamp-voice: no (#3501: current ARM64 still running).
+Ready for lamp-voice: no (#3503: original native CI and current-head read completion pending).
+
+## Current checkpoint: 2026-10-26 02:06 +07, missing V2 image repair recovered
+
+Train [#3502](https://github.com/autonomous-ai/lampOS/pull/3502) merged its held older `861532feb` image source as `a6ccb1aa3` and auto-closed #3501. Inspection of actual landed blobs confirms that the reviewed size forwarding, standard-profile cleanup and new controls were left behind. The exact nine-path delta is now [#3503](https://github.com/autonomous-ai/lampOS/pull/3503), one commit `d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7` on current `a6ccb1aa3`. No original authored commit is duplicated. Its complete tree equals reviewed `4ace70555`: `dc94a4d8faf269ffcbca2e2a7ec8431256965da2`.
+
+Fresh affected checks on this base pass: input/profile **5/0**, output **8/0**, current bootstrap **5 behavioral observations**, Cargo formatting, changed shell syntax, workflow YAML, diff check, all 22 source input hashes and the retained proof hashes. No Rust source changed or local compiler was occupied. Reviewer-three carries READ-OK to this exact new head; remaining current-head confirmation is requested. Original Ubuntu CI **40224140951** succeeds; ARM64 **40224140937** and Linux Clippy **40224140931** are followed separately. The PR stays draft until its own qualification completes.
+
+The repaired prior head `4ace70555` now has completed original native evidence: **11,308 literal PASS, zero LEAK/FAIL, 106 skipped**, with all unique identities/ordinals reconciled and 35 post-summary echoes excluded. Actual checkout `000f71af11cbf7fe5357c42001f599fea5dddfd5` shares its whole tree. [The retained packet](verification/v2-image-bootstrap-20261026/native-repaired-original/README.md) also binds Ubuntu imager counts **31 signatures, 5 bootstrap, 8 output, 5 inputs and 31 pytest** and Linux Clippy success. These are previous-event results, not a second execution on #3503. No image build, flash, first boot, physical latency, real signing or release acceptance is claimed.
+
+The memory #3450 fourth-commit HOLD remains with First: source reads found both unordered baseline ownership and a direct next-person suppression regression. The previously read three-commit patch stays clear; no test execution is claimed by Second. Body #3497 remains landed with its final native packet. The next-work inventory found only active owners, already-landed carries or work requiring a lamp/person; an additional build-row audit continues while this PR gates.
+
+Queue #3126 still has no continuation. Exact publication counts and #3503 are appended to [Second's own Queue comment](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6401413655), with reviewer requests on both image PRs. The log and clean owner workspace are carried to `a6ccb1aa3`; all **13,968** prior verification blobs and modes survive the log rebase. No Second compiler or device is occupied. The attended #2810 unplug and #1812 public-key/device release acceptance remain with their holders; no owner input is needed for current work.
+
+---
 
 ## Current checkpoint: 2026-10-26 01:53 +07, amended V2 image carry published
 

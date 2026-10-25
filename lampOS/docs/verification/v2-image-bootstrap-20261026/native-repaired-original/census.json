@@ -1,0 +1,186 @@
+{
+  "arm64": {
+    "actual_checkout_rows": [
+      "2026-10-25T18:45:05.9274041Z 000f71af11cbf7fe5357c42001f599fea5dddfd5"
+    ],
+    "announced_binaries": 179,
+    "attempt": 1,
+    "audit_parser_correction": "Initial parser assumed an optional leaky annotation was present and failed its summary assertion; accepting both native summary shapes reconciled the existing log without a test rerun.",
+    "conclusion": "success",
+    "distinct_binary_labels": 153,
+    "echo_statuses": {
+      "PASS": 35
+    },
+    "echoes_all_previously_counted": true,
+    "event_head": "4ace70555becb72bb6ddfa9624474e921c0f2a7c",
+    "event_head_tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "full_log_bytes": 2714764,
+    "leaks": [],
+    "log_sha256": "19e21b1fc1faa23f07ca965aa0ae3a249ad770ee9f76d839862f648496c012dd",
+    "ordinals_all_once": true,
+    "post_summary_echoes": 35,
+    "run": 40222685198,
+    "run_metadata": {
+      "attempt": 1,
+      "conclusion": "success",
+      "databaseId": 40222685198,
+      "event": "pull_request",
+      "headSha": "4ace70555becb72bb6ddfa9624474e921c0f2a7c",
+      "startedAt": "2026-10-25T18:44:32Z",
+      "status": "completed",
+      "updatedAt": "2026-10-25T18:58:48Z",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40222685198"
+    },
+    "same_tree": true,
+    "scope": "Repaired original #3501 source only; not evidence for the older source merged by train #3502 or the fresh follow-up PR",
+    "skipped_binaries": 2,
+    "skipped_tests": 106,
+    "start_line": "2026-10-25T18:54:52.4992216Z     Starting 11308 tests across 179 binaries (106 tests and 2 binaries skipped)",
+    "status": "completed",
+    "summary_counts": {
+      "leaky": 0,
+      "passed": 11308,
+      "skipped": 106
+    },
+    "summary_line": "2026-10-25T18:58:24.3504916Z      Summary [ 211.851s] 11308 tests run: 11308 passed, 106 skipped",
+    "terminal_counts": {
+      "FAIL": 0,
+      "LEAK": 0,
+      "PASS": 11308,
+      "TIMEOUT": 0
+    },
+    "terminal_rows": 11308,
+    "tested_checkout": "000f71af11cbf7fe5357c42001f599fea5dddfd5",
+    "tested_checkout_tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "unique_cases": 11308
+  },
+  "audited_at": "2026-10-26T02:04:40+07:00",
+  "clippy": {
+    "evidence_scope": "Public completed run/job metadata; no Clippy log re-downloaded for this packet",
+    "run_metadata": {
+      "attempt": 1,
+      "conclusion": "success",
+      "databaseId": 40222685236,
+      "event": "pull_request",
+      "headSha": "4ace70555becb72bb6ddfa9624474e921c0f2a7c",
+      "metadata_scope": "Workflow conclusion retained separately from selected job conclusions",
+      "selected_jobs": [
+        {
+          "completedAt": "2026-10-25T18:47:45Z",
+          "conclusion": "success",
+          "databaseId": 121257469456,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "startedAt": "2026-10-25T18:44:36Z",
+          "status": "completed",
+          "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40222685236/job/121257469456"
+        }
+      ],
+      "startedAt": "2026-10-25T18:44:32Z",
+      "status": "completed",
+      "updatedAt": "2026-10-25T18:47:46Z",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40222685236"
+    }
+  },
+  "imager": {
+    "bootstrap_outcomes": [
+      {
+        "case": "attacker",
+        "exit": 1,
+        "mock_install_calls": 0
+      },
+      {
+        "case": "mutable-retry",
+        "exit": 0,
+        "mock_install_calls": 2
+      },
+      {
+        "case": "wrong-record",
+        "exit": 1,
+        "mock_install_calls": 1
+      },
+      {
+        "case": "tampered",
+        "exit": 1,
+        "mock_install_calls": 0
+      },
+      {
+        "case": "local",
+        "exit": 0,
+        "mock_install_calls": 1
+      }
+    ],
+    "complete_job_log_bytes": 51348,
+    "complete_job_log_sha256": "d2555c053ff482dc2284a12c53834d0295928cf9a5b50cc176a7401414ccf196",
+    "results": {
+      "bootstrap": {
+        "failed": 0,
+        "passed": 5
+      },
+      "inputs": {
+        "failed": 0,
+        "passed": 5
+      },
+      "output": {
+        "failed": 0,
+        "passed": 8
+      },
+      "pytest": {
+        "passed": 31
+      },
+      "signature": {
+        "failed": 0,
+        "passed": 31
+      }
+    },
+    "run_metadata": {
+      "attempt": 1,
+      "conclusion": "success",
+      "databaseId": 40222685128,
+      "event": "pull_request",
+      "headSha": "4ace70555becb72bb6ddfa9624474e921c0f2a7c",
+      "metadata_scope": "Workflow conclusion retained separately from selected job conclusions",
+      "selected_jobs": [
+        {
+          "completedAt": "2026-10-25T18:45:00Z",
+          "conclusion": "success",
+          "databaseId": 121257468751,
+          "name": "Image builder \u2014 signatures \u00b7 bootstrap \u00b7 output",
+          "startedAt": "2026-10-25T18:44:36Z",
+          "status": "completed",
+          "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40222685128/job/121257468751"
+        }
+      ],
+      "startedAt": "2026-10-25T18:44:32Z",
+      "status": "completed",
+      "updatedAt": "2026-10-25T18:45:24Z",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40222685128"
+    },
+    "scope": "Ubuntu 24.04 shell, mock-bootstrap and disposable-file checks; no image, root, network payload or device execution",
+    "tested_checkout_from_job_log": "000f71af11cbf7fe5357c42001f599fea5dddfd5"
+  },
+  "landing_and_followup": {
+    "followup_full_tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "followup_head": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+    "followup_identity_scope": "Complete tree equality verified by the coordinating builder; this packet does not claim a new execution on the follow-up head. Its own CI is separate.",
+    "followup_pr": 3503,
+    "old_landed_commit_short": "a6ccb1aa3",
+    "old_source_head_short": "861532feb",
+    "old_train_pr": 3502,
+    "old_train_scope": "The train landed the older source and auto-closed #3501; the repaired head is not asserted to have landed through it."
+  },
+  "limits": [
+    "The 11,308 count is the ARM64 nextest execution census, not an aggregate including imager checks or doc tests.",
+    "Runtime test durations are not physical lamp response or settling measurements.",
+    "No real image build, flash, first boot, device acceptance, attended power cut or signed-release acceptance follows from this packet."
+  ],
+  "schema": 1,
+  "scope": "Completed CI of repaired original PR #3501 head only; no test rerun for this packet",
+  "source": {
+    "actual_arm64_and_imager_checkout": "000f71af11cbf7fe5357c42001f599fea5dddfd5",
+    "checkout_base": "4913713548aff7b40f0f4e0b049b5e4000e0baac",
+    "full_tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "head": "4ace70555becb72bb6ddfa9624474e921c0f2a7c",
+    "head_and_checkout_tree_identity_verified": true,
+    "original_pr": 3501
+  }
+}
