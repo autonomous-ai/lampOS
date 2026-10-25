@@ -1,3 +1,13 @@
+## 2026-10-25 22:25 — Private memories survive room-only forget
+
+Ready for lamp-voice: no
+
+[Memory #3484](https://github.com/autonomous-ai/lampOS/pull/3484) is pushed at 6bfbfe096 on bf39e4188. ARM64 40205720457 and Linux Clippy 40205720412 passed. Reviewer-three reports no P1/P2, with all thirteen speaker-memory cases passing and the two private-scope regressions failing against the old implementation. The native unique-count audit and reviewer-two's read are in progress; those results will be posted on the PR before its ready transition.
+
+Full Mac Memory 327/0/8 and VoiceEval 623/0/0 passed on 045236cb1 / 0ddd07377. The final equal-patch rebase preserves all 1,127 relevant source/configuration paths. Fresh current-base formatting, strict Memory/VoiceEval/Actions Clippy, workspace build, all three new Memory regressions and nineteen Actions schedule cases passed. The current actual CLI's twelve socket calls retained the private entries and removed one room entry in both scenarios; first/repeated forget measured 57.72/61.70 ms, from connect through decoded response. Full-suite counts retain their original source. No lamp or acoustic measurement is claimed.
+
+Onboarding #3472's ten-file carry now excludes all five landed prerequisites and is frozen on bf39e4188. Its fresh formatting passed and strict workspace/all-target Clippy is running before the workspace build and all thirteen affected/dependent package suites. The temporary official nextest runner retains the project's test scheduling and zero retries; prior failures remain recorded. First still assigns the successful two-person trial. Common and its children remain separate prepared carries; no lamp was touched.
+
 ## 2026-10-25 21:52 — Memory privacy regression passes through the real socket
 
 Ready for lamp-voice: no
