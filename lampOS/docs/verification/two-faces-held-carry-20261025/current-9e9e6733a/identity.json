@@ -1,0 +1,39 @@
+{
+  "head_before_merge": "cc6d6f10561b9b878cb6082b9866ddc785f1bd38",
+  "merge_base_input": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "original_authored_head": "031990a89093ae5e205c65156f32a1b79d2eb934",
+  "prior_full_source": "a497afbd1e7173e137c5d6a35238b63c8e3df491",
+  "runtime_added_removed_lines_equal": {
+    "lampOS/crates/voice/src/process.rs": true,
+    "lampOS/crates/voice/src/second_provider.rs": true,
+    "lampOS/crates/voice/src/second_provider/worker.rs": true
+  },
+  "base_changed_paths": [
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs",
+    "lampOS/crates/voice/src/reminders.rs",
+    "lampOS/docs/build-rows.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/schedule.md",
+    "lampOS/docs/verification/reminder-reset-say-20261025/README.md"
+  ],
+  "prepared_index_tree": "b25ff104b6b5c0ecc91d9a943e4151fa35afbbeb",
+  "qualified_head": "7ed73b53479dc60a93f5df20b78bcda573d6e24f",
+  "state": "Actual latest-base affected checks passed; earlier full and native executions retain their original sources.",
+  "tracked_source_records": 7084,
+  "source_map_sha256": "d0d7a1b1a538508aee222213cbe54a8cbd39e45204ecd031647843077413adc7",
+  "own_control_pass_counts": {
+    "with_two_faces_held_two_faces_must_stay": 1,
+    "with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room": 1,
+    "with_two_faces_held_looks_between_lines_make_the_first_line_busy": 1
+  },
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-eval.log": "b3927fe71d70b42f11b5f7046b2d6da01ec4213ba6ef8ae53b6434ec1193af61",
+    "test-provider-terminal.log": "7bc495b057e99e1ac2515e0e0c2cb9be87716f75433ce6dfd93c795f94962a9f",
+    "test-reminders.log": "710dd7020930b1f2c5c7816bc0ef05b479f24b81e573da226512b5fa285d081f",
+    "test-worker.log": "b085284e48b450bcf82aaa307a14d449f2b7f046bb75e4ffc777c0ef39f2b280"
+  }
+}

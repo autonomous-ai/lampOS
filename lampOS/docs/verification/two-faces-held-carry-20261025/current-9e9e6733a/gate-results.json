@@ -1,0 +1,79 @@
+{
+  "fmt": {
+    "command": "cargo +1.96.0 fmt --all --check",
+    "started": "2026-10-25T17:44:05Z",
+    "finished": "2026-10-25T17:44:17Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "clippy-final": {
+    "command": "cargo +1.96.0 clippy -q --message-format=short --locked -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+    "started": "2026-10-25T17:44:17Z",
+    "finished": "2026-10-25T17:46:05Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "build": {
+    "command": "cargo +1.96.0 build -q --locked --workspace",
+    "started": "2026-10-25T17:46:05Z",
+    "finished": "2026-10-25T17:47:24Z",
+    "exit": 0,
+    "harnesses": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-reminders": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::reminders::",
+    "started": "2026-10-25T17:47:24Z",
+    "finished": "2026-10-25T17:49:34Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 28,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-provider-terminal": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib coordinator::tests::provider_terminal::",
+    "started": "2026-10-25T17:49:34Z",
+    "finished": "2026-10-25T17:49:35Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 13,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-worker": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice --lib second_provider::worker::tests::",
+    "started": "2026-10-25T17:49:35Z",
+    "finished": "2026-10-25T17:50:07Z",
+    "exit": 0,
+    "harnesses": 1,
+    "passed": 176,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  },
+  "test-eval": {
+    "command": "cargo +1.96.0 test --locked -p lamp-voice-eval",
+    "started": "2026-10-25T17:50:07Z",
+    "finished": "2026-10-25T17:53:14Z",
+    "exit": 0,
+    "harnesses": 4,
+    "passed": 623,
+    "failed": 0,
+    "ignored": 0,
+    "disk_error_lines": []
+  }
+}
