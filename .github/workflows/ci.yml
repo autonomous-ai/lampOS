@@ -31,11 +31,13 @@ jobs:
           bash -n scripts/imager/tests/test_lampos_envelope.sh
           bash -n scripts/imager/tests/test_lampos_image_bootstrap.sh
           sh -n scripts/imager/tests/test_v2_image_output.sh
+          bash -n scripts/imager/tests/test_v2_image_inputs.sh
       - name: signed bootstrap and output contracts (no image or device)
         run: |
           bash scripts/imager/tests/test_lampos_envelope.sh
           bash scripts/imager/tests/test_lampos_image_bootstrap.sh
           sh scripts/imager/tests/test_v2_image_output.sh
+          bash scripts/imager/tests/test_v2_image_inputs.sh
       - name: existing image integrity and resize tests (disposable files only)
         run: python -m pytest scripts/imager/tests -q
 
