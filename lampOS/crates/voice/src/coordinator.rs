@@ -3004,6 +3004,44 @@ fn record(trace: &mut SessionState, event: Value) -> Result<()> {
     trace.record(event).map_err(Into::into)
 }
 
+/// Admit and record one provider offer; preparation grants no playback authority.
+fn handle_requested_audio(
+    reply: &mut Option<Reply>,
+    service: Option<&crate::requested_audio::Service>,
+    worker: BootId,
+    snapshot: Snapshot,
+    (request, session): (u64, u64),
+    offer: lamp_msgs::RequestedAudioOffer,
+    trace: &mut SessionState,
+) -> Result<()> {
+    // Why a refused offer was refused, in the trace and once
+    // in the journal (#2793: a refusal said nothing).
+    let current = reply
+        .as_mut()
+        .filter(|current| current.owner.turn() == request && current.cloud.session == session);
+    let refused = match (service, current) {
+        (None, _) => Some("requested audio is off or unavailable"),
+        (_, None) => Some("not the turn in hand"),
+        (Some(service), Some(current)) => {
+            match current.requested_audio_refusal(worker, snapshot, &offer) {
+                Some(why) => Some(why),
+                None => (!current.accept_requested_audio(service, worker, snapshot, offer))
+                    .then_some("its recording could not be prepared"),
+            }
+        }
+    };
+    let accepted = refused.is_none();
+    if let Some(why) = refused {
+        eprintln!("lamp-voice: request {request}: requested audio refused: {why}");
+    }
+    record(
+        trace,
+        json!({"kind":"requested_audio_offered",
+        "turn":request,"provider_session":session,"accepted":accepted,"refused":refused,
+        "at_us":monotonic_us(),"boundary":"queued preparation; no playback authority"}),
+    )
+}
+
 fn link_trace(link: ProviderLink, received_at_us: u64) -> Value {
     let kind = match link.state {
         ProviderLinkState::Ready { .. } => "provider_ready",
@@ -7224,40 +7262,14 @@ fn conversation_with_gate_inner(
                     session,
                     offer,
                 } => {
-                    // Why a refused offer was refused, in the trace and once
-                    // in the journal (#2793: a refusal said nothing).
-                    let current = reply.as_mut().filter(|current| {
-                        current.owner.turn() == request && current.cloud.session == session
-                    });
-                    let refused = match (requested_audio.as_ref(), current) {
-                        (None, _) => Some("requested audio is off or unavailable"),
-                        (_, None) => Some("not the turn in hand"),
-                        (Some(service), Some(current)) => {
-                            match current.requested_audio_refusal(
-                                rig.provider.boot,
-                                snapshot,
-                                &offer,
-                            ) {
-                                Some(why) => Some(why),
-                                None => (!current.accept_requested_audio(
-                                    service,
-                                    rig.provider.boot,
-                                    snapshot,
-                                    offer,
-                                ))
-                                .then_some("its recording could not be prepared"),
-                            }
-                        }
-                    };
-                    let accepted = refused.is_none();
-                    if let Some(why) = refused {
-                        eprintln!("lamp-voice: request {request}: requested audio refused: {why}");
-                    }
-                    record(
+                    handle_requested_audio(
+                        reply,
+                        requested_audio.as_deref(),
+                        rig.provider.boot,
+                        snapshot,
+                        (request, session),
+                        offer,
                         trace,
-                        json!({"kind":"requested_audio_offered",
-                        "turn":request,"provider_session":session,"accepted":accepted,"refused":refused,
-                        "at_us":monotonic_us(),"boundary":"queued preparation; no playback authority"}),
                     )?;
                 }
                 ProviderOutput::LookAsked {

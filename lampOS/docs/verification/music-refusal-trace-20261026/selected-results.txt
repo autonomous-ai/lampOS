@@ -1,0 +1,50 @@
+[focused]
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 3794 filtered out; finished in 0.21s
+
+[full]
+test result: ok. 3782 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 535.41s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.38s
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[baseline-safe-refusal]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_a_safe_fixed_refusal_without_offer_data ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.03s
+
+[baseline-accepted-null]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_acceptance_with_explicit_null_and_one_repeat_refusal ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.03s
+
+[baseline-stale-envelope]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_unavailable_and_stale_envelope_refusals ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.12s
+
+[restored-safe-refusal]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_a_safe_fixed_refusal_without_offer_data ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.03s
+
+[restored-accepted-null]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_acceptance_with_explicit_null_and_one_repeat_refusal ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.03s
+
+[restored-stale-envelope]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_unavailable_and_stale_envelope_refusals ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.12s
+
+[missing-refused]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_acceptance_with_explicit_null_and_one_repeat_refusal ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.04s
+assertion `left == right` failed
+
+[raw-asset]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_a_safe_fixed_refusal_without_offer_data ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.03s
+assertion `left == right` failed
+
+[unfiltered-envelope]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_unavailable_and_stale_envelope_refusals ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3796 filtered out; finished in 0.09s
+assertion `left == right` failed

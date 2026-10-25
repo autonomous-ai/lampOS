@@ -1059,6 +1059,191 @@ fn a_refused_offer_names_the_condition_that_refused_it() {
     assert_eq!(why(&written, &offer), Some("not a spoken turn"));
 }
 
+// Exercise the same admission-and-record handler as ProviderOutput::RequestedAudio,
+// with the fixture's explicit Service instead of process-global environment state.
+fn private_boundary_offer(test: &Test) -> RequestedAudioOffer {
+    let mut offer = test.offer(1);
+    offer.skills_boot = "private-skills-boot-marker".into();
+    offer.skill = "private-recording-marker".into();
+    offer.context.call_id = "private-call-marker".into();
+    offer.check().unwrap();
+    offer
+}
+
+fn assert_offer_boundary(
+    trace: &SessionState,
+    from: usize,
+    (request, session): (u64, u64),
+    refused: Option<&str>,
+    at_us: u64,
+    offer: &RequestedAudioOffer,
+) {
+    let rows = &trace[from..];
+    assert_eq!(rows.len(), 1, "one boundary record per handled offer");
+    let row = &rows[0];
+    // Equality fixes the complete key set, as well as the safe reason and
+    // queue-only boundary. No offer payload or nested context may be added.
+    assert_eq!(
+        row,
+        &json!({
+            "kind":"requested_audio_offered", "turn":request,
+            "provider_session":session, "accepted":refused.is_none(),
+            "refused":refused, "at_us":at_us,
+            "boundary":"queued preparation; no playback authority"
+        })
+    );
+    if refused.is_none() {
+        // Indexing an absent key also returns Null: require its presence.
+        assert_eq!(row.get("refused"), Some(&Value::Null));
+    }
+    let encoded = serde_json::to_string(row).unwrap();
+    for private in [
+        &offer.asset,
+        &offer.sha256,
+        &offer.skills_boot,
+        &offer.skill,
+        &offer.context.worker_boot,
+        &offer.context.call_id,
+    ] {
+        assert!(
+            !encoded.contains(private),
+            "offer data entered the boundary record"
+        );
+    }
+}
+
+#[test]
+fn requested_audio_boundary_records_a_safe_fixed_refusal_without_offer_data() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let good = private_boundary_offer(&test);
+    let mut bad = good.clone();
+    bad.asset = "/unopened/private-audio-marker.wav".into();
+    bad.sha256 = "private-invalid-digest-marker".into();
+    let turn = (bad.context.request, bad.context.provider_session);
+    let from = test.trace.len();
+    let at_us = monotonic_us();
+    handle_requested_audio(
+        &mut test.reply,
+        Some(&test.service),
+        test.worker,
+        test.snapshot,
+        turn,
+        bad.clone(),
+        &mut test.trace,
+    )
+    .unwrap();
+    assert_offer_boundary(
+        &test.trace,
+        from,
+        turn,
+        Some("the offer does not check"),
+        at_us,
+        &bad,
+    );
+    assert!(test.skills.operations.try_recv().is_err());
+    let current = test.reply.as_ref().unwrap();
+    assert!(!current.requested_audio_bound());
+    assert_eq!(
+        current.requested_audio_refusal(test.worker, test.snapshot, &good),
+        None,
+        "rejection before preparation must not consume the turn's offer"
+    );
+}
+
+#[test]
+fn requested_audio_boundary_records_acceptance_with_explicit_null_and_one_repeat_refusal() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let offer = private_boundary_offer(&test);
+    let turn = (offer.context.request, offer.context.provider_session);
+    for refused in [None, Some("this turn already had its one offer")] {
+        let from = test.trace.len();
+        let at_us = monotonic_us();
+        handle_requested_audio(
+            &mut test.reply,
+            Some(&test.service),
+            test.worker,
+            test.snapshot,
+            turn,
+            offer.clone(),
+            &mut test.trace,
+        )
+        .unwrap();
+        assert_offer_boundary(&test.trace, from, turn, refused, at_us, &offer);
+        assert!(test.reply.as_ref().unwrap().requested_audio_bound());
+        assert_eq!(
+            test.reply.as_ref().unwrap().notice.origin(),
+            SpeechOrigin::Provider
+        );
+        assert!(
+            test.pending.is_none(),
+            "preparation has not dispatched audio"
+        );
+    }
+    test.skills.started(&offer);
+    assert!(
+        test.reply
+            .as_ref()
+            .unwrap()
+            .wait_requested_audio_ready(WAIT)
+    );
+    test.cancel("hand_stop");
+    test.skills
+        .finished(&offer, RequestedAudioOutcome::Cancelled);
+}
+
+#[test]
+fn requested_audio_boundary_records_unavailable_and_stale_envelope_refusals() {
+    let _clock = fixture_clock();
+    for case in [
+        "off",
+        "off_and_stale",
+        "request",
+        "session",
+        "missing_reply",
+    ] {
+        let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+        let offer = private_boundary_offer(&test);
+        let mut turn = (offer.context.request, offer.context.provider_session);
+        match case {
+            "off_and_stale" | "request" => turn.0 += 1,
+            "session" => turn.1 += 1,
+            "missing_reply" => test.reply = None,
+            "off" => {}
+            _ => unreachable!(),
+        }
+        let off = case.starts_with("off");
+        let refused = if off {
+            "requested audio is off or unavailable"
+        } else {
+            "not the turn in hand"
+        };
+        let from = test.trace.len();
+        let at_us = monotonic_us();
+        handle_requested_audio(
+            &mut test.reply,
+            (!off).then_some(&test.service),
+            test.worker,
+            test.snapshot,
+            turn,
+            offer.clone(),
+            &mut test.trace,
+        )
+        .unwrap();
+        assert_offer_boundary(&test.trace, from, turn, Some(refused), at_us, &offer);
+        assert!(test.skills.operations.try_recv().is_err(), "{case}");
+        if let Some(current) = &test.reply {
+            assert!(!current.requested_audio_bound(), "{case}");
+            assert_eq!(
+                current.requested_audio_refusal(test.worker, test.snapshot, &offer),
+                None,
+                "envelope refusal must not consume the current turn's offer: {case}"
+            );
+        }
+    }
+}
+
 #[test]
 fn written_reminder_say_and_offline_turns_never_authorize_requested_recordings() {
     let _clock = fixture_clock();
