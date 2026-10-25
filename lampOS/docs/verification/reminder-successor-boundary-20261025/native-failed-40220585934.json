@@ -1,0 +1,25 @@
+{
+  "offered_head": "91a58a78f46965ef00573e988e2c6ade7ae61ae6",
+  "arm64_run": 40220585934,
+  "arm64_conclusion": "failure",
+  "linux_clippy_run": 40220585803,
+  "linux_clippy_conclusion": "success",
+  "passed": 4877,
+  "failed": 1,
+  "unrun_after_fail_fast": 6420,
+  "skipped": 106,
+  "planned": 11298,
+  "unique_terminal_cases": 4878,
+  "failed_tests": [
+    "lamp-settings::release_pair current_settings_cli_store_smoke"
+  ],
+  "failure": "Executable SHA-256 assertion in settings/tests/release_pair/fixture.rs:294, immediately after spawning an owned serve process.",
+  "observed_running_sha256": "37db8477510a05848540b6cbdeaf43c3af988bd9493c96a20f2fd7be79758f9d",
+  "expected_artifact_sha256": "559410666aae9d415ff072fc9a8682a4f1f5837026e4ee535028f4f21fbc648c",
+  "raw_log_sha256": "b4e840bc66ea8386e11c5a52b09330d4a4b083ec816878fc22da5c29e5cde800",
+  "delivered_train": 3499,
+  "delivered_train_arm64": 40219775198,
+  "delivered_train_head": "6d06843dc7ec7e3b78a5017ef45288b173385d2b",
+  "delivered_commit": "abc79d609126e7c1b83dedb220b7be00b7e7ab6a",
+  "limits": "Failure retained; not rerun, not called a timing flake, no cause established. Delivered train passed separately. Post-failure native doc/process harnesses and exports were not run."
+}

@@ -1,0 +1,29 @@
+{
+  "train_head": "6d06843dc7ec7e3b78a5017ef45288b173385d2b",
+  "current_composition_tree": "2b87b32984f1bede5788e0f664f10e01ef19c689",
+  "current_heads": [
+    "91a58a78f46965ef00573e988e2c6ade7ae61ae6",
+    "7dafce2c58b8ea4a5f2e5fb0993eb04283ddba0b"
+  ],
+  "added_proof_files_only": [
+    "lampOS/docs/verification/held-colleague-constraints-20261025/current-14c64a8db/README.md",
+    "lampOS/docs/verification/held-colleague-constraints-20261025/current-14c64a8db/gate-results.json",
+    "lampOS/docs/verification/held-colleague-constraints-20261025/current-14c64a8db/identity.json",
+    "lampOS/docs/verification/held-colleague-constraints-20261025/current-14c64a8db/test-results.txt",
+    "lampOS/docs/verification/reminder-successor-boundary-20261025/current-14c64a8db/README.md",
+    "lampOS/docs/verification/reminder-successor-boundary-20261025/current-14c64a8db/gate-results.json",
+    "lampOS/docs/verification/reminder-successor-boundary-20261025/current-14c64a8db/identity.json",
+    "lampOS/docs/verification/reminder-successor-boundary-20261025/current-14c64a8db/test-results.txt"
+  ],
+  "execution_claim": "Tree comparison only; actual train run remains6d.",
+  "delivered_commit": "abc79d609126e7c1b83dedb220b7be00b7e7ab6a",
+  "delivered_train": 3499,
+  "train_arm64_run": 40219775198,
+  "train_linux_run": 40219775218,
+  "train_checks": "Both success",
+  "constituents": [
+    3491,
+    3420
+  ],
+  "train_and_landing_whole_tree_equal": true
+}

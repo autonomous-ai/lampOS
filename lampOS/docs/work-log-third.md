@@ -5,6 +5,59 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 01:37 — Reminder and held constraints delivered; calibration gate active
+
+Ready for lamp-voice: no (#3486's combined current-source gate and the new
+factory correction's full gate remain; #3491/#3420 are delivered).
+
+Train142 #3499 delivered #3491 and #3420 as **abc79d609**. Its original
+ARM64 **40219775198** and Linux clippy **40219775218** passed. Whole
+train 6d/landing trees match. The newer evidence-only author carries,
+#3491 **91a58a78f** and #3420 **7dafce2c5**, each passed fresh fmt, strict
+Body/Voice/Eval clippy, workspace build and full Body **609/0/0** on actual
+14c; their clean composition differs from the captured train only by eight
+new proof files. [Delivery comparison](verification/train142-delivery-20261026/delivery.json).
+
+Supplemental reminder 91a native **40220585934 FAILED**: **4,877 passed,
+1 failed, 6,420 unrun, 106 skipped**. Settings release-pair smoke failed its
+post-spawn executable SHA assertion at fixture.rs:294. Linux clippy passed.
+[Failure receipt](verification/reminder-successor-boundary-20261025/native-failed-40220585934.json).
+No rerun, cause, timing-flake label or waiver is claimed. This is separate
+from the successful delivered train. Settings fixture source is unchanged
+between 91a and current abc; it came from Second's #3347. Reading before its
+ready check alone does not establish the cause; the observed executable
+must be identified before replacing the identity check with a wait. The
+held 7daf supplemental native run is still followed.
+
+#3486's 14c gate also passed fmt/strict clippy/build/full Body 609/0 on
+source a901, with proof retained in 5bbb. Before publishing that older base,
+train142 landed. Its clean current prepared merge 835f62fcc combines 5bbb
+with abc and differs from public a5+abc tree 9a4f383da only by four completed
+14c proof files. Reviewer-two was asked for an independent full Voice/Eval
+gate on that exact public composition; no acceptance/execution is claimed
+yet. Original #3355 is closed as superseded, branch and authored commits
+retained. Original a5 native and both source reads remain recorded above.
+
+The claimed factory hands-away correction is on third/head-rest-coverage,
+now actual abc. Unchanged production failed both regression controls 0/2:
+pads 97/98 qualified with rest_changes=0 after all rest samples were missed;
+a delayed first read even had gaps=0. Source, log and executed test binary
+were retained before the repair. Private rest_seen/rest_failed and the
+existing 100 ms freshness bound now reject missing coverage inside rest and
+prevent later samples from repairing that scan. No schema or live touch
+policy changes. Fixed discovery 16/0 and the complete existing factory
+stand-ins 0 failures passed. The review found no P1/P2 and suggested an
+independent latch control and nonzero epoch; both were added before freezing
+all 7,117 source hashes. Final formatting, strict all-target clippy across
+Controls and all 14 reverse dependents, workspace build and full serial
+tests are active. No final full pass or hardware result is claimed.
+
+Queue #3126 reached GitHub's 2,500-comment limit: the composition request was
+posted on #3486, but its Queue copy was refused. No continuation exists yet
+in the old body or open Queue search. First was notified on #3486; Third
+opens no replacement issue and continues source/gate work. No lamp action,
+local ARM64 linking, product activation or acoustic acceptance occurred.
+
 ## 2026-10-26 01:15 — Factory baseline gap taken; train141 carries running
 
 Ready for lamp-voice: no (fresh train141 carries are being qualified).
