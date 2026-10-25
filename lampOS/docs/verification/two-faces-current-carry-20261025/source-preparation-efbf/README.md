@@ -1,0 +1,9 @@
+# Stalled two-face source preparation
+
+Queue claim 6391130169 and original PR claim 6391130400 precede this own-branch source preparation. Open and merged PR searches found no replacement for #3355; the last authored post was 24 October 18:58 +07. The own branch retains authored 031990a89093ae5e205c65156f32a1b79d2eb934 in its history. A no-commit merge of current efbf prepared cleanly, with exactly the original five-file delta and every added/removed line matching the authored patch. No authored product change is added.
+
+Workspace formatting passes with all 7,041 source hashes/modes unchanged. No compiler, unit/integration execution or native qualification ran for this source preparation. The original restricted 2,502/1,217/15 and later 4,000/0/21 reader runs, earlier clock/privacy/expiry findings and original native results retain their exact heads and scopes, not this composition.
+
+While preparation waited, Controls merged as 162216f82. The pending own merge was reconstructed on that base without any manual source edit; the efbf metadata/formatter stream is retained here as the earlier epoch. Current162 compilation/tests remain UNRUN and queued after the current own parent/child carries and existing compiler allocations. Actual two-person acceptance remains the existing First/lamp lane; no activation or device action.
+
+The carried policy intentionally waits for 1.5 seconds of published monotonic two-face evidence before making a room busy. A dedicated subscriber retains at most 16 looks/2.5 seconds; it uses a one-second independent receive wait, not a cloud call or blocking inference in the verdict. Privacy epoch/cutoff, publication age/expiry, gaps and newest-two-face conditions stay unchanged. This is source reasoning, not a new latency measurement. Future gates cover full Voice/Eval and process/census readers, workspace build and original native/current readers; no old pass is transferred.

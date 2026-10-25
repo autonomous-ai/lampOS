@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "worktree": "/private/tmp/third-two-faces-current",
+  "exit": 0,
+  "seconds": 12.886,
+  "source_count": 7041,
+  "source_unchanged": true,
+  "scope": "Only formatter/source preparation. No compiler, runtime test or native gate; pending merge retaining original authored031 commit. Full gates queued after existing allocated compiler lanes."
+}

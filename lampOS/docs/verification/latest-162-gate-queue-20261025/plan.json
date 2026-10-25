@@ -1,0 +1,8 @@
+{
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "parent_head": "b259332013242b94aafdb9f8b3674a48ef19fc16",
+  "child_head": "13e55a4340220c680b20140c4601de011e8bd8a9",
+  "commands": "same required fmt, strict Voice/Eval clippy, workspace build, full serial Voice/Eval tests, each source frozen and committed-bound with Cargo artifact records; one whole invocation per carry",
+  "cpu_plan": "One compiler job per own gate, maximum two together in the next available allocated two-job lane; exclusive existing targets, no cross-root reuse; no new compilation before lane release. Current Skills/Cloud and queued Second allocation precede this request.",
+  "status": "prepared, all gates UNRUN for new162 heads; old passes remain old-head evidence"
+}

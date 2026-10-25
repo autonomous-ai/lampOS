@@ -1,0 +1,15 @@
+{
+  "original_authored_commit": "031990a89093ae5e205c65156f32a1b79d2eb934",
+  "pending_merge_parent": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "original_commit_retained_in_branch_history": true,
+  "five_path_delta": [
+    "lampOS/crates/voice/src/process.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/switches.md"
+  ],
+  "every_added_removed_line_matches_original": true,
+  "prepared_index_tree": "e295e2d30191ccda5916a17d3a4dbbd761377aa1",
+  "scope": "Source preparation only, uncommitted merge of current main into own branch retaining original authored commit; no formatter/compiler/test/native invocation or readiness claim. Old failures/reads stay on original heads; actual lamp acceptance remains First-owned."
+}
