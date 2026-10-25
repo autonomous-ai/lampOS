@@ -1115,11 +1115,22 @@ impl Reply {
             && self.settled(speaker_pending)
             && self.notice.retired()
             && self.playback_gaps == 0;
-        let spoken = sound || self.heard_whole(speaker_pending, snapshot);
-        say.answer(if spoken {
+        let played_whole = sound || self.heard_whole(speaker_pending, snapshot);
+        // complete_reminder runs first. Read its resulting settlement, not the
+        // pre-completion eligibility that successful completion consumes.
+        let reminder_complete = self
+            .reminder
+            .as_ref()
+            .is_none_or(crate::reminders::Receipt::completion_recorded);
+        say.answer(if played_whole && reminder_complete {
             crate::say::Outcome::Spoken
         } else {
-            crate::say::Outcome::Dropped(self.delivery_outcome().to_owned())
+            let why = if played_whole && !reminder_complete {
+                "reminder_completion_unconfirmed"
+            } else {
+                self.delivery_outcome()
+            };
+            crate::say::Outcome::Dropped(why.to_owned())
         });
     }
 

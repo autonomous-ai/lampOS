@@ -197,6 +197,12 @@ impl Receipt {
             proof,
         });
     }
+    /// The result already recorded by `completed`, read after the whole-reply
+    /// join. A skill's say must not infer success from playback after a reset
+    /// invalidated the receipt. This does not claim the worker durably Acked it.
+    pub fn completion_recorded(&self) -> bool {
+        matches!(self.0.borrow().settlement, Some(ToWorker::Complete { .. }))
+    }
     /// A provider deferred before any PCM was received and the coordinator
     /// successfully revoked/published the exact owner. Such an attempt can be
     /// retried later. Partially spoken/otherwise uncertain attempts stay pending.

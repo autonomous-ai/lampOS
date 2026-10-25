@@ -2,7 +2,9 @@
 //! These synthetic PCM receipts establish neither acoustic nor model fidelity.
 use super::*;
 use crate::reminders::{Probe, RoundtripFixture, ToWorker, receipt_for_test};
+use crate::say::{Answer, Outcome};
 use lamp_audio::ownership::{PlaybackCursor, QueuedRange};
+use std::sync::mpsc;
 
 #[test]
 fn reminder_quiet_uses_current_admission_time_after_new_capture_arrived_in_loop() {
@@ -192,6 +194,12 @@ impl Test {
             sequence: 0,
             cursor: 0,
         }
+    }
+    fn ask_skill(&mut self) -> mpsc::Receiver<Answer> {
+        let (ticket, answered) = crate::say::ticket_for_test("reminders");
+        begun_for(Some(ticket), &mut self.reply);
+        assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+        answered
     }
     fn event(&mut self, event: WorkerEvent) -> Result<()> {
         self.peer.control.send(event)?;
@@ -530,11 +538,18 @@ fn reminder_waits_for_named_request_second_look_before_its_window_can_expire() {
 
 #[test]
 fn whole_reminder_joins_two_real_retirements_and_successful_provider_terminal() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     let mut test = Test::new();
+    let answered = test.ask_skill();
     let first = test.generation(17);
     test.accept(&first, 120);
     assert!(test.pending.is_some());
     assert!(test.probe.settlement().is_none());
+    assert!(
+        answered.try_recv().is_err(),
+        "partial acceptance is not spoken"
+    );
     test.accept(&first, 120);
     assert!(test.pending.is_none());
     assert!(!test.finish_if_settled());
@@ -551,8 +566,17 @@ fn whole_reminder_joins_two_real_retirements_and_successful_provider_terminal() 
         !test.finish_if_settled(),
         "accepted final PCM still needs retirement"
     );
+    assert!(
+        answered.try_recv().is_err(),
+        "accepted PCM is not retired PCM"
+    );
     test.retire(&second);
     assert!(test.finish_if_settled());
+    assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+    assert!(
+        answered.try_recv().is_err(),
+        "one settlement answers the ticket once"
+    );
     let Some(ToWorker::Complete { proof, token }) = test.probe.settlement() else {
         panic!("missing completion");
     };
@@ -671,9 +695,12 @@ fn interruption_after_first_retirement_never_acknowledges_later_audio() {
 
 #[test]
 fn no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     for had_audio in [false, true] {
         for failed in [false, true] {
             let mut test = Test::new();
+            let answered = test.ask_skill();
             if had_audio {
                 let chunk = test.generation(17);
                 test.accept(&chunk, 240);
@@ -711,11 +738,21 @@ fn no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording()
                     test.probe.settlement(),
                     Some(ToWorker::Complete { .. })
                 ));
+                assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
             } else {
                 assert!(matches!(
                     test.probe.settlement(),
                     Some(ToWorker::Abandon { .. })
                 ));
+                let reason = if failed {
+                    "provider_failed"
+                } else {
+                    "no_audio_answer"
+                };
+                assert_eq!(
+                    answered.try_recv(),
+                    Ok(Answer::Done(Outcome::Dropped(reason.into())))
+                );
             }
         }
     }
@@ -723,8 +760,11 @@ fn no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording()
 
 #[test]
 fn reset_or_playback_gap_cannot_be_relabeled_whole_reminder_completion() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     for reset in [false, true] {
         let mut test = Test::new();
+        let answered = test.ask_skill();
         let chunk = test.generation(17);
         test.accept(&chunk, 240);
         test.retire(&chunk);
@@ -742,13 +782,66 @@ fn reset_or_playback_gap_cannot_be_relabeled_whole_reminder_completion() {
         } else {
             test.reply.as_mut().unwrap().playback_gaps = 1;
         }
+        assert!(answered.try_recv().is_err());
         test.provider_complete();
         assert!(test.finish_if_settled());
         assert!(matches!(
             test.probe.settlement(),
             Some(ToWorker::Abandon { .. })
         ));
+        let reason = if reset {
+            "reminder_completion_unconfirmed"
+        } else {
+            "audio_written_with_playback_gaps_unscored"
+        };
+        assert_eq!(
+            answered.try_recv(),
+            Ok(Answer::Done(Outcome::Dropped(reason.into())))
+        );
+        assert!(answered.try_recv().is_err());
     }
+}
+
+#[test]
+fn privacy_revocation_after_partial_reminder_playback_drops_the_skill_ticket() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
+    let mut test = Test::new();
+    let answered = test.ask_skill();
+    let first = test.generation(17);
+    test.accept(&first, 240);
+    test.retire(&first);
+    let second = test.generation(23);
+    test.accept(&second, 120);
+    test.provider_complete();
+    assert!(!test.finish_if_settled());
+    assert!(answered.try_recv().is_err());
+    test.owner
+        .set_microphone_permission(now(), Permission::Denied)
+        .unwrap();
+    let current = test.reply.take().unwrap();
+    record_cancelled_reply(current, &mut test.trace, "physical_mute", monotonic_us()).unwrap();
+    test.snapshot = test.owner.snapshot(now()).unwrap();
+    test.speaker
+        .publish_speaker_snapshot(test.snapshot)
+        .unwrap();
+    assert_eq!(test.snapshot.microphone_permission(), Permission::Denied);
+    assert!(test.snapshot.owner().is_none());
+    assert!(matches!(
+        test.probe.settlement(),
+        Some(ToWorker::Abandon { .. })
+    ));
+    assert_eq!(
+        answered.try_recv(),
+        Ok(Answer::Done(Outcome::Dropped("physical_mute".into())))
+    );
+    // The old final retirement cannot revise either of those outcomes.
+    test.retire(&second);
+    assert!(matches!(
+        test.probe.settlement(),
+        Some(ToWorker::Abandon { .. })
+    ));
+    assert!(answered.try_recv().is_err());
 }
 
 #[test]
