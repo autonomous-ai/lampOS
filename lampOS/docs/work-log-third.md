@@ -5,6 +5,53 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 03:09 — Controls published; current two-face carry and privacy correction
+
+Ready for lamp-voice: no (current native checks and readers pending).
+
+The Queue continues at #3504. Its comments through 6402460608 were read;
+Third posted current work there in 6402516688 and 6402545587. The old Queue
+status remains a historical record, with its earlier claims retained.
+
+#3486 is now **d4db9378a** on **409bf7268**, preserving authored commits.
+The carry's nine-path diff is exactly the image-only release delta; every
+other Git entry, including Rust/test/Cargo and scanner inputs, is unchanged.
+Fresh formatting and the five image-input stand-ins pass. Previous 246's
+ARM64 **40226248638** and Linux **40226248637** pass: **11,311 PASS, zero
+leaks/failures/timeouts, 106 skipped**, all three own controls once; its
+actual preview equals its offered tree. Those results are not renamed as
+current. Current original ARM64 **40228973707** and Linux **40228973708**
+are active. Reviewer-three has READ-OK d4db9378a; Reviewer-two is requested.
+[Current proof and prior native receipt](https://github.com/autonomous-ai/lampOS/tree/d4db9378a/lampOS/docs/verification/two-faces-held-carry-20261025/current-409bf7268).
+
+The factory baseline correction is pushed as **#3507**, **65403e535** on
+409. Original production plus two controls failed 0/2 at the intended
+missing-baseline assertion. Final full source 20c1d9c6d/abc passed fmt,
+strict all-target clippy across 14 affected crates, workspace build and
+**7,971/0/55**, 88 summaries and all six new controls once. The unchanged
+patch rebased as 37f823a1a onto 409; fresh fmt/clippy/build and **41/0**
+affected-input follow-ups passed with 7,122 source hashes fixed. Factory
+stand-ins report zero failures. Original ARM64 **40229200159** and Linux
+**40229200161** are active, with current-head reads requested.
+[Proof](https://github.com/autonomous-ai/lampOS/tree/65403e535/lampOS/docs/verification/head-rest-coverage-20261026).
+
+Expression's original tap and ordinary-rest privacy-read regressions each
+fail 0/1 at the actual refusal boundary. The corrected rest fixture reaches
+its 200 ms receipt cadence and asserts current stamps: invalid envelope
+admits Resting instead of Refused at episode 2. Earlier closure typing,
+retained-Idle fixture and sandbox bind failures remain separately retained;
+they are not credited as product reproductions. Both actual original
+executables and raw results are preserved before target reuse.
+
+The narrow correction treats failed Bus::latest reads as closed at four
+existing checks; successful absence keeps compatibility. Both fixed real-bus
+regressions pass 1/0, including in-flight cancellation and no automatic
+revival. Source and English docs are frozen on 409 for fmt, strict clippy,
+workspace build and full serial tests across twelve affected crates. This
+is the sole local Cargo job. No lamp, provider, local ARM64 link or physical
+latency/activation claim is made. #3477's unchanged 8e scheduling HOLD remains
+with its author; Third has made no product scheduling change.
+
 ## 2026-10-26 02:34 — Current two-face carry pushed for native gates
 
 Ready for lamp-voice: no (#3486 current native runs and exact-head reads).
