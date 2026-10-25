@@ -1,0 +1,28 @@
+{
+  "kind": "faces",
+  "head": "a5f10fb09b959dff5b9cbcbca6c4a047e8462749",
+  "offered_head_before_carry": "a5f10fb09b959dff5b9cbcbca6c4a047e8462749",
+  "base": "14c64a8db1578ca3b5095b056463fbbf5aaebb3c",
+  "old_base": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "tree": "9fcca0f852cc81f6e83f6bfefda0e1ce30953d8b",
+  "base_changed_paths": [
+    "lampOS/crates/body/src/unplug.rs",
+    "lampOS/docs/realtime-tests.md",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/README.md",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/SHA256SUMS",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/census.json",
+    "lampOS/docs/verification/body-unplug-gap-clock-20261026/selected-outcomes.txt"
+  ],
+  "body_tree": "55d6c37301400e47df02ed2e43a92af8733ddfe8",
+  "merge_parent": "14c64a8db1578ca3b5095b056463fbbf5aaebb3c",
+  "qualified_head": "a9017ccb8d384060b65796dd9579c80046a6ef28",
+  "tracked_source_records": 7092,
+  "source_map_sha256": "ae3aac362f4bf6a0351744bfc25ea1b50dd67ff1289588b3e88b7ccf277d0dd7",
+  "body_production_prefix_unchanged": true,
+  "raw_log_sha256": {
+    "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-body.log": "bf4c7ae1eeb736829adb979944d237c04c48ffea87f4c8650c52ed97579a42b9"
+  }
+}
