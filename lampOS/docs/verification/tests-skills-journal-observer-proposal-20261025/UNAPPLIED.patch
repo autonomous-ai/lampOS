@@ -1,0 +1,198 @@
+--- a/lampOS/crates/skills/tests/it/addon.rs
++++ b/lampOS/crates/skills/tests/it/addon.rs
+@@ -601,40 +601,12 @@
+ /// dropped by the judge first or not decided at all, then the four's
+ /// trigger again: what the fifth did, in the journal.
+ fn a_fifth_say(drop_the_four: bool) -> String {
+-    use std::sync::{
+-        Arc,
+-        atomic::{AtomicBool, Ordering},
+-        mpsc::{self, RecvTimeoutError},
+-    };
+-
+-    struct DoneDrain {
+-        stop: Arc<AtomicBool>,
+-        worker: Option<std::thread::JoinHandle<Result<(), String>>>,
+-        events: mpsc::Receiver<SkillEvent>,
+-    }
+-
+-    impl DoneDrain {
+-        fn finish(&mut self) -> Result<(), String> {
+-            self.stop.store(true, Ordering::Release);
+-            if let Some(worker) = self.worker.take() {
+-                worker
+-                    .join()
+-                    .map_err(|_| "the Done observer panicked".to_owned())?
+-            } else {
+-                Ok(())
+-            }
+-        }
+-    }
+-
+-    impl Drop for DoneDrain {
+-        fn drop(&mut self) {
+-            let result = self.finish();
+-            if !std::thread::panicking()
+-                && let Err(why) = result
+-            {
+-                panic!("{why}");
+-            }
+-        }
++    use std::io::Read;
++
++    #[derive(Debug)]
++    struct Completion {
++        skill: String,
++        why: String,
+     }
+ 
+     let dir = tempfile::Builder::new()
+@@ -652,7 +624,6 @@
+     );
+     let bus = Bus::new(root.join("bus")).unwrap();
+     let mut proposals = bus.subscribe(AddonProposal::TOPIC, "judge").unwrap();
+-    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+     for (flag, path) in [
+         ("--dir", root.join("skills")),
+@@ -685,86 +656,64 @@
+     // The probe budget is shorter than the unchanged ten-second proposal
+     // limit and starts before any of the first four can be admitted.
+     let completion_deadline = Instant::now() + Duration::from_secs(8);
+-    let stop = Arc::new(AtomicBool::new(false));
+-    let worker_stop = Arc::clone(&stop);
+-    let (done_send, done_recv) = mpsc::sync_channel(32);
+-    let (started_send, started_recv) = mpsc::sync_channel(1);
+-    // Drain while the judge collects proposals, not only when it asks for
+-    // completions. The observer keeps each Done, rather than a latest value.
+-    let worker = std::thread::spawn(move || {
+-        started_send
+-            .send(())
+-            .map_err(|error| format!("the Done observer could not announce startup: {error}"))?;
+-        while !worker_stop.load(Ordering::Acquire) {
+-            let left = completion_deadline.saturating_duration_since(Instant::now());
+-            if left.is_zero() {
+-                return Err("the Done observer's completion budget expired".to_owned());
+-            }
+-            if let Some(message) = events
+-                .recv(left.min(Duration::from_millis(100)))
+-                .map_err(|error| format!("the Done observer could not receive: {error}"))?
+-            {
+-                let event = message.parse::<SkillEvent>().map_err(|error| {
+-                    format!("the Done observer could not parse an event: {error}")
+-                })?;
+-                if event.stage == SkillStage::Done {
+-                    done_send.try_send(event).map_err(|error| match error {
+-                        mpsc::TrySendError::Full(_) => {
+-                            "the Done observer overflowed its 32 completions".to_owned()
+-                        }
+-                        mpsc::TrySendError::Disconnected(_) => {
+-                            "the Done observer's consumer disconnected".to_owned()
+-                        }
+-                    })?;
+-                }
+-            }
+-        }
+-        Ok(())
+-    });
+-    let mut done = DoneDrain {
+-        stop,
+-        worker: Some(worker),
+-        events: done_recv,
+-    };
+-    started_recv
+-        .recv_timeout(completion_deadline.saturating_duration_since(Instant::now()))
+-        .expect("the Done observer starts before the first voice publication");
++    // This cursor belongs to all phases. A completed phase consumes its
++    // journal lines before the next voice publication can start another.
++    let mut journal_seen = Vec::<u8>::new();
++    let mut journal_cursor = 0;
+     let mut completed = |names: &[&str], phase: &str| {
+-        let mut seen = Vec::<SkillEvent>::new();
++        let mut seen = Vec::<Completion>::new();
+         while seen.len() < names.len() {
+             let left = completion_deadline.saturating_duration_since(Instant::now());
+             let status = running.0.try_wait().unwrap();
+             assert!(
+                 !left.is_zero() && status.is_none(),
+                 "waiting for {phase}: child {status:?}, completions {seen:?}; journal:\n{}",
+-                std::fs::read_to_string(root.join("stderr")).unwrap()
++                String::from_utf8_lossy(&journal_seen)
+             );
+-            match done
+-                .events
+-                .recv_timeout(left.min(Duration::from_millis(100)))
++            let mut journal = Vec::new();
++            std::fs::File::open(root.join("stderr"))
++                .unwrap()
++                .take(1_048_577)
++                .read_to_end(&mut journal)
++                .unwrap();
++            assert!(journal.len() <= 1_048_576, "the fixture journal exceeded 1 MiB");
++            assert!(
++                journal.starts_with(&journal_seen),
++                "the fixture journal stopped being append-only during {phase}"
++            );
++            journal_seen = journal;
++            while let Some(end) = journal_seen[journal_cursor..]
++                .iter()
++                .position(|byte| *byte == b'\n')
+             {
+-                Ok(event) => {
+-                    if event.stage == lamp_msgs::SkillStage::Done
+-                        && names.contains(&event.skill.as_str())
+-                        && !seen.iter().any(|old| old.skill == event.skill)
+-                    {
+-                        seen.push(event);
+-                    }
++                let end = journal_cursor + end + 1;
++                let line = std::str::from_utf8(&journal_seen[journal_cursor..end - 1])
++                    .expect("complete fixture journal lines are UTF-8");
++                journal_cursor = end;
++                if let Some((skill, why)) = line
++                    .strip_prefix("lamp-skills: ")
++                    .and_then(|line| line.split_once(" Done: "))
++                    && names.contains(&skill)
++                    && !seen.iter().any(|old| old.skill == skill)
++                {
++                    seen.push(Completion {
++                        skill: skill.to_owned(),
++                        why: why.to_owned(),
++                    });
+                 }
+-                Err(RecvTimeoutError::Timeout) => {}
+-                Err(RecvTimeoutError::Disconnected) => {
+-                    let result = done.finish();
+-                    panic!(
+-                        "the Done observer ended during {phase}: {result:?}; journal:\n{}",
+-                        std::fs::read_to_string(root.join("stderr")).unwrap()
+-                    );
+-                }
++            }
++            if seen.len() < names.len() {
++                std::thread::sleep(
++                    completion_deadline
++                        .saturating_duration_since(Instant::now())
++                        .min(Duration::from_millis(10)),
++                );
+             }
+         }
+         assert!(
+             Instant::now() < completion_deadline,
+             "the completion budget expired during {phase}; journal:\n{}",
+-            std::fs::read_to_string(root.join("stderr")).unwrap()
++            String::from_utf8_lossy(&journal_seen)
+         );
+         seen
+     };
+@@ -837,9 +786,8 @@
+     voice
+         .publish_json(3, &serde_json::json!({ "state": "resting" }))
+         .unwrap();
+-    // The program writes each journal line before publishing its Done.
++    // Only new complete lines from this final trigger can finish this phase.
+     completed(&names, "the final four refusals");
+-    done.finish().unwrap();
+     let journal = std::fs::read_to_string(root.join("stderr")).unwrap();
+     match fifth {
+         Some(message) => format!(

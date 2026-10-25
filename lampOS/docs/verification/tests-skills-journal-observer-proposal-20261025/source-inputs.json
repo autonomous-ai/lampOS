@@ -1,0 +1,34 @@
+[
+  {
+    "path": "lampOS/crates/skills/tests/it/addon.rs",
+    "SHA-256": "31b9a5618eef671cb4cfd4745c3d00ba71e49e45492a94a079829fb65091d4fb"
+  },
+  {
+    "path": "lampOS/docs/skills.md",
+    "SHA-256": "99748c984d93c321d1820f4fa8369f2b668c0853b2187454784eedff04d2d8c0"
+  },
+  {
+    "path": "lampOS/crates/skills/src/main.rs",
+    "SHA-256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777"
+  },
+  {
+    "path": "lampOS/crates/skills/src/addon.rs",
+    "SHA-256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+  },
+  {
+    "path": "lampOS/crates/msgs/src/skills.rs",
+    "SHA-256": "e762c1da88b1b5583e2ce3ef33faa23e88a07e20d0283d71a2fddcf79cc1bb60"
+  },
+  {
+    "path": "lampOS/crates/bus/src/publish.rs",
+    "SHA-256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1"
+  },
+  {
+    "path": "lampOS/crates/ipc/src/log_relay.rs",
+    "SHA-256": "a0c47cd5fd96e5730b8109fd6e99aad9e830ec1e8c99212fa83eff235cb4635f"
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/skills-addon-event-drain-source/base-addon.rs",
+    "SHA-256": "3c866284cc865f76077999c47718ed9cec2997f6c429bb5f36304893818a2d07"
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "status": "Unapplied source proposal only; no source WT mutation, formatter, Cargo or execution.",
+  "candidate source SHA-256": "31b9a5618eef671cb4cfd4745c3d00ba71e49e45492a94a079829fb65091d4fb",
+  "proposal source SHA-256": "454a221c1c98dfd00892d2366ecff5e4264ac391a3fc471011a48b75cd67d822",
+  "proposal patch SHA-256": "49a8b4201fd8b971999a78f89ea5392ae36c072db0db170776e6b145b77b9a29",
+  "candidate bytes unchanged": true,
+  "source boundaries": {
+    "publish journal before bus": "lampOS/crates/skills/src/main.rs:500-515",
+    "main-loop Done then busy removal": "lampOS/crates/skills/src/main.rs:1050-1053",
+    "next external topic read": "lampOS/crates/skills/src/main.rs:1324-1335",
+    "synchronous proposal-only run queues finished": "lampOS/crates/skills/src/main.rs:2231-2248",
+    "busy removal": "lampOS/crates/skills/src/main.rs:1480-1482",
+    "event declaration": "lampOS/crates/msgs/src/skills.rs:38-41",
+    "nonblocking dropped delivery": "lampOS/crates/bus/src/publish.rs:100-119",
+    "event has no latest file": "lampOS/crates/bus/src/publish.rs:685-690",
+    "journal relay may hold/drop": "lampOS/crates/ipc/src/log_relay.rs:198-277"
+  },
+  "observed outcomes source": "Queue comment 6391548859; complete Fourth terminal packet not yet supplied",
+  "observed fixed outcomes": {
+    "baseline full": "519 passed / 0 failed / 9 ignored supplement",
+    "baseline exact": "failed 101",
+    "candidate full": "518 passed / 1 failed / 9 ignored; final four refusals saw three Done events while four were journaled",
+    "candidate exact": "passed"
+  },
+  "historical cause claimed": false
+}

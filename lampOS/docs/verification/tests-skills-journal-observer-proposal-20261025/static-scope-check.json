@@ -1,0 +1,11 @@
+{
+  "patch applied only in memory": true,
+  "test bytes outside a_fifth_say equal": true,
+  "documentation bytes outside hour-budget paragraph equal": true,
+  "all original trigger/proposal/decision/refusal-tail bytes equal except final observer cleanup and explanatory comment": true,
+  "actual candidate test SHA-256": "31b9a5618eef671cb4cfd4745c3d00ba71e49e45492a94a079829fb65091d4fb",
+  "actual candidate docs SHA-256": "99748c984d93c321d1820f4fa8369f2b668c0853b2187454784eedff04d2d8c0",
+  "additional engine source SHA-256": "796af9814ea9e5fd7eaa2f0482dc185fd530ea5889bd5a04aaf274cee9325b8a",
+  "additional engine proof": "Engine::clock_tick returns no synthetic event unless a local-clock trigger exists (lib.rs:5247-5265); SAYS contains only voice/state. Engine::tick returns only ending/reset work (5197-5241); this fixture has no once-per-day and handle(Call::Ends) does not start proposal calls. Hence no later proposal phase runs autonomously before its voice input.",
+  "execution or source mutation": false
+}

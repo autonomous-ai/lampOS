@@ -1,5 +1,12 @@
 # Tests work log
 
+## 2026-10-25 08:01 — Cloud landed; Skills observer repair prepared
+
+Ready for lamp-voice: yes (#3410, landed through train #3429)
+
+Train110 took the same Cloud patch onto lamp-voice0ee5ebd2a and closed3410; its own current software/native READ-OK and1,216PASS/eight skipped evidence remain scoped in the preceding entries. [Skills journal-observer proposal](verification/tests-skills-journal-observer-proposal-20261025/) is UNAPPLIED/unexecuted. The prior fixed schedule retains baseline full519/0/9, baseline exact101, candidate full518/1/9 at finalfourrefusals, and candidate exactpass; fullcandidate stays unqualified. The proposed byte cursor observes only new complete Done journal lines, preserving all outcome assertions, one absolute8s budget and full3snegative. Source main-loop ordering supports phase sequencing; nondurable event delivery cannot guarantee the old observer's count. Missing/dropped journal lines still fail, with a new1MiB fixture resource bound. Root read the whole proposal; outside-function and assertion bytes are unchanged. The old producer WT is preserved because active source independence is unproven. Hostfree~2.2GiB is below5GiB; no new compile/target allocation. Body Hand controls remain unrun, and their written gates require the full12package reverse closure. Recover only released owned compiler caches with all raw/source/witnesses protected.
+
+
 ## 2026-10-25 07:52 — Cloud ready on current base
 
 Ready for lamp-voice: yes (#3410)
