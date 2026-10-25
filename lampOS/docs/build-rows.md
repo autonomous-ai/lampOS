@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-25 10:51 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-25 12:01 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 93.1% over 70 rows. Quality 62.5% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 93.1% over 70 rows. Quality 63.7% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -90,7 +90,7 @@ Written by the first builder from the team's review page at 2026-10-25 10:51 (+0
 | Row | Now | Target | Where it is |
 |---|---|---|---|
 | Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
-| Knows when you have finished | 0.55 | 0.85 | 25 Oct 06:0x, up from 0.45: the product now keeps 300 ms more of a line’s sound before its first word (#3418, train 106). |
+| Knows when you have finished | 0.65 | 0.85 | 25 Oct 12:0x, up from 0.55: the product now carries the hearing setup that won the owner’s A/B (#3371, train 118: a pause after “Lamp,” carries the name to the line, a misheard first word near the name is the name) and t… |
 | Cutting in | 0.50 | 0.75 | 20 Oct 03:45 on the cheaper voice, lamp-4ace: two lines played over a long story each made the lamp pause and then go on, and after two such pauses it no longer lets anyone cut in on that story, so a third line 30 s late… |
 | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
@@ -103,5 +103,5 @@ Written by the first builder from the team's review page at 2026-10-25 10:51 (+0
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
 | Body | 0.65 | 0.80 | 25 Oct 00:2x, up from 0.6: in the product now, merged in train 95: the body rests half an hour after three strains and stands again (#3365), says so on its health (#3378), and moves its pose at 300 counts a second so the… |
 | Head and eye | 0.65 | 0.80 | 23 Oct 11:2x, up from 0.6: head touch passed with the lead’s own hand on lamp-52e6: a tap, a stroke, a 3 s hold that put it to sleep, a tap that woke it, and nothing with hands away (#2857 closed). |
-| The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live | 0.50 | 0.90 | 24 Oct 15:5x, down from 0.55: the owner’s own test: about 6 of 10 lines got through; |
+| The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live | 0.60 | 0.90 | 25 Oct 12:0x, up from 0.5: the product’s voice is now the setup that won the owner’s A/B (#3371) with the first-word and call fixes (#3418, #3443). |
 | Light and all of it together | 0.75 | 0.80 | 24 Oct 16:1x, down from 0.8: the not-feeling-well light (pale white) came on 18 times in three hours on lamp-4ace because its case at 40 °C was judged an error (#3367 makes that 46, off at 50). |
