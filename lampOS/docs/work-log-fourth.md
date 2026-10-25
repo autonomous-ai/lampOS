@@ -1,3 +1,15 @@
+## 2026-10-25 21:52 — Memory privacy regression passes through the real socket
+
+Ready for lamp-voice: no
+
+The room-only forget fix completed its full Mac gate on frozen 86416a0d3: formatting, strict Memory/VoiceEval Clippy and workspace build passed; Memory passed 327/0/8 and VoiceEval 623/0/0. One fixed-binary check then made twelve real socket calls in two sequential synthetic scenarios. Each forget removed only the room entry, retaining private counts one and two respectively; the measured calls took 58.73 ms and 58.55 ms from socket creation/connect through complete response and JSON decoding, below the preselected 100 ms local target. The normal executable stayed byte-identical, an independent private copy is retained, and every owned group closed. This establishes the local deletion boundary, not a latency improvement or lamp behavior.
+
+The exact five-file fix was committed and rebased as 045236cb1 onto 0ddd07377, with an equal one-commit range-diff. Its new formatting, strict Clippy, workspace build and full Memory 327/0/8 have passed; full VoiceEval is active. Main subsequently advanced to bf39e4188 with only Actions schedule replies and their tests changed. A separate dependency audit found no change in Memory's or VoiceEval's relevant runtime/test closure. The finishing gate keeps its frozen source; a final equal-patch carry will rebind source and binary evidence and run appropriate current-head checks before the code push and native PR gates.
+
+Onboarding #3472's activation-only ten-file carry drops all five landed prerequisites and preserves the exact guard/prompt deltas plus current scope and aside code. It now sits on bf39e4188 and full workspace formatting passed. Common #3064's separate carry also preserves the reviewed composition. Both need compiler/runtime qualification; the old Voice 4,045/2/21 and same-driver ring diagnostic remain separate. First still assigns the successful two-person onboarding trial. Photo's audited origin/strict-coverage gap and next consumer repair are posted on #2856; no lamp was touched.
+
+The project's recommended nextest runner was absent locally. Official Mac nextest 0.9.149 is now checksum-verified in a private temporary directory, without a global install or repository change. Only its version/help ran. A next-gate plan preserves every selected package, separate doctests/custom harnesses, project timing groups, bounded concurrency and zero retries; it is not a test result.
+
 ## 2026-10-25 21:02 — Memory privacy repair entering runtime gates
 
 Ready for lamp-voice: no
