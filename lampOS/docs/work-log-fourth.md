@@ -1,3 +1,9 @@
+## 2026-10-26 03:40 — Memory row plan refreshed from the current ship result
+
+Ready for lamp-voice: no
+
+The [memory quality plan](verification/memory-quality-plan-20261024/README.md) now uses current Main's recorded 0.50 score and 0.90 target; its previous 0.35 checkpoint was stale. The ship build's six-of-six room-memory round and landed room-only forget repair are separated from the missing two-person private-context acceptance. Common's current fourteen-package gate is active; onboarding's exact native audit is 11,308 unique passes, zero failures/leaks/timeouts and 106 skips. First's enrollment-within-two-tries decision and counted misses now define the pending lamp trial. No score or lamp result is assigned by Fourth.
+
 ## 2026-10-26 03:34 — Onboarding pushed; Common enters current qualification
 
 Ready for lamp-voice: no
