@@ -1,0 +1,12 @@
+{
+  "frozen_base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "prior_unrun_base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "upstream_changed_paths": [
+    "lampOS/crates/controls/src/record.rs",
+    "lampOS/crates/controls/tests/it/program.rs",
+    "lampOS/docs/controls.md"
+  ],
+  "body_and_cargo_files_unchanged": true,
+  "fresh_target_qualification_still_unrun": true,
+  "scope": "All earlier observations retain their actual base. This source carry occurs before the separate-target candidate qualification."
+}

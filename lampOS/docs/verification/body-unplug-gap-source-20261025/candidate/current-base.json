@@ -1,0 +1,7 @@
+{
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "prior_source_proposal_base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "candidate_patch_unchanged": true,
+  "all_clippy_and_test_observations_unrun": true,
+  "status": "Source-only carry; no compiler allocation or execution"
+}
