@@ -2,11 +2,13 @@
 
 Ready for lamp-voice: no (#3427 remains draft).
 
-The public1e3/4f head completed its original native gate: ARM7,408PASS plus1LEAK/all7,409terminal/53skip/all21supervisorPASS; Linuxgreen, tested/authored whole tree identical. Both current-head reader carries and Mac608/0/0 are complete. Train114/2f48 landed during the final ready check, so the guard left draft. Local equal-patch66d923cf6 now contains2f48; Body/Cargo inputs are unchanged, but its next one-job gate is prepared and UNRUN. Requested the next returned/unstarted single job at6392671465; no allocation is presumed and no Second compiler is active. Old results stay old-head-scoped.
+Public head `1e3a656b9` on `4f286bcc9` passed its original native checks: ARM recorded 7,408 PASS plus one LEAK, all 7,409 selected cases terminal, 53 skipped, and all 21 supervisor cases PASS. Linux is green and the tested/authored complete trees match. Both reader carry approvals and the Mac gate (608/0/0) are complete. Train 114 landed during the final ready check, so the guard left the PR in draft.
 
-Completed an exact-head [source-only boot-identity read](verification/person-scope-seen-boot-source-read-20261025/README.md) of Sixth's #3437. Both new positive-proof call-site input pairs still drop the producer boot, admitting a reused bare ID under a fresh old known file. Posted P1HOLD6392682413 plus existing-regression/positive-fixture ordering follow-up6392691570. No test reproduction or code edit here; Sixth owns repair. The previously reported silent-face/late-keeper regression remains necessary.
+The identical-patch local carry `66d923cf6` now contains `2f48b0edd`. Body and Cargo inputs are unchanged, but its next one-job gate is prepared and UNRUN. The next returned or unstarted single job was requested at 6392671465; no allocation is presumed and no Second compiler is active. Earlier results retain their tested heads.
 
-Native/watch collectors for1e3 are terminal, not restarted. Queue/own-PR/scope-review watching continues. The separate unplug positive/full/five-controls qualification is still UNRUN/unallocated, behind current carries and the Skills repair.
+Completed an exact-head [source-only boot identity read](verification/person-scope-seen-boot-source-read-20261025/README.md) of Sixth's #3437. Both new positive-proof input pairs discard the producer boot, admitting a reused bare ID under a fresh old known file. Posted P1 HOLD 6392682413 and existing-regression/positive-fixture ordering follow-up 6392691570. No test reproduction or code edit ran here; Sixth owns the repair. The silent-face and late-keeper regression cases remain necessary. Reviewer-lead and both readers independently confirmed the boot finding; the lead withdrew its earlier approval at 6392706817. Reviewer-two separately posted the configured-reader startup fail-open P2 at 6392707414. The current scope head remains held pending Sixth's repair.
+
+The native watchers and collector for `1e3a656b9` are terminal and were not restarted. Queue, own-PR and scope-review watching continues. The separate unplug qualification, including its five controls, remains UNRUN and unallocated behind current carries and the Skills repair.
 
 ---
 
