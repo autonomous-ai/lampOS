@@ -1,0 +1,26 @@
+{
+  "offered_head": "a5f10fb09b959dff5b9cbcbca6c4a047e8462749",
+  "arm64_run": 40218880202,
+  "linux_clippy_run": 40218880226,
+  "conclusions": "Both success",
+  "executed_preview": "23c236869bf7af4b3f5988e6f3270deddc17932d",
+  "preview_tree": "5b9c247aacbf262504389d3e541ede0737dac6ab",
+  "preview_parents": [
+    "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+    "a5f10fb09b959dff5b9cbcbca6c4a047e8462749"
+  ],
+  "passed": 11298,
+  "tracked_leaks_in_passed": 1,
+  "skipped": 106,
+  "unique_terminal_cases": 11298,
+  "repeated_equal_rows": 35,
+  "own_control_pass_counts": {
+    "with_two_faces_held_two_faces_must_stay": 1,
+    "with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room": 1,
+    "with_two_faces_held_looks_between_lines_make_the_first_line_busy": 1
+  },
+  "raw_log_sha256": "0ee88c6b6227171e3772817a507639fa3c7607e3e0d9b175c2a9ae81e59ddc4e",
+  "limits": "Original run on offered a5f10fb09 and the actual recorded merge preview; later base changes remain separate. No lamp, acoustic latency or activation claim.",
+  "offered_tree": "5b9c247aacbf262504389d3e541ede0737dac6ab",
+  "preview_equals_offered_tree": true
+}

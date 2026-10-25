@@ -5,6 +5,44 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 01:15 — Factory baseline gap taken; train141 carries running
+
+Ready for lamp-voice: no (fresh train141 carries are being qualified).
+
+#3491 948 and #3420 c8 reached two current READ-OK lines and green original
+ARM64/Linux on 9e9, and were queued for the next train. Train141 then landed
+#3497 as 14c64a8db. Both local five-commit carries are range-diff equal;
+#3486's original history is retained in a clean prepared merge. Fresh fmt,
+strict Body/Voice/Eval clippy, workspace builds and full Body tests run
+serially on the actual new compositions before publication. Old source
+executions and reader lines remain at their actual heads.
+
+#3486 a5/9e9 also passed original ARM64 **40218880202** and Linux clippy
+**40218880226**: **11,297 PASS plus one tracked journal LEAK, 106 skipped**,
+all three own controls once. Preview 23c236869 has exactly the offered tree
+and parents 9e9/a5. [Receipt](verification/two-faces-held-carry-20261025/native-40218880202.json).
+Both current source/proof reads are READ-OK, with native results separately
+posted. Original #3355 remains unchanged and is superseded by this carry.
+
+Taken on Queue6401238585: the factory-touch baseline coverage gap, own
+branch third/head-rest-coverage on actual 14c. Discovery preinitializes
+rest_changes to zero, but a completely skipped hands-away phase or first
+sample delayed until after it can still qualify pads. The factory then
+writes that unobserved rest as a baseline. Open/merged PR and Queue checks
+found no owner of this gap; earlier #1965/#2151/#2347/#2915 are delivered.
+Two deterministic regressions are prepared against unchanged production;
+execution is queued after the current carry compiler job, not claimed.
+
+Planned narrow correction uses existing FRESH_US=100000, clipped to missing
+coverage inside the hands-away interval, plus one actual in-phase sample.
+A failed scan cannot be repaired by later touches. Existing CLI failure
+propagation already restores Controls and refuses installation; no new
+schema, switch, live touch policy or device action is needed. Successful
+scans add no wait and retain the 40 s factory flow. V1's actual transient
+pull probe and kernel edge timestamps have no persisted rest-report
+contract, so this is V2 evidence correctness rather than claimed V1 parity.
+#3276 still needs the authorized hand trial, outside Third's lamp access.
+
 ## 2026-10-26 00:59 — Current carries green; row snapshot delivered
 
 Ready for lamp-voice: yes (#3491 and #3420; final reader lines go on their PRs).
