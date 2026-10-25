@@ -2019,7 +2019,18 @@ pub fn serve(
             );
             remember_asks()
         });
-    let net = match first_force(named, remember) {
+    // A line that plainly asks the lamp to keep something must call
+    // remember, so the lamp never says it kept what it didn't
+    // (`LAMP_MEMORY_KEEP_ASKED`).
+    let keep = crate::remember::asked::on().then(|| {
+        eprintln!(
+            "lamp-voice second: a line that plainly asks the lamp to keep something must call {} in its first round ({})",
+            crate::remember::REMEMBER,
+            crate::remember::asked::ENVIRONMENT
+        );
+        crate::remember::asked::force()
+    });
+    let net = match first_force(named, first_force(remember, keep)) {
         Some(force) => net.forcing(force),
         None => net,
     };

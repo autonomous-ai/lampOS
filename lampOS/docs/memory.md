@@ -1882,6 +1882,19 @@ then use that person's scope:
     probe's quality case waits for a base with the relay probe (#2279);
     until then these tests are its check.
 
+- **A plain ask to keep something calls `remember`**
+  (`LAMP_MEMORY_KEEP_ASKED=on`, off unless set; the second route; on in
+  the product unit). On lamp-4ace on 25 Oct, on the product unit, "Lamp,
+  remember that I take my coffee black." was answered "Noted: black, no
+  sugar. That's in my head now." with no call at all, so the next session
+  didn't know it. With the switch, a line that plainly asks the lamp to
+  keep something at a sentence's start (`remember::asked::asks_to_keep`)
+  makes its first chat round call `remember` (`tool_choice`), after a
+  named ask and a face ask. A question of what the lamp knows, a reminder
+  ("remember to …"), a face ask, the phrase further in and a refusal
+  before it are not forced. What the lamp then says follows what the
+  memory did: kept, or, below, not kept and said so.
+
 - **Nothing personal kept while nobody is known** (the owner's question 1,
   option (b); `LAMP_MEMORY_PERSONAL_NEEDS_FACE=on`, off unless set; both
   voice routes, either memory client; on in the product unit since #3174,
