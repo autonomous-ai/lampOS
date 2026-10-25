@@ -1,0 +1,35 @@
+{
+  "offered_head": "7d8707a6c3ac7d526be638d5cbb9ca28ce746c9d",
+  "arm64_run": 40230772851,
+  "linux_clippy_run": 40230772811,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "conclusions": "Both success",
+  "executed_preview": "ca736831ea3cac4d4e3b9b6ed69c4e8277f15a55",
+  "preview_tree": "03c7922ca832c708c0f967484b7d3438faa8221b",
+  "preview_parents": [
+    "0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5",
+    "7d8707a6c3ac7d526be638d5cbb9ca28ce746c9d"
+  ],
+  "passed": 11319,
+  "leaks_in_passed": 0,
+  "leaky_cases": [],
+  "skipped": 106,
+  "unique_terminal_cases": 11319,
+  "repeated_equal_rows": 35,
+  "own_control_pass_counts": {
+    "a_gap_over_the_hands_away_phase_cannot_qualify_head_pads": 1,
+    "a_first_read_after_the_hands_away_phase_cannot_qualify_head_pads": 1,
+    "missing_rest_coverage_uses_the_existing_freshness_boundary": 1,
+    "first_rest_sample_and_last_rest_sample_must_cover_the_phase_edges": 1,
+    "a_short_rest_needs_a_sample_inside_it_not_only_at_its_end": 1,
+    "gaps_outside_rest_do_not_prevent_a_fresh_baseline_and_held_pads": 1
+  },
+  "raw_log_sha256": "78e3bb72840db7bd36adbc8ce5415772bbebcc318fdea56752c9572f0feff941",
+  "limits": "Original run on offered 7d8707a6c3ac7d526be638d5cbb9ca28ce746c9d and the actual recorded merge preview; later base changes remain separate. No lamp, acoustic latency or activation claim.",
+  "offered_tree": "03c7922ca832c708c0f967484b7d3438faa8221b",
+  "preview_equals_offered_tree": true,
+  "landed_commit": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "landed_tree": "03c7922ca832c708c0f967484b7d3438faa8221b",
+  "landed_equals_captured_and_tested_tree": true
+}

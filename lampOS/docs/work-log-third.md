@@ -5,6 +5,27 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 03:45 — Observed factory baseline delivered
+
+Delivered: #3507 through train147 #3509 as **3d9722f38**. The captured,
+original native preview and landed trees all equal **03c7922ca**: the
+complete qualified Controls patch composed with Skills' landed tests.
+Original ARM64 **40230772851** and Linux **40230772811**, both attempt 1,
+pass: **11,319 unique PASS, zero leaks/failures/timeouts, 106 skipped**,
+all six new discovery controls once. The
+[train receipt](verification/head-rest-coverage-20261026/native-40230772851.json)
+keeps original source and raw-log identities. The constituent's original
+11,314-pass result remains separate. No physical calibration is claimed.
+
+#3486 is temporarily draft at its old remote d4 head while its repaired
+linear replacement is qualified. Private **1b6100a29** rebases cleanly onto
+3d9722f38 with all seven range-diff entries equal; its complete final patch
+still equals qualified d4 over 409. Public d4 plus 3d gives the exact new
+tree **03b0cfcb3**. Reviewer-two has the current identity and will keep any
+already frozen older-base result separate. Expression's full suite and the
+new install-reader test fixture continue; production for the latter is
+still unchanged, pending the bounded original-code negative.
+
 ## 2026-10-26 03:39 — Two-face history repaired; installer reader claimed
 
 Ready: #3507 is captured by train147, not changed after capture. #3486
