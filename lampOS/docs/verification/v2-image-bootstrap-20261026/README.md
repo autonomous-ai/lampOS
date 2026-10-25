@@ -1,8 +1,10 @@
 # V2 image bootstrap source qualification
 
 26 October 2026. Carry of [#3246](https://github.com/autonomous-ai/lampOS/pull/3246)
-for [#2538](https://github.com/autonomous-ai/lampOS/issues/2538), based on
-`abc79d609126e7c1b83dedb220b7be00b7e7ab6a`. The original two commits remain
+for [#2538](https://github.com/autonomous-ai/lampOS/issues/2538), originally based on
+`abc79d609126e7c1b83dedb220b7be00b7e7ab6a`. The amended carry contains
+`4913713548aff7b40f0f4e0b049b5e4000e0baac`; all 22 final image input hashes
+survive that rebase unchanged and fresh Cargo formatting passes. The original two commits remain
 patch-identical (`git range-diff` reports `=` for both). The added repair
 verifies the exact signed manifest before any bootstrap download/execution,
 uses the same staged envelope for both install attempts, checks the recorded
@@ -46,9 +48,35 @@ channel fixture. A separate original Makefile control reproduced the stale
 compressed-output rename. These are command-mocked source observations;
 downloaded fixture bytes are never executed.
 
+## Size forwarding and standard-profile follow-up
+
+The broader carried-source read found that the documented `OUT_IMG_SIZE`
+never reached Docker. The actual Makefile dry run omitted a requested `16G`;
+the fix forwards it, while empty still selects the script's `8G` default.
+V1 also removes an inherited hardware-profile marker for standard images;
+V2 now keeps that behavior. A controlled original block retained a preseeded
+`pro` marker, while the fixed block removes it and preserves unrelated files.
+No stale marker in the real base is asserted.
+
+`MAKE=<Command Line Tools make> bash scripts/imager/tests/test_v2_image_inputs.sh`
+reports **5 passed, 0 failed**: explicit/default size and stale/fresh standard
+plus selected-pro profile cases. `make -n` uses `MAKE=:` so its recursive-command
+exception cannot launch any build. Output tests rerun **8/0**, current bootstrap
+cases rerun **5/0**, and shell syntax, workflow YAML and diff checks pass.
+These are the affected checks; unchanged signature and existing pytest cases
+were not repeated. The Ubuntu job now includes this fourth shell suite.
+
+Before this follow-up, original head `861532feb` had green Ubuntu imager CI
+[40221513668](https://github.com/autonomous-ai/lampOS/actions/runs/40221513668):
+31 signature, 5 bootstrap and 8 output cases pass; existing pytest reports
+31 passed, including disposable ext4. Linux Clippy
+[40221513540](https://github.com/autonomous-ai/lampOS/actions/runs/40221513540)
+also passed. Those runs retain the original inputs and are not evidence for
+the amended head's new controls; its original CI must complete separately.
+
 ## Retained evidence and limits
 
-[inputs.sha256](inputs.sha256) binds the final 21 image inputs, including the
+[inputs.sha256](inputs.sha256) binds the final 22 image inputs, including the
 corrected bootstrap suite. [test-results.txt](test-results.txt) contains
 selected literal result rows from the full gate and the corrected-suite run;
 only temporary paths are removed. The raw logs and ephemeral-key fixture
