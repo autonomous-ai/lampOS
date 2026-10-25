@@ -1,0 +1,16 @@
+keys::tests::the_check_is_one_request_with_the_key_in_its_header: test
+keys::tests::the_services_error_body_is_never_passed_on: test
+light::tests::a_new_look_turns_into_the_next_over_the_change: test
+light::tests::each_phase_has_its_look_and_a_done_lamp_has_none: test
+light::tests::it_fades_in_then_breathes_and_never_goes_dark: test
+light::tests::joining_breathes_twice_as_fast_as_waiting: test
+light::tests::let_go_it_fades_out_then_is_dark_and_comes_back_from_nothing: test
+scan::tests::a_command_that_hangs_is_killed_at_its_limit: test
+scan::tests::a_long_output_is_read_whole_without_stalling_the_command: test
+wake::tests::a_painter_fades_over_the_fades_it_is_given_and_the_lamps_by_default: test
+wake::tests::it_breathes_every_six_seconds_then_every_ten_once_unwell: test
+wake::tests::it_fades_in_and_opens_up_the_ring_over_the_opening: test
+wake::tests::its_first_frame_is_already_lit: test
+wake::tests::let_go_it_fades_out_within_the_fade_and_stays_dark: test
+wake::tests::only_on_turns_it_on: test
+wake::tests::with_no_voice_for_five_minutes_it_turns_pale: test

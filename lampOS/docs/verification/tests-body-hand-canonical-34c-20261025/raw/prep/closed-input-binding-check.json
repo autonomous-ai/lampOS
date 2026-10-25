@@ -1,0 +1,132 @@
+{
+  "control_source_base": "efbf42a02974ff130cb979abc0499ba699c1b34d",
+  "canonical_base": "0ee5ebd2a78f3825847a69e197d3f6b4433e4962",
+  "source_map_sha256": "ced81d098fe6f1927a68d91dd9ad91047861766ebdf81c6ab902b1103c08092f",
+  "metadata_native": 23774,
+  "actual_metadata_sha256": "9e2937a52602494a9077a5684fd587246b09bba899620abbf64ce1cbfb2e1f51",
+  "actual_metadata_byte_equal_closed_efbf": true,
+  "nodes": 451,
+  "local_packages": 48,
+  "reverse_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "source_graph_manifest_inputs_equal": true,
+  "custom_harness_protocol_bindings": [
+    {
+      "package": "lamp-update",
+      "target": "self-cli-exec",
+      "source_path": "lampOS/crates/update/tests/self_cli_exec.rs",
+      "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd",
+      "protocol_case": "actual_cli_exec_confirms_before_the_next_round",
+      "protocol_scope": "Existing one named libtest-compatible all/list/ignored/exact/summary protocol; Mac case ignored, Linux supported percfg. Parser unchanged; actual compiled census/outcomes still required."
+    },
+    {
+      "package": "lamp-update",
+      "target": "self-process-cuts",
+      "source_path": "lampOS/crates/update/tests/self_process_cuts.rs",
+      "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3",
+      "protocol_case": "persisted_self_switches_survive_sigkill",
+      "protocol_scope": "Existing one named libtest-compatible all/list/ignored/exact/summary protocol; Mac case ignored, Linux supported percfg. Parser unchanged; actual compiled census/outcomes still required."
+    }
+  ],
+  "owned_candidate_files_byte_mode_equal_efbf": true,
+  "changed_source_inputs": [
+    {
+      "path": "lampOS/crates/cloud/src/settings.rs",
+      "efbf": {
+        "sha256": "3f7527e1bab70d17b28b489c659ef4092aad82673f91d6f90f0a093a67d45a87",
+        "bytes": 75915,
+        "mode": 420,
+        "mtime_ns": 1792883876819394872,
+        "kind": "file"
+      },
+      "current": {
+        "sha256": "66ad0d899d055e555e25198daee6a0ec3b89c1717da51a2d2697e5aa3af4827f",
+        "bytes": 76375,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792891774575716661
+      }
+    },
+    {
+      "path": "lampOS/crates/controls/src/record.rs",
+      "efbf": {
+        "sha256": "282f4640a4e5a572fca6e11637289c8e6c92540d5fc94aadff93b776c4d7f784",
+        "bytes": 29153,
+        "mode": 420,
+        "mtime_ns": 1792883877470101271,
+        "kind": "file"
+      },
+      "current": {
+        "sha256": "26ed9cdec7469f0c820a940f1b9702b9be0b9a33021432943e7fa4c9fb262993",
+        "bytes": 30602,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792891774756142133
+      }
+    },
+    {
+      "path": "lampOS/crates/controls/tests/it/program.rs",
+      "efbf": {
+        "sha256": "7a1a3158a0c70d42e6e2c1ea6be7ae7a4ce07dd8611ba13dafaeefa48e949d6b",
+        "bytes": 12236,
+        "mode": 420,
+        "mtime_ns": 1792883877841183817,
+        "kind": "file"
+      },
+      "current": {
+        "sha256": "66bf9f911ed5d14cd07a89198f16974d5bbacccc89d0844d7dce3269e215cd72",
+        "bytes": 12679,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792891774899744989
+      }
+    },
+    {
+      "path": "lampOS/docs/cloud.md",
+      "efbf": {
+        "sha256": "79055bbb98129a9938c91d74032b8fffb34645c2355e598267c09d96af89f678",
+        "bytes": 101563,
+        "mode": 420,
+        "mtime_ns": 1792883894899754624,
+        "kind": "file"
+      },
+      "current": {
+        "sha256": "929fc8f6d395d1af1a24802f9461e6991d76fa3b2c7e067ed5e3766f24f346ff",
+        "bytes": 101988,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792891775205894195
+      }
+    },
+    {
+      "path": "lampOS/docs/controls.md",
+      "efbf": {
+        "sha256": "061d0a5aae057523a6642924b86c6c1df2bd1289c8b10cc5f369a7a521c94f6b",
+        "bytes": 114067,
+        "mode": 420,
+        "mtime_ns": 1792883894988391778,
+        "kind": "file"
+      },
+      "current": {
+        "sha256": "e1645d5626dd1e93d015f51fb81ee29d6397c4c4a7ae54ffb996a3af21b53b6b",
+        "bytes": 114593,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792891775569155453
+      }
+    }
+  ],
+  "scope": "Closure/carry-input comparison only. Old2passcontrols remain frozenefbf; metadata was independentlyqueried oncurrent0ee, no code/test equivalence or currentgates waiver."
+}

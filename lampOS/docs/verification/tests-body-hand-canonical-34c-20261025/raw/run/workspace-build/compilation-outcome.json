@@ -1,0 +1,10 @@
+{
+  "build_finished_messages": [
+    {
+      "reason": "build-finished",
+      "success": true
+    }
+  ],
+  "compiler_error_messages": [],
+  "successful": true
+}

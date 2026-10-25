@@ -1,0 +1,2 @@
+tests::explicit_bounded_arguments_and_help_are_valid_without_any_open: test
+tests::no_implicit_device_or_unit_and_no_unknown_controls: test

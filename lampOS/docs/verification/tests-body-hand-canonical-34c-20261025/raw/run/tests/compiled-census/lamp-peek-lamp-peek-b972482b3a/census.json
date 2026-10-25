@@ -1,0 +1,25 @@
+{
+  "package": "lamp-peek",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-peek",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/src/main.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_peek-73600315bdd6f294",
+  "sha256": "b972482b3ace8afa0348bcf083a5fcefa80952e6dcf7eea6b02baceeed284a13",
+  "compiled_cases": [],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 0,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

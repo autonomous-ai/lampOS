@@ -1,0 +1,36 @@
+{
+  "package": "lamp-lean",
+  "target": {
+    "kind": [
+      "lib"
+    ],
+    "crate_types": [
+      "lib"
+    ],
+    "name": "lamp_lean",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean/src/lib.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": true,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_lean-332a9af8170ca045",
+  "sha256": "f64402d718af1db39074e9fb12a36308796d4a4ea27a040930e6df3598ce251e",
+  "compiled_cases": [
+    "footprint::tests::asymmetric_support_distinguishes_yaw_and_rotates_with_coordinates",
+    "footprint::tests::diagonal_inset_uses_unit_normals",
+    "footprint::tests::inset_removes_a_short_chamfer_edge",
+    "footprint::tests::invalid_queries_cannot_report_positive_clearance",
+    "footprint::tests::maximum_vertex_count_retains_the_analytic_regular_polygon",
+    "footprint::tests::refuses_concave_crossed_clockwise_and_collinear_input",
+    "footprint::tests::refuses_duplicates_short_edges_and_unbounded_input",
+    "footprint::tests::rejects_empty_line_point_and_numerically_degenerate_insets",
+    "footprint::tests::true_distance_to_inset_including_corners",
+    "footprint::tests::zero_margin_and_maximum_declared_scale"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 10,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

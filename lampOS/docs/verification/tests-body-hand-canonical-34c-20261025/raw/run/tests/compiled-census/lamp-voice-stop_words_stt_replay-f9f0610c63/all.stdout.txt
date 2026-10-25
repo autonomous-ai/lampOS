@@ -1,0 +1,6 @@
+tests::blocks_are_dated_and_scored_as_the_lamp_read_them: test
+tests::only_cut_lines_are_stop_lines_in_a_mixed_plays_file: test
+tests::only_the_lamps_sounding_is_sent_and_raw_is_asked_on_the_cadence: test
+tests::options_are_read: test
+tests::the_lamps_own_words_stop_nothing: test
+tests::the_voices_stop_words_are_counted_against_the_played_lines: test

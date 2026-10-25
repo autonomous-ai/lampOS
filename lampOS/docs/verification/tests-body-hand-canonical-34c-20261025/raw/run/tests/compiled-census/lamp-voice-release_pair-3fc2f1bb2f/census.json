@@ -1,0 +1,39 @@
+{
+  "package": "lamp-voice",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "release_pair",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/tests/release_pair.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/release_pair-99d83a658939f458",
+  "sha256": "3fc2f1bb2f56c17e67cbffb983d8ba8189ace4877010f7690f403e2da032fd62",
+  "compiled_cases": [
+    "release_6408_reads_6498_completed_delivery_without_another_offer",
+    "release_6408_reads_6498_unfinished_delivery_and_completes_it",
+    "release_6408_replays_6498_exact_ack_intent_without_another_offer",
+    "release_6498_reads_6408_completed_delivery_without_another_offer",
+    "release_6498_reads_6408_unfinished_delivery_and_completes_it",
+    "release_6498_replays_6408_exact_ack_intent_without_another_offer"
+  ],
+  "compiled_ignored_cases": [
+    "release_6408_reads_6498_completed_delivery_without_another_offer",
+    "release_6408_reads_6498_unfinished_delivery_and_completes_it",
+    "release_6408_replays_6498_exact_ack_intent_without_another_offer",
+    "release_6498_reads_6408_completed_delivery_without_another_offer",
+    "release_6498_reads_6408_unfinished_delivery_and_completes_it",
+    "release_6498_replays_6408_exact_ack_intent_without_another_offer"
+  ],
+  "compiled_case_count": 6,
+  "ignored_case_count": 6,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

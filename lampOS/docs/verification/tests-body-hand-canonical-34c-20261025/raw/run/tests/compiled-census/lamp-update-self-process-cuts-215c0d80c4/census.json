@@ -1,0 +1,29 @@
+{
+  "package": "lamp-update",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "self-process-cuts",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/self_process_cuts.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/self_process_cuts-584367f7ea7a7bb2",
+  "sha256": "215c0d80c45908ab8a8118c20c2d6a8f7a7a461cf4abd84d371b13adcf652775",
+  "compiled_cases": [
+    "persisted_self_switches_survive_sigkill"
+  ],
+  "compiled_ignored_cases": [
+    "persisted_self_switches_survive_sigkill"
+  ],
+  "compiled_case_count": 1,
+  "ignored_case_count": 1,
+  "custom_entrypoint": true,
+  "executed_tests_in_this_census": 0
+}

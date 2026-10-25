@@ -1,0 +1,29 @@
+{
+  "package": "lamp-body",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-body-mood",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body_mood-9d0446e9a36c0d5e",
+  "sha256": "8046cb83dbdd92aad07750dcbfe251ddfe026511cc4b22032a1c634348af1f5b",
+  "compiled_cases": [
+    "tests::it_refuses_what_the_body_could_not_read",
+    "tests::it_takes_a_socket_a_mood_and_a_level",
+    "tests::the_datagram_reaches_a_socket"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 3,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

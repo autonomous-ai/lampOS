@@ -1,0 +1,49 @@
+{
+  "grant_id": "Root-BodyHand-34c-canonical-20261025T0153",
+  "plan_identity": "BodyHand-canonical-34c-12reverse-gates",
+  "plan_sha256": "ebcde68ecb34664f5cb0cc2fe3e9136dcd82f2dd7b5503191a4ba34cc13479dd",
+  "controller_sha256": "5227d4939e8fc0ab17a5c4b6030b216e4c578cbf323591401cf6202cae767e44",
+  "source_map_sha256": {
+    "canonical": "884c6f1c5501b047bead8632f70778b6f7c9d7ee35e189c6def41445c6b13fd0"
+  },
+  "source_guards": {
+    "canonical": "907ab7a6e28ea953dbaf6840db72333d9b1afe1161a9543032d5539253acd2c0"
+  },
+  "source_heads": {
+    "canonical": "34c8b517c41c8d2a4099b87fe550d4eb25611ea2"
+  },
+  "execution_authorized": true,
+  "grant_scope": "ONE canonical fmt-strict12-full12-workspace-build-diff; no control retry",
+  "exclusive_target_grant": {
+    "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target",
+    "previous_owner_released": true,
+    "cpu_exclusive": false,
+    "target_exclusive": true
+  },
+  "concurrency_context": {
+    "declaration_scope": "Reviewer-two retains the released lane for two one-job independent VoiceEval gates after its completed Body gate; upper2, handlesUNKNOWN. RootHand upper2, declaredbound4; no global process or isolation claim.",
+    "this_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target",
+    "this_gate_compiler_job_upper_bound": 2,
+    "declared_peer_lanes": [
+      {
+        "builder": "Reviewer-two",
+        "job_upper_bound": 2,
+        "slotpost": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6392131329",
+        "activehandle": "UNKNOWN",
+        "release_chain": [
+          "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6391934407",
+          "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6391777190"
+        ]
+      }
+    ],
+    "total_declared_compile_job_upper_bound": 4,
+    "cpu_exclusive": false,
+    "global_actual_process_count_claim": false,
+    "isolated_host_claim": false,
+    "resource_changes_require_separate_root_grant": true,
+    "slotpost_binding_pending": false
+  },
+  "actual_available_bytes": 22680772608,
+  "minimum_free_bytes": 5368709120,
+  "scope_limits": "One canonical schedule, no A/B repeats or diagnostic samples. Preserve all actual0/101; no waived cache/input/census failures. Source frozen34c plus declaredBody2files; oldefbf controls remain original. No localARM/device/product/API change."
+}

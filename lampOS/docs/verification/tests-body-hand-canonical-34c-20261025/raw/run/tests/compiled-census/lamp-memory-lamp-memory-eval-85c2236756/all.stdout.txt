@@ -1,0 +1,8 @@
+tests::evidence_labels_never_change_retrieved_text_or_ranking: test
+tests::legacy_ties_are_newer_first_and_nonmatches_are_not_retrieved: test
+tests::missing_or_unaligned_evidence_is_rejected: test
+tests::no_labels_never_produces_vacuous_recall: test
+tests::partial_evidence_is_not_all_evidence_and_ndcg_matches_upstream_discount: test
+tests::repeated_session_occurrences_do_not_count_as_distinct_recalled_evidence: test
+tests::roles_and_units_keep_the_two_label_conventions_separate: test
+tests::utf8_bytes_and_full_cutoff_are_measured_without_truncation: test

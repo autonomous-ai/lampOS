@@ -1,0 +1,32 @@
+{
+  "package": "lamp-voice",
+  "target": {
+    "kind": [
+      "example"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "stop_words_stt_replay",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/examples/stop_words_stt_replay-5bdbc6c296f69050",
+  "sha256": "f9f0610c6381ab9ebb18e08a0dd1c694b76cf1fcf2607dcd2a29a8346be0c79d",
+  "compiled_cases": [
+    "tests::blocks_are_dated_and_scored_as_the_lamp_read_them",
+    "tests::only_cut_lines_are_stop_lines_in_a_mixed_plays_file",
+    "tests::only_the_lamps_sounding_is_sent_and_raw_is_asked_on_the_cadence",
+    "tests::options_are_read",
+    "tests::the_lamps_own_words_stop_nothing",
+    "tests::the_voices_stop_words_are_counted_against_the_played_lines"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 6,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

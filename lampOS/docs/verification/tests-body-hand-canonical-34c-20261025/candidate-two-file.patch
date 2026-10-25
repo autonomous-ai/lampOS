@@ -1,0 +1,41 @@
+diff --git a/lampOS/crates/body/src/bus_out.rs b/lampOS/crates/body/src/bus_out.rs
+index 2538373e2e..9945e45290 100644
+--- a/lampOS/crates/body/src/bus_out.rs
++++ b/lampOS/crates/body/src/bus_out.rs
+@@ -1570,0 +1571 @@ mod tests {
++        let mut said = Vec::<Hand>::new();
+@@ -1574,0 +1576,12 @@ mod tests {
++            // Observe each forwarded step before queuing later ones, so
++            // their one-second evidence does not age behind this probe.
++            if step % 4 == 0 {
++                said.push(
++                    hands
++                        .recv(Duration::from_secs(5))
++                        .unwrap()
++                        .expect("a hand")
++                        .parse()
++                        .unwrap(),
++                );
++            }
+@@ -1576,10 +1588,0 @@ mod tests {
+-        let said: Vec<Hand> = (0..5)
+-            .map(|_| {
+-                hands
+-                    .recv(Duration::from_secs(5))
+-                    .unwrap()
+-                    .expect("a hand")
+-                    .parse()
+-                    .unwrap()
+-            })
+-            .collect();
+diff --git a/lampOS/docs/body.md b/lampOS/docs/body.md
+index 50b4c68a35..f7a11bfb07 100644
+--- a/lampOS/docs/body.md
++++ b/lampOS/docs/body.md
+@@ -2985,0 +2986,6 @@ body does.
++The Hand publication fixture observes each forwarded step's actual Hand
++before offering later steps. It still offers all 20 steps and checks the
++same five pushed values and push-start timestamps, with the original
++five-second receive watchdog. Product queueing and one-second freshness
++limits are unchanged; this fixture does not diagnose a historical failure.
++

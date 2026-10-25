@@ -1,0 +1,106 @@
+[
+  {
+    "package": "lamp-memory",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "counts": {
+      "passed": 162,
+      "failed": 2,
+      "ignored": 5,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "sha256": "69393b52b9037db7821b9d5f2da79443dc900dd8002aca9daa6bfa3741f047fa",
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/it-b864a5069c6d724f"
+  },
+  {
+    "package": "lamp-skills",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "counts": {
+      "passed": 290,
+      "failed": 16,
+      "ignored": 1,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "sha256": "84a052d564e003ad651904726a690b03444370eca24c3b287c612bf3c58f97f9",
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/it-03d8e125c34f2f16"
+  },
+  {
+    "package": "lamp-skills",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "requested_audio",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/tests/requested_audio.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "counts": {
+      "passed": 30,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "sha256": "c549d7963052f0bfa5615fbb9975cea1182a54cc42d874728526854c9a67e84b",
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/requested_audio-7f311165d6904c49"
+  },
+  {
+    "package": "lamp-voice",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "counts": {
+      "passed": 274,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "sha256": "938ae2a9977745c7ead7be9f0adb178bdde557118f3fd51ebb537a7d00289252",
+    "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/it-73635c91cd8b88a3"
+  }
+]

@@ -1,0 +1,2219 @@
+[
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-station",
+      "sha256": "ec6612f5778ddde9a0c5ffbc5b012cb5256c237ced9d19c967fce728c1de90d6",
+      "mode": "0o755",
+      "bytes": 5090576
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/ec6612f5778ddde9a0c5ffbc5b012cb5256c237ced9d19c967fce728c1de90d6-lamp-station",
+      "sha256": "ec6612f5778ddde9a0c5ffbc5b012cb5256c237ced9d19c967fce728c1de90d6",
+      "mode": "0o555",
+      "bytes": 5090576
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/station#lamp-station@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/station/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-station",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/station/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-station"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-station",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-mood",
+      "sha256": "c90c99cbc2af5237d9a8d6c3fa05d7809631b72acd1a5a648c898077a1f18942",
+      "mode": "0o755",
+      "bytes": 4775072
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/c90c99cbc2af5237d9a8d6c3fa05d7809631b72acd1a5a648c898077a1f18942-lamp-mood",
+      "sha256": "c90c99cbc2af5237d9a8d6c3fa05d7809631b72acd1a5a648c898077a1f18942",
+      "mode": "0o555",
+      "bytes": 4775072
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/mood#lamp-mood@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/mood/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-mood",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/mood/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-mood"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-mood",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-addons",
+      "sha256": "d70b0ddfdda12124bf3d7d9e5276480a7071151c8d9f74c9dee63905b243d050",
+      "mode": "0o755",
+      "bytes": 2946432
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/d70b0ddfdda12124bf3d7d9e5276480a7071151c8d9f74c9dee63905b243d050-lamp-addons",
+      "sha256": "d70b0ddfdda12124bf3d7d9e5276480a7071151c8d9f74c9dee63905b243d050",
+      "mode": "0o555",
+      "bytes": 2946432
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/addons#lamp-addons@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/addons/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-addons",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/addons/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-addons"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-addons",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-name",
+      "sha256": "5c40bc449a640cb0703f7ba9ca6afe1d59f6a3341017f31ae22855126994e3f5",
+      "mode": "0o755",
+      "bytes": 91414384
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/5c40bc449a640cb0703f7ba9ca6afe1d59f6a3341017f31ae22855126994e3f5-lamp-name",
+      "sha256": "5c40bc449a640cb0703f7ba9ca6afe1d59f6a3341017f31ae22855126994e3f5",
+      "mode": "0o555",
+      "bytes": 91414384
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/name#lamp-name@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/name/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-name",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/name/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-name"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-name",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-same-voice",
+      "sha256": "56ad8e21f8684744000edb20b5bc0194e9dabb3bb6ef40dfda4fca31446e1c6c",
+      "mode": "0o755",
+      "bytes": 89651232
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/56ad8e21f8684744000edb20b5bc0194e9dabb3bb6ef40dfda4fca31446e1c6c-lamp-same-voice",
+      "sha256": "56ad8e21f8684744000edb20b5bc0194e9dabb3bb6ef40dfda4fca31446e1c6c",
+      "mode": "0o555",
+      "bytes": 89651232
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/same-voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-same-voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/same-voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-same-voice"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-same-voice",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-ears",
+      "sha256": "f05bef4998d7a4fb07e51ee328615712fdf9884f4dccdf0ceac06e26874bde2c",
+      "mode": "0o755",
+      "bytes": 74653552
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f05bef4998d7a4fb07e51ee328615712fdf9884f4dccdf0ceac06e26874bde2c-lamp-ears",
+      "sha256": "f05bef4998d7a4fb07e51ee328615712fdf9884f4dccdf0ceac06e26874bde2c",
+      "mode": "0o555",
+      "bytes": 74653552
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ears#lamp-ears@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ears/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-ears",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ears/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-ears"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-ears",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-peek",
+      "sha256": "95bbe137c58842fd5c440781cb3b021a9d49574b130792017cfa530fd4b808ba",
+      "mode": "0o755",
+      "bytes": 8352336
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/95bbe137c58842fd5c440781cb3b021a9d49574b130792017cfa530fd4b808ba-lamp-peek",
+      "sha256": "95bbe137c58842fd5c440781cb3b021a9d49574b130792017cfa530fd4b808ba",
+      "mode": "0o555",
+      "bytes": 8352336
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek#lamp-peek@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-peek",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-peek"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-peek",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-voice-eval",
+      "sha256": "a6c49cf37f476ad483b4b5f1543ed4a45cfdb6c10e2df70cd2606983b4b39885",
+      "mode": "0o755",
+      "bytes": 37069984
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/a6c49cf37f476ad483b4b5f1543ed4a45cfdb6c10e2df70cd2606983b4b39885-lamp-voice-eval",
+      "sha256": "a6c49cf37f476ad483b4b5f1543ed4a45cfdb6c10e2df70cd2606983b4b39885",
+      "mode": "0o555",
+      "bytes": 37069984
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice-eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-voice-eval"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-voice-eval",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-settings",
+      "sha256": "27a25c23881d1f969baa44239c3123d4352076e666579786cb67c8f5ba09867b",
+      "mode": "0o755",
+      "bytes": 4019992
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/27a25c23881d1f969baa44239c3123d4352076e666579786cb67c8f5ba09867b-lamp-settings",
+      "sha256": "27a25c23881d1f969baa44239c3123d4352076e666579786cb67c8f5ba09867b",
+      "mode": "0o555",
+      "bytes": 4019992
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/settings#lamp-settings@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/settings/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-settings",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/settings/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-settings"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-settings",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-setup",
+      "sha256": "e4b3d8d7e642d1ed5fc431109a1d9130ae79654429b825fbef16986741d14b45",
+      "mode": "0o755",
+      "bytes": 20524576
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/e4b3d8d7e642d1ed5fc431109a1d9130ae79654429b825fbef16986741d14b45-lamp-setup",
+      "sha256": "e4b3d8d7e642d1ed5fc431109a1d9130ae79654429b825fbef16986741d14b45",
+      "mode": "0o555",
+      "bytes": 20524576
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup#lamp-setup@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-setup",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-setup"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-setup",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-selftest",
+      "sha256": "70f90a69d50308dcb88bdb36386bc572e5e003bdaa78d5d72109304fcb83dc44",
+      "mode": "0o755",
+      "bytes": 4149880
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/70f90a69d50308dcb88bdb36386bc572e5e003bdaa78d5d72109304fcb83dc44-lamp-selftest",
+      "sha256": "70f90a69d50308dcb88bdb36386bc572e5e003bdaa78d5d72109304fcb83dc44",
+      "mode": "0o555",
+      "bytes": 4149880
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/selftest#lamp-selftest@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/selftest/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-selftest",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/selftest/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-selftest"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-selftest",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-cloud",
+      "sha256": "b4cbe10823297fe0c027deec0759e26da5d915179afdd2aac29b2c27b434ad15",
+      "mode": "0o755",
+      "bytes": 30155504
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b4cbe10823297fe0c027deec0759e26da5d915179afdd2aac29b2c27b434ad15-lamp-cloud",
+      "sha256": "b4cbe10823297fe0c027deec0759e26da5d915179afdd2aac29b2c27b434ad15",
+      "mode": "0o555",
+      "bytes": 30155504
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-cloud",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-cloud"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-cloud",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-tasks",
+      "sha256": "c88437a4928513e387b9903a780192ebb075615e2611909eb94b5cb662e7e353",
+      "mode": "0o755",
+      "bytes": 10429440
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/c88437a4928513e387b9903a780192ebb075615e2611909eb94b5cb662e7e353-lamp-tasks",
+      "sha256": "c88437a4928513e387b9903a780192ebb075615e2611909eb94b5cb662e7e353",
+      "mode": "0o555",
+      "bytes": 10429440
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/tasks/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-tasks",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/tasks/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-tasks"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-tasks",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-surround",
+      "sha256": "eac61db0a98d3df1ee2214f7e1a196879b44dde84616fb4b0ea413a9d7457212",
+      "mode": "0o755",
+      "bytes": 35832648
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/eac61db0a98d3df1ee2214f7e1a196879b44dde84616fb4b0ea413a9d7457212-lamp-surround",
+      "sha256": "eac61db0a98d3df1ee2214f7e1a196879b44dde84616fb4b0ea413a9d7457212",
+      "mode": "0o555",
+      "bytes": 35832648
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/surround#lamp-surround@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/surround/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-surround",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/surround/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default"
+      ],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-surround"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-surround",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-tasks-harness-fixture",
+      "sha256": "d3a5525e218c0800728faf242a5ea97f7bfab4bf5c698b391f55aa6ce3e8b088",
+      "mode": "0o755",
+      "bytes": 1407232
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/d3a5525e218c0800728faf242a5ea97f7bfab4bf5c698b391f55aa6ce3e8b088-lamp-tasks-harness-fixture",
+      "sha256": "d3a5525e218c0800728faf242a5ea97f7bfab4bf5c698b391f55aa6ce3e8b088",
+      "mode": "0o555",
+      "bytes": 1407232
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/tasks#lamp-tasks@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/tasks/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-tasks-harness-fixture",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-tasks-harness-fixture"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-tasks-harness-fixture",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-eyes",
+      "sha256": "ee568455e2b67bc17af9412e818e36b24c76f276602eba3972f4e9419f48fb54",
+      "mode": "0o755",
+      "bytes": 74751016
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/ee568455e2b67bc17af9412e818e36b24c76f276602eba3972f4e9419f48fb54-lamp-eyes",
+      "sha256": "ee568455e2b67bc17af9412e818e36b24c76f276602eba3972f4e9419f48fb54",
+      "mode": "0o555",
+      "bytes": 74751016
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/eyes#lamp-eyes@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/eyes/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-eyes",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/eyes/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-eyes"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-eyes",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-seems-measure",
+      "sha256": "a1b5bd8a8401b61ef21aff85feadc2e3c11b8696e31e6f298f93a77ce43e70fe",
+      "mode": "0o755",
+      "bytes": 74914672
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/a1b5bd8a8401b61ef21aff85feadc2e3c11b8696e31e6f298f93a77ce43e70fe-lamp-seems-measure",
+      "sha256": "a1b5bd8a8401b61ef21aff85feadc2e3c11b8696e31e6f298f93a77ce43e70fe",
+      "mode": "0o555",
+      "bytes": 74914672
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/eyes#lamp-eyes@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/eyes/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-seems-measure",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/eyes/src/bin/seems_measure.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-seems-measure"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-seems-measure",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-air",
+      "sha256": "8a38600af58844eb0230a79978c2ccf45398eee4ff9ab7a479add815aad462e5",
+      "mode": "0o755",
+      "bytes": 881136
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/8a38600af58844eb0230a79978c2ccf45398eee4ff9ab7a479add815aad462e5-lamp-air",
+      "sha256": "8a38600af58844eb0230a79978c2ccf45398eee4ff9ab7a479add815aad462e5",
+      "mode": "0o555",
+      "bytes": 881136
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/air#lamp-air@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/air/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-air",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/air/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-air"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-air",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-sound-fixtures",
+      "sha256": "b2dc94381dbe07dadcd232346ca7f42787ec508558c247a80bd2aeeb8ea1a15d",
+      "mode": "0o755",
+      "bytes": 2459640
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b2dc94381dbe07dadcd232346ca7f42787ec508558c247a80bd2aeeb8ea1a15d-lamp-sound-fixtures",
+      "sha256": "b2dc94381dbe07dadcd232346ca7f42787ec508558c247a80bd2aeeb8ea1a15d",
+      "mode": "0o555",
+      "bytes": 2459640
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/sound-fixtures#lamp-sound-fixtures@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/sound-fixtures/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-sound-fixtures",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/sound-fixtures/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-sound-fixtures"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-sound-fixtures",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-actions",
+      "sha256": "dffa3f3a72d1581dc64fdb2e20ac74f4b96c0b5d9fa42ef787d397ab009e1a7f",
+      "mode": "0o755",
+      "bytes": 8024088
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/dffa3f3a72d1581dc64fdb2e20ac74f4b96c0b5d9fa42ef787d397ab009e1a7f-lamp-actions",
+      "sha256": "dffa3f3a72d1581dc64fdb2e20ac74f4b96c0b5d9fa42ef787d397ab009e1a7f",
+      "mode": "0o555",
+      "bytes": 8024088
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/actions#lamp-actions@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/actions/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-actions",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/actions/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-actions"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-actions",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-observer",
+      "sha256": "2ce26656909ded0f2957af177bfca2521b8a984811ad062ac118fbad11af12af",
+      "mode": "0o755",
+      "bytes": 4011848
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/2ce26656909ded0f2957af177bfca2521b8a984811ad062ac118fbad11af12af-lamp-observer",
+      "sha256": "2ce26656909ded0f2957af177bfca2521b8a984811ad062ac118fbad11af12af",
+      "mode": "0o555",
+      "bytes": 4011848
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/observer#lamp-observer@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/observer/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-observer",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/observer/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-observer"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-observer",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-fit",
+      "sha256": "8869a7e95b94c49a59fed5ed1cd08cc97e902d3eddfaa42ea58d618af1ecb3a4",
+      "mode": "0o755",
+      "bytes": 2478648
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/8869a7e95b94c49a59fed5ed1cd08cc97e902d3eddfaa42ea58d618af1ecb3a4-lamp-policy-fit",
+      "sha256": "8869a7e95b94c49a59fed5ed1cd08cc97e902d3eddfaa42ea58d618af1ecb3a4",
+      "mode": "0o555",
+      "bytes": 2478648
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy#lamp-policy@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-policy-fit",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/src/bin/lamp-policy-fit.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-fit"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-fit",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-skills",
+      "sha256": "051a4210bb838b9d9c4348850533909018eaf1b8aecff3d9af8ef6adfee39594",
+      "mode": "0o755",
+      "bytes": 25513104
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/051a4210bb838b9d9c4348850533909018eaf1b8aecff3d9af8ef6adfee39594-lamp-skills",
+      "sha256": "051a4210bb838b9d9c4348850533909018eaf1b8aecff3d9af8ef6adfee39594",
+      "mode": "0o555",
+      "bytes": 25513104
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-skills"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-skills",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-replay",
+      "sha256": "4d535470c1dace03c4a753b132adb96e637c4d25d383b3f5501329bde0b668f6",
+      "mode": "0o755",
+      "bytes": 8220000
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/4d535470c1dace03c4a753b132adb96e637c4d25d383b3f5501329bde0b668f6-lamp-policy-replay",
+      "sha256": "4d535470c1dace03c4a753b132adb96e637c4d25d383b3f5501329bde0b668f6",
+      "mode": "0o555",
+      "bytes": 8220000
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy#lamp-policy@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-policy-replay",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/src/bin/lamp-policy-replay.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-replay"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-replay",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy",
+      "sha256": "fd47ad7877fedac4a72de0094b8d230c90b95b2ec8ca468dcba7b653bf4016fa",
+      "mode": "0o755",
+      "bytes": 13838864
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/fd47ad7877fedac4a72de0094b8d230c90b95b2ec8ca468dcba7b653bf4016fa-lamp-policy",
+      "sha256": "fd47ad7877fedac4a72de0094b8d230c90b95b2ec8ca468dcba7b653bf4016fa",
+      "mode": "0o555",
+      "bytes": 13838864
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy#lamp-policy@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-policy",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-judges",
+      "sha256": "f7fb7184958c48236d56c6aebd75b7b60266827e92a18074972c41b5030e7e6f",
+      "mode": "0o755",
+      "bytes": 12212384
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f7fb7184958c48236d56c6aebd75b7b60266827e92a18074972c41b5030e7e6f-lamp-policy-judges",
+      "sha256": "f7fb7184958c48236d56c6aebd75b7b60266827e92a18074972c41b5030e7e6f",
+      "mode": "0o555",
+      "bytes": 12212384
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy#lamp-policy@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-policy-judges",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy/src/bin/lamp-policy-judges.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-judges"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-policy-judges",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-records",
+      "sha256": "8ece25b7ce9b1e597398376413c060f27397a0e51a0d1aa7f60986a5092eefbd",
+      "mode": "0o755",
+      "bytes": 3719336
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/8ece25b7ce9b1e597398376413c060f27397a0e51a0d1aa7f60986a5092eefbd-lamp-records",
+      "sha256": "8ece25b7ce9b1e597398376413c060f27397a0e51a0d1aa7f60986a5092eefbd",
+      "mode": "0o555",
+      "bytes": 3719336
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/records#lamp-records@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/records/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-records",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/records/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-records"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-records",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-records-fixture",
+      "sha256": "41619c651685b32b1b2463a45ec2ff9b44bdea85a4da13d640c99d35854bd962",
+      "mode": "0o755",
+      "bytes": 3842696
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/41619c651685b32b1b2463a45ec2ff9b44bdea85a4da13d640c99d35854bd962-lamp-records-fixture",
+      "sha256": "41619c651685b32b1b2463a45ec2ff9b44bdea85a4da13d640c99d35854bd962",
+      "mode": "0o555",
+      "bytes": 3842696
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/records#lamp-records@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/records/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-records-fixture",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/records/src/bin/lamp-records-fixture.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-records-fixture"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-records-fixture",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-turn-end",
+      "sha256": "2636d5a6299d9b835057a641f9316070da6454e8040f1beccc113f1da428fa76",
+      "mode": "0o755",
+      "bytes": 92040608
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/2636d5a6299d9b835057a641f9316070da6454e8040f1beccc113f1da428fa76-lamp-turn-end",
+      "sha256": "2636d5a6299d9b835057a641f9316070da6454e8040f1beccc113f1da428fa76",
+      "mode": "0o555",
+      "bytes": 92040608
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/turn-end#lamp-turn-end@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/turn-end/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-turn-end",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/turn-end/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-turn-end"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-turn-end",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory-fixture",
+      "sha256": "f78f6a6544ff6c72cf05c97243766120b42e7dfbac6639363fdf2e611fd06efb",
+      "mode": "0o755",
+      "bytes": 9715256
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f78f6a6544ff6c72cf05c97243766120b42e7dfbac6639363fdf2e611fd06efb-lamp-memory-fixture",
+      "sha256": "f78f6a6544ff6c72cf05c97243766120b42e7dfbac6639363fdf2e611fd06efb",
+      "mode": "0o555",
+      "bytes": 9715256
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory-fixture",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory-fixture"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory-fixture",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory",
+      "sha256": "2d04975d29b37da8410a067b819af1b45489eb0b613b8502236e7832fe1a0dcc",
+      "mode": "0o755",
+      "bytes": 9357088
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/2d04975d29b37da8410a067b819af1b45489eb0b613b8502236e7832fe1a0dcc-lamp-memory",
+      "sha256": "2d04975d29b37da8410a067b819af1b45489eb0b613b8502236e7832fe1a0dcc",
+      "mode": "0o555",
+      "bytes": 9357088
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-voice",
+      "sha256": "b9286f345ad483c6a97dcaabdb81f8710abe2d43c053127b9e81b46b00dfe9fc",
+      "mode": "0o755",
+      "bytes": 52755224
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b9286f345ad483c6a97dcaabdb81f8710abe2d43c053127b9e81b46b00dfe9fc-lamp-voice",
+      "sha256": "b9286f345ad483c6a97dcaabdb81f8710abe2d43c053127b9e81b46b00dfe9fc",
+      "mode": "0o555",
+      "bytes": 52755224
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-voice"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-voice",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory-eval",
+      "sha256": "a80c35064dfb5c0a5096341b61e6bc034101eec1ce7d0bc52cd5e8d5864843e9",
+      "mode": "0o755",
+      "bytes": 5044512
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/a80c35064dfb5c0a5096341b61e6bc034101eec1ce7d0bc52cd5e8d5864843e9-lamp-memory-eval",
+      "sha256": "a80c35064dfb5c0a5096341b61e6bc034101eec1ce7d0bc52cd5e8d5864843e9",
+      "mode": "0o555",
+      "bytes": 5044512
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-memory-eval",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory-eval"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-memory-eval",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-expression",
+      "sha256": "4b5625bba90acf0ff2429de5ed19fac939ceaceba90991ef8199262b70272cb1",
+      "mode": "0o755",
+      "bytes": 10828688
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/4b5625bba90acf0ff2429de5ed19fac939ceaceba90991ef8199262b70272cb1-lamp-expression",
+      "sha256": "4b5625bba90acf0ff2429de5ed19fac939ceaceba90991ef8199262b70272cb1",
+      "mode": "0o555",
+      "bytes": 10828688
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-expression"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-expression",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-health",
+      "sha256": "833a0eb30b561a8c3ac5d092ce51c1fa0f9f14e0fe89fdc73bf743cb38b6046e",
+      "mode": "0o755",
+      "bytes": 3767864
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/833a0eb30b561a8c3ac5d092ce51c1fa0f9f14e0fe89fdc73bf743cb38b6046e-lamp-health",
+      "sha256": "833a0eb30b561a8c3ac5d092ce51c1fa0f9f14e0fe89fdc73bf743cb38b6046e",
+      "mode": "0o555",
+      "bytes": 3767864
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/health#lamp-health@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/health/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-health",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/health/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-health"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-health",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-audio",
+      "sha256": "647eb90799b1d55a6cd5ebd992a09976dc2a30cf6610d8a658a32b19e126583f",
+      "mode": "0o755",
+      "bytes": 6040680
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/647eb90799b1d55a6cd5ebd992a09976dc2a30cf6610d8a658a32b19e126583f-lamp-audio",
+      "sha256": "647eb90799b1d55a6cd5ebd992a09976dc2a30cf6610d8a658a32b19e126583f",
+      "mode": "0o555",
+      "bytes": 6040680
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/audio#lamp-audio@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/audio/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-audio",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/audio/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-audio"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-audio",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-controls",
+      "sha256": "7a5e2b61988d3f299ddaaa899551807107ec4f210a88ad7a1de64eba6ff920c2",
+      "mode": "0o755",
+      "bytes": 6430104
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/7a5e2b61988d3f299ddaaa899551807107ec4f210a88ad7a1de64eba6ff920c2-lamp-controls",
+      "sha256": "7a5e2b61988d3f299ddaaa899551807107ec4f210a88ad7a1de64eba6ff920c2",
+      "mode": "0o555",
+      "bytes": 6430104
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/controls#lamp-controls@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/controls/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-controls",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/controls/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-controls"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-controls",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-schedule",
+      "sha256": "83f8eb3d70c80d36c53a3a77bb648b1040a7da1ba172f0b53f06ce2fa674168b",
+      "mode": "0o755",
+      "bytes": 8626480
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/83f8eb3d70c80d36c53a3a77bb648b1040a7da1ba172f0b53f06ce2fa674168b-lamp-schedule",
+      "sha256": "83f8eb3d70c80d36c53a3a77bb648b1040a7da1ba172f0b53f06ce2fa674168b",
+      "mode": "0o555",
+      "bytes": 8626480
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/schedule#lamp-schedule@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/schedule/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-schedule",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/schedule/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-schedule"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-schedule",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-mood",
+      "sha256": "540df922467f40c395fa0bd3ef9d552cf12d04355a41644c21a0a74a70382535",
+      "mode": "0o755",
+      "bytes": 548640
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/540df922467f40c395fa0bd3ef9d552cf12d04355a41644c21a0a74a70382535-lamp-body-mood",
+      "sha256": "540df922467f40c395fa0bd3ef9d552cf12d04355a41644c21a0a74a70382535",
+      "mode": "0o555",
+      "bytes": 548640
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-mood",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-mood"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-mood",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-measure",
+      "sha256": "b999045dcfc098d756d190afaafb2eaa6c308b9f20f7bb7ca79c9fff153fe82c",
+      "mode": "0o755",
+      "bytes": 931632
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b999045dcfc098d756d190afaafb2eaa6c308b9f20f7bb7ca79c9fff153fe82c-lamp-body-measure",
+      "sha256": "b999045dcfc098d756d190afaafb2eaa6c308b9f20f7bb7ca79c9fff153fe82c",
+      "mode": "0o555",
+      "bytes": 931632
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-measure",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-measure"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-measure",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-inspect",
+      "sha256": "befa8be399d88fc86cbffc7d562cfedf6a6f55d8b8dd29bd5ee1e31ca262f05f",
+      "mode": "0o755",
+      "bytes": 679216
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/befa8be399d88fc86cbffc7d562cfedf6a6f55d8b8dd29bd5ee1e31ca262f05f-lamp-body-inspect",
+      "sha256": "befa8be399d88fc86cbffc7d562cfedf6a6f55d8b8dd29bd5ee1e31ca262f05f",
+      "mode": "0o555",
+      "bytes": 679216
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-inspect",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-inspect"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-inspect",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-worker",
+      "sha256": "85fb20d90574c7f9338638f480f791906b3f086b5d1111fc6930bca68c22a23e",
+      "mode": "0o755",
+      "bytes": 732064
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/85fb20d90574c7f9338638f480f791906b3f086b5d1111fc6930bca68c22a23e-lamp-body-worker",
+      "sha256": "85fb20d90574c7f9338638f480f791906b3f086b5d1111fc6930bca68c22a23e",
+      "mode": "0o555",
+      "bytes": 732064
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body-worker",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-worker"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body-worker",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body",
+      "sha256": "f7784048253bd8a0c4fde6191f0b9eed46e59d03a1a26b70c40223658a5904c2",
+      "mode": "0o755",
+      "bytes": 1140472
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f7784048253bd8a0c4fde6191f0b9eed46e59d03a1a26b70c40223658a5904c2-lamp-body",
+      "sha256": "f7784048253bd8a0c4fde6191f0b9eed46e59d03a1a26b70c40223658a5904c2",
+      "mode": "0o555",
+      "bytes": 1140472
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-body",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-body",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-keeper",
+      "sha256": "5cea66ab39e2bd34bf2aabd7dcf2f7a27be0b9947a88a6abbab988dddb1adab1",
+      "mode": "0o755",
+      "bytes": 8543056
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/5cea66ab39e2bd34bf2aabd7dcf2f7a27be0b9947a88a6abbab988dddb1adab1-lamp-keeper",
+      "sha256": "5cea66ab39e2bd34bf2aabd7dcf2f7a27be0b9947a88a6abbab988dddb1adab1",
+      "mode": "0o555",
+      "bytes": 8543056
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-keeper",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper/src/main.rs",
+        "edition": "2024",
+        "required-features": [
+          "prepare"
+        ],
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [
+        "default",
+        "prepare"
+      ],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-keeper"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-keeper",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-update",
+      "sha256": "beca1f02ac71d11529e7c746d5d25c507a70d7ff4fdec9fc76492ac04cff3f29",
+      "mode": "0o755",
+      "bytes": 13603480
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/beca1f02ac71d11529e7c746d5d25c507a70d7ff4fdec9fc76492ac04cff3f29-lamp-update",
+      "sha256": "beca1f02ac71d11529e7c746d5d25c507a70d7ff4fdec9fc76492ac04cff3f29",
+      "mode": "0o555",
+      "bytes": 13603480
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-update"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-update",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-ipc-probe",
+      "sha256": "45b67e1875156b4c8d5d07323dfc638e857664b0cc19dcdf2e9093ed0156bf61",
+      "mode": "0o755",
+      "bytes": 1165656
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/45b67e1875156b4c8d5d07323dfc638e857664b0cc19dcdf2e9093ed0156bf61-lamp-ipc-probe",
+      "sha256": "45b67e1875156b4c8d5d07323dfc638e857664b0cc19dcdf2e9093ed0156bf61",
+      "mode": "0o555",
+      "bytes": 1165656
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ipc/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-ipc-probe",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ipc/src/bin/lamp-ipc-probe.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-ipc-probe"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-ipc-probe",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  },
+  {
+    "original": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-bus",
+      "sha256": "5b929516ce223c7bfd23cb97a46caaf30b34eb8dcc8126c2c49a8635cb611d62",
+      "mode": "0o755",
+      "bytes": 2467120
+    },
+    "saved": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/5b929516ce223c7bfd23cb97a46caaf30b34eb8dcc8126c2c49a8635cb611d62-lamp-bus",
+      "sha256": "5b929516ce223c7bfd23cb97a46caaf30b34eb8dcc8126c2c49a8635cb611d62",
+      "mode": "0o555",
+      "bytes": 2467120
+    },
+    "compiler_artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/bus#lamp-bus@0.1.0",
+      "manifest_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/bus/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-bus",
+        "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/bus/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-bus"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/lamp-bus",
+      "fresh": false
+    },
+    "purpose": "Preserve full-run executable/possible compiled CLI child before later workspace clean; future observations require new source/child-scope plan."
+  }
+]

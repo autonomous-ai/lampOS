@@ -1,0 +1,21 @@
+[
+  {
+    "package": "lamp-body",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_body",
+      "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "name": "bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began",
+    "status": "ok"
+  }
+]

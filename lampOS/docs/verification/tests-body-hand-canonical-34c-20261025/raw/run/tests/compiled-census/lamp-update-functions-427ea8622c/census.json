@@ -1,0 +1,31 @@
+{
+  "package": "lamp-update",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "functions",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/functions.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/functions-f833487a161d2a87",
+  "sha256": "427ea8622c5a872b8c6b6eba81217605f1986f8b8c532d27eb2c61e6dca3c534",
+  "compiled_cases": [
+    "a_product_chat_request_offers_dance_at_the_bound",
+    "a_product_lamp_declares_every_function_it_has_within_the_bound",
+    "the_generic_voice_declares_the_clock_and_receives_time_and_session_context",
+    "the_product_voice_s_functions_in_a_process_of_their_own",
+    "with_reports_on_dance_stays_at_the_bound"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 5,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

@@ -1,0 +1,15 @@
+serve::tests::a_cancelled_turn_read_keeps_its_cache_lock_without_blocking_the_runtime: test
+serve::tests::a_form_value_is_read_as_typed: test
+serve::tests::tokens_compare_whole: test
+tests::beyond_this_machine_a_token_is_needed: test
+tests::only_on_switches_it_on: test
+tests::the_unit_takes_port_80_only_once_setup_is_done: test
+turns::tests::a_denied_new_session_keeps_the_old_rows_stale_until_it_can_be_read: test
+turns::tests::a_turns_steps_and_end_are_read_from_its_records_and_nothing_else: test
+turns::tests::denied_root_metadata_and_file_keep_the_read_status_and_recover: test
+turns::tests::missing_and_failed_reads_are_distinct_from_an_empty_readable_session: test
+turns::tests::the_records_are_read_on_from_where_the_last_read_ended: test
+units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing: test
+units::tests::a_folder_that_is_no_hash_names_no_build: test
+units::tests::a_unit_running_another_build_than_its_release_shows_both: test
+units::tests::the_worker_state_is_the_newest_of_the_newest_session_and_nothing_else_is_read: test

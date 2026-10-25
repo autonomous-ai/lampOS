@@ -1,0 +1,41 @@
+{
+  "package": "lamp-peek",
+  "target": {
+    "kind": [
+      "lib"
+    ],
+    "crate_types": [
+      "lib"
+    ],
+    "name": "lamp_peek",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/src/lib.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": true,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_peek-5be1f9fb099b24a7",
+  "sha256": "9f2bb6820e8cbc6b23abbe679606f95db0625aee6ecaa5f3ea51fbb18572634c",
+  "compiled_cases": [
+    "serve::tests::a_cancelled_turn_read_keeps_its_cache_lock_without_blocking_the_runtime",
+    "serve::tests::a_form_value_is_read_as_typed",
+    "serve::tests::tokens_compare_whole",
+    "tests::beyond_this_machine_a_token_is_needed",
+    "tests::only_on_switches_it_on",
+    "tests::the_unit_takes_port_80_only_once_setup_is_done",
+    "turns::tests::a_denied_new_session_keeps_the_old_rows_stale_until_it_can_be_read",
+    "turns::tests::a_turns_steps_and_end_are_read_from_its_records_and_nothing_else",
+    "turns::tests::denied_root_metadata_and_file_keep_the_read_status_and_recover",
+    "turns::tests::missing_and_failed_reads_are_distinct_from_an_empty_readable_session",
+    "turns::tests::the_records_are_read_on_from_where_the_last_read_ended",
+    "units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing",
+    "units::tests::a_folder_that_is_no_hash_names_no_build",
+    "units::tests::a_unit_running_another_build_than_its_release_shows_both",
+    "units::tests::the_worker_state_is_the_newest_of_the_newest_session_and_nothing_else_is_read"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 15,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

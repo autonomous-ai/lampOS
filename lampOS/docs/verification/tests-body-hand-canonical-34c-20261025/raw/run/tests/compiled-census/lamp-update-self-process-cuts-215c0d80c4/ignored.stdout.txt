@@ -1,0 +1,1 @@
+persisted_self_switches_survive_sigkill: test

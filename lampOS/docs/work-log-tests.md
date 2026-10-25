@@ -4498,3 +4498,9 @@ Taken Queue6387992551: the Cloud followup3 no-join result-ack test measured11.02
 Ready for lamp-voice: no
 
 [Independent primary native821 proof](verification/tests-821-native-20261024/) verifies current-at-execution Update7,408PASS+1LEAK and NoPause7,398PASS+1LEAK, zero failures/unrun,53 skipped each, successful pinned Linux commands and exact actual checkout/authored trees. Raw console logs and complete case projections are retained, including the collector’s read-only pinned-command matcher correction without a test rerun. After train100, both PRs were rebased with equal patches and pushed on8db: Update02065c4221 and NoPause7f75cc0ea2. Fresh checks are separate; frozen427 local gates continue without source mutation. Cloud’s two-file event wait is prepared/formatted on8db but no compile/test is allocated while both existing Rust gates run.
+
+## 2026-10-25 03:34 UTC — Hand canonical run closed with failures retained
+
+Ready for lamp-voice: no
+
+Frozen 34c plus the two-file Hand fixture completed formatting, strict all-target Clippy for twelve reverse-dependency packages, workspace build and diff checks. Full parallel tests: 7,316 passed / 20 failed / 52 ignored, all 79 targets bound; the changed Hand case and all 440 Body library tests passed. The full gate remains failed. [Raw result and complete failure names](verification/tests-body-hand-canonical-34c-20261025/) retain the original outcomes, source/CLI identities, closure and independent witness audits. One unchanged-base full-context control is being prepared; no baseline outcome, cause, speed, ARM64, device or readiness claim. Next: discriminate those failures and finish the separately claimed fixture controls.

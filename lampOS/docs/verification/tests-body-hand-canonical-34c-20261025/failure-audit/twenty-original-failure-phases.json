@@ -1,0 +1,162 @@
+[
+  {
+    "package": "lamp-memory",
+    "target": "it",
+    "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh",
+    "raw": "lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\n\nthread 'voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh' (9945561) panicked at crates/memory/tests/it/voice.rs:960:5:\nassertion `left == right` failed: the retry sends one forget: []\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+    "assertion_source": "crates/memory/tests/it/voice.rs",
+    "line": 960
+  },
+  {
+    "package": "lamp-memory",
+    "target": "it",
+    "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation",
+    "raw": "lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: Days memory is answering\nlamp-voice provider: a bare forget after a follow-up forgets entry 3\nlamp-voice provider: memory journal stopped until a fresh worker: why=forgotten\nlamp-memory: conversation_end named 2 source(s) it no longer has; ended with the rest\nlamp-voice provider: memory conversation end was not acknowledged; no retry\nlamp-voice provider: a session for someone known was told one open thread to ask about (#1693)\nlamp-voice provider: the lamp asked about a follow-up (#1693) recorded=true\nlamp-voice provider: Days memory is answering\nlamp-voice provider: a bare forget after a follow-up forgets entry 2\n\nthread 'voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation' (9946776) panicked at crates/memory/tests/it/voice.rs:591:5:\n{\"error\":\"My memory is not answering right now, so I could not do that.\"}\nlamp-voice provider: memory conversation end was not acknowledged; no retry\n\n",
+    "assertion_source": "crates/memory/tests/it/voice.rs",
+    "line": 591
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end",
+    "raw": "\nthread 'skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end' (9966750) panicked at crates/skills/tests/it/skills.rs:4536:5:\n379.659166ms\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 4536
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline",
+    "raw": "\nthread 'routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline' (9966536) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-uxikKn/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: routine-check Done: Expression is not fresh and enabled\n\n",
+    "assertion_source": "crates/skills/tests/it/routine_service.rs",
+    "line": 226
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum",
+    "raw": "\nthread 'routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum' (9966475) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-P7Du3X/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: routine-check Done: Expression is not fresh and enabled\n\n",
+    "assertion_source": "crates/skills/tests/it/routine_service.rs",
+    "line": 226
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest",
+    "raw": "\nthread 'routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest' (9966566) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-e5mR1x/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: routine-check Done: Expression is not fresh and enabled\n\n",
+    "assertion_source": "crates/skills/tests/it/routine_service.rs",
+    "line": 226
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_found_with_no_look_held_is_refused",
+    "raw": "\nthread 'skills::a_found_with_no_look_held_is_refused' (9967101) panicked at crates/skills/tests/it/skills.rs:7117:5:\nassertion `left == right` failed\n  left: []\n right: [\"blue\"]\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 7117
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum",
+    "raw": "\nthread 'routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum' (9966569) panicked at crates/skills/tests/it/routine_service.rs:226:9:\nwaiting for a matching rest request or renewal; child=None; stderr=lamp-skills: skills from /tmp/lsr-HK9jG7/skills, the Policy's ask skipped, a skill's light set through the actions part and given back\nlamp-skills: loaded [\"routine-check\"]\nlamp-skills: night sleep cannot rest (Expression's rest receipts are not fresh): its claim is not said, so Expression's own sleep takes the night once the last one goes stale\nlamp-skills: routine-check Triggered: fixture/routine has held for 0 s\nlamp-skills: routine-check Asked: policy nudge\nlamp-skills: routine-check Answered: the ask is skipped (LAMP_SKILLS_ASK=skip): LAMP_SKILLS_ASK=policy asks the Policy's gate\nlamp-skills: routine-check Done: Expression is not fresh and enabled\n\n",
+    "assertion_source": "crates/skills/tests/it/routine_service.rs",
+    "line": 226
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_queued_run_whose_item_left_is_let_go_and_the_next_still_starts",
+    "raw": "\nthread 'skills::a_queued_run_whose_item_left_is_let_go_and_the_next_still_starts' (9967420) panicked at crates/skills/tests/it/skills.rs:6252:5:\nassertion `left == right` failed\n  left: [\"say: spoken\", \"say: spoken\", \"say: spoken\"]\n right: [\"say: spoken\", \"not made: its item no longer holds as its turn came\", \"say: spoken\"]\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 6252
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_pause_ends_a_search_its_pose_and_its_light",
+    "raw": "\nthread 'skills::a_pause_ends_a_search_its_pose_and_its_light' (9967396) panicked at crates/skills/tests/it/skills.rs:7370:5:\nassertion `left == right` failed\n  left: []\n right: [\"blue\"]\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 7370
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_line_with_no_words_does_not_end_a_search",
+    "raw": "\nthread 'skills::a_line_with_no_words_does_not_end_a_search' (9967283) panicked at crates/skills/tests/it/skills.rs:7269:5:\nassertion `left == right` failed\n  left: []\n right: [\"white\"]\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 7269
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_say_now_after_a_reload_moved_a_held_trigger_does_nothing",
+    "raw": "\nthread 'skills::a_say_now_after_a_reload_moved_a_held_trigger_does_nothing' (9967844) panicked at crates/skills/tests/it/skills.rs:3761:5:\nSkillEvent { skill: \"stuffy\", stage: Answered, why: \"the Policy did not answer in time: nothing is done\", allowed: Some(false) }\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 3761
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks",
+    "raw": "\nthread 'skills::a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks' (9967904) panicked at crates/skills/tests/it/skills.rs:7182:5:\nassertion `left == right` failed\n  left: []\n right: [\"white\"]\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 7182
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks",
+    "raw": "\nthread 'skills::a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks' (9968074) panicked at crates/skills/tests/it/skills.rs:7547:5:\nassertion `left == right` failed\n  left: []\n right: [\"white\"]\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 7547
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::the_asking_lines_late_words_do_not_end_its_search",
+    "raw": "\nthread 'skills::the_asking_lines_late_words_do_not_end_its_search' (9969792) panicked at crates/skills/tests/it/skills.rs:7341:5:\nassertion `left == right` failed\n  left: []\n right: [\"blue\"]\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 7341
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::thinking_after_a_moment_of_speaking_is_still_the_line",
+    "raw": "\nthread 'skills::thinking_after_a_moment_of_speaking_is_still_the_line' (9970623) panicked at crates/skills/tests/it/skills.rs:4687:5:\n562.797774ms; after the say: spoken from 267 ms after the call, the turn over 2250 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 4687
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::without_body_requests_a_last_clip_dropped_is_not_said",
+    "raw": "\nthread 'skills::without_body_requests_a_last_clip_dropped_is_not_said' (9970894) panicked at crates/skills/tests/it/skills.rs:4452:5:\nassertion failed: gestures.try_recv().is_err()\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 4452
+  },
+  {
+    "package": "lamp-skills",
+    "target": "it",
+    "case": "skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt",
+    "raw": "unplug tool admission on host: 644.053\u00b5s\n\nthread 'skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt' (9970778) panicked at crates/skills/tests/it/skills.rs:11698:9:\nno readiness request after physical and rendered proof\n\n",
+    "assertion_source": "crates/skills/tests/it/skills.rs",
+    "line": 11698
+  },
+  {
+    "package": "lamp-skills",
+    "target": "requested_audio",
+    "case": "refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it",
+    "raw": "\nthread 'refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it' (9981196) panicked at crates/skills/tests/requested_audio.rs:1639:5:\nassertion `left == right` failed\n  left: 1\n right: 2\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n",
+    "assertion_source": "crates/skills/tests/requested_audio.rs",
+    "line": 1639
+  },
+  {
+    "package": "lamp-voice",
+    "target": "it",
+    "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "raw": "light calls, fastest to slowest: [2.596607ms, 2.967622ms, 3.499373ms, 3.518416ms, 3.577532ms, 3.960501ms, 34.087159ms, 38.140794ms, 40.063405ms, 56.156135ms, 57.608248ms, 58.046285ms, 72.659333ms, 73.977585ms, 74.452109ms, 76.843837ms, 77.470084ms, 93.306854ms, 94.90337ms, 95.165179ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (10295200) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.596607ms, 2.967622ms, 3.499373ms, 3.518416ms, 3.577532ms, 3.960501ms, 34.087159ms, 38.140794ms, 40.063405ms, 56.156135ms, 57.608248ms, 58.046285ms, 72.659333ms, 73.977585ms, 74.452109ms, 76.843837ms, 77.470084ms, 93.306854ms, 94.90337ms, 95.165179ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n",
+    "assertion_source": "crates/voice/tests/it/light_call.rs",
+    "line": 90
+  }
+]

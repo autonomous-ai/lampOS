@@ -1,0 +1,25 @@
+{
+  "package": "lamp-update",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-update",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/src/main.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_update-37e912ef505f9124",
+  "sha256": "429a604d1019b74c1e675004d47e0f3ede80858cf0fd8df0b014d301c642e387",
+  "compiled_cases": [],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 0,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

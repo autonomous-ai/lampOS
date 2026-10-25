@@ -1,0 +1,1 @@
+/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_voice_eval-079f2fa93fdefee3: Mach-O 64-bit executable x86_64

@@ -1,0 +1,297 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+    Checking libc v0.2.190
+   Compiling syn v3.0.7
+    Checking cfg-if v1.0.5
+   Compiling serde_core v1.0.229
+    Checking bitflags v2.13.2
+    Checking errno v0.3.14
+    Checking itoa v1.0.18
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling cc v1.7.0
+    Checking memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling serde_derive v1.0.229
+   Compiling serde_json v1.0.151
+    Checking zmij v1.0.23
+    Checking typenum v1.20.1
+   Compiling rustix v1.1.5
+    Checking generic-array v0.14.7
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+    Checking digest v0.10.7
+    Checking cpufeatures v0.2.17
+    Checking once_cell v1.21.4
+    Checking sha2 v0.10.9
+    Checking zeroize v1.9.1
+    Checking rustls-pki-types v1.15.1
+   Compiling ring v0.17.14
+    Checking lamp-bus v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/bus)
+    Checking getrandom v0.2.17
+    Checking untrusted v0.9.0
+    Checking lamp-msgs v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/msgs)
+   Compiling rustls v0.23.45
+   Compiling httparse v1.10.1
+    Checking rustls-webpki v0.103.15
+    Checking subtle v2.6.1
+    Checking nix v0.29.0
+    Checking lamp-ipc v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ipc)
+    Checking webpki-roots v1.0.9
+    Checking base64 v0.22.1
+   Compiling syn v2.0.119
+    Checking lamp-update v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update)
+    Checking smallvec v1.16.3
+    Checking lamp-turn-owner v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/turn-owner)
+    Checking bytes v1.12.1
+    Checking lamp-keeper v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper)
+    Checking pin-project-lite v0.2.17
+    Checking signal-hook-registry v1.4.8
+    Checking futures-core v0.3.34
+    Checking glam v0.33.12
+    Checking jiff-tzdb v0.1.9
+    Checking jiff-core v0.1.1
+    Checking jiff v0.2.38
+    Checking lamp-lean v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean)
+    Checking lamp-body v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body)
+    Checking lamp-local-time v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/local-time)
+   Compiling tokio-macros v2.7.2
+    Checking mio v1.2.4
+    Checking socket2 v0.6.5
+    Checking tokio v1.53.1
+   Compiling synstructure v0.14.0
+    Checking http v1.5.0
+    Checking log v0.4.34
+    Checking foldhash v0.2.0
+    Checking futures-sink v0.3.34
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+    Checking zerofrom v0.1.8
+    Checking slab v0.4.12
+    Checking stable_deref_trait v1.2.1
+    Checking futures-task v0.3.34
+    Checking yoke v0.8.3
+    Checking futures-util v0.3.34
+    Checking http-body v1.1.0
+   Compiling tracing-attributes v0.1.31
+    Checking tracing-core v0.1.36
+   Compiling zerovec-derive v0.11.6
+    Checking tracing v0.1.44
+   Compiling displaydoc v0.2.7
+    Checking zerovec v0.11.8
+    Checking cpufeatures v0.3.1
+    Checking percent-encoding v2.3.2
+    Checking tower-service v0.3.3
+    Checking try-lock v0.2.5
+    Checking sync_wrapper v1.0.2
+    Checking want v0.3.2
+    Checking atomic-waker v1.1.2
+    Checking httpdate v1.0.3
+    Checking rand_core v0.10.1
+   Compiling getrandom v0.4.3
+    Checking tower-layer v0.3.3
+    Checking hyper v1.12.0
+    Checking tinystr v0.8.4
+    Checking futures-channel v0.3.34
+    Checking litemap v0.8.3
+    Checking writeable v0.6.4
+    Checking base64 v0.23.1
+    Checking ipnet v2.12.2
+    Checking icu_locale_core v2.3.0
+    Checking hyper-util v0.1.21
+    Checking tower v0.5.3
+    Checking potential_utf v0.1.6
+    Checking zerotrie v0.2.5
+    Checking http-body-util v0.1.5
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_normalizer_data v2.3.0
+    Checking winnow v1.0.4
+    Checking utf8_iter v1.0.4
+    Checking toml_parser v1.1.5+spec-1.1.0
+    Checking icu_collections v2.3.0
+    Checking icu_provider v2.3.1
+    Checking toml_datetime v1.1.2+spec-1.1.0
+    Checking serde_spanned v1.1.2
+    Checking core-foundation-sys v0.8.7
+    Checking toml v1.1.8+spec-1.1.0
+    Checking icu_properties v2.3.0
+    Checking icu_normalizer v2.3.0
+    Checking core-foundation v0.10.1
+    Checking security-framework-sys v2.17.0
+    Checking tokio-rustls v0.26.6
+   Compiling pkg-config v0.3.34
+   Compiling vcpkg v0.2.15
+    Checking security-framework v3.7.0
+   Compiling libsqlite3-sys v0.38.2
+    Checking idna_adapter v1.2.2
+    Checking chacha20 v0.10.2
+    Checking idna v1.1.0
+    Checking rand v0.10.3
+    Checking form_urlencoded v1.2.2
+    Checking hashbrown v0.17.1
+    Checking hashlink v0.12.2
+    Checking url v2.5.8
+    Checking tokio-util v0.7.20
+    Checking fallible-iterator v0.3.0
+    Checking fallible-streaming-iterator v0.1.9
+    Checking tower-http v0.6.11
+    Checking rustls-platform-verifier v0.7.1
+    Checking rusqlite v0.40.2
+    Checking hyper-rustls v0.27.10
+    Checking hybrid-array v0.4.15
+   Compiling unicode-xid v0.2.6
+   Compiling derive_more-impl v2.1.1
+    Checking reqwest v0.13.5
+    Checking lamp-ring v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ring)
+    Checking hound v3.5.1
+   Compiling signal-hook v0.4.4
+   Compiling thiserror v2.0.21
+    Checking derive_more v2.1.1
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+    Checking sonora-simd v0.2.0
+   Compiling thiserror-impl v2.0.21
+    Checking tinyvec v1.13.3
+    Checking sonora-fft v0.2.0
+    Checking const-oid v0.10.2
+    Checking digest v0.11.3
+    Checking unicode-normalization v0.1.25
+    Checking sonora-common-audio v0.2.0
+   Compiling bytemuck_derive v1.12.1
+    Checking bytemuck v1.25.2
+    Checking sha1 v0.11.0
+    Checking data-encoding v2.11.1
+    Checking sonora-agc2 v0.2.0
+    Checking tungstenite v0.30.0
+   Compiling lamp-camera v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/camera)
+    Checking sonora-aec3 v0.2.0
+    Checking sonora-ns v0.2.0
+    Checking webpki-roots v0.26.11
+    Checking tokio-tungstenite v0.30.0
+    Checking sonora v0.2.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/third_party/sonora)
+    Checking lamp-schedule v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/schedule)
+    Checking lamp-turn-end-wire v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/turn-end-wire)
+    Checking rtrb v0.4.0
+    Checking lamp-audio v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/audio)
+    Checking lamp-gemini v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/gemini)
+    Checking lamp-controls v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/controls)
+    Checking lamp-health v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/health)
+    Checking lamp-near-call v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/near-call)
+    Checking lamp-voice-processes v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-processes)
+    Checking lamp-expression v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression)
+    Checking lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice)
+   Compiling autocfg v1.5.1
+    Checking xattr v1.6.1
+    Checking filetime v0.2.29
+    Checking tar v0.4.46
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+    Checking scopeguard v1.2.0
+    Checking lock_api v0.4.14
+   Compiling zerocopy v0.8.62
+    Checking num-integer v0.1.47
+   Compiling zerocopy-derive v0.8.62
+   Compiling anyhow v1.0.104
+   Compiling matrixmultiply v0.3.11
+   Compiling parking_lot_core v0.9.12
+    Checking num-complex v0.4.6
+   Compiling same-file v1.0.6
+   Compiling memo-map v0.3.4
+    Checking rawpointer v0.2.1
+   Compiling minijinja v2.24.0
+   Compiling walkdir v2.5.0
+   Compiling half v2.7.1
+    Checking hashbrown v0.16.1
+    Checking nom v8.0.0
+    Checking either v1.19.0
+   Compiling typeid v1.0.3
+    Checking nom-language v0.1.0
+    Checking itertools v0.15.0
+    Checking string-interner v0.20.0
+   Compiling tract-linalg v0.23.8
+    Checking parking_lot v0.12.5
+    Checking ndarray v0.17.2
+    Checking maplit v1.0.2
+    Checking dyn-clone v1.0.20
+    Checking strength_reduce v0.2.4
+    Checking downcast-rs v2.0.2
+    Checking inventory v0.3.25
+    Checking lazy_static v1.5.1
+    Checking dyn-hash v1.0.0
+   Compiling erased-serde v0.4.10
+    Checking tract-data v0.23.8
+    Checking transpose v0.2.3
+    Checking primal-check v0.3.4
+    Checking lamp-actions v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/actions)
+   Compiling derive-new v0.7.0
+    Checking bit-vec v0.10.1
+   Compiling pastey v0.2.3
+    Checking byteorder v1.5.0
+    Checking bit-set v0.11.1
+    Checking rustfft v6.4.1
+    Checking anymap3 v1.1.0
+    Checking lamp-memory v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory)
+    Checking simd-adler32 v0.3.10
+   Compiling itertools v0.13.0
+    Checking lamp-skills v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills)
+   Compiling prost-derive v0.14.4
+    Checking num-bigint v0.4.8
+    Checking rand_distr v0.6.0
+    Checking num-rational v0.4.2
+    Checking tract-core v0.23.8
+    Checking prost v0.14.4
+    Checking memmap2 v0.9.11
+    Checking zune-core v0.4.12
+    Checking zune-jpeg v0.4.21
+    Checking jpeg-encoder v0.7.1
+    Checking lamp-policy v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/policy)
+    Checking tract-nnef v0.23.8
+    Checking tract-extra v0.23.8
+    Checking tract-onnx-opl v0.23.8
+    Checking tract-hir v0.23.8
+   Compiling objc2 v0.6.5
+    Checking tract-onnx v0.23.8
+    Checking objc2-encode v4.1.0
+    Checking mime v0.3.17
+    Checking serde_path_to_error v0.1.20
+    Checking axum-core v0.5.6
+    Checking matchit v0.8.4
+    Checking fastrand v2.5.0
+    Checking axum v0.8.9
+    Checking tempfile v3.27.0
+    Checking lamp-ears v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/ears)
+    Checking lamp-tasks v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/tasks)
+    Checking block2 v0.6.2
+    Checking dispatch2 v0.3.1
+    Checking objc2-foundation v0.3.2
+    Checking objc2-core-foundation v0.3.2
+    Checking objc2-core-audio-types v0.3.2
+   Compiling cpal v0.19.0 (https://github.com/RustAudio/cpal.git?rev=79275c2313da30e9f8b1ad8168385d091a2c9ada#79275c23)
+    Checking objc2-core-audio v0.3.2
+    Checking objc2-audio-toolbox v0.3.2
+   Compiling rustversion v1.0.23
+    Checking coreaudio-rs v0.14.2
+    Checking mach2 v0.6.0
+   Compiling ort-sys v2.0.0-rc.14
+    Checking dasp_sample v0.11.0
+    Checking objc2-av-foundation v0.3.2
+    Checking lamp-setup v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup)
+    Checking spin v0.9.9
+    Checking flume v0.11.1
+    Checking lamp-observer v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/observer)
+    Checking lamp-sound-fixtures v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/sound-fixtures)
+    Checking rustls-native-certs v0.8.5
+    Checking tokio-stream v0.1.19
+    Checking rustls-webpki v0.102.8
+    Checking rustls-pemfile v2.2.0
+    Checking libloading v0.9.0
+    Checking fixedbitset v0.5.7
+    Checking ort v2.0.0-rc.14
+    Checking rumqttc v0.25.1
+    Checking thread-priority v3.1.1
+    Checking lamp-voice-eval v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval)
+    Checking lamp-turn-end v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/turn-end)
+    Checking lamp-same-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/same-voice)
+    Checking lamp-cloud v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud)
+    Checking lamp-peek v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12m 11s

@@ -1,0 +1,31 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "voice_forget",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_forget.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/voice_forget-d4cb7fec5c0c3e47",
+  "sha256": "68bd68c878d1604d3319671bdd83fe2c5b99f8ff9b8e15198926d61a6afbad77",
+  "compiled_cases": [
+    "after_forgetting_the_next_thing_remembered_is_kept",
+    "forget_everything_removes_all_of_someone_known_and_never_the_room_s",
+    "forget_my_favourite_colour_leaves_the_wedding_kept_in_the_same_conversation",
+    "forget_that_removes_the_conversation_a_kept_thing_came_up_in",
+    "forget_that_removes_what_recall_gave_and_nothing_else"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 5,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

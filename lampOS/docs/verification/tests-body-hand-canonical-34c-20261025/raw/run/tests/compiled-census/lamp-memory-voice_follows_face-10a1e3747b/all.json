@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/voice_follows_face-1dd593594e591dfb",
+    "--list",
+    "--format",
+    "terse"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS",
+  "started_at": "2026-10-25T03:11:42.781701+00:00",
+  "timeout_seconds": 60,
+  "stdout": "all.stdout.txt",
+  "stderr": "all.stderr.txt",
+  "timeout_cleanup": [],
+  "process_group_scope": "Owned process group only; descendants that create another session/group are fixture-owner responsibility.",
+  "owned_pid": 29802,
+  "owned_process_group": 29802,
+  "timed_out": false,
+  "exit_code": 0,
+  "unexpected_residual_group_after_normal_exit": false,
+  "direct_status_before_cleanup": 0,
+  "owned_group_present_before_cleanup": false,
+  "direct_wait_status": 0,
+  "owned_group_absent_after_cleanup": true,
+  "wall_seconds": 0.202181,
+  "finished_at": "2026-10-25T03:11:42.983952+00:00",
+  "stdout_sha256": "6ee67dc9b22ed4e8656175b527181bb5f0303df7c4dd9c407b894d9bf02ca0b7",
+  "stdout_bytes": 85,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

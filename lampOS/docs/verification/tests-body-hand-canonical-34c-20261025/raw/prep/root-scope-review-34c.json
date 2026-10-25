@@ -1,0 +1,25 @@
+{
+  "root_reviewed": true,
+  "final_head": "34c8b517c41c8d2a4099b87fe550d4eb25611ea2",
+  "base": "34c8b517c41c8d2a4099b87fe550d4eb25611ea2",
+  "metadata_sha256": "9e2937a52602494a9077a5684fd587246b09bba899620abbf64ce1cbfb2e1f51",
+  "prior_control_result_sha256": "d027bdd72c2bf578a32066da46e19f6012e6d77175f08d3da051a488842af60e",
+  "packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target",
+  "scope": "Literaljoining12package fmt/strictalltargetsClippy/fulltests/workspacebuild/diff on latestfrozen34c plus declaredBody2files. All48localnamesinvalidatedbeforecompileepochs. Oldcontrols2passonly/nonreproduction retained; no extraobservations. Allactualdoc/customtarget/source/carry checks enforced by prepare_inputs. Source main changes affectSkills/install/fixtures; no oldgate waiver.",
+  "declared_compiler_bound": 4,
+  "global_process_or_isolation_claim": false
+}

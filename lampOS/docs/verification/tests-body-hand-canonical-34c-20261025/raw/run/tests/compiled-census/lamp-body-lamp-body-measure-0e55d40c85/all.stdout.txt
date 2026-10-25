@@ -1,0 +1,5 @@
+tests::it_needs_its_device_unit_and_lock_and_takes_nothing_that_moves: test
+tests::measured_at_is_a_utc_minute: test
+tests::seated_is_a_flag_given_once: test
+tests::the_file_is_written_once_and_never_over_another: test
+tests::the_generic_units_read_seated_once_and_the_confirmed_poses_win: test

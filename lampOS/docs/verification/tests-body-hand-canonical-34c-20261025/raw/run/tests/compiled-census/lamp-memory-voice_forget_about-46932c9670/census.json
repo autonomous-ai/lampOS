@@ -1,0 +1,28 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "voice_forget_about",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_forget_about.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/voice_forget_about-f18de9cac46c9fa5",
+  "sha256": "46932c96708e767e3fc497128c7446794c3db205bc9c888922d43ad73c3ade68",
+  "compiled_cases": [
+    "forget_about_in_the_room_reaches_only_this_conversations_kept_things",
+    "forget_about_removes_that_persons_kept_things_about_it_and_nothing_else"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 2,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

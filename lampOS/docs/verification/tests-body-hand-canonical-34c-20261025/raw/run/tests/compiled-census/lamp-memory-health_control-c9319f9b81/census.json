@@ -1,0 +1,49 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "health_control",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/health_control.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/health_control-a47aa33374660f52",
+  "sha256": "c9319f9b81f0577adda95fbeecf0a252469f7d961c8d129b60d3efce2ba876b8",
+  "compiled_cases": [
+    "a_real_marker_requires_its_exact_complete_line",
+    "a_window_from_another_controller_is_rejected_before_step",
+    "bootstrap_closes_after_one_frame_and_preserves_real_argv_and_child_ownership",
+    "bootstrap_pipe_write_cannot_reset_an_expired_or_blocked_deadline",
+    "cadence_reads_and_same_time_rounds_do_not_invent_publications",
+    "connected_and_checked_queued_before_peer_close_are_read_completely",
+    "counters_and_round_overflow_fail_without_wrapping",
+    "every_due_cycle_is_split_before_a_longer_target",
+    "exact_due_requires_one_real_cycle_and_the_matching_attempt_delta",
+    "expired_host_window_cannot_be_reset_by_a_new_step",
+    "initial_checked_identity_counters_and_deadline_are_validated",
+    "logical_window_is_fixed_and_cannot_be_extended_by_a_later_call",
+    "malformed_truncated_and_oversized_receipts_close_control",
+    "marker_scanning_retains_a_partial_following_line",
+    "missing_marker_after_child_advance_latches_closed_without_cadence_commit",
+    "missing_reply_is_bounded_and_does_not_manufacture_report_progress",
+    "next_due_and_zero_wait_preserve_the_checked_boundary",
+    "pre_due_progress_cannot_regress_or_claim_a_fresh_cycle",
+    "replacing_or_truncating_the_real_log_is_rejected",
+    "startup_guard_kills_and_reaps_the_actual_owned_child",
+    "startup_validates_private_paths_and_expired_budget_before_spawn",
+    "targets_cannot_regress_round_microseconds_or_overflow",
+    "wrong_connected_identity_never_creates_a_controller"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 23,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

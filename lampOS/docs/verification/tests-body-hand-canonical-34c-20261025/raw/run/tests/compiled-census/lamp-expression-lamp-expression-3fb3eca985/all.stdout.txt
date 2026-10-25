@@ -1,0 +1,4 @@
+tests::invalid_options_cannot_accidentally_enable_a_service: test
+tests::outputs_require_the_explicit_enable_switch: test
+tests::the_hour_and_the_time_of_day_are_asked_for_by_name: test
+tests::the_start_line_names_the_zone_only_when_one_is_given: test

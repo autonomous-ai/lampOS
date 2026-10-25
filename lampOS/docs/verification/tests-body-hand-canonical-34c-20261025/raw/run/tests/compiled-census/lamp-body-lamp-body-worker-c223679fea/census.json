@@ -1,0 +1,27 @@
+{
+  "package": "lamp-body",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-body-worker",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body_worker-9e6c54d8d16d8b9d",
+  "sha256": "c223679fea9a1d2bd327a1e3c96d7b8017d012bfbf2cd52000f702aae5592da3",
+  "compiled_cases": [
+    "tests::no_implicit_devices_or_motion_commands"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 1,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

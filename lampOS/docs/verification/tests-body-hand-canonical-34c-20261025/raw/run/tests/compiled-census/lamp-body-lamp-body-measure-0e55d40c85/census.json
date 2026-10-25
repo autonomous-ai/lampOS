@@ -1,0 +1,31 @@
+{
+  "package": "lamp-body",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-body-measure",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_body_measure-160bb32b216afa14",
+  "sha256": "0e55d40c857dd26884efd2a935a0ede5486657373cfeee2b29ee84eed78e4130",
+  "compiled_cases": [
+    "tests::it_needs_its_device_unit_and_lock_and_takes_nothing_that_moves",
+    "tests::measured_at_is_a_utc_minute",
+    "tests::seated_is_a_flag_given_once",
+    "tests::the_file_is_written_once_and_never_over_another",
+    "tests::the_generic_units_read_seated_once_and_the_confirmed_poses_win"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 5,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

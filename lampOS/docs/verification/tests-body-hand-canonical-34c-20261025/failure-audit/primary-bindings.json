@@ -1,0 +1,47 @@
+[
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/results.json",
+    "sha256": "c6e66f78120427cdbd2d9b213c308e2b5838a4878e1154b83d8ef5c21c8603fc",
+    "bytes": 3090146
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/tests.json",
+    "sha256": "e61c7af53fe17f1e9dee196257b19722a7209deb1b9d57da13619d9ab7d681da",
+    "bytes": 1616
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/tests.stdout.txt",
+    "sha256": "c353bdb65b4d0e43f9bacefb4456c8c086dc9e4f8d9b4707d54575bb20943f5b",
+    "bytes": 1198013
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/tests.stderr.txt",
+    "sha256": "0671c31ec90ab83b50b3b821a726e05dd6cc9a119e40c12347b8e71ed0548129",
+    "bytes": 76217
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/target-outcomes.json",
+    "sha256": "554e667a597e441630c09a9c7bfe3fb163ef762e2b6669c0e0d3adb03378fae9",
+    "bytes": 2013136
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/compiled-census.json",
+    "sha256": "466160e6e64f9f825698a280eeec8fa1a87cf05848a82df1d988337757cea40c",
+    "bytes": 727881
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/plan.json",
+    "sha256": "ebcde68ecb34664f5cb0cc2fe3e9136dcd82f2dd7b5503191a4ba34cc13479dd",
+    "bytes": 17003
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/final-source-map.json",
+    "sha256": "884c6f1c5501b047bead8632f70778b6f7c9d7ee35e189c6def41445c6b13fd0",
+    "bytes": 2616589
+  },
+  {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-gates.py",
+    "sha256": "5227d4939e8fc0ab17a5c4b6030b216e4c578cbf323591401cf6202cae767e44",
+    "bytes": 25618
+  }
+]

@@ -1,0 +1,34 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-memory",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/main.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_memory-83413b99be0ca219",
+  "sha256": "ee8684e3f7e6690c6e9010da5b572564f1de4ddba06364d8bb5f3b9ec44a7918",
+  "compiled_cases": [
+    "factory_tests::a_socket_bind_failure_precedes_the_factory_and_store_for_either_backend",
+    "factory_tests::no_bus_root_never_invokes_the_factory_for_either_backend",
+    "factory_tests::the_selected_factory_gets_the_original_root_and_source_once_after_socket_bind",
+    "tests::a_relative_path_an_unknown_option_or_a_bad_number_is_refused",
+    "tests::health_reporting_requires_one_explicit_absolute_bus_root",
+    "tests::the_forget_socket_is_off_unless_set_and_needs_its_group_and_an_absolute_path",
+    "tests::the_memory_days_start_line_names_the_zone_only_when_one_is_given",
+    "tests::the_two_paths_are_required_and_the_days_and_the_offset_have_defaults"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 8,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}
