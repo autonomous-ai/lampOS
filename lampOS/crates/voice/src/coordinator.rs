@@ -1055,17 +1055,23 @@ impl Reply {
             && self.notice.settled()
     }
 
-    /// Whether this turn, as it ends, was the model's and heard whole:
-    /// settled and complete, its audio played with no gap, nobody else
-    /// owning the turn, and the mic allowed.
-    fn heard_whole(&self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) -> bool {
+    /// The output portion of whole-turn delivery. Current ownership and
+    /// microphone permission still have to be checked at completion.
+    fn whole_provider_output(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
         self.settled(speaker_pending)
-            && snapshot.owner().is_none()
-            && snapshot.microphone_permission() == Permission::Allowed
             && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
             && self.had_audio
             && self.playback_gaps == 0
             && self.notice.origin() == SpeechOrigin::Provider
+    }
+
+    /// Whether this turn, as it ends, was the model's and heard whole:
+    /// settled and complete, its audio played with no gap, nobody else
+    /// owning the turn, and the mic allowed.
+    fn heard_whole(&self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) -> bool {
+        self.whole_provider_output(speaker_pending)
+            && snapshot.owner().is_none()
+            && snapshot.microphone_permission() == Permission::Allowed
     }
 
     fn complete_reminder(&mut self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) {
@@ -8334,6 +8340,27 @@ fn conversation_with_gate_inner(
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
                         last_publish = monotonic_us();
+                    }
+                    // Finish an already qualified reminder before this
+                    // candidate can cancel its receipt. Keep the candidate's
+                    // audio pending while the existing completion path below
+                    // retires the owner and updates admission. The next capture
+                    // frame, including quiet, can then admit its kept prefix.
+                    // Failed, partial or reset delivery keeps the interruption
+                    // path; this check never acknowledges a reminder itself.
+                    if let Some(current) = reply.as_ref()
+                        && current.whole_provider_output(&speaker_pending)
+                        && current
+                            .reminder
+                            .as_ref()
+                            .is_some_and(crate::reminders::Receipt::eligible_for_completion)
+                    {
+                        let completion_authority = owner.snapshot(now())?;
+                        if completion_authority.owner() == Some(current.owner)
+                            && completion_authority.microphone_permission() == Permission::Allowed
+                        {
+                            break;
+                        }
                     }
                     // In a room busy with other people's talk, what the
                     // lamp has just been asked is not dropped for the next
