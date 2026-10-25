@@ -1,3 +1,9 @@
+## 2026-10-25 15:45 — Onboarding release handoff prepared
+
+Ready for lamp-voice: no
+
+The prerequisite #3437 has current reader approvals and green ARM64/Linux Clippy on 38fc94f93; it remains open. The nine authored files remain frozen through the ordinary workspace build and full affected/dependent tests, after formatting and strict workspace Clippy passed. The consent prompt asks for the name again in the same consent line because the existing guard correctly refuses a separate bare yes. The prepared played check requires successful intended-speaker saves, swapped positions and a nearer silent bystander, plus zero wrong-face or canceled saves; all-refusal cannot qualify activation. First still assigns that physical check. No test or lamp result is inferred from the source review.
+
 ## 2026-10-25 15:25 — Narrow onboarding formatting and Clippy passed
 
 Ready for lamp-voice: no
