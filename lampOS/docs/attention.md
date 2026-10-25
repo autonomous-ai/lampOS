@@ -237,8 +237,9 @@ told from the lamp.
 often: 27 of the played lines on lamp-4ace from 22 to 25 October, each said
 as "Lamp" or "Hey Lamp". 15 of those were held, 11 as said to someone it
 calls by name ("Louvre, what did I just ask you?" five times of five).
-lamp-name heard none of those five, so the near rule (`LAMP_NAME_NEAR`,
-[second-voice.md](second-voice.md)) could not take it. "We went to the
+lamp-name heard none of those five, so the near rule
+([second-voice.md](second-voice.md), a first word like the name heard near)
+could not take it. "We went to the
 Louvre in May" is no call.
 
 Of the three rounds with no answer heard, the rule held one. In one the
