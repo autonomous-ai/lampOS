@@ -1,0 +1,38 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "exclusive_target": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+  "test_artifacts": [
+    {
+      "package_id": "path+file:///private/tmp/third-carry-colleague-window/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice-eval/tests/it/main.rs",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx/debug/deps/it-ed43bf7ec25f3629",
+      "executable_sha256": "e81fbfb66e86896c87d518159be9e11626508ecc1ae166c42d3aabe2f0553960",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx/debug/deps/it-ed43bf7ec25f3629.d",
+      "dep_info_sha256": "ff0cc71ac2eeed6fb5637b65115a20069b174d7d7a545719e21bf2a354f0a8ec",
+      "source_entry_matches_frozen_map": true
+    }
+  ],
+  "scope": "Post-compile snapshot of the exact Cargo test invocation compiler records, executable hashes and dep-info. Target exclusive to this worktree, no cross-root/compiler-target reuse. Same-worktree prior cache reuse permitted and fresh flags retained; no all-fresh or historical-hash claim. Complete frozen sources separately checked against committed blobs/modes."
+}

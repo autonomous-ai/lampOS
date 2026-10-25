@@ -1,0 +1,18 @@
+{
+  "gate_start_head": "15b7c85af539a0e08a047a4196095d85bb54641b",
+  "head": "15b7c85af539a0e08a047a4196095d85bb54641b",
+  "tree": "12681dd11aa08a75774bf60807030bea1431872d",
+  "base": "a176e66d96dd73aa9330da5d3f0e876402dc74c2",
+  "source_count": 7042,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "selection": "Latest train115 carry: affected Eval switches census only; earlier full Voice/Eval coverage remains frozen114",
+    "summaries": 1,
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "Train115 changes only the Cloud product unit and its switches row. All crate Rust/tests, manifests and build configuration remain byte-identical to the fully executed train114 composition, including the own P3 correction. New latest-source fmt, strict all-target Voice/Eval Clippy, workspace build and the affected Eval switches fixture run here. Earlier full Voice/Eval execution remains frozen114, not relabelled current. Native exact-head gates and current reader dispositions remain before ready."
+}

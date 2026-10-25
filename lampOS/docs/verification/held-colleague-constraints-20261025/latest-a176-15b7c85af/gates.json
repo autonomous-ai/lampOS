@@ -1,0 +1,129 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "a176e66d96dd73aa9330da5d3f0e876402dc74c2",
+  "carried_head": "15b7c85af539a0e08a047a4196095d85bb54641b",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+  "target_scope": "Exclusive existing target belonging to this fixed worktree, reused within it; no imported compiled cache or cross-worktree reuse",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "source_count": 7042,
+  "scope_reason": "Train115 changes only the Cloud product unit and its switches row. All crate Rust/tests, manifests and build configuration remain byte-identical to the fully executed train114 composition, including the own P3 correction. New latest-source fmt, strict all-target Voice/Eval Clippy, workspace build and the affected Eval switches fixture run here. Earlier full Voice/Eval execution remains frozen114, not relabelled current. Native exact-head gates and current reader dispositions remain before ready.",
+  "voice_library_filters": [],
+  "voice_integration_targets": [
+    "it",
+    "release_pair"
+  ],
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 15.168,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-child-a176-current-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 124.833,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-child-a176-current-clippy.txt"
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 110.827,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-child-a176-current-build.txt"
+    },
+    {
+      "name": "tests",
+      "argv": [
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice-eval",
+          "--test",
+          "it",
+          "--message-format=json",
+          "--",
+          "--test-threads=1",
+          "switches::"
+        ]
+      ],
+      "exit": 0,
+      "seconds": 86.546,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-child-a176-current-tests.txt"
+    }
+  ],
+  "test_parts": [
+    {
+      "name": "affected-eval-switches",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "--message-format=json",
+        "--",
+        "--test-threads=1",
+        "switches::"
+      ],
+      "exit": 0,
+      "seconds": 86.545,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-child-a176-current-test-affected-eval-switches.txt"
+    }
+  ]
+}

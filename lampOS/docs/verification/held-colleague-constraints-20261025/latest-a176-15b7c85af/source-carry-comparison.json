@@ -1,0 +1,11 @@
+{
+  "from_full_head": "7faa37cdf3495776e8d5f7b78caf291da3c53265",
+  "to_head": "15b7c85af539a0e08a047a4196095d85bb54641b",
+  "complete_frozen_source_delta": [
+    "lampOS/deploy/product/lamp-cloud.service",
+    "lampOS/docs/switches.md"
+  ],
+  "old_source_records": 7042,
+  "new_source_records": 7042,
+  "all_other_records_identical": true
+}
