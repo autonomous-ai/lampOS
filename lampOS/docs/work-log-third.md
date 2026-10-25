@@ -5,6 +5,34 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 21:19 — Body landed; remaining carries follow the new base
+
+Ready for lamp-voice: no (Body is delivered; remaining carries are qualifying).
+
+#3474 landed through train #3478 on `0ddd07377`. Train ARM64
+**40199931807** and Linux clippy **40199931789** passed. The landed Body
+file is byte-for-byte the offered `b89d3d659` file; the replacement PR was
+closed by the train bot, which recorded the train landing. No device result.
+
+#3408 `92511dc09` gained a second independent READ-OK with full native Mac
+**4,662/0/21** and original Linux audit. The train advanced the release base,
+so it is draft again while rebased `8b9debb80` qualifies on `0ddd07377`.
+Both commits have equal range-diffs; no authored behavior changed.
+
+#3420 is pushed at `9a5cbf6fd`, parent `92511dc09`, release base `86416a0d3`.
+Full local Voice/Eval **4,672/0/21**, formatting, strict clippy and workspace
+build passed, including all ten own added controls. Original Linux clippy
+**40200197617** passed; ARM64 **40200191274** is active. Reviewer-three
+has READ-OK and Reviewer-two is independently qualifying it. It stays draft
+and parent-first; none of this evidence is relabelled as the newer base.
+
+The preserved two-face carry of #3355 has passed fmt, strict Voice/Eval
+clippy and workspace build on the staged `0daa4c4a0` tree over `86416a0d3`;
+its full suite is active in the only owned compiler lane. Its next carry
+must include `0ddd07377`. The reminder successor-admission regression is
+being designed on that new base, with an audit of the real loop and its
+qualified completion bookkeeping. No additional compiler or lamp run.
+
 ## 2026-10-25 20:54 — Parent original Linux gates green
 
 Ready for lamp-voice: yes (#3408 and #3474; independent reads and train gates remain).
