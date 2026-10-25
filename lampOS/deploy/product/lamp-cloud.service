@@ -35,6 +35,17 @@ Environment=LAMP_CLOUD_OFFLINE_WILL=on
 # lampos, under ProtectSystem=strict (/run/lampos-eyes is 0755, `tellable` the eyes' 0600 file
 # of the same user); missing or unreadable, the text goes unnamed.
 Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
+# What the app's Lamp 2 pages change after setup (25 Oct, for the first customer lamps: the app's setup
+# sends no time zone or name, and a new router meant a reset that wipes the lamp). Each passed from the
+# app on lamp-0c89 (docs/lamp-runs.md): the time zone, the person's name and the rename, through root's
+# `lamp-setup change` helper (#2851: the hello used the new name, a reminder came at the new zone's
+# time); a new Wi-Fi network, with a wrong password falling back to the old one (#2852); the skills page,
+# its list 0.8 to 1.0 s after the tap, removing and turning off through `lamp-skills-manage` (#1890); and
+# the update page, reading lamp-update's own status, never starting one (#2194).
+Environment=LAMP_SETTINGS_CHANGE=on
+Environment=LAMP_SETTINGS_WIFI=on
+Environment=LAMP_SKILLS_PAGE=on
+Environment=LAMP_APP_UPDATE=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

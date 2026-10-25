@@ -4,7 +4,7 @@
   "credential": "/etc/lampOS/voice/credential",
   "policy_key": "/etc/lampOS/policy/jev.key",
   "name": "/etc/lampOS/person/name",
-  "country": "VN",
+  "country": "US",
   "page": true,
   "light": true,
   "free_port": [

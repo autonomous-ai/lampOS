@@ -26,7 +26,7 @@ It publishes nothing on the bus at any setting, and with `--apply off` it
 does not even subscribe. The product unit already passes `--apply on`.
 The separate `LAMP_UPDATE_SELF`, `LAMP_UPDATE_MODELS`, `LAMP_UPDATE_APPLY`
 and `LAMP_UPDATE_IMAGE` switches remain off unless set to `on`; the product
-unit sets none of them. The lamp trials below do not enable them elsewhere.
+unit sets `LAMP_UPDATE_SELF` since 25 Oct (below) and none of the others. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
@@ -761,8 +761,10 @@ already running stays mapped.
 With `LAMP_UPDATE_SELF=on` in `lamp-update.service`'s environment, a round
 also moves lamp-update to its build's own binary (`own.rs`, #1680). Off, or
 absent, a round is exactly as above: no `self.json` is ever written, so the
-confirmation and lamp-update-back find nothing to do. The product unit does
-not set it yet.
+confirmation and lamp-update-back find nothing to do. The product unit sets
+it since 25 Oct, before the first customer lamps: without it a customer's
+updater could change only by running install again on the lamp, so no later
+build could carry it units or settings.
 
 1. **Phase 1.** Once a round's parts run build N (the round switched to it,
    or found it up to date), and N's `lamp-update` is not the one
