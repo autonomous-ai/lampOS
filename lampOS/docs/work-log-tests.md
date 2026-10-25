@@ -1,5 +1,53 @@
 # Tests work log
 
+## 2026-10-25 22:08 — Product carrier delivered; journal cleanup control passes
+
+Ready for lamp-voice: no
+
+[Product carrier #3466](https://github.com/autonomous-ai/lampOS/pull/3466) is
+delivered at `e52e3c525` on `0ddd07377`. All three commits are equal across
+the carry. Fresh Mac formatting, strict all-target Clippy across the actual
+12-crate reverse closure, updater build, all 10 carrier tests and diff check
+passed. Native [ARM64
+40202797417](https://github.com/autonomous-ai/lampOS/actions/runs/40202797417)
+passed 11,302 cases (one leaky same-voice journal fixture), 106 skipped, in a
+207.490 s test phase; [Linux Clippy
+40202797405](https://github.com/autonomous-ai/lampOS/actions/runs/40202797405)
+passed. Both readers found no source P1/P2. First's required real
+product-installed GOOD/BAD trial is still pending an authorized lamp owner;
+Tests has no lamp and ran no device action. The pending acceptance run sheet
+is committed in the PR. The next `bf39e4188` carry at `2842f5d7c` preserves
+all three commits and is running fresh gates. Earlier failed full suites and
+prior-head results keep their recorded scopes; no device or full-suite waiver
+is inferred.
+
+The claimed same-voice journal test repair retains the actual
+`Prints::journaled` constructor, fixture and every journal assertion, then
+closes its channels and waits for worker completion and child reaping. On
+matched `86416a0d3`, exactly one original control passed with LEAK and one
+candidate passed without LEAK, using nextest 0.9.149, no retries, the same 100
+ms leak policy and the same 3,765-case inventory. The original's child
+remained until its natural exit 29.780 s later; neither supervisor sent a
+signal. Production layout and behavior are unchanged. On
+`fa31dd56c/0ddd07377`, formatting, strict all-target 12-crate Clippy, the full
+serial x86 Voice library (3,763 passed / 0 failed / 15 ignored; 737.92 s test
+phase), workspace build and diff check all passed. The exact current full-run
+executable is frozen. The repair is now carried to `4d79823c2/bf39e4188`; its
+new gates and PR publication are next, and the earlier full-suite result is
+not relabelled current. No full x86 before count is claimed. The latest
+main-branch ARM baseline is being tracked separately, without the carrier's
+extra cases.
+
+[#3404](https://github.com/autonomous-ai/lampOS/pull/3404)'s stale body now
+records completed fixed qualification: 137 passed / 10 failed / 0 unrun across
+147 observations and six remaining HOLD groups. Ready/Speaking and SleepName
+each have a separate source-only `bf39e4188` worktree, preserving every old
+source/control/witness. Each exact existing two-file patch carries cleanly;
+all other 10,479 tracked lampOS files retain bytes, modes and mtimes. Exactly
+one fresh metadata query per worktree passed: 451 packages, 48 local, actual
+12-crate Expression reverse closure. Both future control plans remain
+disabled; no new control, build, test or cause claim was made for them.
+
 ## 2026-10-25 10:13 — Claimed light and Ready fixture sources prepared
 
 Ready for lamp-voice: no
