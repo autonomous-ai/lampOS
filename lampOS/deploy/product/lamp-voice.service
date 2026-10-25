@@ -256,6 +256,9 @@ Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on
 # A line that plainly asks the lamp to keep something calls remember in its first round, so the lamp never says
 # it kept what it didn't (lamp-4ace, 25 Oct: "remember that I take my coffee black" got "Noted" and no call).
 Environment=LAMP_MEMORY_KEEP_ASKED=on
+# And a line that plainly asks for a timer or a reminder calls the function that sets it (lamp-4ace, 25 Oct:
+# "remind me in three minutes to call my sister" got "Three minutes, call your sister." and no call).
+Environment=LAMP_SCHEDULE_ASKED=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
