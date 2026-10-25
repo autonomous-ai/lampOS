@@ -966,10 +966,10 @@ pub fn observe_on() -> bool {
 pub type Observer = Box<dyn Fn(&Value) -> Option<Value> + Send + Sync>;
 static OBSERVER: OnceLock<Observer> = OnceLock::new();
 /// The jobs waiting for the model, one at a time ([`observe_jobs`]), each
-/// with [`OBSERVE_FORGETS`] as it was before its conversation was ended.
+/// with [`OBSERVE_FORGETS`] as it was at its conversation's first exchange.
 static OBSERVING: OnceLock<SyncSender<(Option<String>, Value, u64)>> = OnceLock::new();
-/// Forgets asked of this process's memory (`forget`, `forget_everything`),
-/// counted as each begins. A job waiting for the model, or with it, from
+/// Forgets asked of this process's memory (`forget`, `forget_everything`,
+/// named or not, kept or refused), counted as each is asked. A job waiting for the model, or with it, from
 /// before a forget is closed with nothing kept: its words are never sent,
 /// or its proposals never given, after the person asked for them to go
 /// (reviewer-two's P2 on #3450).
@@ -4790,6 +4790,9 @@ enum DaysJob {
         person: Option<String>,
         /// The forgets sent before it was made ([`HandOns::forgotten`]).
         forgotten: u64,
+        /// [`OBSERVE_FORGETS`] as it was made: its conversation takes the
+        /// first exchange's, so a forget said in it closes its job unsent.
+        observe_forgets: u64,
     },
     Close(String, Option<String>),
     End,
@@ -5457,6 +5460,14 @@ impl DaysClient {
         (lease, asked_in): Turn<'_>,
     ) -> (Value, bool) {
         let (now, zone) = time;
+        // Every forget asked counts for the observation pass first, before
+        // any of the paths below returns: a named one (`forget_about`) and a
+        // refused one too, so no conversation from before it is observed
+        // (reviewer-two's and reviewer-three's P2 on `208e376a3`). It errs
+        // toward closing a job unsent.
+        if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
+            OBSERVE_FORGETS.fetch_add(1, Ordering::AcqRel);
+        }
         if !scope_current(lease) {
             return (gone(), false);
         }
@@ -5683,7 +5694,6 @@ impl DaysClient {
             // it is written after it, and what the writer has in hand is
             // let finish first, within a little of the call's time.
             if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
-                OBSERVE_FORGETS.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.settle(
                     deadline
@@ -6680,6 +6690,7 @@ impl DaysClient {
                 rules,
                 person: person.map(str::to_owned),
                 forgotten,
+                observe_forgets: OBSERVE_FORGETS.load(Ordering::Acquire),
             })
             .is_ok();
         if sent {
@@ -7185,6 +7196,11 @@ struct Conversation {
     lines: Vec<(u64, u64)>,
     follow: Option<Follow>,
     last_request: u64,
+    /// [`OBSERVE_FORGETS`] as its first exchange was made: a forget said
+    /// in it, or after, closes its observation job unsent (reviewer-three's
+    /// and reviewer-two's P2 on `208e376a3`: read at its end, a forget said
+    /// during it was already counted, and its job was sent).
+    forgets: Option<u64>,
 }
 
 /// A face saved in the room's conversation as `to`'s, in the request
@@ -7199,7 +7215,10 @@ struct Follow {
 }
 
 impl Conversation {
-    fn add(&mut self, id: u64, finished: Instant) {
+    /// `forgets` is [`OBSERVE_FORGETS`] as the exchange was made, before
+    /// the writer took it: the conversation keeps its first exchange's.
+    fn add(&mut self, id: u64, finished: Instant, forgets: u64) {
+        self.forgets.get_or_insert(forgets);
         self.finished = Some(finished);
         if self.sources.len() == SOURCE_IDS {
             self.overflow = true;
@@ -7218,7 +7237,8 @@ impl Conversation {
 /// Hands a conversation's frozen job to the observation thread, started on
 /// the first; with it busy, the job is closed with nothing kept, so the
 /// memory's bounded queue never fills with jobs nobody will finish.
-/// `forgets` is [`OBSERVE_FORGETS`] from before the conversation was ended.
+/// `forgets` is [`OBSERVE_FORGETS`] as the conversation's first exchange
+/// was added.
 fn observe(socket: &Path, person: Option<String>, input: Value, forgets: u64) {
     let jobs = OBSERVING.get_or_init(|| {
         let (jobs, work) = sync_channel(OBSERVE_QUEUE);
@@ -7585,6 +7605,7 @@ fn follow_face(
             .copied()
             .collect(),
         finished: conversation.finished,
+        forgets: conversation.forgets,
         ..Conversation::default()
     };
     let last = conversation.last_request.max(anchor);
@@ -7695,7 +7716,9 @@ fn days_writer(
         // With a model for the pass, the frozen job comes back to be sent
         // to it (#1693 (2)); without, the memory is told there is none.
         let observing = OBSERVER.get().is_some();
-        let forgets = OBSERVE_FORGETS.load(Ordering::Acquire);
+        let forgets = ended
+            .forgets
+            .unwrap_or_else(|| OBSERVE_FORGETS.load(Ordering::Acquire));
         let answer = bounded_exchange_up_to(
             socket,
             &for_person(
@@ -7782,6 +7805,7 @@ fn days_writer(
                 rules,
                 person,
                 forgotten,
+                observe_forgets,
             }) => {
                 // Made before a forget: not written after it.
                 if forgotten < hand_ons.forgotten.load(Ordering::Acquire) {
@@ -7858,7 +7882,7 @@ fn days_writer(
                     .filter(|id| *id > 0 && *id <= i64::MAX as u64);
                 report(id.is_some());
                 if let Some(id) = id {
-                    conversation.add(id, finished);
+                    conversation.add(id, finished, observe_forgets);
                     if let Ok(mut current) = current.lock() {
                         *current = (conversation.person.clone(), conversation.sources.clone());
                     }
@@ -11757,7 +11781,7 @@ mod tests {
         let mut conversation = Conversation::default();
         let now = Instant::now();
         for id in 1..=65 {
-            conversation.add(id, now);
+            conversation.add(id, now, 0);
         }
         assert!(conversation.overflow);
         assert_eq!(conversation.sources.len(), 64);
@@ -12068,6 +12092,7 @@ mod tests {
                 rules: vec![],
                 person: None,
                 forgotten: 0,
+                observe_forgets: 0,
             })
             .unwrap();
         }
@@ -12141,6 +12166,7 @@ mod tests {
             rules: vec![],
             person: person.map(str::to_owned),
             forgotten: 0,
+            observe_forgets: 0,
         };
         send.send(exchange(
             unix_ms() - 2_000,
@@ -12254,6 +12280,7 @@ mod tests {
             rules: vec![],
             person: person.map(str::to_owned),
             forgotten: 0,
+            observe_forgets: 0,
         }
     }
 
@@ -13042,6 +13069,7 @@ mod tests {
             rules: vec![],
             person: Some("p-a".into()),
             forgotten: 0,
+            observe_forgets: 0,
         };
         send.send(exchange("before", now - Duration::from_secs(2)))
             .unwrap();
@@ -15440,6 +15468,7 @@ mod tests {
                 rules: vec![],
                 person: None,
                 forgotten,
+                observe_forgets: 0,
             })
             .unwrap();
         }
