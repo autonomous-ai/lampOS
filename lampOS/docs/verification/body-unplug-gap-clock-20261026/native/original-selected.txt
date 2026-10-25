@@ -1,0 +1,6 @@
+2026-10-25T17:49:08.9754645Z 94c19509ec8bbae733a763064717929d78fadc96
+2026-10-25T17:59:05.4148550Z     Starting 11296 tests across 179 binaries (106 tests and 2 binaries skipped)
+2026-10-25T17:59:16.9785953Z         PASS [   0.008s] (  823/11296) lamp-body unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails
+2026-10-25T17:59:17.1449371Z         PASS [   0.105s] (  864/11296) lamp-body unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop
+2026-10-25T18:02:00.6132295Z         LEAK [   0.218s] ( 9077/11296) lamp-voice same_voice::tests::each_line_the_check_says_is_said_to_its_journal
+2026-10-25T18:02:32.2699446Z      Summary [ 206.855s] 11296 tests run: 11296 passed (1 leaky), 106 skipped

@@ -1,3 +1,15 @@
+## Current checkpoint: 2026-10-26 01:27 +07, Body landed; V2 image carry in final review
+
+[#3497](https://github.com/autonomous-ai/lampOS/pull/3497) landed through train #3498 at `14c64a8db`. Original and train ARM64 each report **11,296 passed (1 leaky), 106 skipped**; each contains **614 Body PASS** rows including both changed cases. Both Linux formatting/Clippy runs pass. The [native proof](verification/body-unplug-gap-clock-20261026/native/README.md) reconciles every unique case and ordinal, excludes 35 later report echoes per run, and binds both actual checkouts, heads and landing to the same complete tree. The existing Mac 609/0/0, independent reader 609/0/0, five negative controls and historical failures retain their separate scopes.
+
+The stalled [V2 image builder #3246](https://github.com/autonomous-ai/lampOS/pull/3246), part of #2538, is carried on `second/v2-image-current`. Both authored commits remain patch-identical after rebase onto `abc79d609`; new fixes authenticate the bootstrap manifest before downloading/executing its updater, pin both install attempts to that signed envelope, compare the final recorded build, and prevent an old compressed image from being reported as a new raw build. The claim and findings are on the original PR and Queue.
+
+The final source gate reports **31 signature checks / 0 failed**, **5 current bootstrap observations**, **8 output tests / 0 failed**, and existing image tests **30 passed, 1 skipped**. The skipped disposable ext4 test requires Linux. Shell syntax, workflow YAML, Cargo formatting and diff checks pass; all image input hashes remain unchanged through the current-base carry. Historical controls separately reproduce the original three faults. Ubuntu imager CI is added; no complete image, flash or first boot is claimed. The replacement PR and native checks are next after independent source review.
+
+This log is rebased onto `abc79d609`; all prior verification blobs and modes are preserved. No Second compiler is active. The attended updater unplug (#2810) and trusted-public-key/device release acceptance (#1812) remain with their designated holders. No owner input or device action is needed for the current coding work.
+
+---
+
 ## Current checkpoint: 2026-10-26 00:49 +07, Body unplug-gap fixture published
 
 [#3497](https://github.com/autonomous-ai/lampOS/pull/3497) is published non-draft at `382e2573ad69f17739580d8c210e8240d5120f2c`, based on `9e9e6733a`. It preserves the controlled sample-gap sequence and a separate enabled-Adapter lifecycle test; runtime and all other existing test bytes remain unchanged. Original PR CI is starting and current-head reviews are pending.

@@ -1,0 +1,211 @@
+{
+  "audited_at": "2026-10-26T01:18:54+07:00",
+  "census_method": {
+    "audit_correction": "The initial audit scoped Body to its library label and rejected the expected 614 count; including all seven Body labels reconciles it. This was a parsing assertion, not a test execution or failure.",
+    "body_scope": "lamp-body and lamp-body:: integration/binary labels",
+    "execution_window": "After the single Starting line, before the single Summary line",
+    "original_and_train_case_sets_equal": true,
+    "padded_ordinals_accepted": true
+  },
+  "limits": [
+    "Native process-test durations are not physical timing measurements.",
+    "No physical unplug, settling, acoustic, device, signing-key or release acceptance is established.",
+    "The preserved historical failed observations and local negative controls are unchanged."
+  ],
+  "pull_request": 3497,
+  "runs": {
+    "original": {
+      "announced_test_binaries": 179,
+      "arm64_run": {
+        "attempt": 1,
+        "conclusion": "success",
+        "databaseId": 40218244607,
+        "event": "pull_request",
+        "headSha": "382e2573ad69f17739580d8c210e8240d5120f2c",
+        "startedAt": "2026-10-25T17:48:35Z",
+        "status": "completed",
+        "updatedAt": "2026-10-25T18:02:56Z",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40218244607"
+      },
+      "body_by_binary": {
+        "lamp-body": 446,
+        "lamp-body::bin/lamp-body": 32,
+        "lamp-body::bin/lamp-body-inspect": 2,
+        "lamp-body::bin/lamp-body-measure": 5,
+        "lamp-body::bin/lamp-body-mood": 3,
+        "lamp-body::bin/lamp-body-worker": 1,
+        "lamp-body::it": 125
+      },
+      "body_terminal_counts": {
+        "PASS": 614
+      },
+      "changed_cases": [
+        {
+          "binary": "lamp-body",
+          "case": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+          "denominator": 11296,
+          "duration": "0.008s",
+          "ordinal": 823,
+          "status": "PASS"
+        },
+        {
+          "binary": "lamp-body",
+          "case": "unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop",
+          "denominator": 11296,
+          "duration": "0.105s",
+          "ordinal": 864,
+          "status": "PASS"
+        }
+      ],
+      "distinct_binary_labels_with_terminal_rows": 153,
+      "excluded_post_summary_echoes": {
+        "PASS": 35,
+        "all_already_counted": true
+      },
+      "full_arm64_log_sha256": "597530774281d767a836abe9c2f3f5f35daee11608ca048d2382bcac4f617e3f",
+      "leaky_cases": [
+        {
+          "binary": "lamp-voice",
+          "case": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+        }
+      ],
+      "linux_format_clippy_run": {
+        "attempt": 1,
+        "conclusion": "success",
+        "databaseId": 40218244592,
+        "event": "pull_request",
+        "headSha": "382e2573ad69f17739580d8c210e8240d5120f2c",
+        "startedAt": "2026-10-25T17:48:35Z",
+        "status": "completed",
+        "updatedAt": "2026-10-25T17:56:30Z",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40218244592"
+      },
+      "ordinals": {
+        "each_exactly_once": true,
+        "maximum": 11296,
+        "minimum": 1
+      },
+      "skipped_binaries": 2,
+      "skipped_tests": 106,
+      "summary": "2026-10-25T18:02:32.2699446Z      Summary [ 206.855s] 11296 tests run: 11296 passed (1 leaky), 106 skipped",
+      "terminal_counts": {
+        "LEAK": 1,
+        "PASS": 11295
+      },
+      "terminal_rows_before_summary": 11296,
+      "tested_checkout": "94c19509ec8bbae733a763064717929d78fadc96",
+      "tested_tree": "b6ecaf8e6b18695bd08de8d8060fa148baef3b03",
+      "unique_binary_test_pairs": 11296
+    },
+    "train": {
+      "announced_test_binaries": 179,
+      "arm64_run": {
+        "attempt": 1,
+        "conclusion": "success",
+        "databaseId": 40218484025,
+        "event": "pull_request",
+        "headSha": "2bc56ea1ca55d3b3c74545fb3762dbe905d03916",
+        "startedAt": "2026-10-25T17:51:33Z",
+        "status": "completed",
+        "updatedAt": "2026-10-25T18:07:14Z",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40218484025"
+      },
+      "body_by_binary": {
+        "lamp-body": 446,
+        "lamp-body::bin/lamp-body": 32,
+        "lamp-body::bin/lamp-body-inspect": 2,
+        "lamp-body::bin/lamp-body-measure": 5,
+        "lamp-body::bin/lamp-body-mood": 3,
+        "lamp-body::bin/lamp-body-worker": 1,
+        "lamp-body::it": 125
+      },
+      "body_terminal_counts": {
+        "PASS": 614
+      },
+      "changed_cases": [
+        {
+          "binary": "lamp-body",
+          "case": "unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails",
+          "denominator": 11296,
+          "duration": "0.018s",
+          "ordinal": 823,
+          "status": "PASS"
+        },
+        {
+          "binary": "lamp-body",
+          "case": "unplug::tests::the_enabled_adapter_publishes_its_latch_and_joins_after_stop",
+          "denominator": 11296,
+          "duration": "0.107s",
+          "ordinal": 854,
+          "status": "PASS"
+        }
+      ],
+      "distinct_binary_labels_with_terminal_rows": 153,
+      "excluded_post_summary_echoes": {
+        "PASS": 35,
+        "all_already_counted": true
+      },
+      "full_arm64_log_sha256": "c6db502d6594e4043edc6eb96e5155523c718f428632d5441865f0deef9f5a90",
+      "leaky_cases": [
+        {
+          "binary": "lamp-voice",
+          "case": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+        }
+      ],
+      "linux_format_clippy_run": {
+        "attempt": 1,
+        "conclusion": "success",
+        "databaseId": 40218484011,
+        "event": "pull_request",
+        "headSha": "2bc56ea1ca55d3b3c74545fb3762dbe905d03916",
+        "startedAt": "2026-10-25T17:51:33Z",
+        "status": "completed",
+        "updatedAt": "2026-10-25T17:55:07Z",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40218484011"
+      },
+      "ordinals": {
+        "each_exactly_once": true,
+        "maximum": 11296,
+        "minimum": 1
+      },
+      "skipped_binaries": 2,
+      "skipped_tests": 106,
+      "summary": "2026-10-25T18:06:50.1210037Z      Summary [ 228.028s] 11296 tests run: 11296 passed (1 leaky), 106 skipped",
+      "terminal_counts": {
+        "LEAK": 1,
+        "PASS": 11295
+      },
+      "terminal_rows_before_summary": 11296,
+      "tested_checkout": "4c62b4551e69c1410a8d7d9cc07d12fec694fc26",
+      "tested_tree": "b6ecaf8e6b18695bd08de8d8060fa148baef3b03",
+      "unique_binary_test_pairs": 11296
+    }
+  },
+  "schema": 1,
+  "scope": "Audit of existing completed native CI; no test rerun",
+  "separate_local_gate": {
+    "body_failed": 0,
+    "body_ignored": 0,
+    "body_passed": 609,
+    "direct_gap_passed": 1,
+    "each_negative_control_failed": 1,
+    "each_negative_control_passed": 0,
+    "independent_reader_mac_result": "609 passed, 0 failed, 0 ignored; a separate read, not added to native totals",
+    "negative_controls": 5,
+    "scope": "Mac gate recorded in the original PR proof"
+  },
+  "source_identity": {
+    "base_is_not_in_tree_equality_claim": true,
+    "commits": {
+      "base": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+      "landed": "14c64a8db1578ca3b5095b056463fbbf5aaebb3c",
+      "original_checkout": "94c19509ec8bbae733a763064717929d78fadc96",
+      "original_head": "382e2573ad69f17739580d8c210e8240d5120f2c",
+      "train_checkout": "4c62b4551e69c1410a8d7d9cc07d12fec694fc26",
+      "train_head": "2bc56ea1ca55d3b3c74545fb3762dbe905d03916"
+    },
+    "complete_tree_for_head_checkouts_train_and_landing": "b6ecaf8e6b18695bd08de8d8060fa148baef3b03",
+    "train_checkout_tree_source": "https://api.github.com/repos/autonomous-ai/lampOS/commits/4c62b4551e69c1410a8d7d9cc07d12fec694fc26"
+  },
+  "train_pull_request": 3498
+}
