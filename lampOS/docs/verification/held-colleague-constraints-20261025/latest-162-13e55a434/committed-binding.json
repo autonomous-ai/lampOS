@@ -1,0 +1,17 @@
+{
+  "gate_start_head": "13e55a4340220c680b20140c4601de011e8bd8a9",
+  "head": "13e55a4340220c680b20140c4601de011e8bd8a9",
+  "tree": "fe82c5d4391a460df4f57486ccfb8c30d1a99522",
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "source_count": 7042,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "summaries": 11,
+    "passed": 4665,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "corrected child stacked on latest162 parent; own patch equal from106; full Voice/Eval plus workspace build, reset/fence/capacity retained; old epochs separate"
+}

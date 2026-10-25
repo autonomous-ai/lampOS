@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-10-25T00:35:19.762384+00:00",
+  "main": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "free_GiB": 26.511,
+  "unix_socket_bind_passed": true,
+  "both_worktrees_clean_and_contain_current_base": true,
+  "cargo_jobs_each": 1,
+  "total_own_compiler_jobs": 2,
+  "allocation_release": 6391420778,
+  "scope": "Existing own-worktree exclusive targets; no ARM local execution/link, no source cache cleanup or new target allocation. Actual fourth lane overlap retained without isolated-host claim."
+}

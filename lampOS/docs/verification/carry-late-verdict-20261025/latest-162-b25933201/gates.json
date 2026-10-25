@@ -1,0 +1,101 @@
+{
+  "worktree": "/private/tmp/third-carry-late-current",
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "carried_head": "b259332013242b94aafdb9f8b3674a48ef19fc16",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
+  "target_scope": "Target exclusive to this worktree and reused within it for current162 carry; no cross-worktree or all-fresh claim",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "1"
+  },
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "parent private verdict carry onto latest 162216f82; only three upstream Controls test/docs paths changed from efbf, own patch equal; full Voice/Eval plus workspace build; old epochs separate",
+  "source_count": 7041,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 12.951,
+      "log": "/private/tmp/third-carry-late-162-current-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 119.607,
+      "log": "/private/tmp/third-carry-late-162-current-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 84.852,
+      "log": "/private/tmp/third-carry-late-162-current-build.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 1053.957,
+      "log": "/private/tmp/third-carry-late-162-current-tests.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

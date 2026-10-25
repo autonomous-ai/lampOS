@@ -1,0 +1,17 @@
+{
+  "gate_start_head": "b259332013242b94aafdb9f8b3674a48ef19fc16",
+  "head": "b259332013242b94aafdb9f8b3674a48ef19fc16",
+  "tree": "a500d214e1136e90a4b6485076e692a97f08185a",
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "source_count": 7041,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "summaries": 11,
+    "passed": 4655,
+    "failed": 0,
+    "ignored": 21,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "parent private verdict carry onto latest 162216f82; only three upstream Controls test/docs paths changed from efbf, own patch equal; full Voice/Eval plus workspace build; old epochs separate"
+}

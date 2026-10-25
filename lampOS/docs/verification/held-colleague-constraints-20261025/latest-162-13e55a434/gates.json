@@ -1,0 +1,101 @@
+{
+  "worktree": "/private/tmp/third-carry-colleague-window",
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "carried_head": "13e55a4340220c680b20140c4601de011e8bd8a9",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+  "target_scope": "Target exclusive to this worktree and reused within it for current162 carry; no cross-worktree or all-fresh claim",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "packages": [
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "scope_reason": "corrected child stacked on latest162 parent; own patch equal from106; full Voice/Eval plus workspace build, reset/fence/capacity retained; old epochs separate",
+  "source_count": 7042,
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 12.899,
+      "log": "/private/tmp/third-held-forget-162-current-fmt.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 119.49,
+      "log": "/private/tmp/third-held-forget-162-current-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 84.542,
+      "log": "/private/tmp/third-held-forget-162-current-build.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 1051.276,
+      "log": "/private/tmp/third-held-forget-162-current-tests.txt",
+      "source_unchanged": true
+    }
+  ],
+  "docker_available": false
+}

@@ -1,0 +1,286 @@
+{
+  "worktree": "/private/tmp/third-carry-late-current",
+  "exclusive_target": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
+  "test_artifacts": [
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice-eval/tests/it/main.rs",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice-eval/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/it-163a25b423cce68f",
+      "executable_sha256": "f3cac87da5af170e55149bbdb739c8bc101aada0f99f21f65db118dc64a56539",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/it-163a25b423cce68f.d",
+      "dep_info_sha256": "9c01022697dd596d4d1f008959a1d29f1db61f12bfb9b0c6ff2238bc10a107db",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice-eval/src/main.rs",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice-eval",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice-eval/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice_eval-a51cb2305c1ff1fc",
+      "executable_sha256": "942cf965126578c4325f8dbdbfcdec4b0d0035537f9e1f54cd239e8541329c0f",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice_eval-a51cb2305c1ff1fc.d",
+      "dep_info_sha256": "50c3e743cfc9a9689d531af7ac5d071d1260fad86189c80cfc1f9ffa9f4f6824",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice-eval/src/lib.rs",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice_eval",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice-eval/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice_eval-1ccdb49161c05ee9",
+      "executable_sha256": "25ea324c810ea6a91073db4ff8b174447f76df11071a43655bac63f3532c9aff",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice_eval-1ccdb49161c05ee9.d",
+      "dep_info_sha256": "9db4f0b2bb92aea2dcd8443aa75da75376780fdf2cf2ca56cb7bad6c5db71d48",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/render_line_second.rs",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/examples/render_line_second-d52e8b12a523439f",
+      "executable_sha256": "6fb25e6f1b2093f0ba4d069b2a7cb8db64658709f727f3adea34c8600ed908a5",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/examples/render_line_second-d52e8b12a523439f.d",
+      "dep_info_sha256": "8a2ef952fa7a797f11c1674eb71d1b1ac4d57fd8728cb9c08a15d3341cb89ad7",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/tests/release_pair.rs",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/release_pair-92e5f959ae720155",
+      "executable_sha256": "b4ebdbc63826484c2dcf98e2d9887189201b546bee1595888fad85f00ab36123",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/release_pair-92e5f959ae720155.d",
+      "dep_info_sha256": "fe1d0cad6e99f13a3dbab18e9b5d9b2e957579b25fecacfa7d065e117ac96824",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/tests/it/main.rs",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/it-ac9b9993d410d428",
+      "executable_sha256": "de2c4728fc8c30476a55468b1aa4f04655361deb4bc95ab91d2fa7dbab71e911",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/it-ac9b9993d410d428.d",
+      "dep_info_sha256": "ab30a93797bd98de75c8b7c6d456443ca508c62d66dd30dfcdc48cfad83c363a",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/src/lib.rs",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "executable_sha256": "f748df523efaac6524eca4a5aa3949190fca04036741b1f4f76a3a2d76cbc37c",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice-6d619bbdd1df3a0d.d",
+      "dep_info_sha256": "b3861cd6b57d8bae22c7c0b5b9160661c3186faa5c69ddf97eb4e563947ce463",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/src/main.rs",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "executable_sha256": "d947d902e666e7ba61dc368af743986e6320e521774061bfb5b956890f1794e1",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice-507b8ab98a2c94b0.d",
+      "dep_info_sha256": "3962b66b23a794c07e1c01c392e10b85a119c3c2a364e0e0f1de3ccf51339225",
+      "source_entry_matches_frozen_map": true
+    },
+    {
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "executable_sha256": "bcb2dca4f8196de8c6fcb6a05353f536674b70a4875129045d142bd7e595b874",
+      "dep_info": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/examples/stop_words_stt_replay-5a8c99799d0dadff.d",
+      "dep_info_sha256": "fc36635f94f1ea6d618d49ef077dbbd7ad8075371ec2c233fc0f315f6081061e",
+      "source_entry_matches_frozen_map": true
+    }
+  ],
+  "scope": "Post-compile snapshot of the exact Cargo test invocation compiler records, executable hashes and dep-info. Target exclusive to this worktree, no cross-root/compiler-target reuse. Same-worktree prior cache reuse permitted and fresh flags retained; no all-fresh or historical-hash claim. Complete frozen sources separately checked against committed blobs/modes."
+}
