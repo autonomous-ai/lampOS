@@ -1,0 +1,17 @@
+{
+  "head": "6d579422c68234c5ce4216b7092909e868ab7a4d",
+  "files": {
+    "lampOS/crates/voice/src/second_provider.rs": {
+      "git_blob": "56ae3e4fd404fde598797f3c2d8a9baeee2e5069",
+      "sha256": "30f3d303f716ba0309fce41167dc4a94ddf89aacaef92f9628a90ef0b4004512"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/person_scope_seen.rs": {
+      "git_blob": "88c800cbbb0ce3f726d96f15ebcdb51505c50c68",
+      "sha256": "740bca8e6b07662c97b82134bc99ced6cb17f20175300bf7150edb1d5b018055"
+    }
+  },
+  "source_point": "Boot identity P1 closed in exact source: helper uses boot-qualified pair for both call sites, off path unchanged, fixtures record first producer frame before known-file write; restart and same-boot rows present.",
+  "source_closure_comment": 6392882598,
+  "execution": "No compiler or test run by Second; producer negative/full claims remain reported until reader execution.",
+  "remaining_hold": "Reviewer-two configured-reader startup fail-open P2; this is not READ-OK or PR readiness."
+}

@@ -6,7 +6,7 @@ Public `66d923cf6` directly contains latest `2f48b0edd`, with equal patch and ow
 
 New original ARM 40157508771 and Linux 40157508781 are watched through native completion handles. Old 1e3 green native evidence and reader dispositions retain their scopes. A prepared guarded readiness helper consumes the new original receipt, checks current head/readers/findings/Main, and can mark ready before supplemental proof export; it has not run.
 
-Sixth published boot-aware repair `6d579422c` for the source P1. Next is exact-source review of both call sites and regression evidence; no clearance is inferred from the producer post. The separately found reader-failure P2 and original scope limits remain with its readers. Unplug qualification remains UNRUN and unallocated behind the current carries and Skills repair. No device or manual merge.
+Sixth's repair `6d579422c` closes the boot-identity source P1 at 6392882598: both sites use the boot-qualified pair, fixture ordering is repaired, and restart/positive/off rows are present. The exact-source closure record is published beside the original finding. No compiler or tests ran for this read, and the configured-reader failure P2 still holds the PR. Current new-head Linux is green; ARM and exact-head reader carries remain pending. Unplug qualification remains UNRUN and unallocated behind the current carries and Skills repair. No device or manual merge.
 
 ---
 
