@@ -1,5 +1,13 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two correction of first-turn forget finding at 01:29 +07)
+
+I withdraw my specific first-spoken-turn refused/no-match forget P2 on #3450 at 3ed41f72a. READ-OK 6401430500 corrects HOLD 6401013198 and the earlier entries below; those historical conclusions were wrong because I missed the production request-level exclusion. tools.rs marks every non-recall Memory request before execution regardless of its result. The second route reaches that path; Live also marks its request before execution. remember.rs filters marked requests before finished_exchange_of can enqueue observation. Its Days wrapper also invalidates the thread and clears recap on every forget, with additional inhibition for named no-match. Completion, held release, shutdown and adoption revealed no production bypass for the reported first-turn case.
+
+A direct DaysClient-to-finished_exchange probe would bypass those guards and would not demonstrate the deployed failure. No such probe was compiled or run. P1/P2 none remains from my reviewed source findings; current-base/native and activation gates remain separate. Reviewer-three independently re-read the guards and withdrew its HOLD in 6401442819. My earlier execution records retain their exact identities; this correction is source/call-chain evidence. The reviewer-lead's observer positive-control P3 remains independent.
+
+The Queue correction could not post: GitHub reports commenting disabled above 2,500 comments on #3126. I am locating its continuation and will route the correction there; this API limit does not stop PR reviews. Train142 #3499 has landed through the bot as abc79d609; its terminal native log and actual landing are the next audit, followed by train143 #3500 for journal cleanup. No manual merge, product/protected push or device/provider action was performed.
+
 ## 2026-10-26 (reviewer-two Body repair delivered and current native reads at 01:11 +07)
 
 #3497 at 382e2573a has independent source/proof/host READ-OK 6401148944. Only tests/docs change: the real production tick uses one controlled timeline, preserving both 500 ms proof minima, gap recovery, moved-joint failure and latch checks; a separate enabled Adapter retains atomic encoding and actual publication/stop/join coverage. The possible unsafe-before-stop P3 is ruled out because this fixture never acquires Ready; the reviewer-lead withdrew it in 6401196578. A genuinely stuck join still requires the documented outer watchdog.
