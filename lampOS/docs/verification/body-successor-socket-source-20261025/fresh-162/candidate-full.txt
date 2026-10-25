@@ -1,0 +1,726 @@
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.190/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.190/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default","extra_traits","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/libc-0dfb03b582720c57/build-script-build"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro2-1.0.107/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro2-1.0.107/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["proc-macro"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/proc-macro2-2d94870f0ea4d142/build-script-build"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/libc-daa0715bb9a1016c/out"}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107","linked_libs":[],"linked_paths":[],"cfgs":["wrap_proc_macro","proc_macro_span_location","proc_macro_span_file"],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/proc-macro2-70ad7221f4865388/out"}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quote-1.0.47/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quote-1.0.47/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["proc-macro"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/quote-fd0cfbda082e4366/build-script-build"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["result","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/serde_core-fbd0550e0367f9cb/build-script-build"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#version_check@0.9.5","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/version_check-0.9.5/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"version_check","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/version_check-0.9.5/src/lib.rs","edition":"2015","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libversion_check-f0c071276347e8bb.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libversion_check-f0c071276347e8bb.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#unicode-ident@1.0.26","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.26/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"unicode_ident","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-ident-1.0.26/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libunicode_ident-ddc059c633f25162.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libunicode_ident-ddc059c633f25162.rmeta"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/serde_core-cbff9bd87c35a82c/out"}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#proc-macro2@1.0.107","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro2-1.0.107/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"proc_macro2","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/proc-macro2-1.0.107/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["proc-macro"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libproc_macro2-352308b0bb34c408.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libproc_macro2-352308b0bb34c408.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/generic-array-0.14.7/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/generic-array-0.14.7/build.rs","edition":"2015","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["more_lengths"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/generic-array-7e3d8daa62b6f10b/build-script-build"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/quote-c26d8b2258dfb22e/out"}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#libc@0.2.190","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.190/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"libc","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.190/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default","extra_traits","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblibc-4d5af6ede2b01472.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblibc-4d5af6ede2b01472.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#quote@1.0.47","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quote-1.0.47/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"quote","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quote-1.0.47/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["proc-macro"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libquote-fd544139460c9263.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libquote-fd544139460c9263.rmeta"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7","linked_libs":[],"linked_paths":[],"cfgs":["relaxed_coherence"],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/generic-array-dd5c5f0312c11a21/out"}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde_core@1.0.229","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"serde_core","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_core-1.0.229/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["result","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libserde_core-cd74dec52ccbfc61.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libserde_core-cd74dec52ccbfc61.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.23/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.23/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/zmij-2d29d35b020b892d/build-script-build"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#typenum@1.20.1","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/typenum-1.20.1/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"typenum","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/typenum-1.20.1/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libtypenum-ce1f28190c46f8cb.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libtypenum-ce1f28190c46f8cb.rmeta"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23","linked_libs":[],"linked_paths":[],"cfgs":[],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/zmij-d49a9d62a6c10155/out"}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#generic-array@0.14.7","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/generic-array-0.14.7/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"generic_array","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/generic-array-0.14.7/src/lib.rs","edition":"2015","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["more_lengths"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libgeneric_array-474ec817a5c76d63.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libgeneric_array-474ec817a5c76d63.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#syn@3.0.7","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-3.0.7/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"syn","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-3.0.7/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["clone-impls","derive","parsing","printing","proc-macro"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libsyn-d0d0d0f69129b09a.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libsyn-d0d0d0f69129b09a.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default","derive","serde_derive","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/serde-fd5efdb2521f13a2/build-script-build"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/serde_json-4a57f03619ad1063/build-script-build"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229","linked_libs":[],"linked_paths":[],"cfgs":["if_docsrs_then_no_serde_core"],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/serde-43ed5ea02769724f/out"}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151","linked_libs":[],"linked_paths":[],"cfgs":["fast_arithmetic=\"64\""],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/serde_json-6c403903cf9adbd9/out"}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde_derive@1.0.229","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_derive-1.0.229/Cargo.toml","target":{"kind":["proc-macro"],"crate_types":["proc-macro"],"name":"serde_derive","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_derive-1.0.229/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libserde_derive-7506ea4ca579bfe4.dylib"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#zmij@1.0.23","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.23/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"zmij","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.23/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libzmij-4931fd674b26e3fa.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libzmij-4931fd674b26e3fa.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#memchr@2.8.3","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"memchr","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/memchr-2.8.3/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["alloc","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libmemchr-1e8adda0fec00744.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libmemchr-1e8adda0fec00744.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#cfg-if@1.0.5","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cfg-if-1.0.5/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"cfg_if","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cfg-if-1.0.5/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libcfg_if-62873b3ed162ed64.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libcfg_if-62873b3ed162ed64.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#itoa@1.0.18","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/itoa-1.0.18/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"itoa","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/itoa-1.0.18/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libitoa-34c6cc1131d95b6d.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libitoa-34c6cc1131d95b6d.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde@1.0.229","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"serde","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default","derive","serde_derive","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libserde-a01eb736a1e7fd36.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libserde-a01eb736a1e7fd36.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#serde_json@1.0.151","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"serde_json","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libserde_json-5974bca8036f3313.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libserde_json-5974bca8036f3313.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#block-buffer@0.10.4","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/block-buffer-0.10.4/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"block_buffer","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/block-buffer-0.10.4/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libblock_buffer-6e130c0c41bef5a5.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libblock_buffer-6e130c0c41bef5a5.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#crypto-common@0.1.7","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crypto-common-0.1.7/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"crypto_common","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/crypto-common-0.1.7/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libcrypto_common-fcc58ac74bcdf945.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libcrypto_common-fcc58ac74bcdf945.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#cpufeatures@0.2.17","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpufeatures-0.2.17/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"cpufeatures","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cpufeatures-0.2.17/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libcpufeatures-3c60d236bb1d1ff5.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libcpufeatures-3c60d236bb1d1ff5.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#digest@0.10.7","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"digest","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/digest-0.10.7/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["alloc","block-buffer","core-api","default","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libdigest-0d0dcc48feb36191.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libdigest-0d0dcc48feb36191.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#cfg_aliases@0.2.2","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cfg_aliases-0.2.2/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"cfg_aliases","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cfg_aliases-0.2.2/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libcfg_aliases-4abdaafe3fb34266.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/deps/libcfg_aliases-4abdaafe3fb34266.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#sha2@0.10.9","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha2-0.10.9/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"sha2","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha2-0.10.9/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["default","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libsha2-ce3d277f8b7303cc.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libsha2-ce3d277f8b7303cc.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nix-0.29.0/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nix-0.29.0/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["process","signal"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/nix-44db7d0a7367d2b5/build-script-build"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/bus#lamp-bus@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/bus/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_bus","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/bus/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_bus-c1807b094662e12b.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_bus-c1807b094662e12b.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.5/Cargo.toml","target":{"kind":["custom-build"],"crate_types":["bin"],"name":"build-script-build","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.5/build.rs","edition":"2021","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["alloc","default","event","fs","net","pipe","process","std","stdio","time"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/debug/build/rustix-467eeb40193574b1/build-script-build"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#bitflags@2.13.2","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitflags-2.13.2/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"bitflags","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bitflags-2.13.2/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libbitflags-49118650242efb79.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libbitflags-49118650242efb79.rmeta"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5","linked_libs":[],"linked_paths":[],"cfgs":["lower_upper_exp_for_non_zero","rustc_diagnostics","libc","apple","bsd"],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/rustix-1d3cd1857412fc10/out"}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/msgs#lamp-msgs@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/msgs/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_msgs","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/msgs/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_msgs-d6dbbc199c593342.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_msgs-d6dbbc199c593342.rmeta"],"executable":null,"fresh":true}
+{"reason":"build-script-executed","package_id":"registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0","linked_libs":[],"linked_paths":[],"cfgs":["macos","apple_targets","bsd"],"env":[],"out_dir":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/build/nix-08609c87cf6eab65/out"}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#errno@0.3.14","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/errno-0.3.14/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"errno","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/errno-0.3.14/src/lib.rs","edition":"2018","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liberrno-111f7449c9f2fbec.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liberrno-111f7449c9f2fbec.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#nix@0.29.0","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nix-0.29.0/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"nix","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/nix-0.29.0/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["process","signal"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libnix-0556a997af5bbfcd.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libnix-0556a997af5bbfcd.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#rustix@1.1.5","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.5/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"rustix","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rustix-1.1.5/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["alloc","default","event","fs","net","pipe","process","std","stdio","time"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/librustix-a3e20061cdc4f72f.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/librustix-a3e20061cdc4f72f.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"registry+https://github.com/rust-lang/crates.io-index#glam@0.33.12","manifest_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glam-0.33.12/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"glam","src_path":"<private-home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glam-0.33.12/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":["f64","std"],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libglam-07bb11395f67b402.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/libglam-07bb11395f67b402.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/lean#lamp-lean@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/lean/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_lean","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/lean/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_lean-f5565e6149a17ec6.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_lean-f5565e6149a17ec6.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/ipc#lamp-ipc@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/ipc/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_ipc","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/ipc/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_ipc-80e46cacb1a1d5cd.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_ipc-80e46cacb1a1d5cd.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/keeper#lamp-keeper@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/keeper/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_keeper","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/keeper/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_keeper-24ba6360f48f0e69.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_keeper-24ba6360f48f0e69.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/turn-owner/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_turn_owner","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/turn-owner/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_turn_owner-d5461d1611c979d1.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_turn_owner-d5461d1611c979d1.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_body","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_body-b9010bcb08590eaf.rlib","/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/liblamp_body-b9010bcb08590eaf.rmeta"],"executable":null,"fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["lib"],"crate_types":["lib"],"name":"lamp_body","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs","edition":"2024","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-84661b2d56bfef8e"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-84661b2d56bfef8e","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-inspect","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-inspect"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-inspect","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-5ea66b1aea6cca28"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-5ea66b1aea6cca28","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["example"],"crate_types":["bin"],"name":"expression_ask","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/expression_ask.rs","edition":"2024","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/expression_ask"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/expression_ask","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-mood","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_mood-6354f51c3d2d46d3"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_mood-6354f51c3d2d46d3","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["example"],"crate_types":["bin"],"name":"head_plan","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/head_plan.rs","edition":"2024","doc":false,"doctest":false,"test":false},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/head_plan"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/head_plan","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-measure","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-measure"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-measure","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-measure","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_measure-4aead657abfc36a4"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_measure-4aead657abfc36a4","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["test"],"crate_types":["bin"],"name":"it","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/tests/it/main.rs","edition":"2024","doc":false,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/it-fefd294d58a8ff86"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/it-fefd294d58a8ff86","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-worker","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_worker-56cbdc1ed1d88222"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_worker-56cbdc1ed1d88222","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-inspect","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":true},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_inspect-3bcdc85139bdcd7b"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_inspect-3bcdc85139bdcd7b","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-worker","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-worker"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-worker","fresh":true}
+{"reason":"compiler-artifact","package_id":"path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0","manifest_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/Cargo.toml","target":{"kind":["bin"],"crate_types":["bin"],"name":"lamp-body-mood","src_path":"/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs","edition":"2024","doc":true,"doctest":false,"test":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-mood"],"executable":"/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-mood","fresh":true}
+{"reason":"build-finished","success":true}
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running unittests src/lib.rs (/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-84661b2d56bfef8e)
+
+running 440 tests
+test body::tests::a_base_found_far_from_home_is_taken_hold_of_where_it_lies_only_with_limp ... ok
+test body::tests::a_base_turning_to_a_face_that_meets_a_hand_is_left_where_it_is ... ok
+test body::tests::a_failed_read_again_after_a_hot_first_read_is_refused_and_let_go ... ok
+test body::tests::a_base_turned_300_counts_comes_home_without_moving_away_or_faster_than_waking ... ok
+test body::tests::a_body_with_eyes_says_why_it_does_not_look ... ok
+test body::tests::a_base_held_gently_by_a_hand_is_not_sent_back_into_it ... ok
+test body::tests::a_fast_rise_after_a_low_first_read_still_stops_near_the_limit ... ok
+test body::tests::a_first_read_at_the_limit_then_one_below_starts_as_usual ... ok
+test body::tests::a_base_that_sticks_34_behind_a_slow_goal_is_led_round_and_settles ... ok
+test body::tests::a_fault_while_lowering_the_shoulder_stands_whatever_its_hold ... ok
+test body::tests::a_cool_joint_glitching_one_read_in_27_runs_on_for_a_minute ... ok
+test body::tests::a_base_that_meets_a_hand_is_not_swayed_on_by_expression ... ok
+test body::tests::a_folded_lamp_whose_elbow_temperature_is_unreadable_lets_go ... ok
+test body::tests::a_force_limit_that_is_not_kept_ends_the_run_before_anything_moves ... ok
+test body::tests::a_folded_lamp_listens_thinks_speaks_and_comes_home ... ok
+test body::tests::a_folded_lamps_warm_shoulder_is_not_read_again ... ok
+test body::tests::a_folded_elbow_lifted_and_held_by_a_hand_goes_back_down_once_let_go ... ok
+test body::tests::a_conversation_nod_playing_when_a_conversation_begins_plays_on ... ok
+test body::tests::a_force_limited_arm_lets_go_at_80_percent_of_its_limit ... ok
+test body::tests::a_flag_that_stays_or_a_missing_home_keeps_it_folded_and_it_runs_as_before ... ok
+test body::tests::a_flag_while_a_standing_lamp_folds_writes_that_joint_nothing_more ... ok
+test body::tests::a_gesture_asked_as_the_lamp_would_fold_keeps_it_up_until_it_ends ... ok
+test body::tests::a_gesture_asked_of_a_folded_lamp_stands_it_up_and_then_plays ... ok
+test body::tests::a_gesture_asked_while_the_lamp_rises_for_a_turn_plays ... ok
+test body::tests::a_gesture_the_anti_tip_rule_refuses_says_dropped_on_body_gesture ... ok
+test body::tests::a_gesture_the_lamp_never_stands_up_for_goes_stale_and_is_said ... ok
+test body::tests::a_gesture_ended_for_a_higher_ask_says_dropped_not_over ... ok
+test body::tests::a_force_limit_is_written_to_the_joints_that_carry_the_lamp_and_read_back ... ok
+test body::tests::a_goal_register_far_from_the_arm_is_not_taken_as_its_goal ... ok
+test body::tests::a_gesture_waiting_when_the_lamp_is_put_to_sleep_is_dropped ... ok
+test body::tests::a_glitch_of_32_between_47_and_48_is_dropped ... ok
+test body::tests::a_hand_holding_a_joint_off_where_it_gave_says_a_hand_until_it_lets_go ... ok
+test body::tests::a_gesture_asked_as_the_reading_lean_eases_in_holds_it_where_it_was ... ok
+test body::tests::a_gesture_past_v1s_tip_over_line_is_refused_whole_and_one_inside_it_plays ... ok
+test body::tests::a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not ... ok
+test body::tests::a_hand_from_the_test_input_is_said_as_a_push ... ok
+test body::tests::a_hand_on_the_elbow_does_not_take_the_fold_past_its_pose ... ok
+test body::tests::a_base_still_pushed_a_second_after_it_stopped_makes_the_lamp_slump_as_v1 ... ok
+test body::tests::a_head_creeping_back_from_a_glance_with_pauses_keeps_its_lead ... ok
+test body::tests::a_head_dipped_before_its_rest_has_lasted_is_led_back_up ... ok
+test body::tests::a_head_found_pressed_on_the_base_rises_out_of_it_slowly_and_then_runs ... ok
+test body::tests::a_hand_letting_go_mid_ease_out_leaves_no_jump ... ok
+test body::tests::a_head_goal_past_the_servos_range_never_reaches_the_wire ... ok
+test body::tests::a_head_found_without_torque_and_unreadable_is_left_while_the_arm_folds ... ok
+test body::tests::a_head_held_off_its_goal_by_a_hand_at_a_low_load_is_in_the_hand ... ok
+test body::tests::a_head_held_while_it_waits_is_judged_by_the_runs_load_and_heat ... ok
+test body::tests::a_hand_gone_does_not_keep_the_next_answer_from_leaning ... ok
+test body::tests::a_head_held_part_way_back_from_a_glance_is_not_led_into_the_hand ... ok
+test body::tests::a_head_resting_still_at_its_own_load_over_100_is_let_go_after_its_ease ... ok
+test body::tests::a_head_moved_and_held_or_pressed_past_its_bound_stays_held_while_the_hand_does ... ok
+test body::tests::a_head_rising_slowly_back_from_a_glance_stays_led_until_it_arrives ... ok
+test body::tests::a_head_lifting_itself_after_a_slump_does_not_make_the_lamp_slump_again ... ok
+test body::tests::a_head_slumped_on_the_base_lifts_before_the_base_turns ... ok
+test body::tests::a_head_that_cannot_lift_ends_the_wake_held_where_it_is_and_says_how_far_it_got ... ok
+test body::tests::a_head_that_never_moves_pressed_briefly_past_its_bound_is_let_go_after_its_ease ... ok
+test body::tests::a_head_that_drooped_in_a_power_cut_is_lifted_home_with_lamp_52e6s_options ... ok
+test body::tests::a_head_that_never_moves_while_its_goal_wanders_off_is_let_go_after_its_ease ... ok
+test body::tests::a_gesture_dropped_or_ended_is_told_whose_it_was_and_who_holds_the_body ... ok
+test body::tests::a_hold_at_a_reading_that_just_jumped_is_not_written_and_the_fault_stands ... ok
+test body::tests::a_head_that_settles_32_short_of_home_wakes_there_and_runs_from_where_it_is ... ok
+test body::tests::a_hold_from_before_the_answer_does_not_keep_it_from_leaning ... ok
+test body::tests::a_hand_that_presses_the_base_while_the_shoulder_comes_down_lets_go_again ... ok
+test body::tests::a_hand_that_turns_the_base_while_the_shoulder_comes_down_lets_go_again ... ok
+test body::tests::a_home_it_is_given_is_reached_slowly_from_where_it_is_found ... ok
+test body::tests::a_hot_first_read_that_repeats_is_refused_as_before ... ok
+test body::tests::a_hot_first_read_with_one_low_glitch_read_again_is_still_refused ... ok
+test body::tests::a_hot_first_read_that_does_not_repeat_starts_as_usual ... ok
+test body::tests::a_held_shoulder_eases_out_as_an_elbow_does ... ok
+test body::tests::a_joint_beyond_what_waking_brings_back_is_refused ... ok
+test body::tests::a_hot_joint_whose_reads_never_settle_stops_as_unreadable ... ok
+test body::tests::a_joint_flapping_between_60_and_64_stops_on_heat ... ok
+test body::tests::a_joint_found_without_torque_is_given_it_goal_first_and_does_not_move ... ok
+test body::tests::a_joint_really_at_70_after_a_first_read_of_40_still_stops_on_heat ... ok
+test body::tests::a_joint_still_loaded_after_it_stopped_pushing_ends_the_run ... ok
+test body::tests::a_joint_pushing_without_moving_is_told_to_stop_after_a_second_and_a_half ... ok
+test body::tests::a_joint_that_cannot_keep_up_ends_the_gesture_and_not_the_run ... ok
+test body::tests::a_joint_that_does_not_answer_its_first_writes_is_taken_hold_of_a_little_later ... ok
+test body::tests::a_joint_that_has_arrived_is_not_pushed_at_and_a_small_change_does_not_move_it ... ok
+test body::tests::a_joint_that_meets_resistance_stops_pushing_for_two_seconds_and_then_goes_on ... ok
+test body::tests::a_joint_that_moves_when_its_torque_comes_on_ends_the_run ... ok
+test body::tests::a_joint_warming_behind_bad_reads_stops_as_unreadable_within_a_second ... ok
+test body::tests::a_joint_that_really_warms_still_stops_after_its_hot_steps ... ok
+test body::tests::a_held_lean_folds_with_the_arm_without_a_jump ... ok
+test body::tests::a_jump_that_stays_becomes_the_reading_and_stops_on_heat ... ok
+test body::tests::a_lamp_held_by_a_hand_drops_a_gesture_and_says_so ... ok
+test body::tests::a_lamp_found_standing_whose_start_is_refused_folds_then_lets_go ... ok
+test body::tests::a_lamp_found_standing_with_a_warm_or_unreadable_elbow_folds_then_lets_go ... ok
+test body::tests::a_lamp_put_to_sleep_drops_a_gesture_and_says_so ... ok
+test body::tests::a_hand_that_stops_the_shoulder_coming_down_lets_go_again_and_the_arm_stays ... ok
+test body::tests::a_lamp_s_own_pitch_window_holds_the_head_and_must_fit_its_servo ... ok
+test body::tests::a_let_go_run_outside_the_window_standing_or_without_folded_counts_is_refused ... ok
+test body::tests::a_let_go_run_outside_the_window_with_its_arm_folded_writes_torque_off_only ... ok
+test body::tests::a_hold_let_go_by_the_fold_eases_and_does_not_stop_the_lamp ... ok
+test body::tests::a_lamp_is_not_stood_up_farther_back_than_v1s_line ... ok
+test body::tests::a_light_head_lifted_by_hand_stays_when_told_to_and_comes_back_when_not ... ok
+test body::tests::a_hold_let_go_by_the_rise_eases_and_does_not_stop_the_lamp ... ok
+test body::tests::a_lean_eases_out_from_where_a_hand_held_it ... ok
+test body::tests::a_load_that_rises_stops_it_where_it_is_and_lets_the_whole_lamp_go ... ok
+test body::tests::a_load_of_800_for_less_than_a_second_and_a_half_changes_nothing ... ok
+test body::tests::a_lean_eases_out_from_a_hand_still_there_after_the_answer ... ok
+test body::tests::a_listening_lamp_dips_its_head_for_expression_and_comes_back ... ok
+test body::tests::a_mood_that_stops_arriving_is_rest ... ok
+test body::tests::a_new_flag_a_moved_elbow_or_a_hot_joint_stops_it ... ok
+test body::tests::a_joint_at_800_for_a_second_and_a_half_lets_go_of_all_five_and_is_taken_up_again_slowly ... ok
+test body::tests::a_hand_slump_then_an_overload_rests_and_comes_back_instead_of_ending_the_run ... ok
+test body::tests::a_pause_during_the_rise_says_dropped_on_body_gesture ... ok
+test body::tests::a_paused_lamp_drops_a_gesture_and_says_so ... ok
+test body::tests::a_pause_after_a_gesture_was_taken_drops_it_and_the_lamp_folds ... ok
+test body::tests::a_nod_says_began_and_then_over_on_body_gesture ... ok
+test body::tests::a_call_is_glanced_for_over_a_shift_at_rest ... ok
+test body::tests::a_pause_during_a_second_gesture_after_the_first_ended_still_folds ... ok
+test body::tests::a_pause_while_the_gesture_it_stood_up_for_plays_lets_it_end_and_folds ... ok
+test body::tests::a_pitch_contact_during_glance_cooling_is_said_as_a_hand_before_it_slumps ... ok
+test body::tests::a_cool_joint_glitching_at_random_one_read_in_27_runs_ten_minutes ... ok
+test body::tests::a_pinned_pitch_held_thirteen_counts_away_still_says_a_hand_before_slump ... ok
+test body::tests::a_resting_arm_goal_more_than_a_step_away_is_refused_not_eased_toward ... ok
+test body::tests::a_reading_lamp_looks_down_at_the_desk_holds_it_and_comes_back ... ok
+test body::tests::a_resting_head_dipped_by_a_glance_is_led_back_up_where_it_stops_short_lifting ... ok
+test body::tests::a_resting_head_back_within_its_way_after_a_glance_is_not_led ... ok
+test body::tests::a_resting_lamp_glances_with_the_switch_and_comes_back_to_rest ... ok
+test body::tests::a_run_that_is_not_only_a_let_go_outside_the_window_is_still_refused ... ok
+test body::tests::a_reading_lamp_keeps_its_lean_through_a_gesture ... ok
+test body::tests::a_cool_joint_glitching_within_the_flap_window_runs_ten_minutes ... ok
+test body::tests::a_seated_lamp_at_1755_with_home_1760_wakes_home_and_without_waking_is_refused ... ok
+test body::tests::a_lowering_that_fails_after_an_overload_ends_the_run_and_lets_the_whole_lamp_go ... ok
+test body::tests::a_second_gesture_asked_while_the_lamp_rises_for_the_first_plays ... ok
+test body::tests::a_short_push_a_contact_floor_and_the_arm_under_a_hand ... ok
+test body::tests::a_shoulder_already_pushed_when_the_lamp_stands_learns_no_load_and_still_stops ... ok
+test body::tests::a_nod_right_after_a_hand_lets_go_of_the_arm_does_not_stop_the_lamp ... ok
+test body::tests::a_resting_joint_jittering_inside_its_band_never_says_a_hand ... ok
+test body::tests::a_shoulder_reading_150_degrees_once_is_counted_and_never_a_peak ... ok
+test body::tests::a_shoulder_resting_short_at_the_same_place_is_counted_once ... ok
+test body::tests::a_reading_lamp_makes_the_whole_of_a_gestures_pitch ... ok
+test body::tests::a_shoulder_left_up_by_a_power_cut_is_lowered_first_and_the_lamp_may_then_stand ... ok
+test body::tests::a_shoulder_that_will_not_come_down_ends_the_run_and_lets_the_whole_lamp_go ... ok
+test body::tests::a_shoulder_lowered_in_a_start_after_a_wait_is_watched_each_step ... ok
+test body::tests::a_reading_lamp_turns_toward_the_place_it_is_asked_and_back ... ok
+test body::tests::a_press_on_a_held_joint_while_the_shoulder_comes_down_is_in_the_peaks ... ok
+test body::tests::a_skill_asked_while_a_conversation_gesture_waits_is_dropped ... ok
+test body::tests::a_search_does_not_turn_toward_the_side_a_face_is_seen_on ... ok
+test body::tests::a_skill_gesture_eases_out_on_the_very_step_the_listening_mood_is_read ... ok
+test body::tests::a_shoulder_that_stops_short_while_lowered_is_let_go_and_waited_for ... ok
+test body::tests::a_skill_gesture_still_waiting_is_dropped_by_a_hand_from_the_test_input ... ok
+test body::tests::a_skill_move_asked_while_a_hand_holds_the_lamp_is_dropped_by_the_hand ... ok
+test body::tests::a_skill_gesture_paused_three_seconds_or_more_ends ... ok
+test body::tests::a_skill_gesture_pauses_on_the_very_step_the_listening_mood_is_read ... ok
+test body::tests::a_skill_gesture_playing_ends_by_a_hand_from_the_test_input_eased_out ... ok
+test body::tests::a_skill_move_ended_for_a_conversation_gesture_eases_out_and_then_it_plays ... ok
+test body::tests::a_skill_gesture_still_waiting_is_dropped_when_a_hand_comes_on_the_lamp ... ok
+test body::tests::a_small_glitch_near_the_limit_then_a_flicker_down_is_not_heat ... ok
+test body::tests::a_skill_gesture_playing_ends_when_a_hand_comes_on_the_lamp ... ok
+test body::tests::a_skill_gesture_paused_for_a_line_left_alone_goes_on_where_it_was ... ok
+test body::tests::a_speaking_lamp_leans_in_and_back_and_its_base_sways_for_expression ... ok
+test body::tests::a_standing_arm_carrying_its_own_weight_counts_no_stall_and_a_push_well_over_it_counts_one ... ok
+test body::tests::a_skills_move_plays_as_a_kept_move_does_and_one_past_v1s_line_is_refused ... ok
+test body::tests::a_speaking_lean_and_an_arbitration_ease_out_never_step_past_the_arm ... ok
+test body::tests::a_gesture_asked_higher_ends_the_one_playing_and_one_asked_no_higher_is_dropped ... ok
+test body::tests::a_standing_pose_is_taken_only_inside_its_caps ... ok
+test body::tests::a_standing_lamp_nods_and_is_left_exactly_where_it_was ... ok
+test body::tests::a_standing_lamp_put_to_sleep_drops_a_gesture_as_it_folds ... ok
+test body::tests::a_standing_lamp_whose_elbow_temperature_is_unreadable_folds_then_lets_go ... ok
+test body::tests::a_standing_shoulder_pushing_short_of_its_goal_is_told_to_stop_and_keeps_its_torque ... ok
+test body::tests::a_speaking_lamp_still_lets_its_lean_go_for_a_gesture ... ok
+test body::tests::a_slumped_lamp_is_not_stood_up_by_a_gesture ... ok
+test body::tests::a_steady_wrong_elbow_reading_before_cancelled_is_not_written_at_the_exit ... ok
+test body::tests::a_step_says_a_hand_while_a_joint_is_held_where_it_gave_way_and_never_without_one ... ok
+test body::tests::a_true_value_settles_through_glitches_after_a_low_first_read ... ok
+test body::tests::a_paused_skill_or_idle_gesture_ends_when_the_lamp_answers_and_eases_out ... ok
+test body::tests::a_sustained_gentle_push_is_said_until_the_hand_lets_go ... ok
+test body::tests::a_slump_during_an_ease_back_leaves_no_offset_after_the_take_up ... ok
+test body::tests::a_wire_that_goes_silent_stops_it_after_half_a_second ... ok
+test body::tests::a_wire_that_fails_for_a_moment_is_ridden_out ... ok
+test body::tests::a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps ... ok
+test body::tests::an_arm_goal_farther_than_a_hold_release_is_refused_not_eased_toward ... ok
+test body::tests::an_arm_goal_is_never_more_than_a_step_from_the_last_unless_it_holds_where_the_arm_is ... ok
+test body::tests::an_arm_goal_outside_its_window_is_not_eased_toward ... ok
+test body::tests::an_arm_goal_outside_its_window_never_reaches_the_wire ... ok
+test body::tests::a_surprise_while_a_standing_lamp_folds_keeps_it_folding_then_lets_go ... ok
+test body::tests::an_arm_goal_refused_in_a_step_ends_the_run_at_that_step ... ok
+test body::tests::an_arm_joint_taken_hold_of_outside_its_window_is_not_given_that_goal ... ok
+test body::tests::an_arm_pose_whose_window_would_reach_the_seam_is_refused ... ok
+test body::tests::an_arm_found_off_its_way_is_not_lowered_and_the_lamp_runs_folded ... ok
+test body::tests::a_wire_failing_mid_lean_keeps_the_lean_as_it_stands ... ok
+test body::tests::an_arm_still_strained_two_seconds_on_ends_the_run_where_it_is ... ok
+test body::tests::after_a_wait_its_run_is_watched_without_a_gap ... ok
+test body::tests::a_press_that_stops_the_lowering_while_a_joint_reads_off_never_holds_the_misread ... ok
+test body::tests::an_arm_that_strains_goes_back_down_and_stays_down_for_a_while ... ok
+test body::tests::a_steady_wrong_elbow_reading_as_the_arm_comes_to_rest_is_not_its_resting_goal ... ok
+test body::tests::an_ask_dropped_as_held_by_a_hand_says_dropped ... ok
+test body::tests::an_arm_resting_short_of_its_fold_and_pushing_is_left_where_it_lies ... ok
+test body::tests::an_arm_held_while_it_speaks_is_not_leaned_into_again ... ok
+test body::tests::asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop ... ok
+test body::tests::an_elbow_read_far_off_in_the_last_step_is_not_written_back_at_the_exit ... ok
+test body::tests::a_steady_wrong_elbow_reading_under_load_as_the_arm_comes_to_rest_is_not_its_resting_goal ... ok
+test body::tests::an_arm_that_sways_7_counts_as_the_base_wakes_is_let_and_one_that_moves_20_is_not ... ok
+test body::tests::asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop ... ok
+test body::tests::an_ask_dropped_as_busy_says_dropped ... ok
+test body::tests::an_elbow_pushing_under_an_old_overload_is_told_to_stop_and_then_carries_the_lamp ... ok
+test body::tests::bad_temperatures_in_a_row_do_not_stop_the_run ... ok
+test body::tests::an_elbow_goal_register_past_its_range_is_never_written_as_a_goal ... ok
+test body::tests::an_elbow_read_past_its_range_just_before_cancelled_is_never_written_as_a_goal ... ok
+test body::tests::asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop ... ok
+test body::tests::found_standing_out_of_range_it_is_refused_as_before_and_not_let_go ... ok
+test body::tests::found_standing_it_is_taken_as_it_is_and_folds_down_when_asked_to_stop ... ok
+test body::tests::at_rest_a_joint_that_stopped_short_is_no_longer_pushed ... ok
+test body::tests::garbage_with_one_good_read_in_50_still_stops_within_seconds ... ok
+test body::tests::asleep_a_gesture_asked_higher_does_not_end_the_one_playing ... ok
+test body::tests::it_does_not_start_on_a_lamp_that_is_not_as_expected ... ok
+test body::tests::held_reads_after_a_hot_streak_do_not_add_to_the_head_heat_streak ... ok
+test body::tests::every_step_can_be_watched_with_the_mood_it_acted_on ... ok
+test body::tests::called_with_nobody_in_view_it_rises_and_glances_once ... ok
+test body::tests::expression_is_held_to_its_own_reach_and_the_joints_and_does_not_stir_a_resting_lamp ... ok
+test body::tests::held_reads_after_a_hot_streak_do_not_add_to_the_arm_heat_streak ... ok
+test body::tests::lone_flaps_around_a_good_value_that_returns_still_stop ... ok
+test body::tests::called_with_a_face_in_view_it_does_not_glance_and_speaking_it_takes_no_call ... ok
+test body::tests::it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there ... ok
+test body::tests::off_is_the_body_before_give_way_was_on_by_default ... ok
+test body::tests::one_hot_reading_while_it_moves_is_not_heat ... ok
+test body::tests::one_bad_read_of_a_joint_is_counted_and_skipped ... ok
+test body::tests::paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds ... ok
+test body::tests::nobody_setting_it_straight_it_stops_asking_and_reads_less ... ok
+test body::tests::reads_within_the_flap_window_of_a_stale_good_one_still_stop ... ok
+test body::tests::refused_for_its_pose_it_lets_go_says_so_and_stays_let_go_while_out_of_range ... ok
+test body::tests::refused_with_its_head_tipped_up_it_keeps_holding_the_head ... ok
+test body::tests::a_skill_or_idle_gesture_playing_ends_when_a_conversation_begins_and_eases_out ... ok
+test body::tests::put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_now ... ok
+test body::tests::shifts_at_rest_and_the_call_are_not_from_outside ... ok
+test body::tests::set_back_in_range_it_takes_hold_where_it_is_and_starts_by_itself ... ok
+test body::tests::spoken_to_it_stands_up_and_left_alone_it_folds_down_again ... ok
+test body::tests::resistance_for_the_fourth_time_in_a_minute_ends_the_run ... ok
+test body::tests::let_go_standing_with_the_arm_still_up_nothing_is_lowered_and_it_stands_from_there ... ok
+test body::tests::stationary_pressure_clears_within_one_tick_after_load_and_displacement_clear ... ok
+test body::tests::stationary_pressure_remains_a_hand_when_it_eases_above_half_the_bound ... ok
+test body::tests::stood_up_the_head_may_look_down_as_far_as_up_and_folded_it_may_not ... ok
+test body::tests::the_arm_is_taken_hold_of_only_on_a_lamp_that_may_stand ... ok
+test body::tests::stood_up_the_head_tilts_to_listen_and_folded_it_does_not ... ok
+test body::tests::the_fold_line_counts_a_sit_down_for_a_strain_on_the_way_up_or_standing ... ok
+test body::tests::the_eyes_take_the_head_further_round_than_any_pose_does ... ok
+test body::tests::the_gesture_pause_is_on_for_on_only ... ok
+test body::tests::the_head_keeps_its_folded_pose_until_the_arm_has_lifted_it_clear ... ok
+test body::tests::the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up ... ok
+test body::tests::the_heads_pitch_never_passes_its_window_however_it_is_found ... ok
+test body::tests::the_ranges_waited_for_are_the_starts_own_bounds ... ok
+test body::tests::the_three_writes_are_exactly_these_bytes ... ok
+test body::tests::the_two_writes_of_a_lamp_that_stands_are_exactly_these_bytes ... ok
+test body::tests::the_hold_after_a_surprise_writes_the_arm_where_it_was_last_read ... ok
+test body::tests::three_bad_reads_of_a_joint_in_a_row_stop_the_body_naming_it ... ok
+test body::tests::three_bad_reads_while_let_go_stop_the_body_on_the_third ... ok
+test body::tests::three_bad_reads_while_lowering_the_shoulder_stop_the_body_on_the_third ... ok
+test body::tests::three_bad_reads_while_waking_stop_the_body_on_the_third ... ok
+test body::tests::told_to_return_a_base_turned_by_hand_under_its_load_gives_way_and_comes_back ... ok
+test body::tests::told_to_return_a_head_tilted_and_held_by_hand_gives_way_again_and_comes_back ... ok
+test body::tests::told_to_stay_a_head_moved_by_hand_stays_and_the_next_mood_is_relative_to_it ... ok
+test body::tests::told_to_stay_a_head_pushed_past_its_reach_is_kept_at_the_edge ... ok
+test body::tests::let_go_standing_with_the_elbow_fallen_it_is_folded_and_stands_again_when_spoken_to ... ok
+test body::tests::told_to_stay_a_short_push_still_gives_way_and_comes_back ... ok
+test body::tests::two_first_reads_of_150_then_45_start_as_usual_standing ... ok
+test body::tests::unplug_attests_a_fold_whose_elbow_rests_a_few_counts_off ... ok
+test body::tests::spoken_to_in_the_middle_of_a_shift_it_lets_it_go_at_once ... ok
+test body::tests::unplug_brings_a_base_looking_aside_home_before_it_attests ... ok
+test body::tests::unplug_during_startup_wake_stops_automatic_motion ... ok
+test body::tests::unplug_during_take_hold_retry_never_turns_torque_back_on ... ok
+test body::tests::unplug_during_hand_recovery_wake_stops_before_it_finishes ... ok
+test body::tests::unplug_never_attests_a_shifted_runtime_home_as_the_configured_fold ... ok
+test body::tests::unplug_folds_now_and_latches_over_later_inputs ... ok
+test body::tests::unplug_never_attests_an_arm_stuck_away_from_its_fold ... ok
+test body::tests::two_fates_in_one_step_are_both_kept ... ok
+test body::tests::unplug_ready_stays_ready_through_a_second_turn ... ok
+test body::tests::unplug_ready_survives_a_bad_read ... ok
+test body::tests::waking_on_a_lamp_found_as_expected_writes_exactly_what_it_did_without ... ok
+test body::tests::with_waking_a_head_held_35_short_at_rest_rests_where_it_is ... ok
+test body::tests::with_eyes_the_head_turns_to_the_face_while_it_listens_and_not_beyond_its_reach ... ok
+test body::tests::without_a_face_or_without_eyes_nothing_is_added_to_what_the_mood_wants ... ok
+test body::tests::without_a_window_of_its_own_the_lamp_runs_exactly_as_before ... ok
+test body::tests::a_standing_session_never_moves_an_arm_goal_more_than_a_step_a_write ... ok
+test body::tests::without_the_switch_a_resting_lamp_writes_exactly_as_when_nothing_is_asked ... ok
+test body::tests::without_the_switch_a_called_lamp_writes_exactly_as_one_never_called ... ok
+test bus_out::tests::a_body_let_go_for_its_pose_says_what_it_asks ... ok
+test bus_out::tests::a_body_let_go_reports_once_per_change_and_slowly_again ... ok
+test bus_out::tests::a_fold_is_said_once_when_it_ends_with_its_time_and_the_joints ... ok
+test bus_out::tests::a_fold_that_rises_again_is_not_said_and_a_retreat_on_the_way_is ... ok
+test bus_out::tests::a_gesture_that_replaces_another_says_the_first_over_and_a_stop_ends_the_last ... ok
+test bus_out::tests::a_drop_says_whose_it_was_why_and_who_holds_the_body_only_when_telling ... ok
+test body::tests::unplug_released_stands_through_the_ordinary_rise_unless_paused ... ok
+test bus_out::tests::a_paused_body_says_paused_and_nothing_else_changes ... ok
+test bus_out::tests::a_hand_that_waited_in_the_queue_is_not_said_as_fresh ... ok
+test body::tests::woken_after_a_hands_sleep_it_stands_at_once ... ok
+test bus_out::tests::how_fast_each_joint_turns_is_worked_out_from_the_step_before ... ok
+test bus_out::tests::only_a_let_go_bodys_ask_is_an_ask ... ok
+test bus_out::tests::tell_says_the_journal_lines_and_publishes_every_piece ... ok
+test bus_out::tests::steps_offered_reach_the_bus_and_the_last_word_is_why_it_stopped ... ok
+test bus_out::tests::the_bad_reads_are_said_at_the_first_step_and_every_five_minutes ... ok
+test bus_out::tests::the_body_is_well_unless_a_joint_is_warm_or_one_lately_met_resistance ... ok
+test bus_out::tests::the_joints_are_named_in_servo_order_in_radians_from_the_middle_of_the_turn ... ok
+test bus_out::tests::what_became_of_each_gesture_is_said_on_body_gesture_whatever_the_step ... ok
+test bus_out::tests::the_hand_is_said_with_each_step_passed_on_and_keeps_when_the_push_began ... ok
+test bus_out::tests::why_the_body_stopped_is_said_in_words_and_only_being_asked_is_not_a_fault ... ok
+test clips::tests::a_clip_is_read_between_its_frames_and_is_over_at_its_end ... ok
+test clips::tests::every_clip_begins_and_ends_at_nothing_and_stays_inside_its_speed_and_size ... ok
+test clips::tests::the_small_moves_at_rest_move_the_head_alone_inside_a_glance_at_rest ... ok
+test cog::tests::a_count_outside_the_servos_range_is_refused_not_clamped ... ok
+test cog::tests::a_step_that_would_lean_back_past_the_ceiling_is_cut_short_as_v1_cut_it ... ok
+test bus_out::tests::a_thread_with_no_room_costs_the_loop_a_step_and_never_a_wait ... ok
+test cog::tests::the_centre_of_gravity_is_v1s_on_the_motor_readings_v1_was_checked_on ... ok
+test exit_report::tests::a_body_older_than_the_temperature_fields_still_reads ... ok
+test exit_report::tests::a_truncated_newest_report_is_said_not_replaced_by_an_older_one ... ok
+test exit_report::tests::lamp_4ace_1525_reads_as_plain_lines ... ok
+test exit_report::tests::the_last_report_wins_and_none_is_none ... ok
+test expression_in::tests::a_request_that_is_stale_out_of_order_or_not_of_this_machine_is_not_taken ... ok
+test expression_in::tests::stillness_adds_nothing_and_a_request_is_not_applied_before_its_time ... ok
+test expression_in::tests::what_is_asked_counts_until_it_runs_out_and_is_given_in_counts ... ok
+test first_stand::tests::a_brush_is_not_the_yes_and_an_unknown_state_breaks_a_hold ... ok
+test first_stand::tests::a_busy_rooms_ask_names_the_touch_alone ... ok
+test first_stand::tests::a_put_off_is_no_yes ... ok
+test first_stand::tests::a_short_yes_is_a_yes_and_anything_that_takes_it_back_is_not ... ok
+test first_stand::tests::a_spoken_yes_is_taken_only_after_the_ask_alone_and_with_someone_near ... ok
+test body::tests::a_shift_starts_and_ends_at_expressions_rest_offset ... ok
+test first_stand::tests::a_touch_held_a_second_after_a_release_is_the_yes ... ok
+test first_stand::tests::an_armed_stop_takes_the_first_touch ... ok
+test first_stand::tests::controls_not_ready_are_not_known ... ok
+test first_stand::tests::controls_unknown_for_a_second_while_it_moves_stop_it ... ok
+test first_stand::tests::near_is_a_fresh_face_big_enough ... ok
+test first_stand::tests::no_tail_of_the_ask_is_a_yes ... ok
+test first_stand::tests::the_confirmed_file_has_this_arms_stand_and_says_so ... ok
+test first_stand::tests::the_joined_line_is_judged_not_each_piece ... ok
+test first_stand::tests::the_lamp_asks_twice_at_most_ten_minutes_apart_and_never_after_a_stand ... ok
+test first_stand::tests::the_lamps_own_words_are_never_its_yes ... ok
+test first_stand::tests::the_record_says_its_outcome_in_words ... ok
+test first_stand::tests::the_spoken_yes_is_turned_off_only_by_off ... ok
+test first_stand::tests::the_stand_is_read_from_the_last_full_stand_line ... ok
+test first_stand::tests::the_stop_is_any_new_touch_after_the_yes_is_let_go ... ok
+test first_stand::tests::what_the_voice_hears_is_subscribed_by_this_name ... ok
+test gaze::stray::a_turn_toward_a_place_is_the_turn_to_a_face_seen_there ... ok
+test gaze::stray::one_stray_sight_among_three_moves_nothing ... ok
+test gaze::tests::a_gain_set_too_high_still_settles_and_the_reach_is_never_passed ... ok
+test gaze::tests::it_does_not_correct_from_a_moving_picture_or_while_it_thinks_or_rests ... ok
+test gaze::tests::it_turns_to_a_face_in_a_few_corrections_and_then_keeps_still ... ok
+test gaze::tests::the_datagram_is_the_one_the_eyes_send_and_a_gaze_is_taken_only_inside_its_caps ... ok
+test gaze::tests::with_nobody_there_it_does_nothing_and_after_a_while_lets_go ... ok
+test gesture::tests::every_pose_stays_within_a_few_degrees_of_where_the_head_was_found ... ok
+test gesture::tests::listening_lifts_and_tilts_and_the_side_alternates_between_exchanges ... ok
+test gesture::tests::rest_is_exactly_where_it_was_found ... ok
+test gesture::tests::speaking_nods_on_the_voice_and_settles_when_it_is_steady ... ok
+test gesture::tests::the_look_away_is_a_glance_that_deepens_only_while_the_thinking_goes_on ... ok
+test hold_in::tests::only_held_as_the_first_word_holds_the_head ... ok
+test cog::tests::every_built_in_clip_passes_v1s_rule ... ok
+test hold_in::tests::the_file_is_read_at_most_every_tenth_of_a_second_and_none_is_free ... ok
+test idle::tests::a_move_is_seldom_the_one_before_and_all_of_them_come ... ok
+test idle::tests::waits_are_irregular_and_inside_their_bounds ... ok
+test inspection::tests::a_latched_status_flag_ends_the_plan_at_that_joint_unless_faults_are_reported ... ok
+test idle::tests::two_moves_do_not_take_strict_turns ... ok
+test inspection::tests::bytes_returned_after_deadline_are_counted_but_never_decoded ... ok
+test inspection::tests::cancellation_before_and_during_transaction_stops_all_future_requests ... ok
+test inspection::tests::cancellation_observed_after_write_keeps_accepted_count_but_discards_reply ... ok
+test inspection::tests::checksum_noise_and_missing_joint_are_explicit_failures ... ok
+test inspection::tests::clock_regression_and_failed_cancellation_source_cannot_admit_another_operation ... ok
+test inspection::tests::continuous_initial_traffic_never_reaches_a_request ... ok
+test inspection::tests::duplicate_reply_faults_instead_of_starting_another_request ... ok
+test inspection::tests::finite_plan_sends_only_ten_read_only_requests_and_decodes_30_replies ... ok
+test inspection::tests::initial_stale_bytes_are_counted_not_accepted_as_replies ... ok
+test inspection::tests::operation_budget_terminates_even_if_clock_and_poll_never_advance ... ok
+test inspection::tests::partial_write_cannot_accept_an_early_stale_response ... ok
+test inspection::tests::read_only_profile_window_reports_all_raw_bytes_without_scale_or_write ... ok
+test inspection::tests::telemetry_target_reports_measured_delay_separately_from_fault_deadline ... ok
+test inspection::tests::timed_out_request_is_not_retried_and_late_reply_is_not_reused ... ok
+test inspection::tests::truncated_reply_deadline_keeps_partial_count_and_never_returns_a_snapshot ... ok
+test inspection::tests::unknown_model_stops_before_using_sts_specific_register_decoders ... ok
+test inspection::tests::write_zero_and_busy_writer_are_bounded_not_retried_as_new_transactions ... ok
+test moves::tests::a_folder_of_moves_is_read_in_file_order_and_each_plays_as_a_gesture ... ok
+test inspection::tests::all_partial_write_and_read_sizes_preserve_exact_requests ... ok
+test moves::tests::a_move_sent_whole_is_checked_as_a_file_is_and_kept_once ... ok
+test body::tests::a_shoulder_flapping_between_55_and_61_runs_20_minutes_judged_at_61 ... ok
+test moves::tests::a_source_is_kept_whole_up_to_64_printable_bytes_or_not_at_all ... ok
+test body::tests::one_reading_off_while_the_shoulder_comes_down_is_not_a_hand ... ok
+test moves::tests::the_promise_is_the_built_in_clips_own ... ok
+test name_in::tests::only_a_sound_and_recent_hearing_is_a_call ... ok
+test moves::tests::the_documented_example_is_a_move_this_body_takes ... ok
+test poses::tests::a_home_pitch_far_outside_the_body_s_range_is_refused ... ok
+test poses::tests::a_home_pitch_inside_the_body_s_range_is_kept_as_read ... ok
+test poses::tests::a_home_pitch_just_outside_the_body_s_range_is_brought_to_its_edge ... ok
+test poses::tests::a_rest_read_becomes_the_lamps_own_poses ... ok
+test poses::tests::a_seated_read_holds_only_the_head_and_its_window ... ok
+test poses::tests::only_a_complete_read_with_torque_off_is_taken ... ok
+test poses::tests::poses_the_body_would_refuse_are_refused_with_why ... ok
+test moves::tests::a_move_the_body_cannot_play_is_refused_with_why_and_the_rest_are_taken ... ok
+test pause_in::tests::it_is_paused_only_while_the_kept_value_says_so ... ok
+test runtime::supervisor::tests::audit_crashed_child_does_not_leak_owned_ipc_directory ... ok
+test runtime::supervisor::tests::abrupt_parent_channel_loss_expires_authority_in_real_child ... ok
+test runtime::supervisor::tests::crashed_child_is_reaped_without_a_successful_shutdown_claim ... ok
+test runtime::supervisor::tests::audit_failed_privacy_send_inhibits_supervisor_immediately ... ok
+test runtime::supervisor::tests::failed_control_before_connection_revokes_admission_and_retains_owned_child ... ok
+test runtime::supervisor::tests::actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement ... ok
+test runtime::supervisor::tests::identity_and_cleanup_receipts_fail_closed ... ok
+test runtime::supervisor::tests::inert_child ... ok
+test runtime::supervisor::tests::hung_owned_child_is_killed_and_reaped_after_missing_inhibit ... ok
+test runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets ... ok
+test runtime::supervisor::tests::inhibition_measurement_must_be_between_spawn_and_publication ... ok
+test runtime::supervisor::tests::malformed_peer_cannot_bypass_expired_watch_or_keep_child_alive ... ok
+test runtime::supervisor::tests::no_peer_cleanup_before_observed_reap_even_after_owned_kill ... ok
+test runtime::supervisor::tests::partial_child_bind_is_cleaned_after_reap_without_waiting_for_second_socket ... ok
+test runtime::supervisor::tests::real_core_fault_receipts_are_accepted_by_supervisor_without_restamping_stop ... ok
+test runtime::supervisor::tests::replacing_directory_does_not_remove_original_or_replacement_contents ... ok
+test runtime::supervisor::tests::serial_cleanup_failure_and_stalled_teardown_never_become_clean_exit ... ok
+test runtime::supervisor::tests::socket_mode_transition_waits_without_accepting_nonprivate_or_wrong_type_peer ... ok
+test runtime::supervisor::tests::socket_replacement_is_retained_and_cleanup_failure_blocks_replacement ... ok
+test sleep_in::tests::a_sleep_another_part_says_is_not_taken ... ok
+test moves::tests::a_folder_that_cannot_be_read_is_an_error_and_an_oversized_one_is_refused_whole ... ok
+test sleep_in::tests::it_is_asleep_only_while_the_voice_says_a_mute_for_sleep ... ok
+test sleep_in::tests::only_on_turns_it_on ... ok
+test unplug::tests::a_cancel_while_folding_finishes_the_fold_first ... ok
+test unplug::tests::a_failed_preparation_is_never_cancelled ... ok
+test unplug::tests::a_gap_after_the_time_limit_is_not_a_timeout_once_ready ... ok
+test runtime::supervisor::tests::qualification_rejects_wrong_supervisor_before_any_channel_dispatch ... ok
+test unplug::tests::a_hand_after_the_cancel_delays_the_stand_and_never_fails_it ... ok
+test unplug::tests::a_matching_cancel_at_ready_stands_only_after_the_spoken_line ... ok
+test unplug::tests::a_new_request_within_the_three_seconds_keeps_the_latch ... ok
+test unplug::tests::an_invalid_read_between_polls_resets_proof ... ok
+test unplug::tests::disabling_live_unplug_does_not_treat_a_filesystem_error_as_an_absent_latch ... ok
+test bus_out::tests::a_hand_after_a_slow_joints_write_is_aged_by_it ... ok
+test unplug::tests::disabling_live_unplug_never_bypasses_a_kept_startup_latch ... ok
+test unplug::tests::foreign_other_request_or_malformed_cancels_are_not_cancels ... ok
+test unplug::tests::kept_request_vetoes_restart_without_hardware ... ok
+test unplug::tests::malformed_skills_request_keeps_live_fail_closed_behavior ... ok
+test unplug::tests::pause_or_a_commanded_fold_supplies_no_physical_proof ... ok
+test unplug::tests::readiness_requires_half_a_second_of_fresh_safe_evidence ... ok
+test unplug::tests::live_foreign_source_cannot_start_a_fold_even_with_a_malformed_payload ... ok
+test unplug::tests::stale_body_evidence_never_stands_after_a_cancel ... ok
+test unplug::tests::restart_with_a_request_and_its_cancel_starts_normally ... ok
+test unplug::tests::with_no_proof_after_the_cancel_it_fails_at_sixty_seconds ... ok
+test unplug::tests::the_running_adapter_unlatches_on_a_matching_cancel ... ok
+test runtime::supervisor::tests::inert_child_stop_timing_samples_are_host_ipc_only ... ok
+test sleep_in::tests::an_old_sleep_is_not_asleep ... ok
+test first_stand::tests::a_body_that_never_ends_is_killed_past_its_bound ... ok
+test body::tests::standing_with_nothing_to_do_it_shifts_rarely_and_irregularly ... ok
+test unplug::tests::a_gap_in_samples_withdraws_ready_and_only_an_unsafe_one_fails ... ok
+test body::tests::three_strains_rest_the_lamp_a_long_while_not_for_the_rest_of_the_run ... ok
+test body::tests::it_does_not_shift_while_talked_to_folded_or_held ... ok
+test body::tests::no_shift_starts_within_thirty_seconds_of_a_drift ... ok
+test body::tests::it_shifts_over_expressions_rest_stream_and_not_while_held_still_or_paused ... ok
+test first_stand::tests::a_stopped_body_is_waited_for_while_it_folds ... ok
+
+test result: ok. 440 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.61s
+
+     Running unittests src/bin/lamp-body.rs (/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-5ea66b1aea6cca28)
+
+running 32 tests
+test tests::a_gesture_dropped_as_it_is_read_is_told_whose_it_was_and_who_keeps_the_body ... ok
+test tests::every_path_is_explicit_and_nothing_else_is_accepted ... ok
+test tests::a_gesture_is_asked_for_by_the_name_of_a_clip_and_nothing_else ... ok
+test tests::a_newer_poses_files_option_still_stops_the_body ... ok
+test tests::a_force_limit_is_a_number_in_its_range_and_brings_the_load_bound_under_it ... ok
+test tests::a_mood_is_one_exact_json_object_and_anything_else_is_ignored ... ok
+test tests::a_reading_pose_may_say_where_it_turns ... ok
+test tests::arbitration_is_on_or_off_and_off_unless_given ... ok
+test tests::a_line_repeated_is_said_once_in_five_seconds_with_a_count ... ok
+test tests::a_seated_poses_line_starts_the_generic_unit_and_never_stands ... ok
+test tests::every_option_the_usage_names_is_known ... ok
+test tests::eyes_are_a_socket_and_what_the_picture_is_worth_or_nothing ... ok
+test tests::give_way_is_return_stay_or_off_and_return_unless_given ... ok
+test tests::hold_from_is_an_absolute_file_and_off_unless_given ... ok
+test tests::let_go_at_stop_is_on_or_off_and_off_unless_given ... ok
+test tests::limp_is_on_or_off_and_on_unless_given_while_giving_way ... ok
+test tests::look_at_name_is_on_or_off_and_on_unless_turned_off ... ok
+test tests::of_two_gestures_in_one_step_the_higher_is_kept_and_the_other_said ... ok
+test tests::moves_are_a_folder_given_as_a_short_absolute_path ... ok
+test tests::overload_is_release_and_off_unless_given ... ok
+test tests::each_step_says_alive_and_the_first_says_ready ... ok
+test tests::pitch_window_is_low_and_high_and_lamp_4ace_s_unless_given ... ok
+test tests::reading_holds_over_the_voice_until_it_goes_unsaid ... ok
+test tests::refused_let_go_is_on_or_off_and_on_unless_turned_off ... ok
+test tests::rest_glance_is_on_or_off_and_on_unless_turned_off ... ok
+test tests::standing_is_a_pose_a_folded_arm_and_a_home_or_nothing ... ok
+test tests::the_product_unit_starts_a_fresh_lamp_with_gaze_off_and_on_once_measured ... ok
+test tests::torque_is_on_or_off_and_off_unless_given ... ok
+test tests::the_mood_socket_reads_a_gesture_a_move_a_mood_or_says_why_not ... ok
+test tests::wake_is_on_or_off_and_on_unless_turned_off ... ok
+test tests::who_asks_is_weighed_only_with_arbitration_and_an_unknown_priority_is_refused ... ok
+test tests::nothing_deployed_passes_hold_from ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/bin/lamp-body-inspect.rs (/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_inspect-3bcdc85139bdcd7b)
+
+running 2 tests
+test tests::no_implicit_device_or_unit_and_no_unknown_controls ... ok
+test tests::explicit_bounded_arguments_and_help_are_valid_without_any_open ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/lamp-body-measure.rs (/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_measure-4aead657abfc36a4)
+
+running 5 tests
+test tests::it_needs_its_device_unit_and_lock_and_takes_nothing_that_moves ... ok
+test tests::measured_at_is_a_utc_minute ... ok
+test tests::seated_is_a_flag_given_once ... ok
+test tests::the_generic_units_read_seated_once_and_the_confirmed_poses_win ... ok
+test tests::the_file_is_written_once_and_never_over_another ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/bin/lamp-body-mood.rs (/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_mood-6354f51c3d2d46d3)
+
+running 3 tests
+test tests::it_takes_a_socket_a_mood_and_a_level ... ok
+test tests::it_refuses_what_the_body_could_not_read ... ok
+test tests::the_datagram_reaches_a_socket ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/lamp-body-worker.rs (/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_worker-56cbdc1ed1d88222)
+
+running 1 test
+test tests::no_implicit_devices_or_motion_commands ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/it/main.rs (/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/it-fefd294d58a8ff86)
+
+running 125 tests
+test calibration::midpoint_and_endpoints_are_dimensionless_and_do_not_apply_homing_twice ... ok
+test calibration::invalid_or_unbounded_unit_identifiers_are_rejected ... ok
+test calibration::identity_sign_offset_and_span_validation_cannot_use_fallbacks ... ok
+test calibration::readback_comparison_checks_joint_mode_span_and_homing_without_writes ... ok
+test calibration::observed_counts_outside_calibration_are_faults_not_clipped_endpoints ... ok
+test control::admission_requires_rest_and_does_not_queue_a_second_segment ... ok
+test calibration::normalized_positions_reject_nonfinite_and_out_of_span_input ... ok
+test calibration::drive_mode_reverses_the_normalized_sign_in_both_directions ... ok
+test calibration::raw_register_words_do_not_silently_become_single_turn_counts ... ok
+test calibration::calibration_is_explicitly_bound_to_a_unit_and_five_unique_joints ... ok
+test control::authority_expiry_and_observed_io_overrun_stop_without_fabricated_recovery ... ok
+test control::camera_close_reopen_cannot_relabel_an_old_placement ... ok
+test calibration::every_homing_value_roundtrips_sign_magnitude_not_twos_complement ... ok
+test control::cancellation_discards_partial_packet_once_and_never_sends_its_tail ... ok
+test control::cancellation_from_completed_occurrence_cannot_stop_new_owner ... ok
+test control::changed_unit_calibration_and_forged_wider_envelope_are_not_substituted ... ok
+test control::clock_regression_latches_fault_and_stale_readback_cannot_start ... ok
+test control::control_loss_and_raii_drop_discard_without_any_park_or_torque_write ... ok
+test control::disabled_or_unknown_torque_cannot_admit_a_goal_or_enable_the_device ... ok
+test control::endpoint_is_quantized_once_not_repeatedly_biased_by_inverse_roundtrip ... ok
+test control::no_motion_without_qualification_inspection_and_original_placement_grant ... ok
+test calibration::full_and_narrow_spans_are_monotonic_and_quantization_is_bounded ... ok
+test control::exported_readback_keeps_original_time_and_never_survives_expiry_or_stop ... ok
+test control::full_goal_accepted_before_observed_overrun_remains_in_failure_evidence ... ok
+test control::first_host_command_is_under_twenty_ms_in_two_ms_local_tick_harness ... ok
+test control::fragmented_read_write_is_bounded_and_corrupt_missing_replies_are_terminal ... ok
+test control::load_direction_is_not_load_magnitude_but_unknown_bits_fault ... ok
+test control::inactive_zero_profiles_never_allow_all_or_body_position_packets ... ok
+test control::input_end_or_new_owner_revokes_partial_motion_before_the_next_byte ... ok
+test control::position_bytes_match_the_pinned_sdk_executed_with_an_inert_port ... ok
+test control::profile_and_trajectory_reject_unbounded_settings_and_bad_units ... ok
+test control::out_of_span_position_and_excess_tracking_error_are_visible_faults ... ok
+test control::prior_or_trailing_traffic_is_not_relabelled_fresh_by_parser_reset ... ok
+test control::profile_mismatch_does_not_write_or_replace_qualified_caps ... ok
+test control::live_overload_and_bad_status_lock_out_without_torque_release ... ok
+test control::profile_partial_write_privacy_and_expiry_are_terminal_with_original_byte_evidence ... ok
+test control::profile_setup_cancel_between_writes_retains_verified_partial_change_without_reset ... ok
+test control::profile_ack_readback_faults_never_advance_to_acceleration ... ok
+test control::profile_preparation_rejects_wrong_values_and_nonstationary_goal_without_writes ... ok
+test control::profile_setup_is_exact_speed_ack_readback_then_acceleration_and_no_position ... ok
+test control::selected_core_preserves_cancel_boundary_after_partial_request ... ok
+test control::profile_preparation_keeps_exact_inactive_bindings_and_single_attempt ... ok
+test control::shared_normalization_never_widens_separate_eeprom_command_bounds ... ok
+test control::shutdown_is_terminal_even_if_host_output_flush_fails ... ok
+test control::selected_core_omits_body_ids_and_retains_exact_unselected_read_counts ... ok
+test control::start_fault_cannot_be_healed_by_requalifying_cached_readback ... ok
+test control::stalled_partial_write_faults_once_without_retry_or_reusing_bus ... ok
+test control::unqualified_inspection_reports_nonzero_device_status ... ok
+test control::valid_stale_snapshot_does_not_cancel_new_motion_but_privacy_does ... ok
+test control::startup_is_idle_and_success_means_five_checked_readbacks_not_write_ack ... ok
+test control::worker_restart_does_not_reuse_old_occurrence_identity ... ok
+test control::successful_writes_without_endpoint_readback_never_report_reached ... ok
+test control::zero_selected_profile_still_rejects_motion_without_preparation ... ok
+test control::selected_profile_worker_priority_privacy_and_stop_prevent_queued_register_write ... ok
+test control::selected_profile_worker_uses_real_channels_original_evidence_and_readback_receipt ... ok
+test head_qualification::old_snapshot_cannot_revoke_newer_qualification_authority ... ok
+test control::stalled_clock_does_not_allow_unbounded_transaction_io_retries ... ok
+test head_qualification::zero_profile_stays_rejected_and_plan_never_invents_envelope ... ok
+test protocol::all_nonzero_servo_flags_fail_even_if_error_reply_has_no_read_data ... ok
+test protocol::a_tracker_asked_to_report_faults_accepts_a_flagged_reply_with_its_flags ... ok
+test control::position_packet_covers_all_counts_and_all_five_little_endian_ids ... ok
+test protocol::bytewise_multiservo_replies_complete_in_any_arrival_rotation ... ok
+test protocol::concatenated_frames_and_noise_are_not_lost ... ok
+test protocol::duplicate_and_unrequested_ids_latch_failure ... ok
+test protocol::every_invalid_length_is_rejected_and_parser_resynchronizes ... ok
+test head_qualification::rejected_inspection_phase_cannot_be_retried_as_new_authority ... ok
+test protocol::every_partial_prefix_is_reported_and_discarded_at_deadline ... ok
+test head_qualification::malformed_or_old_readback_does_not_become_an_exact_return_receipt ... ok
+test protocol::false_long_length_requires_deadline_not_guessing_payload_headers ... ok
+test protocol::five_joint_identities_are_exact ... ok
+test protocol::golden_read_only_packets_match_sts_little_endian_protocol ... ok
+test protocol::golden_status_survives_every_split_and_empty_feed ... ok
+test protocol::invalid_broadcast_status_and_high_status_bit_are_explicit ... ok
+test protocol::every_single_bit_payload_corruption_is_detected ... ok
+test protocol::parser_truncation_can_latch_an_otherwise_complete_transaction_failed ... ok
+test protocol::resynchronization_retains_complete_frame_inside_corrupt_candidate ... ok
+test head_qualification::privacy_during_outbound_never_requests_return_and_discards_pending_serial_work ... ok
+test protocol::sync_read_rejects_empty_duplicate_or_excessive_ids ... ok
+test protocol::wrong_parameter_count_and_missing_joint_are_not_success ... ok
+test readback::homing_register_validates_reserved_bits_and_preserves_mode_for_checking ... ok
+test head_qualification::rejected_original_permit_permanently_inhibits_direct_command_construction ... ok
+test readback::out_of_range_raw_position_is_kept_for_diagnosis_not_normalized ... ok
+test head_qualification::wrong_worker_receipt_stops_queued_motion_before_any_position_write ... ok
+test readback::signed_velocity_extremes_keep_sign_magnitude_and_negative_zero_semantics ... ok
+test readback::telemetry_fields_use_little_endian_offsets_and_preserve_raw_scales ... ok
+test readback::register_decoding_requires_matching_request_address_not_only_length ... ok
+test selection::all_nonempty_subsets_have_exact_lengths_sorted_ids_and_checksum ... ok
+test protocol::maximum_status_survives_all_chunk_sizes_and_wrapping_checksum ... ok
+test selection::empty_unknown_or_malformed_selection_never_deserializes ... ok
+test worker::audit_fatal_command_emits_monotonic_receipt_times ... ok
+test control::cancellation_at_every_local_tick_adds_no_wait_and_no_later_goal ... ok
+test worker::cancellation_between_data_receive_and_bus_tick_never_writes_stale_segment ... ok
+test selection::all_selection_preserves_existing_packet_for_every_encoder_count ... ok
+test worker::expired_authority_without_next_frame_and_newer_expired_privacy_both_inhibit ... ok
+test worker::busy_command_is_rejected_without_queuing_or_replacing_original_motion ... ok
+test worker::data_held_behind_urgent_control_retains_original_age_and_cannot_renew ... ok
+test protocol::every_read_window_is_bounded_without_address_wrap ... ok
+test worker::input_end_revokes_an_inflight_motion_without_waiting_for_the_next_segment ... ok
+test worker::malformed_priority_control_inhibits_even_when_valid_segment_waits ... ok
+test worker::bus_loss_bad_reply_and_slow_host_write_fault_without_retry ... ok
+test worker::foreign_placement_and_explicit_unqualified_profiles_cannot_start ... ok
+test worker::ready_is_stamped_after_the_controls_read_before_it ... ok
+test worker::partial_position_cancel_discards_once_and_never_sends_tail ... ok
+test worker::partial_bus_reads_and_writes_still_use_exact_core_protocol ... ok
+test worker::initial_and_reached_receipts_retain_actual_counts_and_original_read_times ... ok
+test worker::selected_partial_cancel_never_completes_packet_or_publishes_acceptance ... ok
+test worker::startup_without_authority_never_touches_bus ... ok
+test worker::selected_stop_and_privacy_before_first_tick_send_no_position_or_torque ... ok
+test protocol::arbitrary_byte_streams_retain_bounded_storage_and_can_be_reset ... ok
+test worker::stale_cancel_and_old_snapshot_preserve_successor_but_matching_cancel_is_terminal ... ok
+test worker::selected_command_reaches_actual_core_and_reports_exact_emitted_ids ... ok
+test worker::unread_ipc_request_expires_without_renewal ... ok
+test worker_config::provisioning_rejects_hidden_defaults_unqualified_limits_and_narrowing ... ok
+test worker_config::oversized_serialization_does_not_consume_the_next_channel_sequence ... ok
+test worker_config::observed_4ace_shared_normalization_and_eeprom_are_distinct_explicit_inputs ... ok
+test worker_config::explicit_head_only_policy_binds_inactive_zero_profiles_without_qualifying_them ... ok
+test worker_config::bounded_private_file_is_required_before_any_device_open ... ok
+test worker_config::receive_with_reads_the_clock_after_the_packet_arrives ... ok
+test worker_config::transport_preserves_original_sequence_age_and_boot ... ok
+test head_qualification::actual_worker_out_and_exact_return_write_only_id5_and_keep_original_readbacks ... ok
+test worker_config::separate_register_binding_rejects_missing_duplicate_and_invalid_hardware ... ok
+test worker::startup_idle_then_real_ipc_inspection_and_finite_segment_reaches_checked_readback ... ok
+test worker::feedback_backpressure_fails_closed_and_cleanup_error_remains_failure ... ok
+test control::cubic_segment_is_monotonic_bounded_and_rest_to_rest ... ok
+test head_qualification::a_prepared_exact_return_cannot_survive_stop_fault_cancellation_or_privacy ... ok
+
+test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+   Doc-tests lamp_body
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

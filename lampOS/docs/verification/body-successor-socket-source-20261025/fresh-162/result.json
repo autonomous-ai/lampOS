@@ -1,0 +1,975 @@
+{
+  "base": "162216f82db66e642e0c8e3033a9866cfec1ce1f",
+  "stages": [
+    {
+      "tag": "fmt",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_at_unix": 1792887965.2262552,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target",
+        "GIT_NO_LAZY_FETCH": "1",
+        "CARGO_BUILD_TARGET": "aarch64-apple-darwin"
+      },
+      "pid": 85079,
+      "exit": 0,
+      "seconds": 6.222,
+      "completed_at_unix": 1792887971.448159,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [],
+      "literal_test_summaries": [],
+      "case_observed": false
+    },
+    {
+      "tag": "clippy",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_at_unix": 1792887971.448991,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target",
+        "GIT_NO_LAZY_FETCH": "1",
+        "CARGO_BUILD_TARGET": "aarch64-apple-darwin"
+      },
+      "pid": 85198,
+      "exit": 0,
+      "seconds": 15.86,
+      "completed_at_unix": 1792887987.3086662,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [],
+      "literal_test_summaries": [],
+      "case_observed": false
+    },
+    {
+      "tag": "compile",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "started_at_unix": 1792887987.310038,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target",
+        "GIT_NO_LAZY_FETCH": "1",
+        "CARGO_BUILD_TARGET": "aarch64-apple-darwin"
+      },
+      "pid": 88767,
+      "exit": 0,
+      "seconds": 61.148,
+      "completed_at_unix": 1792888048.4584918,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-mood",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-mood",
+          "post_terminal_sha256": "2580ff007f06307415288d519773f95908a50f2d4d0f96d38f35401ef8ebae8d"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "head_plan",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/head_plan.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/head_plan",
+          "post_terminal_sha256": "4383bb394128e34013407299ca5c22edefc73e79b1b4d16b0dc425e4f4d653f5"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/it-fefd294d58a8ff86",
+          "post_terminal_sha256": "232df66840f0cefe9a8011dfa5cc6b347ba244ce3f1c5d28641b1e41c3aa3200"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body",
+          "post_terminal_sha256": "2c620bfa1df1026b11c212cfaf2b0b6f817c0ae999d40ba7fab11c325eb6655d"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-measure",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-measure",
+          "post_terminal_sha256": "7b5540d30a187ed717d6acff5e3a89b453f558c75211b6afe7034710911da8bd"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "expression_ask",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/expression_ask.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/expression_ask",
+          "post_terminal_sha256": "86e19961bcde86695ffb7ab1bd63bbac63a47c8a653804815905aa00157f4956"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-worker",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_worker-56cbdc1ed1d88222",
+          "post_terminal_sha256": "b8fecc932cf530ee812e0d45c6c2d1f7440eb93830c17ea710bf5c55ecd327d4"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-inspect",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_inspect-3bcdc85139bdcd7b",
+          "post_terminal_sha256": "59463067ca0d3c7cc16a371e1dd509f0692b6bf343fa0c18e23a673488bdb6c1"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-inspect",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-inspect",
+          "post_terminal_sha256": "65da3736696033b68ecc1ae108c147703ba606adbef683359f89e6b5e1c93bbb"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-worker",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-worker",
+          "post_terminal_sha256": "7e10d5fa231fb83fef4d3461e57c2f7e6eee6d540168a750edc9cbc2cc9fb92d"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-5ea66b1aea6cca28",
+          "post_terminal_sha256": "6905ded4e964986faae5c1feb76a36121e93c2ee342dd34cdc84ea03d78c11b4"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-mood",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_mood-6354f51c3d2d46d3",
+          "post_terminal_sha256": "78a1d22eb52fa70ec4fa9a18136452b4c8b1eea21dc399dfc5d8f8d57acdd0c0"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-measure",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_measure-4aead657abfc36a4",
+          "post_terminal_sha256": "42ced674165233624ac495db9e1d136e57d429a375a2f5ef262092476e58d0b7"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": false,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-84661b2d56bfef8e",
+          "post_terminal_sha256": "510dee62df5fd92114486d6cf6ee725264722a005da45b9ca4ce22df2d9d8a57"
+        }
+      ],
+      "literal_test_summaries": [],
+      "case_observed": false
+    },
+    {
+      "tag": "candidate-exact",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--lib",
+        "--message-format=json",
+        "--",
+        "--exact",
+        "runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets",
+        "--test-threads=1"
+      ],
+      "started_at_unix": 1792888048.550561,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target",
+        "GIT_NO_LAZY_FETCH": "1",
+        "CARGO_BUILD_TARGET": "aarch64-apple-darwin"
+      },
+      "pid": 91974,
+      "exit": 0,
+      "seconds": 2.054,
+      "completed_at_unix": 1792888050.6049762,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-84661b2d56bfef8e",
+          "post_terminal_sha256": "510dee62df5fd92114486d6cf6ee725264722a005da45b9ca4ce22df2d9d8a57"
+        }
+      ],
+      "literal_test_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 439 filtered out; finished in 0.01s"
+      ],
+      "case_observed": true
+    },
+    {
+      "tag": "candidate-full",
+      "cwd": "/private/tmp/second-body-successor-sockets-20261025/lampOS",
+      "command": [
+        "<private-home>/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--message-format=json"
+      ],
+      "started_at_unix": 1792888050.681953,
+      "expected_exit": 0,
+      "environment_overrides": {
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_TARGET_DIR": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target",
+        "GIT_NO_LAZY_FETCH": "1",
+        "CARGO_BUILD_TARGET": "aarch64-apple-darwin"
+      },
+      "pid": 91998,
+      "exit": 0,
+      "seconds": 9.501,
+      "completed_at_unix": 1792888060.183408,
+      "group_remaining_after_parent": false,
+      "owned_process_group_gone": true,
+      "compiler_artifacts": [
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-84661b2d56bfef8e",
+          "post_terminal_sha256": "510dee62df5fd92114486d6cf6ee725264722a005da45b9ca4ce22df2d9d8a57"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body",
+          "post_terminal_sha256": "2c620bfa1df1026b11c212cfaf2b0b6f817c0ae999d40ba7fab11c325eb6655d"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-inspect",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-inspect",
+          "post_terminal_sha256": "65da3736696033b68ecc1ae108c147703ba606adbef683359f89e6b5e1c93bbb"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body-5ea66b1aea6cca28",
+          "post_terminal_sha256": "6905ded4e964986faae5c1feb76a36121e93c2ee342dd34cdc84ea03d78c11b4"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "expression_ask",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/expression_ask.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/expression_ask",
+          "post_terminal_sha256": "86e19961bcde86695ffb7ab1bd63bbac63a47c8a653804815905aa00157f4956"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-mood",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_mood-6354f51c3d2d46d3",
+          "post_terminal_sha256": "78a1d22eb52fa70ec4fa9a18136452b4c8b1eea21dc399dfc5d8f8d57acdd0c0"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "head_plan",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/examples/head_plan.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/examples/head_plan",
+          "post_terminal_sha256": "4383bb394128e34013407299ca5c22edefc73e79b1b4d16b0dc425e4f4d653f5"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-measure",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-measure",
+          "post_terminal_sha256": "7b5540d30a187ed717d6acff5e3a89b453f558c75211b6afe7034710911da8bd"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-measure",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_measure-4aead657abfc36a4",
+          "post_terminal_sha256": "42ced674165233624ac495db9e1d136e57d429a375a2f5ef262092476e58d0b7"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/it-fefd294d58a8ff86",
+          "post_terminal_sha256": "232df66840f0cefe9a8011dfa5cc6b347ba244ce3f1c5d28641b1e41c3aa3200"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-worker",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_worker-56cbdc1ed1d88222",
+          "post_terminal_sha256": "b8fecc932cf530ee812e0d45c6c2d1f7440eb93830c17ea710bf5c55ecd327d4"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-inspect",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/deps/lamp_body_inspect-3bcdc85139bdcd7b",
+          "post_terminal_sha256": "59463067ca0d3c7cc16a371e1dd509f0692b6bf343fa0c18e23a673488bdb6c1"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-worker",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-worker",
+          "post_terminal_sha256": "7e10d5fa231fb83fef4d3461e57c2f7e6eee6d540168a750edc9cbc2cc9fb92d"
+        },
+        {
+          "package_id": "path+file:///private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body#lamp-body@0.1.0",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-body-mood",
+            "src_path": "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 2,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "fresh": true,
+          "executable": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/target/aarch64-apple-darwin/debug/lamp-body-mood",
+          "post_terminal_sha256": "2580ff007f06307415288d519773f95908a50f2d4d0f96d38f35401ef8ebae8d"
+        }
+      ],
+      "literal_test_summaries": [
+        "test result: ok. 440 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.61s",
+        "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "case_observed": true
+    }
+  ],
+  "compiler_jobs": 2,
+  "scope": "Dedicated fresh-target candidate qualification after discovered original library binding gap; no baseline or negative repeat; Cargo-launched test executables have pre-exec byte witnesses, fixture-spawned children are not individually instrumented.",
+  "runner_wrapper_sha256": "8d1fab371f5760818ded240fa1a3725da2dc8d208299b3fad2638472a020a1e4",
+  "host": "aarch64-apple-darwin",
+  "explicit_native_build_target": "aarch64-apple-darwin",
+  "runner_environment": {
+    "CARGO_TARGET_AARCH64_APPLE_DARWIN_RUNNER": "/opt/homebrew/opt/python@3.14/bin/python3.14 /private/tmp/second-body-successor-audit-20261025/preexec-witness.py",
+    "SECOND_BODY_WITNESS_DIR": "/private/tmp/second-body-successor-audit-20261025/fresh-candidate/launches"
+  },
+  "unix_preflight": "passed in same launcher",
+  "candidate_source_restored_unchanged": true
+}

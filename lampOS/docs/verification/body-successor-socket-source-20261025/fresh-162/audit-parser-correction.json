@@ -1,0 +1,10 @@
+{
+  "original_auditor_sha256": "a45231c5a6909694ffe9422bebdef82deb3da785be169d8b0b98402913723298",
+  "corrected_auditor_sha256": "91052323be9fcbe319746e0408745b2758c8b7f6e1539494711e90313ad7b653",
+  "original_failure": "AssertionError: expected workspace test cwd, actual captured Cargo test cwd is the Body crate root",
+  "observed_cwds": [
+    "/private/tmp/second-body-successor-sockets-20261025/lampOS/crates/body"
+  ],
+  "correction": "Require the exact observed Body crate root; the private pre-exec wrapper never changes cwd. Launcher cwd remains workspace root in command records.",
+  "scope": "Read-only processing correction; no command, source, executable, wrapper, profile or test observation changed or repeated."
+}
