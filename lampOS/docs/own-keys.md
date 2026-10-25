@@ -1,4 +1,4 @@
-# A person's own keys (#2094, proposed product activation, #2846)
+# A person's own keys (#2094, #2846)
 
 Product lamps answer through the Autonomous relay and hold no provider key of
 the company's (the lead on #1711, 20 Oct 07:34). A person may bring their
@@ -7,10 +7,13 @@ and a **Deepgram** key for speech to text. Each is optional. With none, the
 lamp uses the relay, as before. The design was agreed on #2094 (El 09:42,
 the first builder 09:44, Third's privacy read 09:50).
 
-This proposed product change sets **`LAMP_OWN_KEYS=on`** in `lamp-setup`,
-`lamp-cloud`, and `lamp-voice`. Activation remains **HOLD** pending #2094's
-broker/account/TLS work and a fresh activation decision and lamp check on
-the current base; the earlier drop-in trial does not qualify this change.
+The product units set **`LAMP_OWN_KEYS=on`** in `lamp-setup`, `lamp-cloud`,
+and `lamp-voice`. Installing these units enables the feature immediately;
+there is no runtime acceptance gate. Before merging this activation, the
+activation PR must have explicit acceptance from the first builder or owner
+for #2094's broker/account/TLS dependency and a fresh lamp check on the
+current base. Until then the PR stays **HOLD**; the earlier drop-in trial
+does not qualify this change.
 The voice unit also loads the keys' folder
 (`LoadCredential=own:/etc/lampOS/voice/own`, with
 `ConfigurationDirectory=lampOS/voice/own`).
@@ -25,11 +28,10 @@ synced afterward; a failed reload is retried even though the file is gone.
 The folder is removed only when empty.
 
 `lamp-cloud` also needs `LAMP_CLOUD=on` and `LAMP_SETTINGS_CHANGE=on`.
-The product already sets both, so this proposal opens the app's `keys.set`,
+The product sets both, so these units open the app's `keys.set`,
 `keys.remove` and `keys.get` as well as setup's key fields. There is no
-remaining settings-off gate protecting those app calls. That is why this
-product activation remains held, rather than being qualified by the
-installer tests alone.
+remaining settings-off gate protecting those app calls. Installer tests
+alone do not meet the merge prerequisite above.
 The helper's units (`lamp-setup-keys.socket`, `lamp-setup-keys@.service`)
 are in `install`'s list, the socket enabled and the template never. The
 helper itself doesn't read the switch (its unit passes `--enable`): only
@@ -37,7 +39,11 @@ helper itself doesn't read the switch (its unit passes `--enable`): only
 With `LAMP_OWN_KEYS=off` on all three units, each keeps its off behavior:
 setup checks and keeps nothing and says nothing new, the app's kinds are
 "not on this lamp", and the voice reads no person's key even if one is
-there.
+there. The switches are independent: preserving a voice-only
+`LAMP_OWN_KEYS=off` drop-in leaves setup and cloud enabled. Setup and the
+app can still check and store keys, but the voice ignores them, including
+after the helper restarts it. Disable the switch on all three units to
+disable the feature throughout the lamp.
 
 ## How a key arrives
 
@@ -119,7 +125,7 @@ followed, and the only request setup or the helper makes with the key:
 `/etc/lampOS/voice/own/`: `deepseek.key`, `deepseek.url` (the endpoint,
 the old key removed first, so a key never sits beside another key's endpoint) and
 `deepgram.key`. The folder is root's, 0700, each file 0600, written whole and
-renamed into place. The voice's drop-in loads the folder whole
+renamed into place. The voice's product unit loads the folder whole
 (`LoadCredential=own:/etc/lampOS/voice/own`), so each file is the credential
 `own_<file>` in its `CREDENTIALS_DIRECTORY`; `ConfigurationDirectory=` makes
 the folder if it's missing, so an empty one is no credential, never a failed
