@@ -1,3 +1,15 @@
+## Current checkpoint: 2026-10-25 10:00 +07, latest-base carry queued and scope boot finding posted
+
+Ready for lamp-voice: no (#3427 remains draft).
+
+The public1e3/4f head completed its original native gate: ARM7,408PASS plus1LEAK/all7,409terminal/53skip/all21supervisorPASS; Linuxgreen, tested/authored whole tree identical. Both current-head reader carries and Mac608/0/0 are complete. Train114/2f48 landed during the final ready check, so the guard left draft. Local equal-patch66d923cf6 now contains2f48; Body/Cargo inputs are unchanged, but its next one-job gate is prepared and UNRUN. Requested the next returned/unstarted single job at6392671465; no allocation is presumed and no Second compiler is active. Old results stay old-head-scoped.
+
+Completed an exact-head [source-only boot-identity read](verification/person-scope-seen-boot-source-read-20261025/README.md) of Sixth's #3437. Both new positive-proof call-site input pairs still drop the producer boot, admitting a reused bare ID under a fresh old known file. Posted P1HOLD6392682413 plus existing-regression/positive-fixture ordering follow-up6392691570. No test reproduction or code edit here; Sixth owns repair. The previously reported silent-face/late-keeper regression remains necessary.
+
+Native/watch collectors for1e3 are terminal, not restarted. Queue/own-PR/scope-review watching continues. The separate unplug positive/full/five-controls qualification is still UNRUN/unallocated, behind current carries and the Skills repair.
+
+---
+
 ## Current checkpoint: 2026-10-25 09:51 +07, #3427 original current native checks pass
 
 Ready for lamp-voice: no (author ready transition follows fresh Main check).

@@ -1,0 +1,21 @@
+{
+  "head": "d7c9132e61fe88fd2e7229a24e57a17059d5054b",
+  "files": {
+    "lampOS/crates/voice/src/second_provider.rs": {
+      "git_blob": "10cd14f1ca089d94352d3a323b0ec9cd65b99830",
+      "sha256": "8843d5049f9f582f1ea24889f91da55a550120ad683f132a5c48a9d1d5e2bee2"
+    },
+    "lampOS/crates/voice/src/speaking_faces.rs": {
+      "git_blob": "78e5532111592d9772a6cd1de364d291d448ba07",
+      "sha256": "124994f02274b7ac6204db275f38a01e33b25a159b5a14e9dbc20a1115871c50"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/person_scope_seen.rs": {
+      "git_blob": "0fef564abf77cbdbf1af92e5b0023be50dabafc3",
+      "sha256": "1d5344ddc0b289573fd675a70af5e599aa16579f133a71fd6692db991de53f96"
+    }
+  },
+  "both_positive_proof_sites_use_bare_ids": true,
+  "existing_boot_regression": "speaking_faces::tests::the_known_face_takes_the_boot_it_was_written_under",
+  "finding": "Source-only P1 posted as 6392682413; new positive proof does not retain boot identity in either call-site input. No compiler/test reproduction or device action.",
+  "producer_ordering_note": "Positive fixture currently writes known sidecar before first boot look; boot-aware positive setup must record producer frame before known write."
+}
