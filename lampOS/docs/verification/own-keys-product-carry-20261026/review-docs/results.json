@@ -1,0 +1,82 @@
+{
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "gates": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 130445737984,
+      "elapsed_seconds": 55.448,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7136,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 130446905344,
+      "elapsed_seconds": 6.589,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7136,
+      "source_unchanged": true
+    },
+    "switches": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "switches::",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "disk_free_before": 130368856064,
+      "elapsed_seconds": 65.882,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "dfc767561c1f029630f18f3b4dbbe18bc5c4dd81f8f56e70744e8703d21540a4",
+      "source_entries": 7136,
+      "source_unchanged": true
+    }
+  },
+  "inputs": {
+    "lampOS/docs/own-keys.md": "b8e6543f481a5e68884ac3124bed8cbb4178db4579403d21fb9bc864198cb73c",
+    "lampOS/docs/switches.md": "07b1372b65ba7cbb248f287f8dbf9a864b35273bb25e7778abb2a5c0db79f4c4"
+  },
+  "parent": "d71a423ca0437524dcafb1cb3556a37169da3032",
+  "scope": "Documentation-only response to the two review findings; runtime source and units equal parent. Original local/native results stay bound to their original heads.",
+  "switch_reader": {
+    "failed": 0,
+    "filtered": 236,
+    "ignored": 0,
+    "passed": 2
+  }
+}
