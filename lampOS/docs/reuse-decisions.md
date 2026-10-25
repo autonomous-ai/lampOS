@@ -1,5 +1,23 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Promote an already tested release to a stable feed (2026-10-25)
+
+V1's `scripts/release/promote-ota.sh` separates promotion from building:
+it changes a component's minimum version and signs updated metadata. Keep
+the separate operator decision, but change V2 promotion to selecting an
+existing signed build byte-for-byte. This avoids another signing operation
+and preserves the source run, sequence and immutable payload URLs.
+
+Reuse `lamp_update::manifest` for Ed25519 verification, schema validation,
+asset names and bounds, with the independently provisioned public key.
+Reuse the existing CI publisher's staged upload, retained previous asset,
+readback and restoration semantics. GitHub's asset rename is not a
+multi-asset transaction, so retain that limitation and refuse uncertain
+heads rather than promising atomic replacement. A separate Rust CI tool
+keeps GitHub credentials and promotion commands out of the lamp runtime.
+The default feed and product units remain unchanged until their owner
+activates the stable feed. Offline failure tests are not a lamp trial.
+
 ## Bind the requested name to the speaker's own declaration (2026-10-24)
 
 The V1 self-enrollment camera flow assumes the requester is the subject and

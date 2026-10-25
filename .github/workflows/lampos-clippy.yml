@@ -25,7 +25,7 @@ name: lampOS clippy
 on:
   push:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-clippy.yml', '.github/scripts/lampos-source-times.py']
+    paths: ['lampOS/**', '.github/workflows/lampos-clippy.yml', '.github/scripts/lampos-source-times.py', '.github/tools/lampos-promote/**']
   pull_request:
     branches: ['lamp-voice', 'first/voice-cascade-gemini']
     paths:
@@ -41,6 +41,7 @@ on:
       - 'lampOS/docs/switches.md'
       - '.github/workflows/lampos-clippy.yml'
       - '.github/scripts/lampos-source-times.py'
+      - '.github/tools/lampos-promote/**'
   workflow_dispatch:
 
 concurrency:
@@ -64,6 +65,10 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 -c clippy -c rustfmt
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: stable promotion formatting and strict Clippy
+        run: |
+          cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+          cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings
       - name: formatting (whole workspace, pinned Rust)
         working-directory: lampOS
         run: cargo +1.96.0 fmt --all --check
