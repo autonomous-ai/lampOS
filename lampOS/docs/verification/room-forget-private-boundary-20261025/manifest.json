@@ -1,0 +1,13 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 3759,
+      "sha256": "2667d07be89f2b8c7ce02ce0fe1058348ff7586a2a7ea728779e248ebb56cf1a"
+    },
+    "summary.json": {
+      "bytes": 1856,
+      "sha256": "2b3be93020a8ac55fba3409a4161a095ed8373ef973bd659e0d3428437161d54"
+    }
+  },
+  "scope": "Selected source/procedure/count/hash/closure evidence only; no raw protocol, database, private controller or executable"
+}

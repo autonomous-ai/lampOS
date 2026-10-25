@@ -1,0 +1,41 @@
+{
+  "status": "OLD_RUNTIME_BUG_REPRODUCED_NEW_FIX_UNCOMPILED",
+  "public_equivalent_Memory_runtime_source": "056a76132354f40f97eb5fbc519778c04f1ccb19",
+  "old_compiled_workspace_tree": "88d5059caa8e570755eefec59b6b841a5269451d",
+  "old_binary_sha256": "3a75a6df1343ef38cc099279b2827e6d965022ed3bd6990290d6c2e1e2774b62",
+  "relocated_private_copy_used": true,
+  "whole_workspace_feature_or_current_binary_identity_claim": false,
+  "runtime_source_folders_byte_equal": [
+    "crates/memory",
+    "crates/msgs",
+    "crates/bus",
+    "crates/ipc",
+    "crates/local-time"
+  ],
+  "scenario_observations": 1,
+  "real_protocol_calls": 6,
+  "private_entries_before": 1,
+  "private_entries_after": 0,
+  "removed": 2,
+  "expected_room_only_removed": 1,
+  "forget_RPC_elapsed_ms": 56.33873199985828,
+  "latency_boundary": "Before client Unix-socket creation/connect through complete newline response and JSON decode; old executable only, no fixed-binary or hardware measurement.",
+  "owned_process_group_absent": true,
+  "executable_digest_unchanged": true,
+  "compiler_jobs_used": 0,
+  "shared_target_or_cache_written": false,
+  "automatic_retry": false,
+  "exact_SQL_source_checks": {
+    "Python_SQLite_version": "3.51.2",
+    "candidate_cases_passed": 5,
+    "original_policy_failures": 3,
+    "scope": "Actual extracted SQL strings on minimal metadata fixtures, not Rust/protocol gates.",
+    "old_query_sha256": "36d18998b8419ad1b620dababec51bda516af07d14ed7d6a058bc1f0048a77e2",
+    "new_query_sha256": "587ee1b1868c7552d3892ccf56975e3c1b0d18af12a1d71bf12dd808f3dd1c78"
+  },
+  "new_Rust_regressions_written": 3,
+  "standalone_rustfmt_exit": 0,
+  "new_fix_Rust_gates": "UNRUN",
+  "independent_source_review_report_sha256": "c18d56674273c8f0d7146cc3b8027f6816c4574d0ab8ac1f9de321b306bc4134",
+  "raw_protocol_DB_controller_and_executable_remain_private": true
+}

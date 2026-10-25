@@ -8724,3 +8724,7 @@ Updated [the 0.35-to-0.90 plan](verification/memory-quality-plan-20261024/README
 ## 25 October, 12:32 ICT — taken: room forget scope boundary
 
 Taken on the forget/memory quality row: constrain forget_said replacement traversal to room entries after a replacement is adopted into a private scope. Main119 source and the published request contract demonstrate the gap; no runtime reproduction yet. Open and merged checks distinguish this from the already-landed forget_person speaker deletion. Preserve adoption links and ordinary forget behavior; add focused regression and English docs, then canonical gates before code push. Branch: fourth/room-forget-private-scope-20261025. No new switch or compiler allocation.
+
+## 25 October — room forget bug reproduced, correction awaiting gates
+
+[Selected protocol receipt](verification/room-forget-private-boundary-20261025/README.md): one old source-bound Memory executable, six valid RPCs, removed2 versus room-only1 and private kept1→0. Same Memory source as publicMain119; complete old workspace identity remains distinct. Process closed; no compiler/shared-cache write, raw/database/executable private. The four-file fix and3 protocol tests are written, standalone formatting clean, exactSQL5cases pass and independent source read found no P1/P2. Rust/new-binary/native gates remain UNRUN. CallbackMac positive gate now owns the actual single returned at6393924079; no extra job inferred.
