@@ -6,6 +6,28 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 19:39 — Latest Body compile gates passed
+
+Ready for lamp-voice: no (full Voice/VoiceEval tests and the new PR's Linux gates remain).
+
+On frozen `f2ddbc5f4` / `22d93d199`, fmt, strict all-target clippy for
+12 crates and the workspace build have exited 0. The full Voice/VoiceEval
+command is active. The original carry PR now has these completed results
+and the active-carry notice in comment 6397583159; no replacement source
+push is claimed yet.
+
+First selected published build 6819 (`22d93d199`) for Monday's lamps,
+including the delivered Store preparation, off with its separate key.
+That is First's ship selection and played evidence, not a Third lamp run.
+Train 128 then merged #3469/#3463 as `86416a0d3`; its original ARM64
+40192171277 and Linux clippy 40192171268 are green. The active local
+source stays frozen until its command ends, then the final carry is
+compared and qualified against Main.
+
+The OTA carry `6a0601879` preserves its source patch and adds only docs
+and an unexecuted device run sheet; the aside carry `ecc4b3d15` has an
+equal single-patch range-diff. No new Third source finding in either.
+
 ## 2026-10-25 19:16 — Body runtime gate passed; latest integration started
 
 Ready for lamp-voice: no (latest integration and original new Linux runs remain).
