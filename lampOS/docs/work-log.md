@@ -1,4 +1,16 @@
-Ready for lamp-voice: image repair landed; Skills masking controls are still qualifying.
+Ready for lamp-voice: Skills masking controls ready; own-keys carry in its Mac gate.
+
+## Current checkpoint: 2026-10-26 03:25 +07, Skills ready; own-keys carry repaired
+
+[#3506](https://github.com/autonomous-ai/lampOS/pull/3506) is ready at `3ab42b21e` on current `409bf7268`, with Reviewer-three READ-OK and Reviewer-two's current-head no-P1/P2 source/proof clearance. [Original 9a6 native evidence](verification/skills-drop-mask-20261026/native-original/README.md) and [amended 3ab native evidence](verification/skills-drop-mask-20261026/native-amended/README.md) each reconcile **11,313 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**, all five added cases included. Matching original Linux Clippy runs pass. The amended source differs only in verification wording and its checksum; all compiled inputs remain identical. The short-word disclosure finding remains unresolved and these controls describe current permissive behavior, not an agreed privacy rule.
+
+The Mac Skills gate finished **522 passed / 0 failed / 9 ignored** with strict all-target Clippy and formatting. Both separately compiled deliberate faults fail at the intended assertion, **0/1** each; restored source and rebuilt focused module pass **7/0**. Earlier fixture failures remain separate in the source verification. Reviewer-two's independent Mac execution is still unrun and is not claimed here.
+
+The stalled [#3004](https://github.com/autonomous-ai/lampOS/pull/3004) own-keys proposal is claimed and carried on `second/own-keys-product-current` from current Main, retaining its original author and one-line commit as `2236e5447`. Current camera-helper, Store settings and dynamic relay routing are preserved. The repair removes only a regular file containing the exact 919-byte historical own-keys drop-in, preserves edits/off overrides/links/nonregular entries, bounds the read to 920 bytes, rechecks before unlink, syncs the parent and keeps reload debt across failure. Six new regression cases cover preservation and retry; the Linux-only FIFO case awaits native CI. Six docs now state that settings is already enabled and this proposal also opens the app calls. Activation remains HOLD for #2094's broker/account/TLS work and fresh current-base acceptance; no historical lamp result is carried forward.
+
+The own-keys source is frozen for its changed/consumer-crate gate: Update, Voice, Selftest, Setup, Cloud, Health, Controls, Skills and Voice-eval, selected by symbol and unit/doc-reader grep. Formatting passes; focused installer controls are running, followed by strict Clippy and full serial tests in one owned compiler job with a 20 GiB reserve. No local ARM64 or full-workspace gate runs. Native checks will use the draft PR. No lamp, provider, real key or release action ran; no owner input is needed.
+
+---
 
 ## Current checkpoint: 2026-10-26 02:46 +07, complete image repair landed; Skills fixtures corrected
 

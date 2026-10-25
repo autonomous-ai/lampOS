@@ -1,0 +1,68 @@
+{
+  "packet": "original",
+  "audit_time_plus07": "2026-10-26T03:19:14+0700",
+  "identity_file": "identities.json",
+  "original_attempt": 1,
+  "run_ids": {
+    "arm64": 40228167797,
+    "clippy": 40228167739
+  },
+  "raw_logs": {
+    "arm64": {
+      "bytes": 1938648,
+      "sha256": "bcb13f627a445573a27168ff1ec909ae0ba19ea680cfed36920dbfa83a8d8ea2"
+    },
+    "clippy": {
+      "bytes": 42594,
+      "sha256": "516c9b7751a7927d415d439440fcd7769eebce6837266c5cfc34f9aeda70017e"
+    }
+  },
+  "nextest": {
+    "all_echoes_duplicate_counted_cases": true,
+    "all_ordinals_exactly_once": true,
+    "announced_binaries": 179,
+    "echo_status_counts": {
+      "PASS": 35
+    },
+    "literal_terminal_counts": {
+      "FAIL": 0,
+      "LEAK": 0,
+      "PASS": 11313,
+      "SKIP": 0,
+      "TIMEOUT": 0
+    },
+    "ordinal_max": 11313,
+    "ordinal_min": 1,
+    "post_summary_echoes_excluded": 35,
+    "selected": 11313,
+    "selected_unrun": 0,
+    "skip_count_limit": "Skipped test and binary totals are aggregate selection counts; individual skip identities were not enumerated in this log.",
+    "skipped_binaries": 2,
+    "skipped_tests": 106,
+    "start_literal": "2026-10-25T19:56:37.4927328Z     Starting 11313 tests across 179 binaries (106 tests and 2 binaries skipped)",
+    "summary_literal": "2026-10-25T20:00:06.3337731Z      Summary [ 208.841s] 11313 tests run: 11313 passed, 106 skipped",
+    "terminal_binary_labels": 153,
+    "unique_cases": 11313,
+    "unique_ordinals": 11313
+  },
+  "selected_cases_file": "selected-results.json",
+  "separate_doc_and_custom_tests": {
+    "doc_summary_count": 46,
+    "doc_passed": 4,
+    "doc_failed": 0,
+    "doc_ignored": 0,
+    "relay_signals_ok": 1,
+    "process_unique_pass_rows": 12,
+    "process_failed": 0,
+    "stable_promotion_passed": 22,
+    "stable_promotion_failed": 0
+  },
+  "parser_note": "Thirty-five identical terminal report echoes after the nextest summary are excluded. Unique binary/test identities and ordinals 1 through 11313 reconcile exactly once. This is log accounting, not a CI rerun.",
+  "limits": [
+    "No retry, cancellation or local test execution was requested for this audit.",
+    "The 106 skipped test and two excluded binary totals are aggregate nextest selection counts.",
+    "The immutable checkout tree is resolved from Git metadata; these jobs do not supply a runtime source before/after hash guard.",
+    "Native CPU and Engine tests do not establish typed-bus acceptance, physical lamp behavior, hardware or latency qualification.",
+    "Short ASCII word controls document existing permissive behavior, not an agreed privacy policy; the separate privacy finding remains unresolved."
+  ]
+}

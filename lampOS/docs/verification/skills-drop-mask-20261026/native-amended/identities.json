@@ -1,0 +1,45 @@
+{
+  "pr": 3506,
+  "packet": "amended",
+  "authored": {
+    "sha": "3ab42b21e4f9d00a014caf5c71acc20387892685",
+    "tree": "e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3"
+  },
+  "base": "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+  "checkout": {
+    "sha": "6151385accb4fb7ea50f223e5f4790d61a321bcd",
+    "tree": "e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3",
+    "parents": [
+      "409bf72685ec1046ffc2fbfd51654cb2693e1297",
+      "3ab42b21e4f9d00a014caf5c71acc20387892685"
+    ]
+  },
+  "merge_tree_matches_authored": true,
+  "tree_evidence": "Checkout SHA is literal in both job logs; its tree and parents are resolved from the immutable public Git commit object. The authored tree is read from the immutable local Git object.",
+  "arm64": {
+    "run_id": 40229020501,
+    "attempt": 1,
+    "conclusion": "success",
+    "head": "3ab42b21e4f9d00a014caf5c71acc20387892685",
+    "event": "pull_request",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40229020501",
+    "job": {
+      "id": 121276544841,
+      "name": "lampOS — build and test on Linux ARM64 (1/1)",
+      "conclusion": "success"
+    }
+  },
+  "clippy": {
+    "run_id": 40229020474,
+    "attempt": 1,
+    "conclusion": "success",
+    "head": "3ab42b21e4f9d00a014caf5c71acc20387892685",
+    "event": "pull_request",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40229020474",
+    "job": {
+      "id": 121276544634,
+      "name": "lampOS — clippy, every crate and target (x86 Linux)",
+      "conclusion": "success"
+    }
+  }
+}

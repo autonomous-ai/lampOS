@@ -1,0 +1,11 @@
+# Skills dropped-chance masking: amended head
+
+PR #3506's amended head is `3ab42b21e4f9d00a014caf5c71acc20387892685`, based on `409bf72685ec1046ffc2fbfd51654cb2693e1297`. Both official jobs checked out merge preview `6151385accb4fb7ea50f223e5f4790d61a321bcd`, tree `e3ab85c9ef9573d2188296c69f81b1cf0d0d5ee3`. That immutable tree equals the amended authored head's tree. [identities.json](identities.json) records the full identities and job IDs.
+
+Only the verification README and its checksum changed from the [original head](../native-original/README.md), to describe the short-word controls as current permissive behavior. The compiled inputs and the fixture identified by SHA-256 `fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192` are unchanged. The following outcomes come from new original runs for this amended head; they are not carried test counts.
+
+[ARM64 run 40229020501, original attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40229020501/attempts/1) succeeds: **11,313 unique PASS; zero LEAK, FAIL or TIMEOUT; 106 skipped; zero selected unrun**, in 208.680 seconds. All ordinals 1–11,313 reconcile exactly once; 35 identical post-summary echoes are excluded. All five new `welcome_stuck::drop_mask_` cases pass at ordinals 5,472–5,476, retained in [selected-results.json](selected-results.json). Separate steps pass four workspace doctests across 46 summaries, relay signals, and 12 process tests. The stable-promotion workspace separately reports 22 passes. These are not added to the nextest count.
+
+[Linux Clippy run 40229020474, original attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40229020474/attempts/1) succeeds, including pinned workspace formatting, strict workspace/all-target Clippy and separate stable-promotion formatting/Clippy. [census.json](census.json) binds both private raw job logs by byte length and SHA-256. No retry, cancellation or local test run was requested for this audit.
+
+These Engine controls do not establish typed-bus, physical lamp, hardware or latency acceptance. Short ASCII word descriptions remain existing permissive behavior, not an agreed privacy policy; the separate privacy finding remains unresolved.

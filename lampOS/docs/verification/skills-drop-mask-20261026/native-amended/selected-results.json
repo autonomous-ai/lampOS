@@ -1,0 +1,54 @@
+{
+  "packet": "amended",
+  "authored_head": "3ab42b21e4f9d00a014caf5c71acc20387892685",
+  "arm64_run": 40229020501,
+  "attempt": 1,
+  "checkout": "6151385accb4fb7ea50f223e5f4790d61a321bcd",
+  "cases": [
+    {
+      "binary": "lamp-skills::it",
+      "line": 6300,
+      "ordinal": 5472,
+      "seconds": 0.005,
+      "status": "PASS",
+      "test": "welcome_stuck::drop_mask_counts_faces_without_their_contents",
+      "total": 11313
+    },
+    {
+      "binary": "lamp-skills::it",
+      "line": 6301,
+      "ordinal": 5473,
+      "seconds": 0.005,
+      "status": "PASS",
+      "test": "welcome_stuck::drop_mask_hides_arbitrary_text",
+      "total": 11313
+    },
+    {
+      "binary": "lamp-skills::it",
+      "line": 6302,
+      "ordinal": 5474,
+      "seconds": 0.005,
+      "status": "PASS",
+      "test": "welcome_stuck::drop_mask_hides_list_contents",
+      "total": 11313
+    },
+    {
+      "binary": "lamp-skills::it",
+      "line": 6303,
+      "ordinal": 5475,
+      "seconds": 0.005,
+      "status": "PASS",
+      "test": "welcome_stuck::drop_mask_hides_object_contents",
+      "total": 11313
+    },
+    {
+      "binary": "lamp-skills::it",
+      "line": 6304,
+      "ordinal": 5476,
+      "seconds": 0.006,
+      "status": "PASS",
+      "test": "welcome_stuck::drop_mask_keeps_safe_scalar_descriptions",
+      "total": 11313
+    }
+  ]
+}
