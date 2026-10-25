@@ -545,7 +545,20 @@ pub fn declared(settings: &Settings) -> Vec<Tool> {
 /// `LAMP_USE_SKILL=on`, `use_skill` carries every core skill, so it is a
 /// core name (the first builder on #2644).
 pub fn uncut(settings: &Settings) -> (Vec<Tool>, Vec<String>, BTreeSet<String>) {
-    let mut tools = core_tools(settings);
+    uncut_within(settings, lamp_gemini::MAX_TOOLS)
+}
+
+/// [`uncut`] with the executive's functions taken up to `bound`, not
+/// Live's: the second route's own ([`crate::second_provider::MAX_TOOLS`]).
+/// Taken up to Live's 32 there, each function more of the voice's own
+/// pushed one of the lamp's own actions out of every chat request, with
+/// room to spare (25 Oct: `LAMP_MEMORY_FORGET_ALL`'s `forget_everything`
+/// and `LAMP_REPORTS`' two left `snooze_reminder` out).
+pub fn uncut_within(
+    settings: &Settings,
+    bound: usize,
+) -> (Vec<Tool>, Vec<String>, BTreeSet<String>) {
+    let mut tools = core_tools_within(settings, bound);
     let skills = skills_after(settings, &tools);
     let mut core = core_skills(settings);
     let mut cut: Vec<String> = Vec::new();
@@ -694,6 +707,11 @@ fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
 
 /// The voice's own functions and the executive's.
 fn core_tools(settings: &Settings) -> Vec<Tool> {
+    core_tools_within(settings, lamp_gemini::MAX_TOOLS)
+}
+
+/// [`core_tools`] with the executive's taken up to `bound` ([`uncut_within`]).
+fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     let mut tools = Vec::new();
     if settings.decline {
         tools.push(not_for_me());
@@ -728,7 +746,7 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
         tools.push(crate::reports_stop::state_tool());
     }
     if let Some(directory) = &settings.exec {
-        let room = lamp_gemini::MAX_TOOLS - tools.len();
+        let room = bound.saturating_sub(tools.len());
         tools.extend(
             catalog(&directory.join(CATALOG_FILE))
                 .into_iter()
@@ -3946,6 +3964,32 @@ mod tests {
         assert!(voices_own(crate::reports_stop::STATE_NAME));
         // Off, the flag is never given.
         assert!(crate::reports_stop::arguments(None).is_empty());
+    }
+
+    /// 25 Oct: the second route's chat request takes the executive's
+    /// functions up to its own bound, so with more of the voice's own (here
+    /// reports' two and the faces') every one of the lamp's actions is still
+    /// offered there; a Live session takes them up to its 32, as before.
+    #[test]
+    fn the_chat_route_keeps_every_action_past_lives_bound() {
+        let (_dir, mut settings) = many_skills("chat-own-bound");
+        settings.reports_stop = true;
+        settings.who = Some("/run/lampos-eyes/who.sock".into());
+        let names =
+            |tools: Vec<Tool>| -> Vec<String> { tools.into_iter().map(|tool| tool.name).collect() };
+        let live = names(core_tools(&settings));
+        assert_eq!(live.len(), lamp_gemini::MAX_TOOLS, "{live:?}");
+        assert!(!live.iter().any(|name| name == "light_24"), "{live:?}");
+        let chat = names(crate::second_provider::worker::chat_tools(
+            &settings,
+            &[],
+            false,
+        ));
+        assert!(
+            (0..25).all(|n| chat.contains(&format!("light_{n}"))),
+            "{chat:?}"
+        );
+        assert!(chat.len() <= crate::second_provider::MAX_TOOLS);
     }
 
     /// The reviewer's P3 on #1906: `LAMP_REPORTS=on` declares two more,

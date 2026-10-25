@@ -1142,7 +1142,8 @@ pub fn search_for(
 }
 
 /// The functions each chat request of this route is given, before a spoken
-/// turn's name signal: the lamp's ([`crate::tools::uncut`]),
+/// turn's name signal: the lamp's ([`crate::tools::uncut_within`] this route's
+/// bound, so none of the lamp's own actions is left out for Live's),
 /// [`crate::tools::THE_TIME`] only for elsewhere (the time here is told in
 /// every request), then the search's, and with `look` (a spoken turn with a
 /// full look) the look's ([`look_tool`]), within this route's own bound of
@@ -1156,7 +1157,8 @@ pub fn chat_tools(
     look: bool,
 ) -> Vec<lamp_gemini::Tool> {
     let places = tools.clock && tools.places;
-    let (lamp, skills, mut core) = crate::tools::uncut(tools);
+    let (lamp, skills, mut core) =
+        crate::tools::uncut_within(tools, crate::second_provider::MAX_TOOLS);
     let mut told = time_elsewhere(lamp, places);
     told.extend(search.iter().cloned());
     if look {
