@@ -29,6 +29,21 @@ fn old_product(settings: bool) -> Lamp {
     let mut lamp = Lamp::installed();
     assert!(!lamp.config.settings);
     assert!(!apply::on(None));
+    // Install uses today's defaults; this fixture deliberately restores the
+    // pre-carrier product updater, whose settings switch was absent.
+    let updater = lamp.read("/etc/systemd/system/lamp-update.service");
+    assert_eq!(
+        unit::environment(&updater, apply::SWITCH).as_deref(),
+        Some("on"),
+        "the current factory product explicitly enables settings updates"
+    );
+    let setting = "Environment=LAMP_UPDATE_APPLY=on\n";
+    assert_eq!(updater.matches(setting).count(), 1);
+    fs::write(
+        lamp.root.join("etc/systemd/system/lamp-update.service"),
+        updater.replacen(setting, "", 1),
+    )
+    .unwrap();
     assert_eq!(
         unit::environment(
             &lamp.read("/etc/systemd/system/lamp-update.service"),

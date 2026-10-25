@@ -1,6 +1,7 @@
 //! The product's settings and tmpfiles a build carries, written at the
-//! switch by `lamp-update-apply` (#1680, docs/updates.md). Off unless
-//! `LAMP_UPDATE_APPLY=on` is in lamp-update.service's environment.
+//! switch by `lamp-update-apply` (#1680, docs/updates.md). The round enables
+//! them with `LAMP_UPDATE_APPLY=on`, or the authenticated managed-product
+//! default. An explicit off still prevents the round requesting any write.
 //!
 //! A round runs in a sandbox that writes only `/opt/lampOS`,
 //! `/etc/systemd/system` and its records. So at the switch it stages a

@@ -1,7 +1,8 @@
 //! The manifest of a build, made where it is built: every lampOS binary
 //! in a folder (CI's `arm64-out`, with its `SHA256SUMS`), every unit of
 //! every lamp's own folder (`deploy/<lamp>/`, a folder with a `LAMP.md`),
-//! and the product's skills (`skills/`, each of
+//! ordinary binary-backed services in `deploy/product/`, and the product's
+//! skills (`skills/`, each of
 //! [`PRODUCT_SKILLS`](crate::install::PRODUCT_SKILLS)) as one file,
 //! [`product_skills::BUNDLE`]. The units are copied beside the binaries as
 //! `<lamp>.<unit>`, and the skills written there, so that the folder is
@@ -92,7 +93,7 @@ pub fn make_with(
     } else {
         Some(min_updater.unwrap_or(1).max(manifest::IMAGE_UPDATER))
     };
-    let min_updater = if reset_plan.is_none() {
+    let mut min_updater = if reset_plan.is_none() {
         min_updater
     } else {
         Some(min_updater.unwrap_or(1).max(manifest::RESET_PLAN_UPDATER))
@@ -135,6 +136,51 @@ pub fn make_with(
         size: bytes.len() as u64,
     });
     files.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut units = Vec::new();
+    for lamp in fs::read_dir(deploy)? {
+        let lamp = lamp?;
+        let name = lamp.file_name().to_string_lossy().into_owned();
+        let product = name == manifest::PRODUCT_LAMP;
+        if !manifest::is_token(&name) || (!product && !lamp.path().join("LAMP.md").is_file()) {
+            continue;
+        }
+        for entry in fs::read_dir(lamp.path())? {
+            let entry = entry?;
+            let unit_name = entry.file_name().to_string_lossy().into_owned();
+            if !manifest::is_unit_name(&unit_name) || !entry.file_type()?.is_file() {
+                continue;
+            }
+            // The updater's own service and fixed recovery helpers keep their
+            // existing handover boundary; this carrier is for ordinary parts.
+            if product && unit_name == crate::round::OWN_UNIT {
+                continue;
+            }
+            let bytes = fs::read(entry.path())?;
+            // Only a part installed by build: the others are not updated.
+            let Some(text) = std::str::from_utf8(&bytes).ok() else {
+                continue;
+            };
+            if unit::program(text).is_none() && unit::linked(text).is_none() {
+                continue;
+            }
+            let unit = Unit {
+                lamp: name.clone(),
+                unit: unit_name,
+                sha256: manifest::sha256_hex(&bytes),
+                size: bytes.len() as u64,
+            };
+            fs::write(binaries.join(unit.file_name()), &bytes)?;
+            units.push(unit);
+        }
+    }
+    units.sort_by(|a, b| (&a.lamp, &a.unit).cmp(&(&b.lamp, &b.unit)));
+    if units.iter().any(|unit| unit.lamp == manifest::PRODUCT_LAMP) {
+        min_updater = Some(
+            min_updater
+                .unwrap_or(1)
+                .max(manifest::PRODUCT_UNITS_UPDATER),
+        );
+    }
     if let Some(needed) = min_updater {
         if !files.iter().any(|file| file.name == "lamp-update") {
             return Err(invalid(format!(
@@ -148,35 +194,6 @@ pub fn make_with(
             )));
         }
     }
-    let mut units = Vec::new();
-    for lamp in fs::read_dir(deploy)? {
-        let lamp = lamp?;
-        let name = lamp.file_name().to_string_lossy().into_owned();
-        if !manifest::is_token(&name) || !lamp.path().join("LAMP.md").is_file() {
-            continue;
-        }
-        for entry in fs::read_dir(lamp.path())? {
-            let entry = entry?;
-            let unit_name = entry.file_name().to_string_lossy().into_owned();
-            if !manifest::is_unit_name(&unit_name) || !entry.file_type()?.is_file() {
-                continue;
-            }
-            let bytes = fs::read(entry.path())?;
-            // Only a part installed by build: the others are not updated.
-            let Some(_) = std::str::from_utf8(&bytes).ok().and_then(unit::program) else {
-                continue;
-            };
-            let unit = Unit {
-                lamp: name.clone(),
-                unit: unit_name,
-                sha256: manifest::sha256_hex(&bytes),
-                size: bytes.len() as u64,
-            };
-            fs::write(binaries.join(unit.file_name()), &bytes)?;
-            units.push(unit);
-        }
-    }
-    units.sort_by(|a, b| (&a.lamp, &a.unit).cmp(&(&b.lamp, &b.unit)));
     let made = Manifest {
         schema: SCHEMA,
         channel: channel.to_owned(),
@@ -201,6 +218,100 @@ pub fn make_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn product_services_and_linked_lamp_overrides_are_carried_with_level_six() {
+        let folder = tempfile::tempdir().unwrap();
+        let out = folder.path().join("out");
+        let deploy = folder.path().join("deploy");
+        fs::create_dir_all(&out).unwrap();
+        fs::create_dir_all(deploy.join(manifest::PRODUCT_LAMP)).unwrap();
+        fs::create_dir_all(deploy.join("lamp-owned")).unwrap();
+        fs::write(deploy.join("lamp-owned/LAMP.md"), "owned\n").unwrap();
+        fs::write(out.join("lamp-update"), "update").unwrap();
+        fs::write(out.join("lamp-voice"), "voice").unwrap();
+        fs::write(out.join("lamp-body"), "body").unwrap();
+        let product = "[Service]\nExecStart=/opt/lampOS/releases/current/lamp-voice serve\n";
+        let owned = format!("{product}Environment=LAMP_BUS_ROOT=/run/owned\n");
+        for (name, text) in [
+            ("lamp-voice.service", product.to_owned()),
+            (
+                "lamp-body.service",
+                format!(
+                    "[Service]\nExecStart=/opt/lampOS/body/{}/lamp-body serve\n",
+                    "a".repeat(64)
+                ),
+            ),
+            (
+                "lamp-update.service",
+                "[Service]\nExecStart=/opt/lampOS/update/current/lamp-update serve\n".into(),
+            ),
+            (
+                "lamp-external.service",
+                "[Service]\nExecStart=/usr/bin/true\n".into(),
+            ),
+            ("lamp-voice.socket", "[Socket]\nListenStream=1\n".into()),
+            ("lampos.target", "[Unit]\n".into()),
+        ] {
+            fs::write(deploy.join(manifest::PRODUCT_LAMP).join(name), text).unwrap();
+        }
+        fs::write(deploy.join("lamp-owned/lamp-voice.service"), &owned).unwrap();
+        let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let made = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &"c".repeat(40),
+            "https://channel.test/build-7/",
+            None,
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(made.min_updater, Some(manifest::PRODUCT_UNITS_UPDATER));
+        assert_eq!(made.units.len(), 3);
+        let product_voice = made
+            .units
+            .iter()
+            .find(|unit| unit.lamp == manifest::PRODUCT_LAMP && unit.unit == "lamp-voice.service")
+            .unwrap();
+        assert_eq!(
+            fs::read(out.join(product_voice.file_name())).unwrap(),
+            product.as_bytes()
+        );
+        assert_eq!(
+            product_voice.sha256,
+            manifest::sha256_hex(product.as_bytes())
+        );
+        let lamp_voice = made
+            .units
+            .iter()
+            .find(|unit| unit.lamp == "lamp-owned")
+            .unwrap();
+        assert_eq!(
+            fs::read(out.join(lamp_voice.file_name())).unwrap(),
+            owned.as_bytes()
+        );
+        assert_eq!(
+            manifest::parse(&fs::read(out.join("manifest.json")).unwrap()).unwrap(),
+            made
+        );
+        fs::remove_file(out.join("lamp-update")).unwrap();
+        let error = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            8,
+            &"c".repeat(40),
+            "https://channel.test/build-8/",
+            None,
+            Vec::new(),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("carries no lamp-update"));
+    }
 
     #[test]
     fn binaries_and_each_lamps_units_but_nothing_else() {
