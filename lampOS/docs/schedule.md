@@ -701,8 +701,10 @@ function that sets it (`tool_choice`): `set_timer` for a duration from now,
 right after the ask ("remind me in three minutes …", "remind me tomorrow at
 6:30 …", "wake me up at seven"), and a clock time must stand as one, so a
 task's length, another sentence's time or "at 180 degrees" forces nothing. It
-errs toward not forcing: a line with any word that may take the ask back or put
-it in doubt ("don't", "no", "wait", "cancel", "actually", "or", …) and a
+errs toward not forcing: the line must be one sentence, the ask (beside a
+greeting), and a line with quote marks, a `%`, or any word that may take the ask
+back, put it in doubt or make it another operation ("every day", "starting at
+noon") ("don't", "no", "wait", "cancel", "actually", "or", …) and a
 question that isn't an ask are asked as before, and the round after the call is asked with its
 result, so the lamp says what the schedule did.
 
