@@ -1,0 +1,1478 @@
+{
+  "new": 99,
+  "protected": 146,
+  "unique_paths_verified": 245,
+  "bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/993f3b81dd8ce1ba80d67d108ecb55fa5a7aa7a079ba8a7d6b8a954ffa03a986-turn_end_replay",
+      "sha256": "993f3b81dd8ce1ba80d67d108ecb55fa5a7aa7a079ba8a7d6b8a954ffa03a986",
+      "bytes": 91269728,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/271d58caeafb38ec2f149dd83650bed36baa7449b079001b86453a520764518b-lamp_peek-73600315bdd6f294",
+      "sha256": "271d58caeafb38ec2f149dd83650bed36baa7449b079001b86453a520764518b",
+      "bytes": 1019912,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/a36dde7588350ea33ecd34651d3cffaecc3cefd6fdef65e902b25a8675b160f1-lamp-peek",
+      "sha256": "a36dde7588350ea33ecd34651d3cffaecc3cefd6fdef65e902b25a8675b160f1",
+      "bytes": 7823744,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/2168e921e12c550982f78221bc236212ab56a2c28ca51226f6c92cc4df802fd7-lamp-voice-eval",
+      "sha256": "2168e921e12c550982f78221bc236212ab56a2c28ca51226f6c92cc4df802fd7",
+      "bytes": 36466264,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/f03e5ed634747afb700704172a7cf555f7d13aa9993af2694de468cf3bd4a79d-same_voice_pairs",
+      "sha256": "f03e5ed634747afb700704172a7cf555f7d13aa9993af2694de468cf3bd4a79d",
+      "bytes": 91483472,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/f16917dd43a46f9d2070700ef6410d3ffc2fbec6ce7f2ab7d6513f09451c2c2d-peek-f1e8827be703642e",
+      "sha256": "f16917dd43a46f9d2070700ef6410d3ffc2fbec6ce7f2ab7d6513f09451c2c2d",
+      "bytes": 8881904,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/3a3abe42b5592752c24d384df14653165eb398c2e2b042685dc4231ce92b36b7-lamp_voice_eval-09c0422b7d9af692",
+      "sha256": "3a3abe42b5592752c24d384df14653165eb398c2e2b042685dc4231ce92b36b7",
+      "bytes": 7888992,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/6e503965810509e2dad51f89b887d883685ec13b20a8935d1f31378b3afbd7b8-lamp-cloud",
+      "sha256": "6e503965810509e2dad51f89b887d883685ec13b20a8935d1f31378b3afbd7b8",
+      "bytes": 29603672,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/0506fa1d4d2a91cde8687e104eb6ca38dedb53fb6f8b62db7da93c3b02b85933-it-d42eb1c7e5987252",
+      "sha256": "0506fa1d4d2a91cde8687e104eb6ca38dedb53fb6f8b62db7da93c3b02b85933",
+      "bytes": 19635784,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/c50deac8b6ac38dcb4cb480b1cce0950c3b169f7efe60c78d2517b2f6c890bf5-lamp_cloud-5a32893ab71db8d7",
+      "sha256": "c50deac8b6ac38dcb4cb480b1cce0950c3b169f7efe60c78d2517b2f6c890bf5",
+      "bytes": 1019920,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/2313e7e75005ca220d66bd25ccc47e1960c887f2c1926d0d2f2feb9e56f4cd59-release_pair-92f8243e031a1e05",
+      "sha256": "2313e7e75005ca220d66bd25ccc47e1960c887f2c1926d0d2f2feb9e56f4cd59",
+      "bytes": 3099704,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/17e1deecf9fd86829ba5d3213e7761569f5f8ee30dd93c2c699703417506e9c3-it-6b946a5e051ef7a4",
+      "sha256": "17e1deecf9fd86829ba5d3213e7761569f5f8ee30dd93c2c699703417506e9c3",
+      "bytes": 20392112,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/837797dab11b3d5e4ab2471bdcbca8e7d1e72e71986e6ae7698e88ce4713778e-lamp_memory-0af22b32a7e8fee0",
+      "sha256": "837797dab11b3d5e4ab2471bdcbca8e7d1e72e71986e6ae7698e88ce4713778e",
+      "bytes": 12201736,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/d80a045e597c37e3caf11f2b0908ddd6bebcf6a83626e130f9264db9792ff5c2-voice_follows_face-1dd593594e591dfb",
+      "sha256": "d80a045e597c37e3caf11f2b0908ddd6bebcf6a83626e130f9264db9792ff5c2",
+      "bytes": 11857152,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/db6c54bdd72f74dd75d64547a1b65bda0620d68542962d0788f383397a0e8913-it-03d8e125c34f2f16",
+      "sha256": "db6c54bdd72f74dd75d64547a1b65bda0620d68542962d0788f383397a0e8913",
+      "bytes": 26251488,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/54476eebf84eb662472449486073aa6a314faac76ec794e53681e1776962e941-duplex_lab",
+      "sha256": "54476eebf84eb662472449486073aa6a314faac76ec794e53681e1776962e941",
+      "bytes": 3719088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/9c912df264525e4e0c10c76ad6a6a8bae1250ddb971d8de9763d2485a231ad9f-voice_link_used-05a182028a521157",
+      "sha256": "9c912df264525e4e0c10c76ad6a6a8bae1250ddb971d8de9763d2485a231ad9f",
+      "bytes": 11815464,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/9deba985b3ef75b9c9bb54b418f389c7212e1ae1a04baf263429882e0e395c72-lamp_voice_eval-079f2fa93fdefee3",
+      "sha256": "9deba985b3ef75b9c9bb54b418f389c7212e1ae1a04baf263429882e0e395c72",
+      "bytes": 30685200,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/fc7cb3fd177cebf525f3e2c28e2d5848881b1f8479561c1159c9b3b53b31d100-forget_shared_exchange-4c78b7cb5f42ec18",
+      "sha256": "fc7cb3fd177cebf525f3e2c28e2d5848881b1f8479561c1159c9b3b53b31d100",
+      "bytes": 6735488,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/cdaab65f7b69c764c88c99b92ed3a21c8fae60fd2ee49e6c147f39a3866559d9-functions-f833487a161d2a87",
+      "sha256": "cdaab65f7b69c764c88c99b92ed3a21c8fae60fd2ee49e6c147f39a3866559d9",
+      "bytes": 22922800,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/41bbc9859f0135fc6e4814fe83e5e873af57632d49eed2361459230a90bdb3bb-release_pair-99d83a658939f458",
+      "sha256": "41bbc9859f0135fc6e4814fe83e5e873af57632d49eed2361459230a90bdb3bb",
+      "bytes": 6074912,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/fced4d7d4e71128271e550b8b9a527b1d2d583629bfc34596fd0ded5ef371c5a-stop_words_stt_replay-5bdbc6c296f69050",
+      "sha256": "fced4d7d4e71128271e550b8b9a527b1d2d583629bfc34596fd0ded5ef371c5a",
+      "bytes": 3581440,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/489cfdc78b52b1f6be9b0ea8cebdda5af9c8e513f30d70f949ae9b3f5c9f4a57-lamp-skills",
+      "sha256": "489cfdc78b52b1f6be9b0ea8cebdda5af9c8e513f30d70f949ae9b3f5c9f4a57",
+      "bytes": 25587920,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/ab3fdfbe4aea40e30ac1aabf8f2c8c3f4123b1fdbce182e746290b430c2674af-lamp-voice",
+      "sha256": "ab3fdfbe4aea40e30ac1aabf8f2c8c3f4123b1fdbce182e746290b430c2674af",
+      "bytes": 50638712,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/902fb03ed22577ccbe3fbee9a6e435617db52a34699227165c40e08f7559c509-voice_forget-d4cb7fec5c0c3e47",
+      "sha256": "902fb03ed22577ccbe3fbee9a6e435617db52a34699227165c40e08f7559c509",
+      "bytes": 12125448,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/13ed6d29c4a73be600fe5a54dcd30ed87d90cde37f7fcb5107dae85e479aed18-install-50bf62de40b53745",
+      "sha256": "13ed6d29c4a73be600fe5a54dcd30ed87d90cde37f7fcb5107dae85e479aed18",
+      "bytes": 16702120,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/07793fbf0eb1009c1c475da71cd681e8ea1a73ed25baa0956cb6e9e986b59409-head_qualification_operator",
+      "sha256": "07793fbf0eb1009c1c475da71cd681e8ea1a73ed25baa0956cb6e9e986b59409",
+      "bytes": 1873968,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/f75bb96252fa619014bb82bfa2abca71817ec4fb108ea1d792ddc94503136a03-lamp_memory_eval-f5db972ba691a95b",
+      "sha256": "f75bb96252fa619014bb82bfa2abca71817ec4fb108ea1d792ddc94503136a03",
+      "bytes": 2177528,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/67783dd6131af6c11cfa2a520bd13da52ae4ec5b8d2f3c3d01f1bb346f444269-voice_forget_named-71edb0837cf0037a",
+      "sha256": "67783dd6131af6c11cfa2a520bd13da52ae4ec5b8d2f3c3d01f1bb346f444269",
+      "bytes": 11726432,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/0e9f08dda2bb8225b7cdfd3a14660c8264c466c4f1ca65e74fc41433441af730-lamp_update-37e912ef505f9124",
+      "sha256": "0e9f08dda2bb8225b7cdfd3a14660c8264c466c4f1ca65e74fc41433441af730",
+      "bytes": 1019984,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/83ccde70b6f7472ea5a2bca52be27147a34ef43c691bc39b3499b27515e9a4c3-reference_pace",
+      "sha256": "83ccde70b6f7472ea5a2bca52be27147a34ef43c691bc39b3499b27515e9a4c3",
+      "bytes": 5021080,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/4cb0dcc1832450dc8dba5e3bae89859e0ad5e61e06f3aec651a6e06f6d6792b4-round-11a459c39bb76aa7",
+      "sha256": "4cb0dcc1832450dc8dba5e3bae89859e0ad5e61e06f3aec651a6e06f6d6792b4",
+      "bytes": 20935184,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/6c1a0126e2078d42619e8ddb881e9ea6d06dc62fc6a49715c418d7d0aea109a7-requested_audio-7f311165d6904c49",
+      "sha256": "6c1a0126e2078d42619e8ddb881e9ea6d06dc62fc6a49715c418d7d0aea109a7",
+      "bytes": 16389448,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/222c6aed8dfb40a1fe52427c1306ed6f15489f0ea560d6d2d8f9720fd725e203-release_pair-4c330c26cfcb0f6b",
+      "sha256": "222c6aed8dfb40a1fe52427c1306ed6f15489f0ea560d6d2d8f9720fd725e203",
+      "bytes": 4427584,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/ef4adde61eb44f3375d8c977ee0b2ccc6d6f615fdb848a15d628d8a0ef87c0eb-it-b864a5069c6d724f",
+      "sha256": "ef4adde61eb44f3375d8c977ee0b2ccc6d6f615fdb848a15d628d8a0ef87c0eb",
+      "bytes": 18614848,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/25cd27846f7910b40aa919a654628de71faa12f06a9bda28eb6d483951d30b77-lamp_cloud-3b3a9a4f82d4ebc1",
+      "sha256": "25cd27846f7910b40aa919a654628de71faa12f06a9bda28eb6d483951d30b77",
+      "bytes": 36671336,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/a5f888b73e7ef0766c4a34348c77bbb94d1bd3bae23a60abdfe027caedc48f70-voice_forget_about-f18de9cac46c9fa5",
+      "sha256": "a5f888b73e7ef0766c4a34348c77bbb94d1bd3bae23a60abdfe027caedc48f70",
+      "bytes": 11611832,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/0f2f10a93c20aa286ba55a46edda1ca0afef845e56aed2a56d3b24c459104960-self_cli_exec-f64b721a3e4209eb",
+      "sha256": "0f2f10a93c20aa286ba55a46edda1ca0afef845e56aed2a56d3b24c459104960",
+      "bytes": 548160,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/15519e7a7ab8f055a375e59348e11c295306710d97c4ea4c82997ac1a7640e51-probe_handover",
+      "sha256": "15519e7a7ab8f055a375e59348e11c295306710d97c4ea4c82997ac1a7640e51",
+      "bytes": 16080480,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/870e1e1aa6f391a6536df503c1935256738595747ec81206bf6b65cfde9c76ff-it-f00b0d167c98c106",
+      "sha256": "870e1e1aa6f391a6536df503c1935256738595747ec81206bf6b65cfde9c76ff",
+      "bytes": 1999488,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/581e7fbcd43ebee51ebddcfe3bcbfd55720ae3aeb6e33166fb33a862d9fafcd0-lamp_voice-b6dc78794ec93371",
+      "sha256": "581e7fbcd43ebee51ebddcfe3bcbfd55720ae3aeb6e33166fb33a862d9fafcd0",
+      "bytes": 1259360,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/655b188f7580d75100591e354dea9514c0f98efcaf24c00c0a85676807aff7d2-render_line_second-b9b52812b570e84b",
+      "sha256": "655b188f7580d75100591e354dea9514c0f98efcaf24c00c0a85676807aff7d2",
+      "bytes": 1704680,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/2128088e0a38749d042369980dce783b1259d5f68ff130d9db5cd40cd423a1e7-lamp_skills-8d31d51df6f14a95",
+      "sha256": "2128088e0a38749d042369980dce783b1259d5f68ff130d9db5cd40cd423a1e7",
+      "bytes": 16682088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/0d99a7abba3ed80a1960f268fe231b413e44f68eb041b3a471906bbd4dda318d-health_control-a47aa33374660f52",
+      "sha256": "0d99a7abba3ed80a1960f268fe231b413e44f68eb041b3a471906bbd4dda318d",
+      "bytes": 2471992,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/ad49165dc63fd5c050993648a6e5d1f6b700f9dc204da15221bd42a9f6dc70c0-forgot-fd6638675ad23908",
+      "sha256": "ad49165dc63fd5c050993648a6e5d1f6b700f9dc204da15221bd42a9f6dc70c0",
+      "bytes": 5208544,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/bdbf8c42fc0d8179bc575fed3ff8bc32e6bb4499e1b2c192bbd3470a08ee4bb7-it-73635c91cd8b88a3",
+      "sha256": "bdbf8c42fc0d8179bc575fed3ff8bc32e6bb4499e1b2c192bbd3470a08ee4bb7",
+      "bytes": 115522320,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/3638db2eb63d5f0036daa78ddbc42d24f84736f75806607d4d88ed01a0f9ec6f-forget_person-0deddd938b7bacb2",
+      "sha256": "3638db2eb63d5f0036daa78ddbc42d24f84736f75806607d4d88ed01a0f9ec6f",
+      "bytes": 9780816,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/1fcf403cdb65caf2e900aa8ff4b3f84ebc854593f052b22f6fd1a7f66280d5ec-ring_process_probe",
+      "sha256": "1fcf403cdb65caf2e900aa8ff4b3f84ebc854593f052b22f6fd1a7f66280d5ec",
+      "bytes": 7292560,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/1ff21e29ffd8383d9cf9aaf90e358ef3d63ba723a8303b5bbe4a1534bfd688b5-voice_since_until-28f83169b6275560",
+      "sha256": "1ff21e29ffd8383d9cf9aaf90e358ef3d63ba723a8303b5bbe4a1534bfd688b5",
+      "bytes": 11621512,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/23ada23489d44ce298c084f36599d9ea2797033785cedc188a87d3ad01dd4894-lamp_update-848e77ac6440879c",
+      "sha256": "23ada23489d44ce298c084f36599d9ea2797033785cedc188a87d3ad01dd4894",
+      "bytes": 14180072,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/1dad0a9a855d96c204575e2e64900b7edf1fabd43c40ab3ae8d9092c4030893c-admission_latency",
+      "sha256": "1dad0a9a855d96c204575e2e64900b7edf1fabd43c40ab3ae8d9092c4030893c",
+      "bytes": 1090976,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/fb177b91e0154de91858f7364ee6d4646dbc1af442ae04bb0ced3259328a8efc-lamp_skills-1307f9b251c59b00",
+      "sha256": "fb177b91e0154de91858f7364ee6d4646dbc1af442ae04bb0ced3259328a8efc",
+      "bytes": 17421776,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/478b4a3935d2c29606334c6591fce980f0837e55486d831b60e8a5341b4bb458-voice_observe-8fca32d650057c26",
+      "sha256": "478b4a3935d2c29606334c6591fce980f0837e55486d831b60e8a5341b4bb458",
+      "bytes": 10789824,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/59651c368145a0d3389f6bf091ce2504275f1364f10b9702e286b71d632c9bd8-release_pair-6a7b383b0db4d353",
+      "sha256": "59651c368145a0d3389f6bf091ce2504275f1364f10b9702e286b71d632c9bd8",
+      "bytes": 4674144,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/6d1aed551762136e5313a46e8312be0351fcf0f452b6ab73c8eaa070934d3400-self_process_cuts-584367f7ea7a7bb2",
+      "sha256": "6d1aed551762136e5313a46e8312be0351fcf0f452b6ab73c8eaa070934d3400",
+      "bytes": 544552,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/8dfc5dc8178a03261985af38798f936a8266171521beb81e0cc51680c446ac6b-lamp_memory-83413b99be0ca219",
+      "sha256": "8dfc5dc8178a03261985af38798f936a8266171521beb81e0cc51680c446ac6b",
+      "bytes": 9627720,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/df69f88f34e2fe1094bbe706782c1ca8b712e8de111d221173937e713b57cb5d-paraphrase_fixture-48401515e5a149f1",
+      "sha256": "df69f88f34e2fe1094bbe706782c1ca8b712e8de111d221173937e713b57cb5d",
+      "bytes": 1752960,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/6f4aafb050789754361a4c9bb9e9340247600a4f7ea7aaddc62045f4f74fa7e2-release_pair-1cffc6d9d32163c9",
+      "sha256": "6f4aafb050789754361a4c9bb9e9340247600a4f7ea7aaddc62045f4f74fa7e2",
+      "bytes": 3502064,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/11a836cb2e802187de36e0a366a01318aabae67da0e13e189f2e53b4e8197550-render_relaxing_music",
+      "sha256": "11a836cb2e802187de36e0a366a01318aabae67da0e13e189f2e53b4e8197550",
+      "bytes": 644536,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/b05b57050a8ddddd5f5b14fefea383935bf82d47042b5aa3cc2eddb6b2cb01e6-voice_early_words-177a409ed98660a5",
+      "sha256": "b05b57050a8ddddd5f5b14fefea383935bf82d47042b5aa3cc2eddb6b2cb01e6",
+      "bytes": 11924816,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/bb4a5e601c86c5684a9b39d048ee605ef09b98ad1421014e22c116e1f0a2779a-lamp_setup-0420e7dbd0bdd7fb",
+      "sha256": "bb4a5e601c86c5684a9b39d048ee605ef09b98ad1421014e22c116e1f0a2779a",
+      "bytes": 1019920,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/ae490089a2fa383adc5b78c57b7643e90b224183c66061620a2e6c9f679d2a39-hearing_replay",
+      "sha256": "ae490089a2fa383adc5b78c57b7643e90b224183c66061620a2e6c9f679d2a39",
+      "bytes": 2059664,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/911e71097500e7c8fa1753bcfceeb5ad3fcaf6fedce3d2c703a39b73d6a22a48-wake-1817e6f65533e377",
+      "sha256": "911e71097500e7c8fa1753bcfceeb5ad3fcaf6fedce3d2c703a39b73d6a22a48",
+      "bytes": 1820288,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/153de6030866c96e763f90b5a7e555513fe8d08e8a8db66a2bde0aac93c89489-lamp-setup",
+      "sha256": "153de6030866c96e763f90b5a7e555513fe8d08e8a8db66a2bde0aac93c89489",
+      "bytes": 19817480,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/0f73923cefd488fca9d80c506600cdc7ea6069628cce8d06142dbadcab550c29-it-671b21cade528fe0",
+      "sha256": "0f73923cefd488fca9d80c506600cdc7ea6069628cce8d06142dbadcab550c29",
+      "bytes": 15832056,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/059a7dca7da3df6b2fbed81634e30b403b062dfbcd04f83c7a65f39d757b6b3d-lamp_peek-5be1f9fb099b24a7",
+      "sha256": "059a7dca7da3df6b2fbed81634e30b403b062dfbcd04f83c7a65f39d757b6b3d",
+      "bytes": 4232896,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/9d5061c327cf611def8b18cb97310aa04eab0a3d4130283a9c4020aaf9aa6a42-lamp_setup-84cf96c59d18cc85",
+      "sha256": "9d5061c327cf611def8b18cb97310aa04eab0a3d4130283a9c4020aaf9aa6a42",
+      "bytes": 13603768,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/a7ef1426fa728babac15ad333867784a7b80e26757bd0a4e17af15237b2f7252-lamp-memory-eval",
+      "sha256": "a7ef1426fa728babac15ad333867784a7b80e26757bd0a4e17af15237b2f7252",
+      "bytes": 5044568,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/24f72fa2c36c7139d9983ea66b9e46edc5902078f09306460a177f9637ef96c9-lamp-memory-fixture",
+      "sha256": "24f72fa2c36c7139d9983ea66b9e46edc5902078f09306460a177f9637ef96c9",
+      "bytes": 9714872,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/e47c966a3970641a3ccdfc12ed3232ec07687129597fb98004b5f11d9a2334c4-lamp-memory",
+      "sha256": "e47c966a3970641a3ccdfc12ed3232ec07687129597fb98004b5f11d9a2334c4",
+      "bytes": 9356640,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/8a35d5e967ddcbda1931763cbf60b197eadf1189c1a3015b1588c2fceaad0f10-replay_cost",
+      "sha256": "8a35d5e967ddcbda1931763cbf60b197eadf1189c1a3015b1588c2fceaad0f10",
+      "bytes": 4974352,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/1e6dadd96f92360bb8ec9660c4153121b39754eebe277639f7eb8ee9264bdccd-lamp_expression-f768989f9c233433",
+      "sha256": "1e6dadd96f92360bb8ec9660c4153121b39754eebe277639f7eb8ee9264bdccd",
+      "bytes": 2894744,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/b8362f18630597238401af8f661ac041a241f483a045e5512a1ea5c509bbdefc-lamp-expression",
+      "sha256": "b8362f18630597238401af8f661ac041a241f483a045e5512a1ea5c509bbdefc",
+      "bytes": 10806936,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/d34dcba17b545025642fd6f5cc59af1c8da28248680fd04384427e2c9b4cc485-lamp_lean-332a9af8170ca045",
+      "sha256": "d34dcba17b545025642fd6f5cc59af1c8da28248680fd04384427e2c9b4cc485",
+      "bytes": 1188288,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/792659ae9ae12967779e09356341205d19c980086360ab71b0501e25a1563078-runtime-b52f6baa2e80330c",
+      "sha256": "792659ae9ae12967779e09356341205d19c980086360ab71b0501e25a1563078",
+      "bytes": 8346696,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/82582266064d5d2bb680f67f361919b627a8559cf48090d1a70761f8dd565bee-rest_cost",
+      "sha256": "82582266064d5d2bb680f67f361919b627a8559cf48090d1a70761f8dd565bee",
+      "bytes": 5009296,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/c653cfbf38934ccf769ef5c6a8129ae39e9b7dfcf2cf55b403825ac6d40cafe5-it-ea6f93305b6d7f2a",
+      "sha256": "c653cfbf38934ccf769ef5c6a8129ae39e9b7dfcf2cf55b403825ac6d40cafe5",
+      "bytes": 3916760,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/6766e16beea7cfc6e19b8f3245d3546ba7132c50720c8366921e8df5c49671da-it-d8575dda435eb43e",
+      "sha256": "6766e16beea7cfc6e19b8f3245d3546ba7132c50720c8366921e8df5c49671da",
+      "bytes": 15853968,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/9de35ccb1ac64895b1c2a99b5cfd03d7427f31a02ff30daa59c5f91e8fa351a7-check",
+      "sha256": "9de35ccb1ac64895b1c2a99b5cfd03d7427f31a02ff30daa59c5f91e8fa351a7",
+      "bytes": 2777944,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/34ebbf7e2439cd0b345f0de51ac9c50db941b6577a0e6b445084c729a2d4d7dc-recent_playout_cost",
+      "sha256": "34ebbf7e2439cd0b345f0de51ac9c50db941b6577a0e6b445084c729a2d4d7dc",
+      "bytes": 5004384,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/084b98d1d03a1866f70e7ffcf9de1e3ecfe02afd98785f8e64c1816a1e1469c1-head_plan",
+      "sha256": "084b98d1d03a1866f70e7ffcf9de1e3ecfe02afd98785f8e64c1816a1e1469c1",
+      "bytes": 1770384,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/bc5a04cebd6b97c3b13a71439597a03557804e2c1e08d6377bd52d140b0f595d-lamp-body-mood",
+      "sha256": "bc5a04cebd6b97c3b13a71439597a03557804e2c1e08d6377bd52d140b0f595d",
+      "bytes": 548632,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/e3b2c96f7ea21f6b8835486bfe566f82581e83685437daf84793bec5494f2978-lamp_expression-87834248cbd87140",
+      "sha256": "e3b2c96f7ea21f6b8835486bfe566f82581e83685437daf84793bec5494f2978",
+      "bytes": 7570320,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/79e34f61c07de1149b2d18a4c5c8b35cecb007de3250c94fb699a97325d60ddb-lamp_body_mood-9d0446e9a36c0d5e",
+      "sha256": "79e34f61c07de1149b2d18a4c5c8b35cecb007de3250c94fb699a97325d60ddb",
+      "bytes": 1165080,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/cd4b93db1878cde0a205a7e16e9d08c147b1b7316e680873389c6d8c8a64e273-lamp_body_worker-9e6c54d8d16d8b9d",
+      "sha256": "cd4b93db1878cde0a205a7e16e9d08c147b1b7316e680873389c6d8c8a64e273",
+      "bytes": 1332264,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/3f4d72f7ec91db8816ffd404fce44ab52cfcfd4e3c7614331f9f2b70e7b9bae8-expression_ask",
+      "sha256": "3f4d72f7ec91db8816ffd404fce44ab52cfcfd4e3c7614331f9f2b70e7b9bae8",
+      "bytes": 1586688,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/b847060218b64503ffb7087ebc84619dad8a13a4491380ca7200d5e329b21f34-lamp_body-6aa8d283b7d2353f",
+      "sha256": "b847060218b64503ffb7087ebc84619dad8a13a4491380ca7200d5e329b21f34",
+      "bytes": 3117048,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/2d44916b8f7b454026518daa0affe08beebe0f2a00a446ccdee8c31595df50d0-lamp-body-inspect",
+      "sha256": "2d44916b8f7b454026518daa0affe08beebe0f2a00a446ccdee8c31595df50d0",
+      "bytes": 679208,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/2fb6d46c63c10500d88cba690ce098a2ad7f873ecb85024b1fdfe1691a85e1d3-lamp_body_measure-160bb32b216afa14",
+      "sha256": "2fb6d46c63c10500d88cba690ce098a2ad7f873ecb85024b1fdfe1691a85e1d3",
+      "bytes": 1520008,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/ef6df4544e9dc7068772efcd7fdc9aec84a1d032c13eedf0a101e9e8e8e4f964-it-bda9dd473807073f",
+      "sha256": "ef6df4544e9dc7068772efcd7fdc9aec84a1d032c13eedf0a101e9e8e8e4f964",
+      "bytes": 7138864,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/c340ffc701a80c435a8b183eb678931eeed4b3f9be43127d859abd35985ed395-lamp-body-worker",
+      "sha256": "c340ffc701a80c435a8b183eb678931eeed4b3f9be43127d859abd35985ed395",
+      "bytes": 732088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/3f71c55ef5d16a261f226d9d5a302e7eec7521c8b8e5a8930c8d4001711d4148-lamp-body-measure",
+      "sha256": "3f71c55ef5d16a261f226d9d5a302e7eec7521c8b8e5a8930c8d4001711d4148",
+      "bytes": 928656,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/9b68b75f51b58a2686b7ed834216ec3767cf00da52688c8f9aad21fdd1f955b2-lamp_body_inspect-786b5ad8d2a0a7e5",
+      "sha256": "9b68b75f51b58a2686b7ed834216ec3767cf00da52688c8f9aad21fdd1f955b2",
+      "bytes": 1327496,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/a18f4d47c5b433d1c31b3c9b1404d325adc65ced995349ab91526606c1055e6e-lamp-body",
+      "sha256": "a18f4d47c5b433d1c31b3c9b1404d325adc65ced995349ab91526606c1055e6e",
+      "bytes": 1140128,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/7fe81a97c53446ab34e2edcf57c1ad9b17414a3950d6761309b50f3bc541b184-lamp_keeper-b90bc9f7ee259680",
+      "sha256": "7fe81a97c53446ab34e2edcf57c1ad9b17414a3950d6761309b50f3bc541b184",
+      "bytes": 3286280,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/8de06d1089b63f766afc61d1b548d585a48435141be1dd462b4253e389555184-lamp_keeper-17c84dccfff326fb",
+      "sha256": "8de06d1089b63f766afc61d1b548d585a48435141be1dd462b4253e389555184",
+      "bytes": 2043880,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/d37485f4b019b93f8f4b63b500a851091bd5961c3ef4632eb027089b44f765ca-lamp-update",
+      "sha256": "d37485f4b019b93f8f4b63b500a851091bd5961c3ef4632eb027089b44f765ca",
+      "bytes": 13605080,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/abddec606dd22b4eaf06894e433b3502aa556f98278f69a9cce644b34de437f9-lamp_voice-a9b95286b805e668",
+      "sha256": "abddec606dd22b4eaf06894e433b3502aa556f98278f69a9cce644b34de437f9",
+      "bytes": 140060400,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/frozen-executables/23d92331266be03a5b30c8728ac9779ad90abf21864ade2592333138e178f3e1-lamp_body-e3e309ea1afce98d",
+      "sha256": "23d92331266be03a5b30c8728ac9779ad90abf21864ade2592333138e178f3e1",
+      "bytes": 143975616,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/16aa18b9c8993eaf981d8d17976d2f448690c1dbe9b01f6171cef3c69acc6eb2-lamp-peek",
+      "sha256": "16aa18b9c8993eaf981d8d17976d2f448690c1dbe9b01f6171cef3c69acc6eb2",
+      "bytes": 7823744,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/b972482b3ace8afa0348bcf083a5fcefa80952e6dcf7eea6b02baceeed284a13-lamp_peek-73600315bdd6f294",
+      "sha256": "b972482b3ace8afa0348bcf083a5fcefa80952e6dcf7eea6b02baceeed284a13",
+      "bytes": 1019912,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/965922cb04b264d4dc2126e57d543e08a77996213eea861f8288b96444af67e0-peek-f1e8827be703642e",
+      "sha256": "965922cb04b264d4dc2126e57d543e08a77996213eea861f8288b96444af67e0",
+      "bytes": 8881904,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/51df1bdeb3da18be4e9c394a52655491edec662dab0160dded003cd42dea3320-lamp-cloud",
+      "sha256": "51df1bdeb3da18be4e9c394a52655491edec662dab0160dded003cd42dea3320",
+      "bytes": 29603672,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/e9643d5f44158f229391162c8cbda6fd94b17b6d142abd1450afbc71e2853ea3-lamp_voice_eval-09c0422b7d9af692",
+      "sha256": "e9643d5f44158f229391162c8cbda6fd94b17b6d142abd1450afbc71e2853ea3",
+      "bytes": 7888992,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/dd0c549ecc0befa25c4ef9f2d39f58e9c1e2fb1221cb0bb09e7dc816f7778f83-lamp-voice-eval",
+      "sha256": "dd0c549ecc0befa25c4ef9f2d39f58e9c1e2fb1221cb0bb09e7dc816f7778f83",
+      "bytes": 36466264,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/dc5108c983719855f1c6506d45639543e40c77a44244fe0a8ae743648f4eaec8-turn_end_replay",
+      "sha256": "dc5108c983719855f1c6506d45639543e40c77a44244fe0a8ae743648f4eaec8",
+      "bytes": 91269728,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/f3dee66cf0581cff0b3f96593eb0400b74d154dfd66e5c16151cb74590794f4a-same_voice_pairs",
+      "sha256": "f3dee66cf0581cff0b3f96593eb0400b74d154dfd66e5c16151cb74590794f4a",
+      "bytes": 91483472,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/33d041b9b24a3c46088b828e6bdce1822c32e1ff0955b046871d2fa20dd3cd19-it-6b946a5e051ef7a4",
+      "sha256": "33d041b9b24a3c46088b828e6bdce1822c32e1ff0955b046871d2fa20dd3cd19",
+      "bytes": 20392112,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/113575f87c30f92bc7ff1a54d3bc8552bd58c7ea08687c5acc0f97699da5b105-release_pair-92f8243e031a1e05",
+      "sha256": "113575f87c30f92bc7ff1a54d3bc8552bd58c7ea08687c5acc0f97699da5b105",
+      "bytes": 3099704,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/9a3bccdee1ef78e7c9f0374cb8bdf0564fc6baaae84085511175fb824276ba48-lamp_cloud-5a32893ab71db8d7",
+      "sha256": "9a3bccdee1ef78e7c9f0374cb8bdf0564fc6baaae84085511175fb824276ba48",
+      "bytes": 1019920,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/ebc2660a8d7df803453e563ecaed9946ac643e9277a035a4478563a9699dc2f0-it-d42eb1c7e5987252",
+      "sha256": "ebc2660a8d7df803453e563ecaed9946ac643e9277a035a4478563a9699dc2f0",
+      "bytes": 19635784,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/0b7f15f3c598aab02a9f80e48dd2e2992eaa7bcdd18e7199ab358eb2f4c4bf51-lamp_cloud-3b3a9a4f82d4ebc1",
+      "sha256": "0b7f15f3c598aab02a9f80e48dd2e2992eaa7bcdd18e7199ab358eb2f4c4bf51",
+      "bytes": 36671336,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/30364cf99d62ce4d18b789c9189a21bb89195b134529aed6a86a824e0fa25007-wake-1817e6f65533e377",
+      "sha256": "30364cf99d62ce4d18b789c9189a21bb89195b134529aed6a86a824e0fa25007",
+      "bytes": 1820288,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/07d16fd374f970758642c06285b6080c3464e23975286335443d594424985b1e-lamp-setup",
+      "sha256": "07d16fd374f970758642c06285b6080c3464e23975286335443d594424985b1e",
+      "bytes": 19817480,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/82bb560b3e76b4ca90efbd8709f53b4532ced63482419ad9623317bf46a30706-lamp_setup-0420e7dbd0bdd7fb",
+      "sha256": "82bb560b3e76b4ca90efbd8709f53b4532ced63482419ad9623317bf46a30706",
+      "bytes": 1019920,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/9598a3832c0da9ae0d3ef508e5b768b1665bcf9eb0c9667d169d7506d7eb6d51-lamp_voice_eval-079f2fa93fdefee3",
+      "sha256": "9598a3832c0da9ae0d3ef508e5b768b1665bcf9eb0c9667d169d7506d7eb6d51",
+      "bytes": 30685200,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/6d9a85611cf79e9f5f67f64f3708f8622d95d3c9cb099662a6fed98c3ffab44b-head_qualification_operator",
+      "sha256": "6d9a85611cf79e9f5f67f64f3708f8622d95d3c9cb099662a6fed98c3ffab44b",
+      "bytes": 1873968,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/4985144d8afe30e5e4a8b2ce75a175d097a9a4da610941adef1676237b75b915-it-671b21cade528fe0",
+      "sha256": "4985144d8afe30e5e4a8b2ce75a175d097a9a4da610941adef1676237b75b915",
+      "bytes": 15832056,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/4f1f06846a0705b80aee718beab4dd1986856cdb862e64ca446f05590ef045f1-hearing_replay",
+      "sha256": "4f1f06846a0705b80aee718beab4dd1986856cdb862e64ca446f05590ef045f1",
+      "bytes": 2059664,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/677326408508d304fcff6abf4a3f8f32ea8d6a6a48aca12e8ccc795dc4d381e6-probe_handover",
+      "sha256": "677326408508d304fcff6abf4a3f8f32ea8d6a6a48aca12e8ccc795dc4d381e6",
+      "bytes": 16080480,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/a5d402035c673dc69ce1b79de990faa2cba58e2aaf9906a5c8c35096cc1a9313-duplex_lab",
+      "sha256": "a5d402035c673dc69ce1b79de990faa2cba58e2aaf9906a5c8c35096cc1a9313",
+      "bytes": 3719088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/f9f0610c6381ab9ebb18e08a0dd1c694b76cf1fcf2607dcd2a29a8346be0c79d-stop_words_stt_replay-5bdbc6c296f69050",
+      "sha256": "f9f0610c6381ab9ebb18e08a0dd1c694b76cf1fcf2607dcd2a29a8346be0c79d",
+      "bytes": 3581440,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/1b5ec8a322234368060cac4b8dec7449189f88454f45b9571f656d0f26702911-ring_process_probe",
+      "sha256": "1b5ec8a322234368060cac4b8dec7449189f88454f45b9571f656d0f26702911",
+      "bytes": 7292560,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/938ae2a9977745c7ead7be9f0adb178bdde557118f3fd51ebb537a7d00289252-it-73635c91cd8b88a3",
+      "sha256": "938ae2a9977745c7ead7be9f0adb178bdde557118f3fd51ebb537a7d00289252",
+      "bytes": 115522320,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/4edde06bbeac09803e55bc835d20c949d59b1610b67c38bd3df2a9e7681a5cfc-reference_pace",
+      "sha256": "4edde06bbeac09803e55bc835d20c949d59b1610b67c38bd3df2a9e7681a5cfc",
+      "bytes": 5021080,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/1d1eece002e1c3c7b88cf9f7a971aa7280cca13d825047e5d5a1de14ce29a091-render_line_second-b9b52812b570e84b",
+      "sha256": "1d1eece002e1c3c7b88cf9f7a971aa7280cca13d825047e5d5a1de14ce29a091",
+      "bytes": 1704680,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/4ee529a50b64509123fe9267aa5c4c987acf472be01a9ff09a665c68fff766e6-lamp_voice-b6dc78794ec93371",
+      "sha256": "4ee529a50b64509123fe9267aa5c4c987acf472be01a9ff09a665c68fff766e6",
+      "bytes": 1259360,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/3fc2f1bb2f56c17e67cbffb983d8ba8189ace4877010f7690f403e2da032fd62-release_pair-99d83a658939f458",
+      "sha256": "3fc2f1bb2f56c17e67cbffb983d8ba8189ace4877010f7690f403e2da032fd62",
+      "bytes": 6074912,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/2e60fed30e0b6266ce7a81e2726f19624bd4c65d0f4e3201bf5163f96ab3ba92-admission_latency",
+      "sha256": "2e60fed30e0b6266ce7a81e2726f19624bd4c65d0f4e3201bf5163f96ab3ba92",
+      "bytes": 1090976,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/897daf7ed84380a4e1fca555d20d2adfbc40060516c18caf335169832f586a05-render_relaxing_music",
+      "sha256": "897daf7ed84380a4e1fca555d20d2adfbc40060516c18caf335169832f586a05",
+      "bytes": 644536,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/427ea8622c5a872b8c6b6eba81217605f1986f8b8c532d27eb2c61e6dca3c534-functions-f833487a161d2a87",
+      "sha256": "427ea8622c5a872b8c6b6eba81217605f1986f8b8c532d27eb2c61e6dca3c534",
+      "bytes": 22922800,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/c549d7963052f0bfa5615fbb9975cea1182a54cc42d874728526854c9a67e84b-requested_audio-7f311165d6904c49",
+      "sha256": "c549d7963052f0bfa5615fbb9975cea1182a54cc42d874728526854c9a67e84b",
+      "bytes": 16389448,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/0e874be2ecfb82caa09b1246d6ccde4423353ee261b5f503b9c4b245fb26a033-it-f00b0d167c98c106",
+      "sha256": "0e874be2ecfb82caa09b1246d6ccde4423353ee261b5f503b9c4b245fb26a033",
+      "bytes": 1999488,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/f4b79e53550ac2c3969271e4eebe97530cf783ba578687fb14e7366709b8ba3c-install-50bf62de40b53745",
+      "sha256": "f4b79e53550ac2c3969271e4eebe97530cf783ba578687fb14e7366709b8ba3c",
+      "bytes": 16702120,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/b2d36dc0df21cf950cb99ca26cecb3047703088dd32aa91b7d6c2b1baf9df30e-lamp_skills-1307f9b251c59b00",
+      "sha256": "b2d36dc0df21cf950cb99ca26cecb3047703088dd32aa91b7d6c2b1baf9df30e",
+      "bytes": 17421776,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/df0d4a854dc81d6414c40edb6985efef8eafa4613bb32b664820a32c07d34306-round-11a459c39bb76aa7",
+      "sha256": "df0d4a854dc81d6414c40edb6985efef8eafa4613bb32b664820a32c07d34306",
+      "bytes": 20935184,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/6e3566d8d3fab3daf900f482949ccf44bf3079f8e3f505e4c4b43222d96a49e8-lamp_update-848e77ac6440879c",
+      "sha256": "6e3566d8d3fab3daf900f482949ccf44bf3079f8e3f505e4c4b43222d96a49e8",
+      "bytes": 14180072,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/215c0d80c45908ab8a8118c20c2d6a8f7a7a461cf4abd84d371b13adcf652775-self_process_cuts-584367f7ea7a7bb2",
+      "sha256": "215c0d80c45908ab8a8118c20c2d6a8f7a7a461cf4abd84d371b13adcf652775",
+      "bytes": 544552,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/429a604d1019b74c1e675004d47e0f3ede80858cf0fd8df0b014d301c642e387-lamp_update-37e912ef505f9124",
+      "sha256": "429a604d1019b74c1e675004d47e0f3ede80858cf0fd8df0b014d301c642e387",
+      "bytes": 1019984,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/e2fb769f6e724af64018f888d2ca71312ef8c473ebeea92ac309b344315a4cff-lamp_skills-8d31d51df6f14a95",
+      "sha256": "e2fb769f6e724af64018f888d2ca71312ef8c473ebeea92ac309b344315a4cff",
+      "bytes": 16682088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/c69c0d2688545a97162aad4c03f1dd6a0ce70410c8a7921c6e046fb8075a7862-release_pair-6a7b383b0db4d353",
+      "sha256": "c69c0d2688545a97162aad4c03f1dd6a0ce70410c8a7921c6e046fb8075a7862",
+      "bytes": 4674144,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/27991f5bcdc2d31bcf88c71917c71ee307bbe5985012ddf6bc0c89db86bc1976-release_pair-1cffc6d9d32163c9",
+      "sha256": "27991f5bcdc2d31bcf88c71917c71ee307bbe5985012ddf6bc0c89db86bc1976",
+      "bytes": 3502064,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/84a052d564e003ad651904726a690b03444370eca24c3b287c612bf3c58f97f9-it-03d8e125c34f2f16",
+      "sha256": "84a052d564e003ad651904726a690b03444370eca24c3b287c612bf3c58f97f9",
+      "bytes": 26251488,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/bcbc036bbac1d81c00dadb94c8c8a0d8ac6deb4087a6fd59e0e5dd7f811244bc-self_cli_exec-f64b721a3e4209eb",
+      "sha256": "bcbc036bbac1d81c00dadb94c8c8a0d8ac6deb4087a6fd59e0e5dd7f811244bc",
+      "bytes": 548160,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/8f80393fc6ded1e6c99efe5185f023e5a0cfd1da1f248ec172ad3ef33c73dd06-lamp_setup-84cf96c59d18cc85",
+      "sha256": "8f80393fc6ded1e6c99efe5185f023e5a0cfd1da1f248ec172ad3ef33c73dd06",
+      "bytes": 13603768,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/9f2bb6820e8cbc6b23abbe679606f95db0625aee6ecaa5f3ea51fbb18572634c-lamp_peek-5be1f9fb099b24a7",
+      "sha256": "9f2bb6820e8cbc6b23abbe679606f95db0625aee6ecaa5f3ea51fbb18572634c",
+      "bytes": 4232896,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/4096c249cc6cc2114273faffff158f6a3d69e66953b635eeb6ba5bef6cfff3bc-release_pair-4c330c26cfcb0f6b",
+      "sha256": "4096c249cc6cc2114273faffff158f6a3d69e66953b635eeb6ba5bef6cfff3bc",
+      "bytes": 4427584,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/46932c96708e767e3fc497128c7446794c3db205bc9c888922d43ad73c3ade68-voice_forget_about-f18de9cac46c9fa5",
+      "sha256": "46932c96708e767e3fc497128c7446794c3db205bc9c888922d43ad73c3ade68",
+      "bytes": 11611832,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/81f784d4f5edcab8a1dbda309d405799204da3e57dc5381ada80657a5cc70d88-voice_link_used-05a182028a521157",
+      "sha256": "81f784d4f5edcab8a1dbda309d405799204da3e57dc5381ada80657a5cc70d88",
+      "bytes": 11815464,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/129c34bce62713a77fec3b51692f38c171dee1bb5c1d39236d003c41934e7d4a-paraphrase_fixture-48401515e5a149f1",
+      "sha256": "129c34bce62713a77fec3b51692f38c171dee1bb5c1d39236d003c41934e7d4a",
+      "bytes": 1752960,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/52fb778d7acd3ac3f58b653ed05028ca0596863766850646ca464cb9d1101469-forget_person-0deddd938b7bacb2",
+      "sha256": "52fb778d7acd3ac3f58b653ed05028ca0596863766850646ca464cb9d1101469",
+      "bytes": 9780816,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/2e1ef75d40b7f35d8f96bbfff09fda89046ef1d4c9ec5e17c1963ad406ec12c4-voice_observe-8fca32d650057c26",
+      "sha256": "2e1ef75d40b7f35d8f96bbfff09fda89046ef1d4c9ec5e17c1963ad406ec12c4",
+      "bytes": 10789824,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/10a1e3747b868f33adf0bdb8c0a64001d259c78c4537f89342c7500df7f17ca8-voice_follows_face-1dd593594e591dfb",
+      "sha256": "10a1e3747b868f33adf0bdb8c0a64001d259c78c4537f89342c7500df7f17ca8",
+      "bytes": 11857152,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/bff6d26af7b4e045aa68a62ce28a84fe953bbd795a38f5aa07da2010582c6eb0-lamp-memory-fixture",
+      "sha256": "bff6d26af7b4e045aa68a62ce28a84fe953bbd795a38f5aa07da2010582c6eb0",
+      "bytes": 9714872,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/ee8684e3f7e6690c6e9010da5b572564f1de4ddba06364d8bb5f3b9ec44a7918-lamp_memory-83413b99be0ca219",
+      "sha256": "ee8684e3f7e6690c6e9010da5b572564f1de4ddba06364d8bb5f3b9ec44a7918",
+      "bytes": 9627720,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/33eaaa50822c3342bb6ec73a17e7582d288c6e27d1bf235205a52a20c4b9143a-lamp-memory",
+      "sha256": "33eaaa50822c3342bb6ec73a17e7582d288c6e27d1bf235205a52a20c4b9143a",
+      "bytes": 9356640,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/85c22367561d7ae356723c05707812a4c0decf06dd20821c604e50e8498834a3-lamp_memory_eval-f5db972ba691a95b",
+      "sha256": "85c22367561d7ae356723c05707812a4c0decf06dd20821c604e50e8498834a3",
+      "bytes": 2177528,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/fe53d398e4d982184ac38a3523bec56173aaf21b5cadebdef18bae0e17ec560c-lamp-memory-eval",
+      "sha256": "fe53d398e4d982184ac38a3523bec56173aaf21b5cadebdef18bae0e17ec560c",
+      "bytes": 5044568,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/68bd68c878d1604d3319671bdd83fe2c5b99f8ff9b8e15198926d61a6afbad77-voice_forget-d4cb7fec5c0c3e47",
+      "sha256": "68bd68c878d1604d3319671bdd83fe2c5b99f8ff9b8e15198926d61a6afbad77",
+      "bytes": 12125448,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/1a0ddd9fc201a29b5bf358841aafa3f2644bade09f69060015a8778c48a40d4c-lamp_voice-a9b95286b805e668",
+      "sha256": "1a0ddd9fc201a29b5bf358841aafa3f2644bade09f69060015a8778c48a40d4c",
+      "bytes": 140060400,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/507fa19e24790e07f8c843dea54e26854727d3d80d7af32e2ed865b79addaccf-voice_early_words-177a409ed98660a5",
+      "sha256": "507fa19e24790e07f8c843dea54e26854727d3d80d7af32e2ed865b79addaccf",
+      "bytes": 11924816,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/85940b55f8a3b79fbe425f5006125fb71c341d79d6af1225b46bc4893aa69e7e-forgot-fd6638675ad23908",
+      "sha256": "85940b55f8a3b79fbe425f5006125fb71c341d79d6af1225b46bc4893aa69e7e",
+      "bytes": 5208544,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/374512ebe58f21849bacf24fa212cdcc94ab9825f7f1e8dd9e6910781335ebfb-voice_since_until-28f83169b6275560",
+      "sha256": "374512ebe58f21849bacf24fa212cdcc94ab9825f7f1e8dd9e6910781335ebfb",
+      "bytes": 11621512,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/c9319f9b81f0577adda95fbeecf0a252469f7d961c8d129b60d3efce2ba876b8-health_control-a47aa33374660f52",
+      "sha256": "c9319f9b81f0577adda95fbeecf0a252469f7d961c8d129b60d3efce2ba876b8",
+      "bytes": 2471992,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/fffddccd1c446ab97f1f04287ba39a396ef9090f1e64beedba2c1cded5efa405-voice_forget_named-71edb0837cf0037a",
+      "sha256": "fffddccd1c446ab97f1f04287ba39a396ef9090f1e64beedba2c1cded5efa405",
+      "bytes": 11726432,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/e858c7cdf14b2aff07819ea23c03b7906ab11bd34854eb1413326cb91e1b5be2-forget_shared_exchange-4c78b7cb5f42ec18",
+      "sha256": "e858c7cdf14b2aff07819ea23c03b7906ab11bd34854eb1413326cb91e1b5be2",
+      "bytes": 6735488,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/69393b52b9037db7821b9d5f2da79443dc900dd8002aca9daa6bfa3741f047fa-it-b864a5069c6d724f",
+      "sha256": "69393b52b9037db7821b9d5f2da79443dc900dd8002aca9daa6bfa3741f047fa",
+      "bytes": 18614848,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/b1727b31b50e3d877dd4b855aab800ea785ee99ccac58d63ecd7d454d6068a79-lamp-voice",
+      "sha256": "b1727b31b50e3d877dd4b855aab800ea785ee99ccac58d63ecd7d454d6068a79",
+      "bytes": 50638712,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/fd59dce3c7eab9faf8d74d818a5a66409bd5a78b815edc87c87e84c6983c53b5-lamp-skills",
+      "sha256": "fd59dce3c7eab9faf8d74d818a5a66409bd5a78b815edc87c87e84c6983c53b5",
+      "bytes": 25587920,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/95a79aa28a13b3a4e20ab9d77c64de4a92a3dc11c6c40bbbf13a342599addf15-rest_cost",
+      "sha256": "95a79aa28a13b3a4e20ab9d77c64de4a92a3dc11c6c40bbbf13a342599addf15",
+      "bytes": 5009296,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/7fdf48b9cac22752ab03ff623ad8da5c0f3a93f97eb2bbe6f0d0f58f1aded534-it-ea6f93305b6d7f2a",
+      "sha256": "7fdf48b9cac22752ab03ff623ad8da5c0f3a93f97eb2bbe6f0d0f58f1aded534",
+      "bytes": 3916760,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/33b557ad7f667aa029806e1dd94db313ac21fd19441076268045d79d3c7cffa8-lamp-expression",
+      "sha256": "33b557ad7f667aa029806e1dd94db313ac21fd19441076268045d79d3c7cffa8",
+      "bytes": 10806936,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/cf0752495f40f86a0eaf411494f55a5f2ffe67d38030f239d04aa3811408fcca-lamp_memory-0af22b32a7e8fee0",
+      "sha256": "cf0752495f40f86a0eaf411494f55a5f2ffe67d38030f239d04aa3811408fcca",
+      "bytes": 12201736,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/4a5c57f35c51dd2f9d3b07ea2b2e292b1bd3e5fe654063ad87cab663585dd614-replay_cost",
+      "sha256": "4a5c57f35c51dd2f9d3b07ea2b2e292b1bd3e5fe654063ad87cab663585dd614",
+      "bytes": 4974352,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/a917cb87e4d052677b317427370ececaace3f9ceec6ece744750f41a1498fcb0-runtime-b52f6baa2e80330c",
+      "sha256": "a917cb87e4d052677b317427370ececaace3f9ceec6ece744750f41a1498fcb0",
+      "bytes": 8346696,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/3fb3eca985707cb9cc2f44ec37679671f933704d01c6c870455b36968fcba77b-lamp_expression-f768989f9c233433",
+      "sha256": "3fb3eca985707cb9cc2f44ec37679671f933704d01c6c870455b36968fcba77b",
+      "bytes": 2894744,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/3812a4bffa91e0be3d30c6f90b06d1071ac24aea5e3f3f94fe16955a97f82d9f-check",
+      "sha256": "3812a4bffa91e0be3d30c6f90b06d1071ac24aea5e3f3f94fe16955a97f82d9f",
+      "bytes": 2777944,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/84794c3c3872eed4b542fd3faae1c494bf82b6a6f1263a34053c6f856a50b195-recent_playout_cost",
+      "sha256": "84794c3c3872eed4b542fd3faae1c494bf82b6a6f1263a34053c6f856a50b195",
+      "bytes": 5004384,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/f64402d718af1db39074e9fb12a36308796d4a4ea27a040930e6df3598ce251e-lamp_lean-332a9af8170ca045",
+      "sha256": "f64402d718af1db39074e9fb12a36308796d4a4ea27a040930e6df3598ce251e",
+      "bytes": 1188288,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/0839c90f8c6ae5b88f0a9cb7d0e6ef3dab7da74268fca19b8f74e994fe232c81-it-d8575dda435eb43e",
+      "sha256": "0839c90f8c6ae5b88f0a9cb7d0e6ef3dab7da74268fca19b8f74e994fe232c81",
+      "bytes": 15853968,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/ff301be5eb6710de3bdc316c48ec8a4fe3395faf6932ad66fa2f90c7a028c456-lamp_expression-87834248cbd87140",
+      "sha256": "ff301be5eb6710de3bdc316c48ec8a4fe3395faf6932ad66fa2f90c7a028c456",
+      "bytes": 7570320,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/59ca342cc983160a4c13aaf469e8e06561c7386cfc957712cccd44eafad8d8a6-expression_ask",
+      "sha256": "59ca342cc983160a4c13aaf469e8e06561c7386cfc957712cccd44eafad8d8a6",
+      "bytes": 1586688,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/d930ccb70a4269c94e6b21bffb7a9b5a344da4f1021e94d44be52a727bba1d77-lamp-body-measure",
+      "sha256": "d930ccb70a4269c94e6b21bffb7a9b5a344da4f1021e94d44be52a727bba1d77",
+      "bytes": 928656,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/14ef090d48a3f78327ceddf42b7e735b3c369e99e83efe1535b3a61d9bfd6dc4-lamp-body-mood",
+      "sha256": "14ef090d48a3f78327ceddf42b7e735b3c369e99e83efe1535b3a61d9bfd6dc4",
+      "bytes": 548632,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/3516c15f82fc79dd93c81f6a8b2af965200c378d0c532218b4e532fe1535b589-it-bda9dd473807073f",
+      "sha256": "3516c15f82fc79dd93c81f6a8b2af965200c378d0c532218b4e532fe1535b589",
+      "bytes": 7138864,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/840e6f3a3797df44c93f5b7b736fd4503934eef1a43cc4c7965427672f31bb15-lamp-body",
+      "sha256": "840e6f3a3797df44c93f5b7b736fd4503934eef1a43cc4c7965427672f31bb15",
+      "bytes": 1140128,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/7b67f24ef1352867d99ebdaa230b033117a01478fc698b194c2bf90ed6d239ca-head_plan",
+      "sha256": "7b67f24ef1352867d99ebdaa230b033117a01478fc698b194c2bf90ed6d239ca",
+      "bytes": 1770384,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/0e55d40c857dd26884efd2a935a0ede5486657373cfeee2b29ee84eed78e4130-lamp_body_measure-160bb32b216afa14",
+      "sha256": "0e55d40c857dd26884efd2a935a0ede5486657373cfeee2b29ee84eed78e4130",
+      "bytes": 1520008,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/d4537ffce7cd1e9b409b483a89374796e99254a20f491238dd28201b7d68af21-lamp-body-inspect",
+      "sha256": "d4537ffce7cd1e9b409b483a89374796e99254a20f491238dd28201b7d68af21",
+      "bytes": 679208,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/19278a7940130ab919789a379a1da8aa0ad5658a75728d06936efbdd718a22d3-lamp-body-worker",
+      "sha256": "19278a7940130ab919789a379a1da8aa0ad5658a75728d06936efbdd718a22d3",
+      "bytes": 732088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/8046cb83dbdd92aad07750dcbfe251ddfe026511cc4b22032a1c634348af1f5b-lamp_body_mood-9d0446e9a36c0d5e",
+      "sha256": "8046cb83dbdd92aad07750dcbfe251ddfe026511cc4b22032a1c634348af1f5b",
+      "bytes": 1165080,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/c223679fea9a1d2bd327a1e3c96d7b8017d012bfbf2cd52000f702aae5592da3-lamp_body_worker-9e6c54d8d16d8b9d",
+      "sha256": "c223679fea9a1d2bd327a1e3c96d7b8017d012bfbf2cd52000f702aae5592da3",
+      "bytes": 1332264,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/d3e3a527feac6cbb5e34240b9c16f598d5015113de667f172efdc49cef5ac611-lamp_body_inspect-786b5ad8d2a0a7e5",
+      "sha256": "d3e3a527feac6cbb5e34240b9c16f598d5015113de667f172efdc49cef5ac611",
+      "bytes": 1327496,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/ba759b8f58e7ce51a0d619665aec1f1b492ba6273a6d10d09a5701027bef9c27-lamp-update",
+      "sha256": "ba759b8f58e7ce51a0d619665aec1f1b492ba6273a6d10d09a5701027bef9c27",
+      "bytes": 13605080,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/e2839b311fc3b2c3987392bdbb4ae632d1d636e3651f49fead3d4897dbdbf6ec-lamp_body-6aa8d283b7d2353f",
+      "sha256": "e2839b311fc3b2c3987392bdbb4ae632d1d636e3651f49fead3d4897dbdbf6ec",
+      "bytes": 3117048,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/f20ba79586e6737edc39e49c0a1657eabdce24dab4171345524e55e9ab891ad5-lamp_keeper-17c84dccfff326fb",
+      "sha256": "f20ba79586e6737edc39e49c0a1657eabdce24dab4171345524e55e9ab891ad5",
+      "bytes": 2043880,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/a29a7ff2e1004e4251d2df5aa7959f42d5daebefdf34581eacbf7bd30dbebfb6-lamp_keeper-b90bc9f7ee259680",
+      "sha256": "a29a7ff2e1004e4251d2df5aa7959f42d5daebefdf34581eacbf7bd30dbebfb6",
+      "bytes": 3286280,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/tests/frozen-executables/1979c2d7b69d4d01ac824aa51296d07551ef213ffbcf0db000bb35f5da68c708-lamp_body-e3e309ea1afce98d",
+      "sha256": "1979c2d7b69d4d01ac824aa51296d07551ef213ffbcf0db000bb35f5da68c708",
+      "bytes": 143967048,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/ec6612f5778ddde9a0c5ffbc5b012cb5256c237ced9d19c967fce728c1de90d6-lamp-station",
+      "sha256": "ec6612f5778ddde9a0c5ffbc5b012cb5256c237ced9d19c967fce728c1de90d6",
+      "bytes": 5090576,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/c90c99cbc2af5237d9a8d6c3fa05d7809631b72acd1a5a648c898077a1f18942-lamp-mood",
+      "sha256": "c90c99cbc2af5237d9a8d6c3fa05d7809631b72acd1a5a648c898077a1f18942",
+      "bytes": 4775072,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/d70b0ddfdda12124bf3d7d9e5276480a7071151c8d9f74c9dee63905b243d050-lamp-addons",
+      "sha256": "d70b0ddfdda12124bf3d7d9e5276480a7071151c8d9f74c9dee63905b243d050",
+      "bytes": 2946432,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/5c40bc449a640cb0703f7ba9ca6afe1d59f6a3341017f31ae22855126994e3f5-lamp-name",
+      "sha256": "5c40bc449a640cb0703f7ba9ca6afe1d59f6a3341017f31ae22855126994e3f5",
+      "bytes": 91414384,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/56ad8e21f8684744000edb20b5bc0194e9dabb3bb6ef40dfda4fca31446e1c6c-lamp-same-voice",
+      "sha256": "56ad8e21f8684744000edb20b5bc0194e9dabb3bb6ef40dfda4fca31446e1c6c",
+      "bytes": 89651232,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f05bef4998d7a4fb07e51ee328615712fdf9884f4dccdf0ceac06e26874bde2c-lamp-ears",
+      "sha256": "f05bef4998d7a4fb07e51ee328615712fdf9884f4dccdf0ceac06e26874bde2c",
+      "bytes": 74653552,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/95bbe137c58842fd5c440781cb3b021a9d49574b130792017cfa530fd4b808ba-lamp-peek",
+      "sha256": "95bbe137c58842fd5c440781cb3b021a9d49574b130792017cfa530fd4b808ba",
+      "bytes": 8352336,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/a6c49cf37f476ad483b4b5f1543ed4a45cfdb6c10e2df70cd2606983b4b39885-lamp-voice-eval",
+      "sha256": "a6c49cf37f476ad483b4b5f1543ed4a45cfdb6c10e2df70cd2606983b4b39885",
+      "bytes": 37069984,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/27a25c23881d1f969baa44239c3123d4352076e666579786cb67c8f5ba09867b-lamp-settings",
+      "sha256": "27a25c23881d1f969baa44239c3123d4352076e666579786cb67c8f5ba09867b",
+      "bytes": 4019992,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/e4b3d8d7e642d1ed5fc431109a1d9130ae79654429b825fbef16986741d14b45-lamp-setup",
+      "sha256": "e4b3d8d7e642d1ed5fc431109a1d9130ae79654429b825fbef16986741d14b45",
+      "bytes": 20524576,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/70f90a69d50308dcb88bdb36386bc572e5e003bdaa78d5d72109304fcb83dc44-lamp-selftest",
+      "sha256": "70f90a69d50308dcb88bdb36386bc572e5e003bdaa78d5d72109304fcb83dc44",
+      "bytes": 4149880,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b4cbe10823297fe0c027deec0759e26da5d915179afdd2aac29b2c27b434ad15-lamp-cloud",
+      "sha256": "b4cbe10823297fe0c027deec0759e26da5d915179afdd2aac29b2c27b434ad15",
+      "bytes": 30155504,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/c88437a4928513e387b9903a780192ebb075615e2611909eb94b5cb662e7e353-lamp-tasks",
+      "sha256": "c88437a4928513e387b9903a780192ebb075615e2611909eb94b5cb662e7e353",
+      "bytes": 10429440,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/eac61db0a98d3df1ee2214f7e1a196879b44dde84616fb4b0ea413a9d7457212-lamp-surround",
+      "sha256": "eac61db0a98d3df1ee2214f7e1a196879b44dde84616fb4b0ea413a9d7457212",
+      "bytes": 35832648,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/d3a5525e218c0800728faf242a5ea97f7bfab4bf5c698b391f55aa6ce3e8b088-lamp-tasks-harness-fixture",
+      "sha256": "d3a5525e218c0800728faf242a5ea97f7bfab4bf5c698b391f55aa6ce3e8b088",
+      "bytes": 1407232,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/ee568455e2b67bc17af9412e818e36b24c76f276602eba3972f4e9419f48fb54-lamp-eyes",
+      "sha256": "ee568455e2b67bc17af9412e818e36b24c76f276602eba3972f4e9419f48fb54",
+      "bytes": 74751016,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/a1b5bd8a8401b61ef21aff85feadc2e3c11b8696e31e6f298f93a77ce43e70fe-lamp-seems-measure",
+      "sha256": "a1b5bd8a8401b61ef21aff85feadc2e3c11b8696e31e6f298f93a77ce43e70fe",
+      "bytes": 74914672,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/8a38600af58844eb0230a79978c2ccf45398eee4ff9ab7a479add815aad462e5-lamp-air",
+      "sha256": "8a38600af58844eb0230a79978c2ccf45398eee4ff9ab7a479add815aad462e5",
+      "bytes": 881136,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b2dc94381dbe07dadcd232346ca7f42787ec508558c247a80bd2aeeb8ea1a15d-lamp-sound-fixtures",
+      "sha256": "b2dc94381dbe07dadcd232346ca7f42787ec508558c247a80bd2aeeb8ea1a15d",
+      "bytes": 2459640,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/dffa3f3a72d1581dc64fdb2e20ac74f4b96c0b5d9fa42ef787d397ab009e1a7f-lamp-actions",
+      "sha256": "dffa3f3a72d1581dc64fdb2e20ac74f4b96c0b5d9fa42ef787d397ab009e1a7f",
+      "bytes": 8024088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/2ce26656909ded0f2957af177bfca2521b8a984811ad062ac118fbad11af12af-lamp-observer",
+      "sha256": "2ce26656909ded0f2957af177bfca2521b8a984811ad062ac118fbad11af12af",
+      "bytes": 4011848,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/8869a7e95b94c49a59fed5ed1cd08cc97e902d3eddfaa42ea58d618af1ecb3a4-lamp-policy-fit",
+      "sha256": "8869a7e95b94c49a59fed5ed1cd08cc97e902d3eddfaa42ea58d618af1ecb3a4",
+      "bytes": 2478648,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/051a4210bb838b9d9c4348850533909018eaf1b8aecff3d9af8ef6adfee39594-lamp-skills",
+      "sha256": "051a4210bb838b9d9c4348850533909018eaf1b8aecff3d9af8ef6adfee39594",
+      "bytes": 25513104,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/4d535470c1dace03c4a753b132adb96e637c4d25d383b3f5501329bde0b668f6-lamp-policy-replay",
+      "sha256": "4d535470c1dace03c4a753b132adb96e637c4d25d383b3f5501329bde0b668f6",
+      "bytes": 8220000,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/fd47ad7877fedac4a72de0094b8d230c90b95b2ec8ca468dcba7b653bf4016fa-lamp-policy",
+      "sha256": "fd47ad7877fedac4a72de0094b8d230c90b95b2ec8ca468dcba7b653bf4016fa",
+      "bytes": 13838864,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f7fb7184958c48236d56c6aebd75b7b60266827e92a18074972c41b5030e7e6f-lamp-policy-judges",
+      "sha256": "f7fb7184958c48236d56c6aebd75b7b60266827e92a18074972c41b5030e7e6f",
+      "bytes": 12212384,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/8ece25b7ce9b1e597398376413c060f27397a0e51a0d1aa7f60986a5092eefbd-lamp-records",
+      "sha256": "8ece25b7ce9b1e597398376413c060f27397a0e51a0d1aa7f60986a5092eefbd",
+      "bytes": 3719336,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/41619c651685b32b1b2463a45ec2ff9b44bdea85a4da13d640c99d35854bd962-lamp-records-fixture",
+      "sha256": "41619c651685b32b1b2463a45ec2ff9b44bdea85a4da13d640c99d35854bd962",
+      "bytes": 3842696,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/2636d5a6299d9b835057a641f9316070da6454e8040f1beccc113f1da428fa76-lamp-turn-end",
+      "sha256": "2636d5a6299d9b835057a641f9316070da6454e8040f1beccc113f1da428fa76",
+      "bytes": 92040608,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f78f6a6544ff6c72cf05c97243766120b42e7dfbac6639363fdf2e611fd06efb-lamp-memory-fixture",
+      "sha256": "f78f6a6544ff6c72cf05c97243766120b42e7dfbac6639363fdf2e611fd06efb",
+      "bytes": 9715256,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/2d04975d29b37da8410a067b819af1b45489eb0b613b8502236e7832fe1a0dcc-lamp-memory",
+      "sha256": "2d04975d29b37da8410a067b819af1b45489eb0b613b8502236e7832fe1a0dcc",
+      "bytes": 9357088,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b9286f345ad483c6a97dcaabdb81f8710abe2d43c053127b9e81b46b00dfe9fc-lamp-voice",
+      "sha256": "b9286f345ad483c6a97dcaabdb81f8710abe2d43c053127b9e81b46b00dfe9fc",
+      "bytes": 52755224,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/a80c35064dfb5c0a5096341b61e6bc034101eec1ce7d0bc52cd5e8d5864843e9-lamp-memory-eval",
+      "sha256": "a80c35064dfb5c0a5096341b61e6bc034101eec1ce7d0bc52cd5e8d5864843e9",
+      "bytes": 5044512,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/4b5625bba90acf0ff2429de5ed19fac939ceaceba90991ef8199262b70272cb1-lamp-expression",
+      "sha256": "4b5625bba90acf0ff2429de5ed19fac939ceaceba90991ef8199262b70272cb1",
+      "bytes": 10828688,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/833a0eb30b561a8c3ac5d092ce51c1fa0f9f14e0fe89fdc73bf743cb38b6046e-lamp-health",
+      "sha256": "833a0eb30b561a8c3ac5d092ce51c1fa0f9f14e0fe89fdc73bf743cb38b6046e",
+      "bytes": 3767864,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/647eb90799b1d55a6cd5ebd992a09976dc2a30cf6610d8a658a32b19e126583f-lamp-audio",
+      "sha256": "647eb90799b1d55a6cd5ebd992a09976dc2a30cf6610d8a658a32b19e126583f",
+      "bytes": 6040680,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/7a5e2b61988d3f299ddaaa899551807107ec4f210a88ad7a1de64eba6ff920c2-lamp-controls",
+      "sha256": "7a5e2b61988d3f299ddaaa899551807107ec4f210a88ad7a1de64eba6ff920c2",
+      "bytes": 6430104,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/83f8eb3d70c80d36c53a3a77bb648b1040a7da1ba172f0b53f06ce2fa674168b-lamp-schedule",
+      "sha256": "83f8eb3d70c80d36c53a3a77bb648b1040a7da1ba172f0b53f06ce2fa674168b",
+      "bytes": 8626480,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/540df922467f40c395fa0bd3ef9d552cf12d04355a41644c21a0a74a70382535-lamp-body-mood",
+      "sha256": "540df922467f40c395fa0bd3ef9d552cf12d04355a41644c21a0a74a70382535",
+      "bytes": 548640,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/b999045dcfc098d756d190afaafb2eaa6c308b9f20f7bb7ca79c9fff153fe82c-lamp-body-measure",
+      "sha256": "b999045dcfc098d756d190afaafb2eaa6c308b9f20f7bb7ca79c9fff153fe82c",
+      "bytes": 931632,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/befa8be399d88fc86cbffc7d562cfedf6a6f55d8b8dd29bd5ee1e31ca262f05f-lamp-body-inspect",
+      "sha256": "befa8be399d88fc86cbffc7d562cfedf6a6f55d8b8dd29bd5ee1e31ca262f05f",
+      "bytes": 679216,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/85fb20d90574c7f9338638f480f791906b3f086b5d1111fc6930bca68c22a23e-lamp-body-worker",
+      "sha256": "85fb20d90574c7f9338638f480f791906b3f086b5d1111fc6930bca68c22a23e",
+      "bytes": 732064,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/f7784048253bd8a0c4fde6191f0b9eed46e59d03a1a26b70c40223658a5904c2-lamp-body",
+      "sha256": "f7784048253bd8a0c4fde6191f0b9eed46e59d03a1a26b70c40223658a5904c2",
+      "bytes": 1140472,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/5cea66ab39e2bd34bf2aabd7dcf2f7a27be0b9947a88a6abbab988dddb1adab1-lamp-keeper",
+      "sha256": "5cea66ab39e2bd34bf2aabd7dcf2f7a27be0b9947a88a6abbab988dddb1adab1",
+      "bytes": 8543056,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/beca1f02ac71d11529e7c746d5d25c507a70d7ff4fdec9fc76492ac04cff3f29-lamp-update",
+      "sha256": "beca1f02ac71d11529e7c746d5d25c507a70d7ff4fdec9fc76492ac04cff3f29",
+      "bytes": 13603480,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/45b67e1875156b4c8d5d07323dfc638e857664b0cc19dcdf2e9093ed0156bf61-lamp-ipc-probe",
+      "sha256": "45b67e1875156b4c8d5d07323dfc638e857664b0cc19dcdf2e9093ed0156bf61",
+      "bytes": 1165656,
+      "mode": "0o555"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-canonical-prep/run-2026-10-25T015421.338234+0000/workspace-build/frozen-executables/5b929516ce223c7bfd23cb97a46caaf30b34eb8dcc8126c2c49a8635cb611d62-lamp-bus",
+      "sha256": "5b929516ce223c7bfd23cb97a46caaf30b34eb8dcc8126c2c49a8635cb611d62",
+      "bytes": 2467120,
+      "mode": "0o555"
+    }
+  ],
+  "scope": "Read-only SHA/mode/size verification of saved witnesses; no executable execution or target access."
+}

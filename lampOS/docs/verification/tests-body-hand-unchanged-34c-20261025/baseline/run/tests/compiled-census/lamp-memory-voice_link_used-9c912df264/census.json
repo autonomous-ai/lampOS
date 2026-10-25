@@ -1,0 +1,28 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "voice_link_used",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_link_used.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/voice_link_used-05a182028a521157",
+  "sha256": "9c912df264525e4e0c10c76ad6a6a8bae1250ddb971d8de9763d2485a231ad9f",
+  "compiled_cases": [
+    "forgetting_a_kept_thing_leaves_the_talk_that_did_not_use_it",
+    "the_talk_that_used_a_kept_thing_goes_with_it"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 2,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

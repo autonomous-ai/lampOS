@@ -1,0 +1,2 @@
+a_forget_that_names_a_thing_removes_only_it_and_never_the_newest_kept_line: test
+a_named_forget_in_the_room_never_reaches_a_persons_or_an_earlier_conversations: test

@@ -1,0 +1,25 @@
+{
+  "package": "lamp-setup",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-setup",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/src/main.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_setup-0420e7dbd0bdd7fb",
+  "sha256": "bb4a5e601c86c5684a9b39d048ee605ef09b98ad1421014e22c116e1f0a2779a",
+  "compiled_cases": [],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 0,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

@@ -1,0 +1,190 @@
+{
+  "baseline_totals": {
+    "passed": 7321,
+    "failed": 15,
+    "ignored": 52
+  },
+  "baseline_failures": [
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "bus_out::tests::someone_is_turned_to_the_lamp_only_when_the_eyes_newest_fresh_look_says_so"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "bus_out::tests::the_faces_in_view_are_counted_only_from_the_eyes_newest_fresh_look"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "case": "coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "it",
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them"
+    }
+  ],
+  "reproduced_candidate_failures": [
+    {
+      "package": "lamp-voice",
+      "target": "it",
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them"
+    }
+  ],
+  "candidate_failures_not_reproduced": [
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::a_refused_follow_up_forget_survives_the_next_turn_note_refresh"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "case": "voice::forget_that_after_a_follow_up_leaves_nothing_of_its_conversation"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_found_with_no_look_held_is_refused"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_queued_run_whose_item_left_is_let_go_and_the_next_still_starts"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_pause_ends_a_search_its_pose_and_its_light"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_line_with_no_words_does_not_end_a_search"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_say_now_after_a_reload_moved_a_held_trigger_does_nothing"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::the_asking_lines_late_words_do_not_end_its_search"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::thinking_after_a_moment_of_speaking_is_still_the_line"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::without_body_requests_a_last_clip_dropped_is_not_said"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "case": "skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "requested_audio",
+      "case": "refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it"
+    }
+  ],
+  "observations_per_source": 1,
+  "no_causal_waiver": true
+}

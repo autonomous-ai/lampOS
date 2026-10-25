@@ -4516,3 +4516,9 @@ Ready for lamp-voice: no
 Ready for lamp-voice: no
 
 [Declared 7b source and checks](verification/tests-sleep-name-source-7b-20261025/) preserve the whole original case, delivery checks, wall catch-up and real bounds. The fixture queues one Activity and publishes it last with nominal typed age 250 ms; only test/doc files changed. Pinned formatting and diff checks passed. The original refused topic remains unknown; the fixed 260 ms old/new control is still unexecuted and is not a historical reproduction. No compiler or current-main readiness claim. Root’s unchanged-34c full twelve-package comparison remains active in its two jobs.
+
+## 2026-10-25 05:55 UTC — unchanged Hand base run closed and compared
+
+Ready for lamp-voice: no
+
+[Unchanged 34c full-context proof](verification/tests-body-hand-unchanged-34c-20261025/): 7,321 passed / 15 failed / 52 ignored against the candidate's 7,316 / 20 / 52; both all 79 targets and 7,388 names bound, Body library 440/0/0. Only the light-call failure repeated the same predicate; nineteen candidate failures did not reproduce in one base run. Independent retained-binary audit finds all non-Body-test bytes equal except N_OSO debugger-object strings. Neither full gate is green; no historical cause, environment equivalence or speed claim. All 204 commands, 408 streams and 245 saved witnesses audited; exact source restoration with new mtimes complete. Root returned two jobs, then reserved the one actually returned by the short Body gate for current-head Hand gates. Native/current readiness remains separate.

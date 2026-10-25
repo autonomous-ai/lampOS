@@ -1,0 +1,30 @@
+{
+  "package": "lamp-expression",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-expression",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/src/main.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_expression-f768989f9c233433",
+  "sha256": "1e6dadd96f92360bb8ec9660c4153121b39754eebe277639f7eb8ee9264bdccd",
+  "compiled_cases": [
+    "tests::invalid_options_cannot_accidentally_enable_a_service",
+    "tests::outputs_require_the_explicit_enable_switch",
+    "tests::the_hour_and_the_time_of_day_are_asked_for_by_name",
+    "tests::the_start_line_names_the_zone_only_when_one_is_given"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 4,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

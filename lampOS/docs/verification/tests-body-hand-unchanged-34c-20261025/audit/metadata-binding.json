@@ -1,0 +1,20 @@
+{
+  "raw_metadata_sha256": "9e2937a52602494a9077a5684fd587246b09bba899620abbf64ce1cbfb2e1f51",
+  "raw_metadata_bytes": 2365078,
+  "raw_metadata_private": true,
+  "projected_graph_sha256": "6ab74fb52ff2c153593988422b1f9e979b4f9a7001db36daba2d9ad28b2758f3",
+  "packages": 451,
+  "local_packages": 48,
+  "fields_omitted": [
+    "authors",
+    "description",
+    "homepage",
+    "repository",
+    "documentation",
+    "readme",
+    "license",
+    "license_file",
+    "metadata"
+  ],
+  "binding_scope": "Projection derived from actual baseline metadata command stdout, whose stream SHA/direct wait/group closure were verified."
+}

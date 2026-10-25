@@ -1,0 +1,68 @@
+{
+  "package": "lamp-keeper",
+  "target": {
+    "kind": [
+      "lib"
+    ],
+    "crate_types": [
+      "lib"
+    ],
+    "name": "lamp_keeper",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper/src/lib.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": true,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_keeper-b90bc9f7ee259680",
+  "sha256": "7fe81a97c53446ab34e2edcf57c1ad9b17414a3950d6761309b50f3bc541b184",
+  "compiled_cases": [
+    "keep::tests::a_failed_selftest_is_never_restarted",
+    "keep::tests::a_part_unwell_for_the_delay_is_restarted_and_not_before",
+    "keep::tests::a_unit_not_running_and_the_keeper_itself_are_left_alone",
+    "keep::tests::nothing_is_done_without_act",
+    "keep::tests::one_that_keeps_failing_is_left_alone_and_reported_once",
+    "keep::tests::the_voice_is_never_restarted_in_a_turn",
+    "notify::tests::alive_every_step_is_sent_at_most_twice_an_interval",
+    "notify::tests::each_word_is_one_datagram_byte_for_byte",
+    "notify::tests::without_a_socket_everything_is_a_no_op",
+    "notify::tests::without_a_watchdog_alive_says_nothing",
+    "package::tests::a_release_without_units_is_not_started",
+    "package::tests::health_reads_what_serve_wrote_and_is_not_ready_without_it",
+    "package::tests::only_the_old_units_that_run_are_masked_and_stopped",
+    "package::tests::the_bus_root_is_root_s_with_the_parts_group_and_set_group_id",
+    "package::tests::the_command_link_points_at_the_running_release_and_is_replaced_whole",
+    "package::tests::the_lamp_is_brought_up_from_the_units_the_release_carries_and_tied_to_the_keeper",
+    "package::tests::the_lamp_is_ready_when_every_part_it_carries_runs",
+    "package::tests::with_its_marker_present_the_setup_check_changes_nothing",
+    "package::tests::without_its_marker_only_setup_starts_and_the_lamp_once_the_marker_appears",
+    "profile::tests::a_file_that_appears_is_not_replaced",
+    "profile::tests::a_lamp_without_poses_is_prepared_and_left_to_the_seated_measure",
+    "profile::tests::a_moved_lamp_gets_no_reset_whatever_its_wiring_says",
+    "profile::tests::a_prepare_cut_between_the_marker_and_the_plan_leaves_the_lamp_set_up",
+    "profile::tests::a_prepared_lamp_is_not_refused_for_its_account",
+    "profile::tests::a_refusal_writes_nothing",
+    "profile::tests::a_second_camera_is_refused_not_guessed",
+    "profile::tests::a_shipped_reset_plan_is_written_over_and_a_changed_one_kept",
+    "profile::tests::poses_take_the_models_gaze_until_this_lamps_is_measured",
+    "profile::tests::prepare_keeps_what_a_lamp_already_has",
+    "profile::tests::prepare_never_marks_set_up_a_lamp_reset_into_setup",
+    "profile::tests::prepare_writes_what_is_missing_and_says_the_gaze_is_the_models",
+    "profile::tests::the_probe_finds_a_v1_lamps_hardware",
+    "profile::tests::the_probe_stops_on_a_missing_or_doubled_device",
+    "profile::tests::the_voice_options_never_carry_the_ring_ceiling",
+    "profile::tests::write_a_moved_pins_fixture",
+    "restart::tests::a_restart_is_answered_first_and_refused_under_an_update",
+    "restart::tests::a_restart_is_refused_while_another_holder_has_the_update_lock",
+    "units::tests::parts_and_units_name_each_other",
+    "units::tests::status_says_each_unit_its_build_and_its_health",
+    "units::tests::the_show_text_is_read_unit_by_unit"
+  ],
+  "compiled_ignored_cases": [
+    "profile::tests::write_a_moved_pins_fixture"
+  ],
+  "compiled_case_count": 40,
+  "ignored_case_count": 1,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

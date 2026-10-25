@@ -1,0 +1,31 @@
+{
+  "package": "lamp-keeper",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-keeper",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper/src/main.rs",
+    "edition": "2024",
+    "required-features": [
+      "prepare"
+    ],
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_keeper-17c84dccfff326fb",
+  "sha256": "8de06d1089b63f766afc61d1b548d585a48435141be1dd462b4253e389555184",
+  "compiled_cases": [
+    "tests::a_pause_is_kept_on_the_bus_until_resumed",
+    "tests::waiting_ends_when_it_is_done_or_after_the_longest"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 2,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

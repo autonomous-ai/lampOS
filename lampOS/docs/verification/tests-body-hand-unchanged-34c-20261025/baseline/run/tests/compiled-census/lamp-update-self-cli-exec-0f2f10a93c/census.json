@@ -1,0 +1,29 @@
+{
+  "package": "lamp-update",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "self-cli-exec",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/self_cli_exec.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/self_cli_exec-f64b721a3e4209eb",
+  "sha256": "0f2f10a93c20aa286ba55a46edda1ca0afef845e56aed2a56d3b24c459104960",
+  "compiled_cases": [
+    "actual_cli_exec_confirms_before_the_next_round"
+  ],
+  "compiled_ignored_cases": [
+    "actual_cli_exec_confirms_before_the_next_round"
+  ],
+  "compiled_case_count": 1,
+  "ignored_case_count": 1,
+  "custom_entrypoint": true,
+  "executed_tests_in_this_census": 0
+}

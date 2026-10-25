@@ -1,0 +1,30 @@
+{
+  "package": "lamp-voice",
+  "target": {
+    "kind": [
+      "example"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "render_line_second",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/render_line_second.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/examples/render_line_second-b9b52812b570e84b",
+  "sha256": "655b188f7580d75100591e354dea9514c0f98efcaf24c00c0a85676807aff7d2",
+  "compiled_cases": [
+    "tests::silence_is_cut_at_either_end_with_50_ms_kept",
+    "tests::the_arguments_are_checked_as_render_lines_are",
+    "tests::the_manifest_names_the_configured_voice_and_model",
+    "tests::the_wav_is_mono_16_bit_at_the_routes_rate"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 4,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

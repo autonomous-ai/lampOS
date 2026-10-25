@@ -1,0 +1,57 @@
+{
+  "package": "lamp-skills",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "requested_audio",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/tests/requested_audio.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/requested_audio-7f311165d6904c49",
+  "sha256": "6c1a0126e2078d42619e8ddb881e9ea6d06dc62fc6a49715c418d7d0aea109a7",
+  "compiled_cases": [
+    "a_second_start_and_finish_are_terminal",
+    "a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation",
+    "byte_identical_file_edits_remain_accepted_with_full_content_reads",
+    "catalog_body_and_core_metadata_follow_filtered_duplicate_tool_winners",
+    "disabled_media_reserves_its_tool_without_advertisement_or_authority",
+    "every_asset_scan_reads_all_payloads_and_preserves_live_offers",
+    "exact_context_offer_and_unknown_private_enums_are_checked",
+    "in_place_permission_edit_and_asset_edit_revoke_existing_offers",
+    "original_start_and_finish_boundaries_never_move",
+    "paths_links_and_modified_assets_are_refused",
+    "real_call_socket_keeps_legacy_tools_and_requires_private_spoken_context",
+    "real_service_switch_off_hides_and_refuses_media_with_valid_context",
+    "refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it",
+    "refuses_every_ungranted_or_non_tool_shape_and_unknown_values",
+    "renewal_never_revives_a_lease_and_terminal_call_cannot_be_reissued",
+    "replacement_revocation_restart_and_stale_scans_fail_quiet",
+    "requested_audio_cannot_mix_with_proposals_or_unplug_words",
+    "requested_audio_permission_cannot_turn_search_found_into_a_run",
+    "requested_audio_refuses_a_granted_daily_clock_trigger",
+    "requested_audio_refuses_exact_and_ranked_confirmation_tables",
+    "requested_audio_refuses_fully_granted_limits_and_routine_steps",
+    "requested_audio_refuses_fully_granted_rise_triggers",
+    "requested_audio_refuses_fully_granted_shows_and_choice_steps",
+    "requested_audio_refuses_history_that_an_ordinary_tool_can_tell",
+    "requested_audio_refuses_valid_nudge_limits_and_stop_settings",
+    "requested_audio_refuses_valid_search_and_watch_settings",
+    "restored_size_and_modified_time_cannot_hide_audio_or_permission_edits",
+    "sixteen_maximum_recordings_report_full_content_scan_costs",
+    "the_bounded_table_refuses_instead_of_evicting_replay_protection",
+    "unchanged_file_metadata_cannot_validate_a_different_public_asset_digest",
+    "validates_and_packs_while_off_but_never_advertises_or_runs_media"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 31,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

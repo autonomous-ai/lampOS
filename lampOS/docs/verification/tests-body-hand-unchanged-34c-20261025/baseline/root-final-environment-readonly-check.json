@@ -1,0 +1,183 @@
+{
+  "stable_relevant_except_PATH_equal": true,
+  "original_without_PATH": {
+    "CARGO_BUILD_JOBS": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+    "CARGO_TARGET_DIR": "39b741bf2e66dc8138ec4fb9063ba4e528f3bc825ebcbf28d0c0d9df317213a9",
+    "HOME": "27190ac24934972eae20178e7d7d6802b5f59e73a4c122d185e1a9e31d47660c",
+    "LANG": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "LC_ALL": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "LC_CTYPE": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "TMPDIR": "b401daa7e11b9ef6591fb61fb53d946efd103389f8daf85e35b2a0f7c03985e9"
+  },
+  "current_without_PATH": {
+    "HOME": "27190ac24934972eae20178e7d7d6802b5f59e73a4c122d185e1a9e31d47660c",
+    "LANG": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "LC_ALL": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "LC_CTYPE": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+    "TMPDIR": "b401daa7e11b9ef6591fb61fb53d946efd103389f8daf85e35b2a0f7c03985e9",
+    "CARGO_TARGET_DIR": "39b741bf2e66dc8138ec4fb9063ba4e528f3bc825ebcbf28d0c0d9df317213a9",
+    "CARGO_BUILD_JOBS": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+  },
+  "PATH_exception": {
+    "exception": "PATH only; original raw PATH was not saved and cannot be reconstructed",
+    "original_path_sha256": "d907a22e359ef499fa2bee852f0358def00623bf02d5e87e63d6316028c4004f",
+    "permitted_current_path_sha256": "68c08512a936b34709e56dfd4460ab608735e3264e4a9b7c9ef4b1a43b54ace9",
+    "same_full_environment_claim": false,
+    "resolved_tools": [
+      {
+        "name": "cargo",
+        "which": "/Users/autonomous/.cargo/bin/cargo",
+        "resolved": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "bytes": 12945744
+      },
+      {
+        "name": "rustup",
+        "which": "/Users/autonomous/.cargo/bin/rustup",
+        "resolved": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "bytes": 12945744
+      },
+      {
+        "name": "rustc",
+        "which": "/Users/autonomous/.cargo/bin/rustc",
+        "resolved": "/Users/autonomous/.cargo/bin/rustup",
+        "sha256": "259e2b84274434085163fe8d556510571772cda2aa6d87ca6aa664f57bc644e3",
+        "bytes": 12945744
+      },
+      {
+        "name": "git",
+        "which": "/usr/bin/git",
+        "resolved": "/usr/bin/git",
+        "sha256": "b8763cf250e607a778bb4603cecb5b90338814d0a3dfcba0d57b1de242f610e9",
+        "bytes": 118640
+      },
+      {
+        "name": "sh",
+        "which": "/bin/sh",
+        "resolved": "/bin/sh",
+        "sha256": "c0eaf44f9242d5bbc2e14f4e8b7dccc1eff7f2976d64dc18914d5ef9f373e100",
+        "bytes": 101040
+      },
+      {
+        "name": "bash",
+        "which": "/bin/bash",
+        "resolved": "/bin/bash",
+        "sha256": "16303dedab719ddb63efd9dd68092a0da37b397bfd4fcb856d5f1c86c5ee414b",
+        "bytes": 1290128
+      },
+      {
+        "name": "cat",
+        "which": "/bin/cat",
+        "resolved": "/bin/cat",
+        "sha256": "2b6e8f3f90c42a9d8d1e5471efb4173ad3499fc8ca4039b39327b394616cf39e",
+        "bytes": 118800
+      },
+      {
+        "name": "sleep",
+        "which": "/bin/sleep",
+        "resolved": "/bin/sleep",
+        "sha256": "c30e72b2e2d6a4eb32b6f38f07815346bc734d031d3c712d9123f28d8b237051",
+        "bytes": 100976
+      },
+      {
+        "name": "kill",
+        "which": "/bin/kill",
+        "resolved": "/bin/kill",
+        "sha256": "9354b1505290ffea73ddf52ca46fd9333466569a921f228df41b0346a1c8d592",
+        "bytes": 101312
+      },
+      {
+        "name": "env",
+        "which": "/usr/bin/env",
+        "resolved": "/usr/bin/env",
+        "sha256": "75690864f0e7397db05bcc0f4439915559ce24c2d834d530e4e619c14b938556",
+        "bytes": 102176
+      },
+      {
+        "name": "uname",
+        "which": "/usr/bin/uname",
+        "resolved": "/usr/bin/uname",
+        "sha256": "e12b51fe01f02007b15dfd9ee72d273d553656fa75d2e2800e13ec7714c5d615",
+        "bytes": 101264
+      }
+    ],
+    "pinned_1_96_0_toolchain_files": [
+      {
+        "name": "cargo",
+        "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo",
+        "resolved": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/cargo",
+        "sha256": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+        "bytes": 34365184
+      },
+      {
+        "name": "rustc",
+        "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustc",
+        "resolved": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustc",
+        "sha256": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499",
+        "bytes": 401528
+      },
+      {
+        "name": "rustfmt",
+        "path": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustfmt",
+        "resolved": "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustfmt",
+        "sha256": "e0d4e3ba5e00cf354d17cc1e58973e8ead1b67dd5968254baabe950ecbf2461f",
+        "bytes": 4771560
+      }
+    ],
+    "scope": "Readonly shutil.which/realpath/hash only; no cargo/rustc/rustup/systemtool execution. Original producer records do not bind original tool executable path/hash; no invented original tool identity comparison. Actual pinned toolchain/source/profile/full-Cargo-command remains controlled. Systemtool list is known-tool binding, not an exhaustive descendant census."
+  },
+  "same_full_environment_claim": false,
+  "excluded_keys": [
+    "BROWSER",
+    "CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS",
+    "CODEX_CI",
+    "CODEX_HOME",
+    "CODEX_MANAGED_BY_NPM",
+    "CODEX_MANAGED_PACKAGE_ROOT",
+    "CODEX_SANDBOX",
+    "CODEX_SANDBOX_NETWORK_DISABLED",
+    "CODEX_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "CODEX_TOOL_CALL_ID",
+    "CODEX_VERSION",
+    "COLORTERM",
+    "COMMAND_MODE",
+    "DISABLE_AUTO_UPDATE",
+    "GH_PAGER",
+    "GIT_PAGER",
+    "GRID_NO_UPDATE_CHECK",
+    "HARNESS_NATIVE_LAUNCH_TOKEN",
+    "HARNESS_PREVIOUS_BROWSER",
+    "LESS",
+    "LOGNAME",
+    "LSCOLORS",
+    "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S",
+    "NO_COLOR",
+    "NVM_BIN",
+    "NVM_CD_FLAGS",
+    "NVM_DIR",
+    "NVM_INC",
+    "OLDPWD",
+    "OSLogRateLimit",
+    "PAGER",
+    "PWD",
+    "SHELL",
+    "SHLVL",
+    "SSH_AUTH_SOCK",
+    "TERM",
+    "TERM_PROGRAM",
+    "TERM_PROGRAM_VERSION",
+    "TMUX",
+    "TMUX_PANE",
+    "USER",
+    "XPC_FLAGS",
+    "XPC_SERVICE_NAME",
+    "ZSH",
+    "_",
+    "__CFBundleIdentifier",
+    "__CF_USER_TEXT_ENCODING",
+    "is_vim"
+  ],
+  "exclusion_scope": "Tool/session/Codex metadata and other non-relevant keys are not asserted stable."
+}

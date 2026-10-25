@@ -1,0 +1,4 @@
+tests::silence_is_cut_at_either_end_with_50_ms_kept: test
+tests::the_arguments_are_checked_as_render_lines_are: test
+tests::the_manifest_names_the_configured_voice_and_model: test
+tests::the_wav_is_mono_16_bit_at_the_routes_rate: test

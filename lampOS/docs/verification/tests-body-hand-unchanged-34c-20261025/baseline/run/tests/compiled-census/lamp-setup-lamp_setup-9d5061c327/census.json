@@ -1,0 +1,42 @@
+{
+  "package": "lamp-setup",
+  "target": {
+    "kind": [
+      "lib"
+    ],
+    "crate_types": [
+      "lib"
+    ],
+    "name": "lamp_setup",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/src/lib.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": true,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_setup-84cf96c59d18cc85",
+  "sha256": "9d5061c327cf611def8b18cb97310aa04eab0a3d4130283a9c4020aaf9aa6a42",
+  "compiled_cases": [
+    "keys::tests::the_check_is_one_request_with_the_key_in_its_header",
+    "keys::tests::the_services_error_body_is_never_passed_on",
+    "light::tests::a_new_look_turns_into_the_next_over_the_change",
+    "light::tests::each_phase_has_its_look_and_a_done_lamp_has_none",
+    "light::tests::it_fades_in_then_breathes_and_never_goes_dark",
+    "light::tests::joining_breathes_twice_as_fast_as_waiting",
+    "light::tests::let_go_it_fades_out_then_is_dark_and_comes_back_from_nothing",
+    "scan::tests::a_command_that_hangs_is_killed_at_its_limit",
+    "scan::tests::a_long_output_is_read_whole_without_stalling_the_command",
+    "wake::tests::a_painter_fades_over_the_fades_it_is_given_and_the_lamps_by_default",
+    "wake::tests::it_breathes_every_six_seconds_then_every_ten_once_unwell",
+    "wake::tests::it_fades_in_and_opens_up_the_ring_over_the_opening",
+    "wake::tests::its_first_frame_is_already_lit",
+    "wake::tests::let_go_it_fades_out_within_the_fade_and_stays_dark",
+    "wake::tests::only_on_turns_it_on",
+    "wake::tests::with_no_voice_for_five_minutes_it_turns_pale"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 16,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

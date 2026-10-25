@@ -1,0 +1,30 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "forget_shared_exchange",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/forget_shared_exchange.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/forget_shared_exchange-4c78b7cb5f42ec18",
+  "sha256": "fc7cb3fd177cebf525f3e2c28e2d5848881b1f8479561c1159c9b3b53b31d100",
+  "compiled_cases": [
+    "forgetting_a_kept_thing_leaves_a_noticed_thing_from_the_same_exchange",
+    "forgetting_a_noticed_thing_leaves_a_kept_thing_from_the_same_exchange",
+    "forgetting_an_exchange_keeps_its_kept_thing_and_loses_its_observation",
+    "forgetting_everything_still_leaves_nothing_of_the_persons"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 4,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

@@ -1,0 +1,1 @@
+/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/forget_shared_exchange-4c78b7cb5f42ec18: Mach-O 64-bit executable x86_64

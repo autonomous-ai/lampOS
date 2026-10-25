@@ -1,0 +1,31 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "release_pair",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/release_pair.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/release_pair-4c330c26cfcb0f6b",
+  "sha256": "222c6aed8dfb40a1fe52427c1306ed6f15489f0ea560d6d2d8f9720fd725e203",
+  "compiled_cases": [
+    "current_reads_release_6408_days_and_forget_survives_release_6408_reopen",
+    "release_6408_reads_current_days_and_forget_survives_current_reopen"
+  ],
+  "compiled_ignored_cases": [
+    "current_reads_release_6408_days_and_forget_survives_release_6408_reopen",
+    "release_6408_reads_current_days_and_forget_survives_current_reopen"
+  ],
+  "compiled_case_count": 2,
+  "ignored_case_count": 2,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

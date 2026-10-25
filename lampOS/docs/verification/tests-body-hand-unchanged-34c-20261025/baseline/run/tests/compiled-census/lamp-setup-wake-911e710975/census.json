@@ -1,0 +1,32 @@
+{
+  "package": "lamp-setup",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "wake",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/tests/wake.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/wake-1817e6f65533e377",
+  "sha256": "911e71097500e7c8fa1753bcfceeb5ad3fcaf6fedce3d2c703a39b73d6a22a48",
+  "compiled_cases": [
+    "a_ring_that_is_not_there_yet_is_tried_again_and_shown",
+    "a_waking_face_that_never_answers_cannot_keep_the_privacy_ring_dark",
+    "asked_before_any_ring_opened_it_answers_at_once_and_never_opens_one",
+    "it_lights_at_once_and_the_voice_finds_the_ring_free_once_answered",
+    "something_that_is_not_the_voices_ask_leaves_the_ring_lit",
+    "the_privacy_ring_has_it_within_100_ms_of_asking"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 6,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

@@ -1,0 +1,27 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "forgot",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/forgot.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/forgot-fd6638675ad23908",
+  "sha256": "ad49165dc63fd5c050993648a6e5d1f6b700f9dc204da15221bd42a9f6dc70c0",
+  "compiled_cases": [
+    "a_forget_of_everything_kept_under_a_person_is_told_on_the_bus_and_nothing_else"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 1,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

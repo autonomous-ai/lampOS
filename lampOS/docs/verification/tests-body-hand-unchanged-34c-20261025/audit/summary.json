@@ -1,0 +1,33 @@
+{
+  "source_base": "34c8b517c41c8d2a4099b87fe550d4eb25611ea2",
+  "native_handle": 16943,
+  "controller_terminal_exit": 0,
+  "actual_full_tests_exit": 101,
+  "actual_full_tests_wall_seconds": 3342.492547,
+  "baseline": {
+    "passed": 7321,
+    "failed": 15,
+    "ignored": 52
+  },
+  "candidate": {
+    "passed": 7316,
+    "failed": 20,
+    "ignored": 52
+  },
+  "complete_targets": 79,
+  "same_case_inventory": 7388,
+  "body_lib_both": {
+    "passed": 440,
+    "failed": 0
+  },
+  "commands": 204,
+  "streams_verified": 408,
+  "new_witnesses_verified": 99,
+  "protected_old_witnesses_verified": 146,
+  "overlap": "Only light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them reproduced the same line-90 middle-call <25ms predicate. Other 19 candidate failures did not reproduce. Baseline has 14 different Voice lib failures.",
+  "binary_audit": "98/99 executable pairs differ only in N_OSO debug-map opaque rcgu object suffixes; every other byte is equal. Body lib-test code/data differs. No semantic equivalence/environment equality/cause claim.",
+  "source_restore": "All 10,460 submitted candidate bytes/full modes/kinds restored in closed maps; only two owned mtimes are new. No current WT scan.",
+  "run_scope": "One fixed baseline full run; no repeat, extra observation or current-head qualification. Controller zero means evidence/restoration completed, not green tests.",
+  "privacy": "Raw full Cargo metadata remains private; graph projection and raw SHA/binding receipt are selected. No binaries/Python bodies/raw environment/full Git personal metadata.",
+  "cleanup_limits": "All 204 direct waits and owned groups closed, no timeout. No exhaustive global/nested-session absence claim. Some actual ordinary test failures report their own fixture child/watchdog/cleanup errors and remain explicit in raw phases."
+}

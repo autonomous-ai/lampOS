@@ -1,0 +1,27 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "paraphrase_fixture",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/paraphrase_fixture.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/paraphrase_fixture-48401515e5a149f1",
+  "sha256": "df69f88f34e2fe1094bbe706782c1ca8b712e8de111d221173937e713b57cb5d",
+  "compiled_cases": [
+    "paraphrase_fixture_has_its_shape"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 1,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

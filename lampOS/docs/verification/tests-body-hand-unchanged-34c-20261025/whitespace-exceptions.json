@@ -1,0 +1,6 @@
+{
+  "paths": [
+    "lampOS/docs/verification/tests-body-hand-unchanged-34c-20261025/baseline/run/tests/tests.stdout.txt"
+  ],
+  "reason": "Keep the original raw test stdout blank line at EOF byte-for-byte; only this literal path is excluded from whitespace checking, all raw hashes remain mandatory."
+}

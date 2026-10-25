@@ -1,0 +1,33 @@
+{
+  "package": "lamp-voice-eval",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-voice-eval",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/src/main.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_voice_eval-09c0422b7d9af692",
+  "sha256": "3a3abe42b5592752c24d384df14653165eb398c2e2b042685dc4231ce92b36b7",
+  "compiled_cases": [
+    "observe_dry::tests::a_copy_that_fails_partway_is_removed",
+    "observe_dry::tests::a_cut_that_joins_or_drops_made_up_conversations_is_refused",
+    "observe_dry::tests::a_dry_run_keeps_what_the_store_allows_and_removes_its_copy",
+    "observe_dry::tests::its_arguments_need_a_store_an_out_folder_and_a_key",
+    "observe_dry::tests::the_journal_is_cut_into_conversations_as_the_voice_cuts_it",
+    "observe_dry::tests::the_made_up_set_is_scored_against_what_each_conversation_should_keep",
+    "observe_dry::tests::the_score_counts_whole_words_and_each_thing_once"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 7,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

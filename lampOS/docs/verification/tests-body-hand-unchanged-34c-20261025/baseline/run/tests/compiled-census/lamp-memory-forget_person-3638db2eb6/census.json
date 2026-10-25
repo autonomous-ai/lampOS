@@ -1,0 +1,29 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "forget_person",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/forget_person.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/forget_person-0deddd938b7bacb2",
+  "sha256": "3638db2eb63d5f0036daa78ddbc42d24f84736f75806607d4d88ed01a0f9ec6f",
+  "compiled_cases": [
+    "forget_person_leaves_nothing_of_one_person_in_days_and_nobody_elses_is_touched",
+    "forget_person_leaves_nothing_of_one_person_in_the_legacy_store_and_nobody_elses_is_touched",
+    "the_narrow_socket_takes_forget_person_only_and_refuses_the_rest_untouched"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 3,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

@@ -1,0 +1,43 @@
+{
+  "execution_authorized": true,
+  "authorized_at": "2026-10-25T04:25:26.249703+00:00",
+  "grant_id": "root-one-unchanged-34c-full12-after-fourth-actual-closure",
+  "plan_sha256": "7801e69bd3882b03a46ab0a9c247bbc74dd35b9d45eac6e33b7dbe1c9943d8ab",
+  "controller_sha256": "31b5ee396b42e0bf86d0013523eda778d4e22c0540962d4d26a2bf72daac9122",
+  "candidate_guards": {
+    "canonical": "907ab7a6e28ea953dbaf6840db72333d9b1afe1161a9543032d5539253acd2c0"
+  },
+  "target_exclusive": true,
+  "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target",
+  "wt_two_file_switch_authorized": true,
+  "protected_witnesses": {
+    "entries": 146,
+    "manifest_sha256": "92803569911072770a0171c73e4c3802b8901aee52d8d47027b80196305a5b49"
+  },
+  "resource_context": {
+    "root_compiler_job_upper_bound": 2,
+    "resource_grant_pending": false,
+    "declared_peer_lanes": [
+      {
+        "builder": "Reviewer-two",
+        "job_upper_bound": 1,
+        "slotpost": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6393213686",
+        "activehandle": "UNKNOWN"
+      },
+      {
+        "builder": "Third",
+        "job_upper_bound": 1,
+        "slotpost": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6393226373",
+        "activehandle": "UNKNOWN"
+      }
+    ],
+    "global_actual_process_count_claim": false,
+    "isolated_host_claim": false,
+    "cpu_exclusive": false,
+    "total_declared_compile_job_upper_bound": 4,
+    "actual_pair_handoff": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6393360270"
+  },
+  "observation_count": 1,
+  "previous_root_owner_native47816_closed_exit": 1,
+  "scope": "One metadata/clean48/full12 command sequence; no retry; finally restore exact two candidate files/fullmodes with actual new mtimes; no current-main or historical cause claim"
+}

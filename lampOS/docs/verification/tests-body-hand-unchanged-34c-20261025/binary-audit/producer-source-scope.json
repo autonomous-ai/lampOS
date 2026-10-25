@@ -1,0 +1,3299 @@
+{
+  "source_map_paths": 10460,
+  "source_byte_mode_kind_delta": [
+    {
+      "path": "lampOS/crates/body/src/bus_out.rs",
+      "candidate": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792892798838988256
+      },
+      "baseline": {
+        "sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+        "bytes": 64180,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792902364789307664
+      }
+    },
+    {
+      "path": "lampOS/docs/body.md",
+      "candidate": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792892798951058564
+      },
+      "baseline": {
+        "sha256": "936e01931c5ae0068f16d2d47bd8a0396ca2f966600d6e5f987d6c2a83128c12",
+        "bytes": 203745,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792902364792955159
+      }
+    }
+  ],
+  "producer_pairs_verified": [
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "turn_end_replay",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/examples/turn_end_replay.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f199b0dad551f4124a482b8a0663d8010d42936efc1551b45619eb68ab64997b",
+      "candidate_producer_sha256": "f199b0dad551f4124a482b8a0663d8010d42936efc1551b45619eb68ab64997b"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek#lamp-peek@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-peek",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "c9bdd07b19b992ac32f04470ed9e9333a4a3f528fef7af11ad19f6f7b0100891",
+      "candidate_producer_sha256": "c9bdd07b19b992ac32f04470ed9e9333a4a3f528fef7af11ad19f6f7b0100891"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek#lamp-peek@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-peek",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f610af3517e87b6d2a2d74ed229a3adb6286d3dce8709580772ebec6c1a927a7",
+      "candidate_producer_sha256": "f610af3517e87b6d2a2d74ed229a3adb6286d3dce8709580772ebec6c1a927a7"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice-eval",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "3f07a790743164b8826ab6350480031ea5807963362d3e3702e76ef3073550c9",
+      "candidate_producer_sha256": "3f07a790743164b8826ab6350480031ea5807963362d3e3702e76ef3073550c9"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "same_voice_pairs",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/examples/same_voice_pairs.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "23ae6615018a608b035664a41c23dd70792f300e750a70de16ab07fa15c58333",
+      "candidate_producer_sha256": "23ae6615018a608b035664a41c23dd70792f300e750a70de16ab07fa15c58333"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek#lamp-peek@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "peek",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/tests/peek.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "8e629bd901cffcc71e46d4d387c44120eccf9304c525724ffda5d60a6db8b49b",
+      "candidate_producer_sha256": "8e629bd901cffcc71e46d4d387c44120eccf9304c525724ffda5d60a6db8b49b"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice-eval",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "5c57a860e61baec67c104f6fd3e96fd4e2fd8beca80c1eb27dfbbc069cd9c334",
+      "candidate_producer_sha256": "5c57a860e61baec67c104f6fd3e96fd4e2fd8beca80c1eb27dfbbc069cd9c334"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-cloud",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "21b9ed499c2f26092a305ea238db39bd6f84138f042efe754016d51f42cdb640",
+      "candidate_producer_sha256": "21b9ed499c2f26092a305ea238db39bd6f84138f042efe754016d51f42cdb640"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "e6978101cbf83b8d8bc64b318f2f66bc6d83e83e0cc439d71c71b3ddbc966463",
+      "candidate_producer_sha256": "e6978101cbf83b8d8bc64b318f2f66bc6d83e83e0cc439d71c71b3ddbc966463"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-cloud",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "533cbfb82b39f7dac89d2a2a3e615b860b903a84ca1908aecf44e59bf33ef97b",
+      "candidate_producer_sha256": "533cbfb82b39f7dac89d2a2a3e615b860b903a84ca1908aecf44e59bf33ef97b"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "release_pair",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/tests/release_pair.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "c75b7bc15c38e6201fb7118ea463afc956633787e089235729b3d85e5babc7e3",
+      "candidate_producer_sha256": "c75b7bc15c38e6201fb7118ea463afc956633787e089235729b3d85e5babc7e3"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f6428ecfb5da0e76424cfdd9f1ac43b0c274fe2ce270b0b3aaf1ce6f5a7a3f66",
+      "candidate_producer_sha256": "f6428ecfb5da0e76424cfdd9f1ac43b0c274fe2ce270b0b3aaf1ce6f5a7a3f66"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_memory",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "35f2071477ebda6bd19b8e79f575b3ae57fc3ac9819a73cd0d4b192404a97f44",
+      "candidate_producer_sha256": "35f2071477ebda6bd19b8e79f575b3ae57fc3ac9819a73cd0d4b192404a97f44"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_follows_face",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_follows_face.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "abb9a819ee93ec2ea3bfb54a8f0852e5657ac3c1470ee02afb198985e87cd3a8",
+      "candidate_producer_sha256": "abb9a819ee93ec2ea3bfb54a8f0852e5657ac3c1470ee02afb198985e87cd3a8"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "9b022cb424b1ae95cfc39741a85ffc29dc401f76a8627628b3b677bf919a4156",
+      "candidate_producer_sha256": "9b022cb424b1ae95cfc39741a85ffc29dc401f76a8627628b3b677bf919a4156"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "duplex_lab",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/duplex_lab.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "37b5da58f81ed2e7b907049f9a6035ef00ea33d08cbd7fe7e556fdc0292b5b41",
+      "candidate_producer_sha256": "37b5da58f81ed2e7b907049f9a6035ef00ea33d08cbd7fe7e556fdc0292b5b41"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_link_used",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_link_used.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "d729f72ccefc66322e4471ef2ecab4c9074eb993d0fd12af164135d56176d631",
+      "candidate_producer_sha256": "d729f72ccefc66322e4471ef2ecab4c9074eb993d0fd12af164135d56176d631"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice_eval",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice-eval/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "2ce0e8064af905958e7e1ec747c2a575ebb377cd01c9bb4ef6b29f579af45c59",
+      "candidate_producer_sha256": "2ce0e8064af905958e7e1ec747c2a575ebb377cd01c9bb4ef6b29f579af45c59"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "forget_shared_exchange",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/forget_shared_exchange.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "58228f803c5c02f5144f84248d42d5361ca6637b848e44c1fe071e2d0a72737a",
+      "candidate_producer_sha256": "58228f803c5c02f5144f84248d42d5361ca6637b848e44c1fe071e2d0a72737a"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "functions",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/functions.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "5d8d555d8316d7b382a282bb4b25bc2b910fd8c96c17223a571e119f248d0dbc",
+      "candidate_producer_sha256": "5d8d555d8316d7b382a282bb4b25bc2b910fd8c96c17223a571e119f248d0dbc"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "release_pair",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/tests/release_pair.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "5668081ceac9343fbbd8e4dad95c82f477ccfa9188e2b78603123e67e0ebb769",
+      "candidate_producer_sha256": "5668081ceac9343fbbd8e4dad95c82f477ccfa9188e2b78603123e67e0ebb769"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "stop_words_stt_replay",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "c670c74c5a8b24cbfba7aa3fb880b27aa877722e87742b77bb187bd9cf0ce6b1",
+      "candidate_producer_sha256": "c670c74c5a8b24cbfba7aa3fb880b27aa877722e87742b77bb187bd9cf0ce6b1"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-skills",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "7a0b12211ce8598dd68a4ae5a042ee2bbe54ad56b55f8b9c2ea10c919bfa0371",
+      "candidate_producer_sha256": "7a0b12211ce8598dd68a4ae5a042ee2bbe54ad56b55f8b9c2ea10c919bfa0371"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "a68ce3ef06fbb1ab9fe2ddb090ce33bc436d56571919e7a5061605315e72b0f6",
+      "candidate_producer_sha256": "a68ce3ef06fbb1ab9fe2ddb090ce33bc436d56571919e7a5061605315e72b0f6"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_forget",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_forget.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f05aeace6718f97133efe5d136f6a7192328060df3d6d6ba9bf580d8e77b86a3",
+      "candidate_producer_sha256": "f05aeace6718f97133efe5d136f6a7192328060df3d6d6ba9bf580d8e77b86a3"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "install",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/install.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "901f5a63f42d968058fa09ade77c041867b9ed764fc09457b55cd30d82886538",
+      "candidate_producer_sha256": "901f5a63f42d968058fa09ade77c041867b9ed764fc09457b55cd30d82886538"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "head_qualification_operator",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/head_qualification_operator.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "8022031e98354dc8e6a589a2f4ce0552580b860bcaad10ffb65182a2e9297801",
+      "candidate_producer_sha256": "8022031e98354dc8e6a589a2f4ce0552580b860bcaad10ffb65182a2e9297801"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-memory-eval",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "20645999d1266d4695776e03ef1da2636df2c35f33fb6116fb9ce8968c821e90",
+      "candidate_producer_sha256": "20645999d1266d4695776e03ef1da2636df2c35f33fb6116fb9ce8968c821e90"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_forget_named",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_forget_named.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "b423be6efa5301517206ba71ce4a6e812b507cef9c844b8a3d5c2b4d3555781c",
+      "candidate_producer_sha256": "b423be6efa5301517206ba71ce4a6e812b507cef9c844b8a3d5c2b4d3555781c"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-update",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "aa15956c437841c4220f0a02296a1415208ad5a7a51d8ef8af19a3d78c0555c0",
+      "candidate_producer_sha256": "aa15956c437841c4220f0a02296a1415208ad5a7a51d8ef8af19a3d78c0555c0"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "reference_pace",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/reference_pace.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "16fb06b038c92e9db4dfae18d4d6da13edc67c3f250e84325b76ab3bd34d0644",
+      "candidate_producer_sha256": "16fb06b038c92e9db4dfae18d4d6da13edc67c3f250e84325b76ab3bd34d0644"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "round",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/round.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "52b0ddff5af073dd6b2e905dc840f50e37828c999213679e99e8982bb675f796",
+      "candidate_producer_sha256": "52b0ddff5af073dd6b2e905dc840f50e37828c999213679e99e8982bb675f796"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "requested_audio",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/tests/requested_audio.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "79513671fb2382e3786dd45b13f41fedf7ae6f173de4dee0c09f204d34062f38",
+      "candidate_producer_sha256": "79513671fb2382e3786dd45b13f41fedf7ae6f173de4dee0c09f204d34062f38"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "release_pair",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/release_pair.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "9b8c5932c12f80ee2e518b7c2e8bad028e3d8f17122715da4140775f2689cf24",
+      "candidate_producer_sha256": "9b8c5932c12f80ee2e518b7c2e8bad028e3d8f17122715da4140775f2689cf24"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "8f0c819e1142ec15ebdd1053cbb7be75774902887b3bc38e4b75a318acb3ad2a",
+      "candidate_producer_sha256": "8f0c819e1142ec15ebdd1053cbb7be75774902887b3bc38e4b75a318acb3ad2a"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud#lamp-cloud@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_cloud",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "77c26676d96bbefe18fcd670b41d6632056c826983f206f76b0affd8fdbc873e",
+      "candidate_producer_sha256": "77c26676d96bbefe18fcd670b41d6632056c826983f206f76b0affd8fdbc873e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_forget_about",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_forget_about.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "d65607b0cf1be6e0694bfc17482de0b47dfdb64cc4985a04a2d3499405ec9496",
+      "candidate_producer_sha256": "d65607b0cf1be6e0694bfc17482de0b47dfdb64cc4985a04a2d3499405ec9496"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "self-cli-exec",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/self_cli_exec.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "d30e7915bd9072070061c37f781be6f490d412868b5de8bc126eb9103b264c5a",
+      "candidate_producer_sha256": "d30e7915bd9072070061c37f781be6f490d412868b5de8bc126eb9103b264c5a"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "probe_handover",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/probe_handover.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "5ee3c645d3b69cf46e236c2e77af5d9b05529c893b5d99fc6af51532274d2af0",
+      "candidate_producer_sha256": "5ee3c645d3b69cf46e236c2e77af5d9b05529c893b5d99fc6af51532274d2af0"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "cade108daee521328e4776f0e7f78e6a8dcbda918f45a9621a56c4235c658a5a",
+      "candidate_producer_sha256": "cade108daee521328e4776f0e7f78e6a8dcbda918f45a9621a56c4235c658a5a"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "36283d1486bb472228435be159964d76cd2d96c22b333a7a4afde4cab73e9bd9",
+      "candidate_producer_sha256": "36283d1486bb472228435be159964d76cd2d96c22b333a7a4afde4cab73e9bd9"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "render_line_second",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/render_line_second.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "83c409548e6207c69f43c1ffe055719384ae537c26f7a9e7190883d9cd959f63",
+      "candidate_producer_sha256": "83c409548e6207c69f43c1ffe055719384ae537c26f7a9e7190883d9cd959f63"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-skills",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "8e963799afa57e00b6a666071d0a16388ceda9008ea4a582e2b4a41c0700265e",
+      "candidate_producer_sha256": "8e963799afa57e00b6a666071d0a16388ceda9008ea4a582e2b4a41c0700265e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "health_control",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/health_control.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "896da46108b5f7c7169eb691fb0d081912d456c7df7a29ed4cc43f6ead58dbfe",
+      "candidate_producer_sha256": "896da46108b5f7c7169eb691fb0d081912d456c7df7a29ed4cc43f6ead58dbfe"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "forgot",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/forgot.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f07096af0244e3f160dcf76ab3fed09ec3626a9b401714b446259a356eb3c29f",
+      "candidate_producer_sha256": "f07096af0244e3f160dcf76ab3fed09ec3626a9b401714b446259a356eb3c29f"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "3ec26c8c717c6dbffa1e6f52dca9f07a93ecb82a811dcacac0f0d16697c76085",
+      "candidate_producer_sha256": "3ec26c8c717c6dbffa1e6f52dca9f07a93ecb82a811dcacac0f0d16697c76085"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "forget_person",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/forget_person.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "3119857264961af5b17f18141f04d21fa519e402b07e8dac3248e793e7d1de77",
+      "candidate_producer_sha256": "3119857264961af5b17f18141f04d21fa519e402b07e8dac3248e793e7d1de77"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "ring_process_probe",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/ring_process_probe.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "1c0e70a3781d70ae6406db1747fbc00864af54e0962ad95f00a722c352ba71ee",
+      "candidate_producer_sha256": "1c0e70a3781d70ae6406db1747fbc00864af54e0962ad95f00a722c352ba71ee"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_since_until",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_since_until.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "b4e90f3df2362de955f90a49753cfa28da0293244110d573faeec19631cf6168",
+      "candidate_producer_sha256": "b4e90f3df2362de955f90a49753cfa28da0293244110d573faeec19631cf6168"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_update",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f850a412d60c6a27f46f22f74cd47476b97bdf107f0f9e529d31f57b52afdd0e",
+      "candidate_producer_sha256": "f850a412d60c6a27f46f22f74cd47476b97bdf107f0f9e529d31f57b52afdd0e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "admission_latency",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/admission_latency.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "7ea5e2fbb49695477737b92ed73fd1d6b9ae6a8d62e58254ace87799248d2db0",
+      "candidate_producer_sha256": "7ea5e2fbb49695477737b92ed73fd1d6b9ae6a8d62e58254ace87799248d2db0"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_skills",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "53bd53bbb2a699b10d51402072eb056e92a7130b3bd6df284e1086978c51d383",
+      "candidate_producer_sha256": "53bd53bbb2a699b10d51402072eb056e92a7130b3bd6df284e1086978c51d383"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_observe",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_observe.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "ac53840b604f43ea89cb51d887e16f043aae5c2dc0d96ab511e3cc39b9d54b86",
+      "candidate_producer_sha256": "ac53840b604f43ea89cb51d887e16f043aae5c2dc0d96ab511e3cc39b9d54b86"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "release_pair",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/tests/release_pair.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "6e3dc10837332b0a7cc49100a97a27b53cfdf039204186f3b2c5bb6c33399c5a",
+      "candidate_producer_sha256": "6e3dc10837332b0a7cc49100a97a27b53cfdf039204186f3b2c5bb6c33399c5a"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "self-process-cuts",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/self_process_cuts.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "8ac32a094d402e5a209e6e5ccd27d49b7f370a39c7956e90dfa8f1acb5d2ba7e",
+      "candidate_producer_sha256": "8ac32a094d402e5a209e6e5ccd27d49b7f370a39c7956e90dfa8f1acb5d2ba7e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-memory",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "3a2586973a84430f2ddd9abbde86412c541a5e473fef4a7fe3b46f3cc93d4934",
+      "candidate_producer_sha256": "3a2586973a84430f2ddd9abbde86412c541a5e473fef4a7fe3b46f3cc93d4934"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "paraphrase_fixture",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/paraphrase_fixture.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "dc288a587e8e26e9d9ad2de53245ca398df2afa0591516bce46efb0e45ec94d3",
+      "candidate_producer_sha256": "dc288a587e8e26e9d9ad2de53245ca398df2afa0591516bce46efb0e45ec94d3"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "release_pair",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/tests/release_pair.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "b85379eb097f4e0c79ad4772dc72fb5d79dc2552c152f55caf239f73e131fd28",
+      "candidate_producer_sha256": "b85379eb097f4e0c79ad4772dc72fb5d79dc2552c152f55caf239f73e131fd28"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills#lamp-skills@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "render_relaxing_music",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/examples/render_relaxing_music.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f2486a29bd8e81ccada30cbc0357c4578493d2d2a9f1c4ed955ddd8d713b9a13",
+      "candidate_producer_sha256": "f2486a29bd8e81ccada30cbc0357c4578493d2d2a9f1c4ed955ddd8d713b9a13"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "voice_early_words",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_early_words.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "9230af195b71deb8c31f6547bf7ebe15e2c406630aff41c9eaa279dc1d746f94",
+      "candidate_producer_sha256": "9230af195b71deb8c31f6547bf7ebe15e2c406630aff41c9eaa279dc1d746f94"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup#lamp-setup@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-setup",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "5300fcc868429fe7cf34a793dcb4f224c1b490254948565e8173dd8141372d0c",
+      "candidate_producer_sha256": "5300fcc868429fe7cf34a793dcb4f224c1b490254948565e8173dd8141372d0c"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "hearing_replay",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/examples/hearing_replay.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "ac1dcf20b366158f75c07d641dbc2d0c541df0e381ed74301a2a42d5664f30d0",
+      "candidate_producer_sha256": "ac1dcf20b366158f75c07d641dbc2d0c541df0e381ed74301a2a42d5664f30d0"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup#lamp-setup@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "wake",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/tests/wake.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "78864c689e91c9f34561a14e8f1c890ffc0a678fd2df1345b83edf256588bcc6",
+      "candidate_producer_sha256": "78864c689e91c9f34561a14e8f1c890ffc0a678fd2df1345b83edf256588bcc6"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup#lamp-setup@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-setup",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "1c85c58ba6f9c053644d1e804da20ba03671cfcd17d081a474a5bd23c41752d2",
+      "candidate_producer_sha256": "1c85c58ba6f9c053644d1e804da20ba03671cfcd17d081a474a5bd23c41752d2"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup#lamp-setup@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "6bb9be591fbd468467625eff0337c06746ceb8a467c6d71504d1320e1c0779f5",
+      "candidate_producer_sha256": "6bb9be591fbd468467625eff0337c06746ceb8a467c6d71504d1320e1c0779f5"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek#lamp-peek@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_peek",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "831fdb64f453fa8572985395d498192090eafa6127555cbf949fb9dd587ca339",
+      "candidate_producer_sha256": "831fdb64f453fa8572985395d498192090eafa6127555cbf949fb9dd587ca339"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup#lamp-setup@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_setup",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/setup/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "dc87693e78db166bb2afca4043af4a8c1d2c4322e3156c58613b8f17fcf3c1cf",
+      "candidate_producer_sha256": "dc87693e78db166bb2afca4043af4a8c1d2c4322e3156c58613b8f17fcf3c1cf"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-memory-eval",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "2db6611d186a16771717f4c74f1d09178c4bc6be9729d3fc18f9420934ec2cd2",
+      "candidate_producer_sha256": "2db6611d186a16771717f4c74f1d09178c4bc6be9729d3fc18f9420934ec2cd2"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-memory-fixture",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "a84ff08b5f8979fe656e3826b24d124378a1d18273b3bb8750105652db77e76a",
+      "candidate_producer_sha256": "a84ff08b5f8979fe656e3826b24d124378a1d18273b3bb8750105652db77e76a"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory#lamp-memory@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-memory",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "2d3a66336cdaa02766beef86642b3cca1870882242cc1e06afe66ea707bc995e",
+      "candidate_producer_sha256": "2d3a66336cdaa02766beef86642b3cca1870882242cc1e06afe66ea707bc995e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "replay_cost",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/examples/replay_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "38ddbd2bf7aefcda9c33b10a8ac5becfcc33c0af3f82b0cc519c3c98006c596d",
+      "candidate_producer_sha256": "38ddbd2bf7aefcda9c33b10a8ac5becfcc33c0af3f82b0cc519c3c98006c596d"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-expression",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f30c534044c51c3132b4681181bc6be96b4e7d2cf834f8465777bb6fdbc73aae",
+      "candidate_producer_sha256": "f30c534044c51c3132b4681181bc6be96b4e7d2cf834f8465777bb6fdbc73aae"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-expression",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "9d07ce7438426d9ca690b0623cc12248d9e9f693a029b01cb1e69b508152944e",
+      "candidate_producer_sha256": "9d07ce7438426d9ca690b0623cc12248d9e9f693a029b01cb1e69b508152944e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean#lamp-lean@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_lean",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "1240459041f95251cfd971ee25adf074f5954b13e43816fdeae6376b5818a767",
+      "candidate_producer_sha256": "1240459041f95251cfd971ee25adf074f5954b13e43816fdeae6376b5818a767"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "runtime",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/tests/runtime.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "6ccba3c3cfa98c13b61131460088c579a30ac6251ef7b16914ee8aed87bc4e76",
+      "candidate_producer_sha256": "6ccba3c3cfa98c13b61131460088c579a30ac6251ef7b16914ee8aed87bc4e76"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "rest_cost",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/examples/rest_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "86c904363b1b49e76f1fb7ac64ac71ac7d86dd72e8c97be3678f6b2d5ddb5b91",
+      "candidate_producer_sha256": "86c904363b1b49e76f1fb7ac64ac71ac7d86dd72e8c97be3678f6b2d5ddb5b91"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean#lamp-lean@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "cba1ab0ca4111883a704eb9155130033c87c820b56027c914528d2d59d32b368",
+      "candidate_producer_sha256": "cba1ab0ca4111883a704eb9155130033c87c820b56027c914528d2d59d32b368"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "4999cd20444aee2470656d2053c79b67ee929b32901939b99d68840a2044f123",
+      "candidate_producer_sha256": "4999cd20444aee2470656d2053c79b67ee929b32901939b99d68840a2044f123"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean#lamp-lean@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "check",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/lean/examples/check.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "62346559e09fd747c93183d0c2db7e8b9a1b6e9f20f89fbaf19a71351827941e",
+      "candidate_producer_sha256": "62346559e09fd747c93183d0c2db7e8b9a1b6e9f20f89fbaf19a71351827941e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "recent_playout_cost",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/examples/recent_playout_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "0569252fd056c056323fbe81b1b2fa0423046d97a8802670b33239a89072d36e",
+      "candidate_producer_sha256": "0569252fd056c056323fbe81b1b2fa0423046d97a8802670b33239a89072d36e"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "head_plan",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/examples/head_plan.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "b102640f0fcbd339ae11292dd03f12b62ebaf726a078ad03c4dbdf50412af567",
+      "candidate_producer_sha256": "b102640f0fcbd339ae11292dd03f12b62ebaf726a078ad03c4dbdf50412af567"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-mood",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "5e63af79a54721f9f8853361ba8e76804c23e3b6f2e7d9f232359dc8549f84d3",
+      "candidate_producer_sha256": "5e63af79a54721f9f8853361ba8e76804c23e3b6f2e7d9f232359dc8549f84d3"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_expression",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/expression/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "b4f9c7190ddebe518f94b67d7f70a84aac0a0b11446ddde7803bc046d4aa7a9d",
+      "candidate_producer_sha256": "b4f9c7190ddebe518f94b67d7f70a84aac0a0b11446ddde7803bc046d4aa7a9d"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-mood",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "914b11b7c2e4bc60719527ed6e25a5e0426223a1291dcfaccdd397f06d6cd081",
+      "candidate_producer_sha256": "914b11b7c2e4bc60719527ed6e25a5e0426223a1291dcfaccdd397f06d6cd081"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-worker",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "5f08a1a6609c02d20be798bdae6810869cb5420ee50a06dc4dd4b991df38132b",
+      "candidate_producer_sha256": "5f08a1a6609c02d20be798bdae6810869cb5420ee50a06dc4dd4b991df38132b"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "expression_ask",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/examples/expression_ask.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "a9702a8b468c4b78aafc89b6e36e354dfea7c7992dd673872b082473db47fb0a",
+      "candidate_producer_sha256": "a9702a8b468c4b78aafc89b6e36e354dfea7c7992dd673872b082473db47fb0a"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "88f38ce5e334638ed2380ad97ec2e16d87d4cc845563df21546c0dad782cff8c",
+      "candidate_producer_sha256": "88f38ce5e334638ed2380ad97ec2e16d87d4cc845563df21546c0dad782cff8c"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-inspect",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "47d8d370d97b913daf56d110cff21d4718d3a9f40b50cca2178e544b0e284416",
+      "candidate_producer_sha256": "47d8d370d97b913daf56d110cff21d4718d3a9f40b50cca2178e544b0e284416"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-measure",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "6a044dc820d358dbf6f952f4021c503691548780dd0e7e19802a09ff6e8dc5ee",
+      "candidate_producer_sha256": "6a044dc820d358dbf6f952f4021c503691548780dd0e7e19802a09ff6e8dc5ee"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "32622fd97ef64fd5fb2ab2fb71b5228683d5eb94ba0920fb07a798221f68ca0f",
+      "candidate_producer_sha256": "32622fd97ef64fd5fb2ab2fb71b5228683d5eb94ba0920fb07a798221f68ca0f"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-worker",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "73db24b9b940e6d4e003383ddda232d85aa431362c5d2a7092e909432cc8fa1b",
+      "candidate_producer_sha256": "73db24b9b940e6d4e003383ddda232d85aa431362c5d2a7092e909432cc8fa1b"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-measure",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "2d5a3f5b4ee71a8b30239b5ebe380fbb00ff6397b5b027d32f5c674d352694d1",
+      "candidate_producer_sha256": "2d5a3f5b4ee71a8b30239b5ebe380fbb00ff6397b5b027d32f5c674d352694d1"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body-inspect",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "76fa8e2a342db3febb33e5589272642e500ea5280fe3da79a8651b72505ca363",
+      "candidate_producer_sha256": "76fa8e2a342db3febb33e5589272642e500ea5280fe3da79a8651b72505ca363"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-body",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/bin/lamp-body.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "777a053bfe3bc95a03796592c182167c02680256998b9058971caeeb8f8e8c14",
+      "candidate_producer_sha256": "777a053bfe3bc95a03796592c182167c02680256998b9058971caeeb8f8e8c14"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper#lamp-keeper@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_keeper",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [
+          "default",
+          "prepare"
+        ]
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "9f7d9a2e2fcd1a3047738c7ecb7b78d362a84b986fbfe3af896facfc90cd1754",
+      "candidate_producer_sha256": "9f7d9a2e2fcd1a3047738c7ecb7b78d362a84b986fbfe3af896facfc90cd1754"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper#lamp-keeper@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-keeper",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/keeper/src/main.rs",
+          "edition": "2024",
+          "required-features": [
+            "prepare"
+          ],
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [
+          "default",
+          "prepare"
+        ]
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "21230a678e92b43b5e444115b90b9e5b426e4996e81d1e624406d6f04eddeeb9",
+      "candidate_producer_sha256": "21230a678e92b43b5e444115b90b9e5b426e4996e81d1e624406d6f04eddeeb9"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update#lamp-update@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-update",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/update/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f46e24f0571ed5acdbfa83ae250cc26081190360f5fae6562931c1fdcfb779f8",
+      "candidate_producer_sha256": "f46e24f0571ed5acdbfa83ae250cc26081190360f5fae6562931c1fdcfb779f8"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice#lamp-voice@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "f4f080ffbc9d116c404b74cd6dc43222f06f9c2eca94b34d9f6ef6d865ae788d",
+      "candidate_producer_sha256": "f4f080ffbc9d116c404b74cd6dc43222f06f9c2eca94b34d9f6ef6d865ae788d"
+    },
+    {
+      "unit": {
+        "package_id": "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body#lamp-body@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_body",
+          "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/body/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "same_package_target_profile_features": true,
+      "both_actual_compiler_artifacts_fresh_false": true,
+      "baseline_producer_sha256": "fad5589150448e2ae1f679ad17ffec95fca9727d2941c46586ab3b9224d9bb2d",
+      "candidate_producer_sha256": "fad5589150448e2ae1f679ad17ffec95fca9727d2941c46586ab3b9224d9bb2d"
+    }
+  ],
+  "priority_targets_and_normal_CLI_catalog": [
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "db6c54bdd72f74dd75d64547a1b65bda0620d68542962d0788f383397a0e8913",
+      "candidate_sha256": "84a052d564e003ad651904726a690b03444370eca24c3b287c612bf3c58f97f9"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "lamp-skills",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "489cfdc78b52b1f6be9b0ea8cebdda5af9c8e513f30d70f949ae9b3f5c9f4a57",
+      "candidate_sha256": "fd59dce3c7eab9faf8d74d818a5a66409bd5a78b815edc87c87e84c6983c53b5"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "lamp-voice",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "ab3fdfbe4aea40e30ac1aabf8f2c8c3f4123b1fdbce182e746290b430c2674af",
+      "candidate_sha256": "b1727b31b50e3d877dd4b855aab800ea785ee99ccac58d63ecd7d454d6068a79"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "requested_audio",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "6c1a0126e2078d42619e8ddb881e9ea6d06dc62fc6a49715c418d7d0aea109a7",
+      "candidate_sha256": "c549d7963052f0bfa5615fbb9975cea1182a54cc42d874728526854c9a67e84b"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "ef4adde61eb44f3375d8c977ee0b2ccc6d6f615fdb848a15d628d8a0ef87c0eb",
+      "candidate_sha256": "69393b52b9037db7821b9d5f2da79443dc900dd8002aca9daa6bfa3741f047fa"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "it",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "bdbf8c42fc0d8179bc575fed3ff8bc32e6bb4499e1b2c192bbd3470a08ee4bb7",
+      "candidate_sha256": "938ae2a9977745c7ead7be9f0adb178bdde557118f3fd51ebb537a7d00289252"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "lamp-memory-eval",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "a7ef1426fa728babac15ad333867784a7b80e26757bd0a4e17af15237b2f7252",
+      "candidate_sha256": "fe53d398e4d982184ac38a3523bec56173aaf21b5cadebdef18bae0e17ec560c"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "lamp-memory-fixture",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "24f72fa2c36c7139d9983ea66b9e46edc5902078f09306460a177f9637ef96c9",
+      "candidate_sha256": "bff6d26af7b4e045aa68a62ce28a84fe953bbd795a38f5aa07da2010582c6eb0"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "lamp-memory",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "e47c966a3970641a3ccdfc12ed3232ec07687129597fb98004b5f11d9a2334c4",
+      "candidate_sha256": "33eaaa50822c3342bb6ec73a17e7582d288c6e27d1bf235205a52a20c4b9143a"
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp-expression",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "b8362f18630597238401af8f661ac041a241f483a045e5512a1ea5c509bbdefc",
+      "candidate_sha256": "33b557ad7f667aa029806e1dd94db313ac21fd19441076268045d79d3c7cffa8"
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp-body-mood",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "bc5a04cebd6b97c3b13a71439597a03557804e2c1e08d6377bd52d140b0f595d",
+      "candidate_sha256": "14ef090d48a3f78327ceddf42b7e735b3c369e99e83efe1535b3a61d9bfd6dc4"
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp-body-inspect",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "2d44916b8f7b454026518daa0affe08beebe0f2a00a446ccdee8c31595df50d0",
+      "candidate_sha256": "d4537ffce7cd1e9b409b483a89374796e99254a20f491238dd28201b7d68af21"
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp-body-worker",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "c340ffc701a80c435a8b183eb678931eeed4b3f9be43127d859abd35985ed395",
+      "candidate_sha256": "19278a7940130ab919789a379a1da8aa0ad5658a75728d06936efbdd718a22d3"
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp-body-measure",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "3f71c55ef5d16a261f226d9d5a302e7eec7521c8b8e5a8930c8d4001711d4148",
+      "candidate_sha256": "d930ccb70a4269c94e6b21bffb7a9b5a344da4f1021e94d44be52a727bba1d77"
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp-body",
+      "normal_CLI": true,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "a18f4d47c5b433d1c31b3c9b1404d325adc65ced995349ab91526606c1055e6e",
+      "candidate_sha256": "840e6f3a3797df44c93f5b7b736fd4503934eef1a43cc4c7965427672f31bb15"
+    }
+  ],
+  "selected_source_bindings": {
+    "lampOS/crates/skills/tests/it/routine_service.rs": {
+      "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+      "bytes": 20877,
+      "mode": 420,
+      "kind": "file",
+      "mtime_ns": 1792883885095693419
+    },
+    "lampOS/crates/skills/tests/it/skills.rs": {
+      "sha256": "5226aa9a8c1703d5311a946bccc237ea187be5b6bef2f0a34a00065e55f6e7e1",
+      "bytes": 453587,
+      "mode": 420,
+      "kind": "file",
+      "mtime_ns": 1792892790793550905
+    },
+    "lampOS/crates/skills/tests/requested_audio.rs": {
+      "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36",
+      "bytes": 62489,
+      "mode": 420,
+      "kind": "file",
+      "mtime_ns": 1792883885279120189
+    },
+    "lampOS/crates/voice/tests/it/light_call.rs": {
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "bytes": 3214,
+      "mode": 420,
+      "kind": "file",
+      "mtime_ns": 1792883892888379249
+    },
+    "lampOS/crates/memory/tests/it/voice.rs": {
+      "sha256": "ab0f14dd70f9b25ed71f4aeb23811b61f46dc78f06cc52bb1106d2cf375635a9",
+      "bytes": 34811,
+      "mode": 420,
+      "kind": "file",
+      "mtime_ns": 1792883880067808144
+    }
+  },
+  "child_scope_notes": [
+    "Skills routine_service.rs:156, skills.rs:1313 and requested_audio.rs:1406 launch CARGO_BIN_EXE_lamp-skills; the saved normal lamp-skills CLI is covered.",
+    "Voice light_call.rs uses in-process RingLight/bus/Executive; Memory voice.rs uses in-process Fixture and client. No direct Command/current_exe/CARGO_BIN_EXE in these two source files.",
+    "All 32 actual normal/example CLI witnesses are included in the 99-pair binary audit, including evaluator/body/voice/memory/skills CLI catalog. This is not an exhaustive per-case descendant or arbitrary system-program audit."
+  ],
+  "build_version_scope": "No build.rs exists in the four directly inspected body/skills/memory/voice crate roots. The 98 exact-outside-string-table proof excludes a changed embedded Git version/data value in those paired files; no claim about other runtime/environment inputs."
+}

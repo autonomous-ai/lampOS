@@ -1,0 +1,15 @@
+{
+  "reviewed_at": "2026-10-25T03:53:03.961150+00:00",
+  "reviewer": "Tests root",
+  "controller_sha256": "31b5ee396b42e0bf86d0013523eda778d4e22c0540962d4d26a2bf72daac9122",
+  "plan_sha256": "cc73cb0163e5341c3b60bee7f2ca49c59dc34c01f865dfb10a5c24cc97f74a56",
+  "status": "Reviewed source-only control; actual resource grant remains pending",
+  "source_146_witness_653_registry_readonly_preflight": "root-readonly-preflight.json",
+  "environment_readonly_preflight": "root-final-environment-readonly-check.json",
+  "known_difference": "Original PATH raw value was not retained. Both original/current hashes and current resolved tool identities are explicit; no complete environment or historical tool-byte equality claim. All other relevant stable key presences/value hashes match.",
+  "comparison_scope": "One original full twelve-package Cargo command/default parallel harness, same frozen34c source epoch without the two-file fixture delta; local48 invalidation and exact bound registry lineage. Full Cargo avoids standalone feature/runtime-child substitution. All observed compiler test/CLI identities compared; arbitrary system/escaped descendants not exhaustively mapped. No byte-equality causal waiver.",
+  "restoration": "Two exact owned files only; saved candidate bytes/fullmodes restored with actual new mtimes in finally. Unrecognized external changes are never overwritten.",
+  "allocation": "Fourth two, Second one, Reviewer-two one, actual Queue6393140733. Root zero. Baseline must not start until actual two-job handoff.",
+  "actual_test_observations": 0,
+  "execution_authorized": false
+}

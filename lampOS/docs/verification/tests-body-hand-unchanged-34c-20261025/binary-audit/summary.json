@@ -1,0 +1,68 @@
+{
+  "retained_pairs": 99,
+  "full_file_hashes_reverified": 198,
+  "identical_outside_LC_SYMTAB_string_table": 98,
+  "all_98_differences_only_opaque_rcgu_object_suffixes": true,
+  "all_98_changed_strings_referenced_only_by_N_OSO": true,
+  "sole_section_or_load_command_difference": {
+    "package": "lamp-body",
+    "target": "lamp_body",
+    "profile": "lib test opt0 debug2"
+  },
+  "priority_integration_pairs": [
+    {
+      "package": "lamp-skills",
+      "target": "it",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "db6c54bdd72f74dd75d64547a1b65bda0620d68542962d0788f383397a0e8913",
+      "candidate_sha256": "84a052d564e003ad651904726a690b03444370eca24c3b287c612bf3c58f97f9"
+    },
+    {
+      "package": "lamp-skills",
+      "target": "requested_audio",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "6c1a0126e2078d42619e8ddb881e9ea6d06dc62fc6a49715c418d7d0aea109a7",
+      "candidate_sha256": "c549d7963052f0bfa5615fbb9975cea1182a54cc42d874728526854c9a67e84b"
+    },
+    {
+      "package": "lamp-memory",
+      "target": "it",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "ef4adde61eb44f3375d8c977ee0b2ccc6d6f615fdb848a15d628d8a0ef87c0eb",
+      "candidate_sha256": "69393b52b9037db7821b9d5f2da79443dc900dd8002aca9daa6bfa3741f047fa"
+    },
+    {
+      "package": "lamp-voice",
+      "target": "it",
+      "normal_CLI": false,
+      "equal_all_bytes_outside_string_table": true,
+      "all_sections_and_load_commands_equal": true,
+      "baseline_sha256": "bdbf8c42fc0d8179bc575fed3ff8bc32e6bb4499e1b2c192bbd3470a08ee4bb7",
+      "candidate_sha256": "938ae2a9977745c7ead7be9f0adb178bdde557118f3fd51ebb537a7d00289252"
+    }
+  ],
+  "all_99_package_target_profile_features_equal": true,
+  "both_99_fresh_false": true,
+  "tool_records": [
+    {
+      "tool": "Python standard library struct/mmap/hashlib",
+      "operation": "Read retained saved witnesses only; stream full hashes, parse Mach-O64, compare all sections/load commands and exact non-string-table regions. No executable launch.",
+      "first_native_handle": 58215,
+      "first_terminal_exit": 0,
+      "N_OSO_refinement_handle": 6174,
+      "refinement_terminal_exit": 0,
+      "parser_script_sha256": "b3407e3db365dc4e9bbfee6f3de30237162299fd650b821a2f32c13e31a7cc0b"
+    }
+  ],
+  "limits": [
+    "Not semantic equivalence from __text: the stronger 98-pair result compares every byte outside the string table, then classifies every changed string and symbol reference.",
+    "No complete per-case descendant/system-program scope, environment equality, timing equality, historical cause or failure waiver follows.",
+    "All original full-run failures remain retained."
+  ]
+}

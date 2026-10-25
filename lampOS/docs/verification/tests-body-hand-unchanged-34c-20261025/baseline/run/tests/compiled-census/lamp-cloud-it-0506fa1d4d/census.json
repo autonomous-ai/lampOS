@@ -1,0 +1,56 @@
+{
+  "package": "lamp-cloud",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "it",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/cloud/tests/it/main.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/it-d42eb1c7e5987252",
+  "sha256": "0506fa1d4d2a91cde8687e104eb6ca38dedb53fb6f8b62db7da93c3b02b85933",
+  "compiled_cases": [
+    "app_contract::a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update",
+    "app_contract::each_field_the_apps_page_reads_is_there_with_the_type_it_takes",
+    "app_contract::schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without",
+    "app_contract::the_faces_page_reads_names_and_removes_one",
+    "app_contract::the_software_update_is_answered_from_lamp_updates_status",
+    "report_contract::a_lamp_with_the_armed_way_back_or_the_switch_off_says_nothing_waits",
+    "report_contract::a_lamp_without_the_armed_way_back_says_lamp_update_waits",
+    "report_contract::every_report_carries_the_agreed_fields_and_sent_at_is_set_once",
+    "report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit",
+    "report_contract::the_apps_switch_reads_the_agreed_reply_and_its_refusal",
+    "ring::a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_given_way",
+    "setup::the_generation_on_every_reply_is_the_one_setups_status_says",
+    "setup::the_unit_reads_the_account_where_the_products_setup_writes_it",
+    "setup::what_setup_writes_from_the_apps_request_reads_as_a_complete_account",
+    "skills_contract::a_skill_from_a_package_is_listed_with_its_sha256_and_version",
+    "skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope",
+    "skills_contract::the_skills_page_reads_the_agreed_reply_and_its_refusal",
+    "switch::lamp_4aces_cloud_on_writes_the_units_whole_drop_in",
+    "switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot",
+    "switch::the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts",
+    "switch::the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it",
+    "switch::the_unit_may_reach_lamp_voices_app_make_socket",
+    "switch::with_the_switch_on_it_connects_to_the_accounts_broker",
+    "switch::without_the_switch_it_says_so_and_connects_nowhere",
+    "texts::a_line_from_another_publisher_on_messages_out_is_not_sent",
+    "texts::a_named_text_goes_named_only_while_its_yes_stands_as_it_goes",
+    "texts::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news",
+    "texts::a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events",
+    "texts::task_news_comes_out_with_no_text_asked_first",
+    "texts::with_nothing_listening_a_text_is_refused_at_once_and_off_it_is_not_here"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 30,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

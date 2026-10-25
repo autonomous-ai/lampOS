@@ -1,0 +1,27 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "voice_follows_face",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/tests/voice_follows_face.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/voice_follows_face-1dd593594e591dfb",
+  "sha256": "d80a045e597c37e3caf11f2b0908ddd6bebcf6a83626e130f9264db9792ff5c2",
+  "compiled_cases": [
+    "what_the_caller_said_before_their_face_was_saved_follows_them_and_no_one_elses"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 1,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

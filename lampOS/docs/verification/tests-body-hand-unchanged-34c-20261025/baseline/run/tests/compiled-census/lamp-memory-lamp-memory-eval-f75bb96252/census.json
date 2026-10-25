@@ -1,0 +1,34 @@
+{
+  "package": "lamp-memory",
+  "target": {
+    "kind": [
+      "bin"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "lamp-memory-eval",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/lamp_memory_eval-f5db972ba691a95b",
+  "sha256": "f75bb96252fa619014bb82bfa2abca71817ec4fb108ea1d792ddc94503136a03",
+  "compiled_cases": [
+    "tests::evidence_labels_never_change_retrieved_text_or_ranking",
+    "tests::legacy_ties_are_newer_first_and_nonmatches_are_not_retrieved",
+    "tests::missing_or_unaligned_evidence_is_rejected",
+    "tests::no_labels_never_produces_vacuous_recall",
+    "tests::partial_evidence_is_not_all_evidence_and_ndcg_matches_upstream_discount",
+    "tests::repeated_session_occurrences_do_not_count_as_distinct_recalled_evidence",
+    "tests::roles_and_units_keep_the_two_label_conventions_separate",
+    "tests::utf8_bytes_and_full_cutoff_are_measured_without_truncation"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 8,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

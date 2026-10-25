@@ -1,0 +1,23 @@
+{
+  "complete_targets": 79,
+  "compiled_targets": 67,
+  "compiled_case_names": 7388,
+  "same_candidate_baseline_case_and_ignore_inventory": true,
+  "baseline_totals": {
+    "passed": 7321,
+    "failed": 15,
+    "ignored": 52
+  },
+  "candidate_totals": {
+    "passed": 7316,
+    "failed": 20,
+    "ignored": 52
+  },
+  "baseline_test_wall_seconds": 3342.492547,
+  "baseline_test_exit": 101,
+  "controller_exit": 0,
+  "one_fixed_full_run": true,
+  "repeat_count": 0,
+  "no_causal_claim": true,
+  "body_lib_expected_pass_count": 440
+}

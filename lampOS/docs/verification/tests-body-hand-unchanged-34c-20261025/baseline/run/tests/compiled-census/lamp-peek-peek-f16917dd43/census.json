@@ -1,0 +1,37 @@
+{
+  "package": "lamp-peek",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "peek",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/peek/tests/peek.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/peek-f1e8827be703642e",
+  "sha256": "f16917dd43a46f9d2070700ef6410d3ffc2fbec6ce7f2ab7d6513f09451c2c2d",
+  "compiled_cases": [
+    "a_word_heard_never_reaches_any_view",
+    "beyond_this_machine_without_a_token_it_does_not_start",
+    "every_view_reads_only_and_answers_only_get",
+    "the_face_the_lamp_follows_is_marked_with_its_point",
+    "the_one_page_streams_each_section_and_never_a_word",
+    "the_stream_reads_only_and_asks_for_the_token",
+    "the_stream_reports_denied_sessions_and_recovers_without_words_or_paths",
+    "the_units_are_read_once_however_many_ask_at_once",
+    "with_a_token_only_the_form_or_the_header_opens_it",
+    "with_the_camera_closed_no_box_is_drawn",
+    "without_a_token_it_answers_only_as_this_machine"
+  ],
+  "compiled_ignored_cases": [],
+  "compiled_case_count": 11,
+  "ignored_case_count": 0,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

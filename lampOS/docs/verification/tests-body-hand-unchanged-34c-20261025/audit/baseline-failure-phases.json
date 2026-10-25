@@ -1,0 +1,851 @@
+{
+  "failures": [
+    {
+      "case": "bus_out::tests::someone_is_turned_to_the_lamp_only_when_the_eyes_newest_fresh_look_says_so",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1095614,
+      "excerpt_sha256": "e66bc319170785855c3683377048e2fedb418d60f8f8be6a4ac92f8d628d2dcf",
+      "excerpt": "\nthread 'bus_out::tests::someone_is_turned_to_the_lamp_only_when_the_eyes_newest_fresh_look_says_so' (11263137) panicked at crates/voice/src/bus_out.rs:1798:9:\nassertion `left == right` failed\n  left: None\n right: Some(false)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/bus_out.rs",
+          "line": 1798,
+          "column": 9,
+          "source_sha256": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0",
+          "context": [
+            {
+              "line": 1794,
+              "text": "            eyes.publish_json(lamp_ipc::monotonic_us(), &Faces { faces })"
+            },
+            {
+              "line": 1795,
+              "text": "                .unwrap();"
+            },
+            {
+              "line": 1796,
+              "text": "        };"
+            },
+            {
+              "line": 1797,
+              "text": "        say(&mut eyes, vec![]);"
+            },
+            {
+              "line": 1798,
+              "text": "        assert_eq!(someone_turned_to_lamp(&bus), Some(false));"
+            },
+            {
+              "line": 1799,
+              "text": "        say(&mut eyes, vec![face(Some(false)), face(None)]);"
+            },
+            {
+              "line": 1800,
+              "text": "        assert_eq!(someone_turned_to_lamp(&bus), Some(false));"
+            },
+            {
+              "line": 1801,
+              "text": "        say(&mut eyes, vec![face(None), face(Some(true))]);"
+            },
+            {
+              "line": 1802,
+              "text": "        assert_eq!(someone_turned_to_lamp(&bus), Some(true));"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "bus_out::tests::the_faces_in_view_are_counted_only_from_the_eyes_newest_fresh_look",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1096027,
+      "excerpt_sha256": "026a997fc009a03b70dbe1a8a4aaaa9f650beaa7ddf0cb913a2ccc04eb065ae3",
+      "excerpt": "\nthread 'bus_out::tests::the_faces_in_view_are_counted_only_from_the_eyes_newest_fresh_look' (11263142) panicked at crates/voice/src/bus_out.rs:1844:9:\nassertion `left == right` failed\n  left: None\n right: Some(2)\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/bus_out.rs",
+          "line": 1844,
+          "column": 9,
+          "source_sha256": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0",
+          "context": [
+            {
+              "line": 1840,
+              "text": "        say("
+            },
+            {
+              "line": 1841,
+              "text": "            &mut eyes,"
+            },
+            {
+              "line": 1842,
+              "text": "            vec![face(\"f1\", Some(true)), face(\"f2\", Some(false))],"
+            },
+            {
+              "line": 1843,
+              "text": "        );"
+            },
+            {
+              "line": 1844,
+              "text": "        assert_eq!(faces_in_view(&bus), Some(2));"
+            },
+            {
+              "line": 1845,
+              "text": "        std::thread::sleep(Duration::from_millis(400));"
+            },
+            {
+              "line": 1846,
+              "text": "        assert_eq!(faces_in_view(&bus), None);"
+            },
+            {
+              "line": 1847,
+              "text": "        std::fs::remove_dir_all(root).unwrap();"
+            },
+            {
+              "line": 1848,
+              "text": "    }"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1096342,
+      "excerpt_sha256": "d8137ed25e71d9712032efe62cebcce0eb1190f3ebca9e90d20d8f955a981e15",
+      "excerpt": "\nthread 'body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found' (11263103) panicked at crates/voice/src/body_motion.rs:389:9:\nStill\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/body_motion.rs",
+          "line": 389,
+          "column": 9,
+          "source_sha256": "1c4798c6a5a2ed5b9849dc59434fca2ee978ac5bcebcc3f4e61eb2656a1ed2fd",
+          "context": [
+            {
+              "line": 385,
+              "text": "            now,"
+            },
+            {
+              "line": 386,
+              "text": "            crate::privacy_bus::wall_ms(),"
+            },
+            {
+              "line": 387,
+              "text": "            now,"
+            },
+            {
+              "line": 388,
+              "text": "        );"
+            },
+            {
+              "line": 389,
+              "text": "        assert!(matches!(judged, Judged::Moved { .. }), \"{judged:?}\");"
+            },
+            {
+              "line": 390,
+              "text": "        assert_eq!(joints.motion.moves.len(), 1);"
+            },
+            {
+              "line": 391,
+              "text": "    }"
+            },
+            {
+              "line": 392,
+              "text": "}"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1096572,
+      "excerpt_sha256": "bebd0afff76f0ace7c0207e2708050a33f5ca6234d59a438d710b5b5043fc26f",
+      "excerpt": "\nthread 'coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure' (11265363) panicked at crates/voice/src/coordinator/motor/tests.rs:883:9:\nowned child timed out: adapter=Some(\"motor worker ended independently\"); connected=true; ready=false; reaped=true; supervisor=Some(\"motor inhibited: ControlLost\"); largest_poll_gap_us=1518; output=\nrunning 1 test\nmotor_fixture_phase=child_entry at_us=77379963532\nmotor_fixture_phase=channels_bound at_us=77380114382\nmotor_fixture_phase=channels_connected at_us=77380171192\nmotor_fixture_event=Inhibited { at_us: 77380248883, motion: None, report: StopEvidence { privacy_revision: None, profile_preparation: None\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/motor/tests.rs",
+          "line": 883,
+          "column": 9,
+          "source_sha256": "a4a2c75611c9c84b2587919d47d8a468687095cba0633101b7b8c8b0a7203328",
+          "context": [
+            {
+              "line": 879,
+              "text": "    let mut last_poll = Instant::now();"
+            },
+            {
+              "line": 880,
+              "text": "    let mut largest_poll_gap = Duration::ZERO;"
+            },
+            {
+              "line": 881,
+              "text": "    while !predicate(motor) {"
+            },
+            {
+              "line": 882,
+              "text": "        largest_poll_gap = largest_poll_gap.max(last_poll.elapsed());"
+            },
+            {
+              "line": 883,
+              "text": "        assert!("
+            },
+            {
+              "line": 884,
+              "text": "            crate::scenario_clock::instant() < until,"
+            },
+            {
+              "line": 885,
+              "text": "            \"owned child timed out: adapter={:?}; connected={}; ready={}; reaped={}; supervisor={:?}; largest_poll_gap_us={}; output={}\","
+            },
+            {
+              "line": 886,
+              "text": "            motor.failure(),"
+            },
+            {
+              "line": 887,
+              "text": "            motor.child.as_ref().is_some_and(Supervisor::connected),"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1097348,
+      "excerpt_sha256": "75db708cce8aa6f725544bcd49f295500f8497333f364521194f7eaee50b3a2d",
+      "excerpt": "lamp-voice: the ring faulted (ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms); starting it again, 1 of 3\n\nthread 'coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean' (11266227) panicked at crates/voice/src/coordinator/optional_ring_tests.rs:882:5:\nrestart tick took 55.934172ms\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/optional_ring_tests.rs",
+          "line": 882,
+          "column": 5,
+          "source_sha256": "4615229b2fe33afe00a42c03eb36e5fa8678abd31f0e7d39e6a2f2eebe0d8df8",
+          "context": [
+            {
+              "line": 878,
+              "text": "        .ring"
+            },
+            {
+              "line": 879,
+              "text": "        .restart_tick_with_clock(|event| record(trace, event), at_us)"
+            },
+            {
+              "line": 880,
+              "text": "        .unwrap();"
+            },
+            {
+              "line": 881,
+              "text": "    let took = started.elapsed();"
+            },
+            {
+              "line": 882,
+              "text": "    assert!("
+            },
+            {
+              "line": 883,
+              "text": "        took < Duration::from_millis(50),"
+            },
+            {
+              "line": 884,
+              "text": "        \"restart tick took {took:?}\""
+            },
+            {
+              "line": 885,
+              "text": "    );"
+            },
+            {
+              "line": 886,
+              "text": "    adopted"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1097845,
+      "excerpt_sha256": "d9b1b4db6577e9d58af4fcc2c83850337298e1345fa32e2ded160a998e77e710",
+      "excerpt": "lamp-voice: the ring faulted (ring output fault: SPI write returned after 15000 us; budget is 10000 us, late for 2000 ms); starting it again, 1 of 3\n\nthread 'coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean' (11267039) panicked at crates/voice/src/coordinator/optional_ring_tests.rs:882:5:\nrestart tick took 74.783166ms\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/optional_ring_tests.rs",
+          "line": 882,
+          "column": 5,
+          "source_sha256": "4615229b2fe33afe00a42c03eb36e5fa8678abd31f0e7d39e6a2f2eebe0d8df8",
+          "context": [
+            {
+              "line": 878,
+              "text": "        .ring"
+            },
+            {
+              "line": 879,
+              "text": "        .restart_tick_with_clock(|event| record(trace, event), at_us)"
+            },
+            {
+              "line": 880,
+              "text": "        .unwrap();"
+            },
+            {
+              "line": 881,
+              "text": "    let took = started.elapsed();"
+            },
+            {
+              "line": 882,
+              "text": "    assert!("
+            },
+            {
+              "line": 883,
+              "text": "        took < Duration::from_millis(50),"
+            },
+            {
+              "line": 884,
+              "text": "        \"restart tick took {took:?}\""
+            },
+            {
+              "line": 885,
+              "text": "    );"
+            },
+            {
+              "line": 886,
+              "text": "    adopted"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1098306,
+      "excerpt_sha256": "a1cd59a055bfa54161d340d3d1df30af2e9b63f4caf65e453b9a66253cd59dc0",
+      "excerpt": "motor_validated_offer_to_channel_us=93\n\nthread 'coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice' (11263813) panicked at crates/voice/src/coordinator/motor/tests.rs:134:72:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"scenario host watchdog\" }\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/motor/tests.rs",
+          "line": 134,
+          "column": 72,
+          "source_sha256": "a4a2c75611c9c84b2587919d47d8a468687095cba0633101b7b8c8b0a7203328",
+          "context": [
+            {
+              "line": 130,
+              "text": ""
+            },
+            {
+              "line": 131,
+              "text": "/// One step of a parent polling loop: a scenario step when stepped, else a"
+            },
+            {
+              "line": 132,
+              "text": "/// one millisecond pause as before."
+            },
+            {
+              "line": 133,
+              "text": "fn pause() {"
+            },
+            {
+              "line": 134,
+              "text": "    if !crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap() {"
+            },
+            {
+              "line": 135,
+              "text": "        std::thread::park_timeout(Duration::from_millis(1));"
+            },
+            {
+              "line": 136,
+              "text": "    }"
+            },
+            {
+              "line": 137,
+              "text": "}"
+            },
+            {
+              "line": 138,
+              "text": ""
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1098748,
+      "excerpt_sha256": "36595b26e064ab77d62ca8c5235d9c4a4ecaa1fbd3b855340603e32a6cad0abc",
+      "excerpt": "\nthread 'coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap' (11263864) panicked at crates/voice/src/coordinator/motor/tests.rs:134:72:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"scenario host watchdog\" }\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/motor/tests.rs",
+          "line": 134,
+          "column": 72,
+          "source_sha256": "a4a2c75611c9c84b2587919d47d8a468687095cba0633101b7b8c8b0a7203328",
+          "context": [
+            {
+              "line": 130,
+              "text": ""
+            },
+            {
+              "line": 131,
+              "text": "/// One step of a parent polling loop: a scenario step when stepped, else a"
+            },
+            {
+              "line": 132,
+              "text": "/// one millisecond pause as before."
+            },
+            {
+              "line": 133,
+              "text": "fn pause() {"
+            },
+            {
+              "line": 134,
+              "text": "    if !crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap() {"
+            },
+            {
+              "line": 135,
+              "text": "        std::thread::park_timeout(Duration::from_millis(1));"
+            },
+            {
+              "line": 136,
+              "text": "    }"
+            },
+            {
+              "line": 137,
+              "text": "}"
+            },
+            {
+              "line": 138,
+              "text": ""
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1099159,
+      "excerpt_sha256": "2574a8bf8b8dbf5dde0b936334a0e88e38139a0c27461706e77181e52614b7a6",
+      "excerpt": "\nthread 'coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests' (11265036) panicked at crates/voice/src/coordinator/motor/tests.rs:134:72:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: TimedOut, error: \"scenario host watchdog\" }\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/motor/tests.rs",
+          "line": 134,
+          "column": 72,
+          "source_sha256": "a4a2c75611c9c84b2587919d47d8a468687095cba0633101b7b8c8b0a7203328",
+          "context": [
+            {
+              "line": 130,
+              "text": ""
+            },
+            {
+              "line": 131,
+              "text": "/// One step of a parent polling loop: a scenario step when stepped, else a"
+            },
+            {
+              "line": 132,
+              "text": "/// one millisecond pause as before."
+            },
+            {
+              "line": 133,
+              "text": "fn pause() {"
+            },
+            {
+              "line": 134,
+              "text": "    if !crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap() {"
+            },
+            {
+              "line": 135,
+              "text": "        std::thread::park_timeout(Duration::from_millis(1));"
+            },
+            {
+              "line": 136,
+              "text": "    }"
+            },
+            {
+              "line": 137,
+              "text": "}"
+            },
+            {
+              "line": 138,
+              "text": ""
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1099580,
+      "excerpt_sha256": "7e7f3f4e7204e6e263b2e9c07658fcee0e3565af53c1bbdcfe919271c49f190b",
+      "excerpt": "\nthread 'coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back' (11272409) panicked at crates/voice/src/coordinator/tests/duplex.rs:447:10:\ncalled `Result::unwrap()` on an `Err` value: StaleOwner\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/tests/duplex.rs",
+          "line": 447,
+          "column": 10,
+          "source_sha256": "97a0b9050347a6f81584ec9c640482509eb87a56a36376e89075b0af9ad41498",
+          "context": [
+            {
+              "line": 443,
+              "text": "            &mut self.chunk,"
+            },
+            {
+              "line": 444,
+              "text": "            &mut self.snapshot,"
+            },
+            {
+              "line": 445,
+              "text": "            &mut self.mask,"
+            },
+            {
+              "line": 446,
+              "text": "        )"
+            },
+            {
+              "line": 447,
+              "text": "        .unwrap();"
+            },
+            {
+              "line": 448,
+              "text": "        let chunk = self.speaker.data.receive::<SpeakerChunk>().unwrap()?;"
+            },
+            {
+              "line": 449,
+              "text": "        let pending = self.pending.take().unwrap();"
+            },
+            {
+              "line": 450,
+              "text": "        assert_eq!(pending.sequence, chunk.chunk_sequence);"
+            },
+            {
+              "line": 451,
+              "text": "        let frame = 480 + 240 * (chunk.chunk_sequence - 1);"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1099920,
+      "excerpt_sha256": "3e9d9587236493c45aa550a07f4f01d385f6f2cd1d27e5ba136a62c28d7ced2b",
+      "excerpt": "\nthread 'coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics' (11323870) panicked at crates/voice/src/coordinator/tests/termination.rs:68:9:\nsignal child did not finish\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/tests/termination.rs",
+          "line": 68,
+          "column": 9,
+          "source_sha256": "dae0973e514ebbfcf076d83f23b9927815bbfcf5d14ac67805a69424e399db68",
+          "context": [
+            {
+              "line": 64,
+              "text": "    let status = loop {"
+            },
+            {
+              "line": 65,
+              "text": "        if let Some(status) = child.0.try_wait().unwrap() {"
+            },
+            {
+              "line": 66,
+              "text": "            break status;"
+            },
+            {
+              "line": 67,
+              "text": "        }"
+            },
+            {
+              "line": 68,
+              "text": "        assert!(Instant::now() < deadline, \"signal child did not finish\");"
+            },
+            {
+              "line": 69,
+              "text": "        thread::sleep(Duration::from_millis(2));"
+            },
+            {
+              "line": 70,
+              "text": "    };"
+            },
+            {
+              "line": 71,
+              "text": "    reader.join().unwrap();"
+            },
+            {
+              "line": 72,
+              "text": "    assert!(status.success(), \"child assertions failed: {status}\");"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1100245,
+      "excerpt_sha256": "4954fd392ed2ebeeab5aa28605e22319696213086b92a2272341629a98d8e8a0",
+      "excerpt": "\nthread 'coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics' (11324001) panicked at crates/voice/src/coordinator/tests/termination.rs:68:9:\nsignal child did not finish\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/tests/termination.rs",
+          "line": 68,
+          "column": 9,
+          "source_sha256": "dae0973e514ebbfcf076d83f23b9927815bbfcf5d14ac67805a69424e399db68",
+          "context": [
+            {
+              "line": 64,
+              "text": "    let status = loop {"
+            },
+            {
+              "line": 65,
+              "text": "        if let Some(status) = child.0.try_wait().unwrap() {"
+            },
+            {
+              "line": 66,
+              "text": "            break status;"
+            },
+            {
+              "line": 67,
+              "text": "        }"
+            },
+            {
+              "line": 68,
+              "text": "        assert!(Instant::now() < deadline, \"signal child did not finish\");"
+            },
+            {
+              "line": 69,
+              "text": "        thread::sleep(Duration::from_millis(2));"
+            },
+            {
+              "line": 70,
+              "text": "    };"
+            },
+            {
+              "line": 71,
+              "text": "    reader.join().unwrap();"
+            },
+            {
+              "line": 72,
+              "text": "    assert!(status.success(), \"child assertions failed: {status}\");"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1100572,
+      "excerpt_sha256": "aa33cab4d442ae38a0913a263e15738911c1df4dea1adc455cbd3a9119f647d9",
+      "excerpt": "\nthread 'hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives' (11327277) panicked at crates/voice/src/hand_controls/tests.rs:1529:13:\nthe touch never arrived: Health { received: 2, rejected: 1, lost: 0, reconnects: 0, discontinuities: 2, pump_running: false, persistence_failed: false }\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/hand_controls/tests.rs",
+          "line": 1529,
+          "column": 13,
+          "source_sha256": "3c3ce295763a7fe92c90535ca91fd4d5865a9effcb784963e09b2b77164cffaf",
+          "context": [
+            {
+              "line": 1525,
+              "text": "            if owner.poll().unwrap().head_touch_at_us.is_some() {"
+            },
+            {
+              "line": 1526,
+              "text": "                elapsed_us.push(lamp_ipc::monotonic_us() - published);"
+            },
+            {
+              "line": 1527,
+              "text": "                break;"
+            },
+            {
+              "line": 1528,
+              "text": "            }"
+            },
+            {
+              "line": 1529,
+              "text": "            assert!("
+            },
+            {
+              "line": 1530,
+              "text": "                std::time::Instant::now() < deadline,"
+            },
+            {
+              "line": 1531,
+              "text": "                \"the touch never arrived: {:?}\","
+            },
+            {
+              "line": 1532,
+              "text": "                owner.health()"
+            },
+            {
+              "line": 1533,
+              "text": "            );"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1100967,
+      "excerpt_sha256": "e2bc264a8970f3b33f5338b3411ef08d56a1bcb70b7aee741ffd10b805b0f15c",
+      "excerpt": "{\"seconds\":null,\"status\":\"listening_ready\"}\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 61208 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"provider_first_audio\", \"provider_audio_enqueued\", \"turn_taking_availability\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_renewals\", \"ring_requested\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, false, false)]\n\nthread 'coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken' (11317968) panicked at crates/voice/src/coordinator/tests/second_route.rs:387:9:\nresult Err(\"scenario host watchdog; verified cleanup failed: session Fixture: fixture child 61208 exit observation timed out (5 occurrences)\")\nkinds [\"endpoint_policy\", \"turn_taking_availability\", \"capture_started\", \"provider_link_current\", \"listening_ready\", \"input_candidate\", \"input_admitted\", \"ring_requested\", \"provider_input_started\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"ring_feedback\", \"ring_renewals\", \"ring_requested\", \"local_endpoint\", \"ring_requested\", \"provider_first_audio\", \"provider_audio_enqueued\", \"turn_taking_availability\", \"ring_feedback\", \"speaker_first_write\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_requested\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_feedback\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"ring_renewals\", \"ring_requested\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"speech_queue_drained\", \"provider_audio_enqueued\", \"provider_turn_complete\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \"ring_feedback\", \"speech_queue_drained\", \"ring_renewals\", \"ring_requested\", \"speech_queue_drained\", \"turn_finished\", \"ring_shutdown_write\"]\nphases [Listening, Waiting, Speaking]\ninstalls [(None, false, false), (None, true, false), (Some(1), true, false), (None, false, false)]\n\n\nfailures:\n    body_motion::tests::the_body_said_on_a_real_bus_is_dated_and_found\n    bus_out::tests::someone_is_turned_to_the_lamp_only_when_the_eyes_newest_fresh_look_says_so\n    bus_out::tests::the_faces_in_view_are_counted_only_from_the_eyes_newest_fresh_look\n    coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice\n    coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap\n    coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests\n    coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure\n    coordinator::optional_ring_tests::a_faulted_ring_starts_again_off_the_loop_and_a_stop_after_it_is_clean\n    coordinator::optional_ring_tests::a_stop_during_a_restart_waits_for_it_and_ends_clean\n    coordinator::tests::duplex::a_microphone_that_stops_arriving_does_not_hold_the_reply_back\n    coordinator::tests::second_route::the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken\n    coordinator::tests::termination::sigint_retains_failure_and_acknowledged_synthetic_diagnostics\n    coordinator::tests::termination::sigterm_retains_failure_and_acknowledged_synthetic_diagnostics\n    hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives\n\ntest result: FAILED. 3730 passed; 14 failed; 15 ignored; 0 measured; 0 filtered out; finished in 537.75s\n\n\nrunning 1 test\ntest tests::stt_checks_options_are_rounds_then_what_is_held_within_their_bounds ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n\nrunning 275 tests\ntest admission::a_newer_owner_cannot_be_cancelled_by_an_older_candidate_decision ... ok\ntest admission::controller_restart_rejects_but_camera_or_heartbeat_updates_do_not ... ok\ntest admission::explicit_natural_completion_allows_a_new_turn_without_rewriting_candidate_history ... ok\ntest admission::expired_ended_candidate_and_a_new_start_are_both_reported ... ok\ntest admission::early_endpoint_is_retained_and_delivered_once_even_after_quiet_ticks ... ok\ntest admission::acceptance_drains_exact_original_prefix_and_held_pcm_once ... ok\ntest admission::pending_and_policy_rejection_do_not_cancel_real_speech_or_light ... ok\ntest admission::fixed_deadline_is_anchored_to_capture_not_receipt_or_new_evidence ... ok\ntest admission::planned_dsp_advance_preserves_stream_but_cannot_rewind_it ... ok\ntest admission::closed_privacy_and_expired_authority_reject_pending_input ... ok\ntest admission::absent_owner_or_wrong_completion_receipt_cannot_imply_natural_completion ... ok\ntest admission::detector_failure_or_clock_regression_cannot_leave_acceptable_pending_audio ... ok\ntest admission::full_prefix_plus_twenty_held_blocks_is_the_fifty_block_limit ... ok\ntest admission::a_capture_gap_invalidates_pending_audio_and_makes_late_acceptance_inert ... ok\ntest admission::pending_capture_and_privacy_incarnations_cannot_be_relabelled ... ok\ntest admission::malformed_prefixes_never_grant_a_candidate_or_affect_old_output ... ok\ntest admission::rejection_drains_the_same_burst_until_its_endpoint_before_rearming ... ok\ntest admission::reset_never_reuses_candidate_identity_or_accepts_old_evidence ... ok\ntest admission::short_prefix_cannot_borrow_unused_prefix_capacity_to_wait_longer ... ok\ntest call_wait::a_call_wait_must_be_longer_than_the_window_and_at_most_three_seconds ... ok\ntest call_wait::a_first_sign_while_the_name_is_said_still_waits ... ok\ntest call_wait::speech_that_goes_on_past_a_call_is_not_one ... ok\ntest call_wait::only_the_name_waits_for_the_rest_and_says_so_when_the_wait_runs_out ... ok\ntest call_wait::the_rest_of_the_call_is_the_same_utterance_and_ends_as_any_other ... ok\ntest admission::uncorrelated_future_stale_and_pretrigger_evidence_are_inert ... ok\ntest admission::streaming_requires_contiguous_fresh_audio_and_fixed_capture_privacy ... ok\ntest camera_config::finite_duration_is_validated_before_any_worker_or_device ... ok\ntest camera_runtime::an_opening_deadline_cannot_be_extended_by_progress_and_stop_is_not_success ... ok\ntest camera_runtime::closed_and_permitted_but_not_started_never_open_or_claim_a_frame ... ok\ntest camera_runtime::driver_teardown_after_prompt_revoke_has_its_own_bound ... ok\ntest camera_runtime::control_full_at_final_handoff_retains_only_original_token ... ok\ntest camera_runtime::frame_link::consumer_flags_are_strict ... ok\ntest camera_runtime::full_control_slice_defers_port_work_and_then_keeps_latest_delivery_bounded ... ok\ntest camera_runtime::full_metadata_channel_closes_once_and_never_retries_frame ... ok\ntest camera_runtime::late_control_cannot_revive_expired_capture ... ok\ntest camera_runtime::no_permission_or_unknown_permission_cannot_open_camera ... ok\ntest camera_runtime::no_first_frame_with_continuous_authority_is_explicit_failure ... ok\ntest camera_config::exact_configuration_digest_is_checked_again_before_child_start ... ok\ntest camera_runtime::parent_rechecks_original_grant_and_cannot_relabel_after_reopen ... ok\ntest camera_runtime::original_grant_unknown_timestamp_and_metadata_only_survive_delivery ... ok\ntest camera_runtime::parent_has_no_ready_frame_on_start_and_reports_bounded_samples_only ... ok\ntest camera_runtime::parent_rejects_late_wrong_source_repeated_and_old_epoch_metadata ... ok\ntest camera_runtime::frame_link::privacy_revoke_closes_the_frame_link_before_the_camera_stops ... ok\ntest camera_runtime::queued_old_progress_cannot_hide_a_current_worker_stall ... ok\ntest camera_runtime::read_and_start_overruns_stop_without_a_current_frame ... ok\ntest camera_runtime::frame_link::a_worker_fault_closes_consumers ... ok\ntest camera_runtime::frame_link::frames_leave_the_library_only_for_a_waiting_consumer ... ok\ntest camera_runtime::read_failure_is_reported_before_driver_teardown_and_stays_failed ... ok\ntest camera_runtime::reported_stop_time_follows_cleanup_and_duplicate_start_is_failure ... ok\ntest camera_config::private_regular_bounded_single_link_file_required ... ok\ntest camera_runtime::revoke_after_post_read_drain_is_seen_at_final_handoff_drain ... ok\ntest camera_runtime::revoke_during_dequeue_discards_original_frame_before_handoff ... ok\ntest camera_runtime::revoke_during_start_suppresses_started_readiness_and_stops_once ... ok\ntest camera_runtime::stale_duplicate_authority_does_not_close_newer_capture ... ok\ntest camera_runtime::startup_discard_keeps_camera_loop_live_until_a_fresh_original_grant_frame ... ok\ntest camera_runtime::startup_discard_summary_reaches_progress_without_claiming_a_frame ... ok\ntest camera_runtime::startup_draining_serves_privacy_and_stop_before_any_export_or_next_read ... ok\ntest camera_runtime::camera_role_channels_are_separate_and_unknown_roles_still_rejected ... ok\ntest camera_runtime::stop_after_dequeue_and_before_delivery_wins ... ok\ntest camera_runtime::teardown_overrun_keeps_prompt_revocation_but_never_reports_success ... ok\ntest camera_runtime::startup_forever_old_frames_finish_as_unavailable_with_first_latest_age_evidence ... ok\ntest camera_runtime::timestamp_fault_receipt_retains_exact_comparison_without_frame_bytes ... ok\ntest diagnostics::capture_processing_cannot_be_mislabelled_as_render_processing ... ok\ntest camera_config::identity_path_format_and_size_have_no_defaults_or_fallbacks ... ok\ntest diagnostics::closed_privacy_cannot_be_overridden_by_pcm_metadata ... ok\ntest diagnostics::accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm ... ok\ntest end_silence::a_pause_shorter_than_the_wait_does_not_end_the_utterance ... ok\ntest end_silence::a_wait_outside_300_to_2000_ms_is_refused ... ok\ntest diagnostics::no_overwrite_private_parent_and_symlink_rejection ... ok\ntest diagnostics::audio_fault_end_is_incomplete_even_with_good_written_pcm ... ok\ntest end_silence::an_utterance_ends_after_exactly_the_wait_that_was_asked_for ... ok\ntest diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement ... ok\ntest end_silence::each_policy_keeps_its_own_wait_when_none_is_asked_for ... ok\ntest diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs ... ok\ntest endpoint_confirmation::a_few_words_are_not_sent_to_the_model_and_end_on_the_silence_window ... ok\ntest diagnostics::render_cursor_gap_does_not_insert_silence ... ok\ntest diagnostics::repeated_privacy_observation_does_not_reset_the_render_cursor ... ok\ntest endpoint_confirmation::a_lower_floor_ends_a_short_finished_line_at_the_commit ... ok\ntest endpoint_confirmation::a_late_name_sign_in_the_pause_still_holds_the_name_alone_with_a_lower_floor ... ok\ntest endpoint_confirmation::an_uncertain_verdict_asked_again_ends_the_line_only_on_a_complete_second ... ok\ntest endpoint_confirmation::any_speech_scored_block_restarts_the_pause_like_the_baseline ... ok\ntest diagnostics::render_records_only_accepted_prefix_and_typed_priming_silence ... ok\ntest endpoint_confirmation::busy_classifier_is_retried_with_the_same_trailing_context ... ok\ntest endpoint_confirmation::cancellation_and_reset_invalidate_pending_verdicts ... ok\ntest endpoint_confirmation::capture_discontinuity_faults_and_drops_the_pending_verdict ... ok\ntest endpoint_confirmation::complete_verdict_ends_at_the_commit_pause ... ok\ntest endpoint_confirmation::confirmation_never_runs_before_the_check_window ... ok\ntest endpoint_confirmation::default_profile_bands_end_complete_uncertain_and_incomplete_pauses ... ok\ntest endpoint_confirmation::default_profile_holds_unfinished_speech_but_resumes_on_speech ... ok\ntest diagnostics::replaced_artifact_never_receives_original_pcm_or_valid_marker ... ok\ntest endpoint_confirmation::failed_inference_falls_back_without_a_verdict ... ok\ntest diagnostics::duration_and_frame_shape_limits_disable_evidence_without_blocking ... ok\ntest endpoint_confirmation::incomplete_verdict_holds_until_the_incomplete_window ... ok\ntest endpoint_confirmation::invalid_policies_are_rejected ... ok\ntest endpoint_confirmation::late_result_never_closes_a_later_utterance ... ok\ntest endpoint_confirmation::mechanics_threshold_treats_a_moderate_verdict_as_incomplete ... ok\ntest endpoint_confirmation::responsive_profile_is_explicit_and_commits_at_400_ms ... ok\ntest diagnostics::capture_sequence_gap_and_unannounced_epoch_change_fail ... ok\ntest endpoint_confirmation::resumed_speech_discards_a_pending_complete_verdict ... ok\ntest endpoint_confirmation::retained_snapshot_is_the_latest_model_window ... ok\ntest endpoint_confirmation::slow_result_times_out_and_is_ignored_afterwards ... ok\ntest endpoint_confirmation::snapshot_holds_preroll_opening_and_resumed_speech_in_order ... ok\ntest endpoint_confirmation::the_name_alone_still_waits_for_the_rest_with_a_lower_floor ... ok\ntest endpoint_confirmation::verdict_after_the_commit_pause_ends_on_arrival ... ok\ntest endpoint_confirmation::the_start_counts_toward_the_floor_only_with_the_switch ... ok\ntest endpoint_confirmation::without_confirmation_the_baseline_records_its_silence_endpoint ... ok\ntest endpoint_confirmation::unavailable_model_falls_back_to_the_baseline_window ... ok\ntest endpoint_confirmation::with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as_before ... ok\ntest endpoint_confirmation::with_the_nights_switches_an_unfinished_verdict_holds_and_a_confident_one_ends_as_before ... ok\ntest expression_out::the_planner_takes_everything_the_voice_says_and_plans_what_it_was_written_for ... ok\ntest expression_out::the_held_turn_pair_is_taken_whole_by_the_rest_catalogue ... ok\ntest first_words::first_words_are_reached_only_within_the_last_one_point_six_seconds ... ok\ntest first_words::a_yields_start_reaches_back_to_the_first_words_only_with_them_kept ... ok\ntest expression_out::said_ahead_the_lamps_sound_reaches_the_planner_in_time ... ok\ntest fixture_provider::conversation_cues_preserve_turns_endpoints_and_cancellation_reasons ... ok\ntest fixture_provider::cancellation_overtaking_start_reserves_original_owner_and_never_relabels_reply ... ok\ntest fixture_provider::blocked_output_is_retained_then_discarded_on_new_owner_without_replay ... ok\ntest fixture_provider::cue_backpressure_is_bounded_and_latches_without_affecting_authority ... ok\ntest fixture_provider::cancellation_overtaking_end_drops_queued_pcm ... ok\ntest fixture_provider::cue_event_to_peer_receipt_latency_is_reported_with_a_bounded_send_path ... ok\ntest fixture_provider::fixture_cli_requires_explicit_retention_and_no_unknown_or_duplicate_flags ... ok\ntest fixture_provider::cues_are_bounded_ordered_fresh_and_keep_owner_epoch_context ... ok\ntest fixture_provider::cue_endpoint_must_be_private_same_user_socket_not_symlink_or_file ... ok\ntest diagnostics::omitted_open_privacy_and_missing_opening_frames_are_invalid ... ok\ntest fixture_provider::delayed_fresh_authority_cannot_revive_an_expired_original_lease ... ok\ntest diagnostics::playback_reset_requires_matching_old_discard_and_advancing_epoch ... ok\ntest fixture_provider::multiple_playback_occurrences_remain_one_turn_until_completion ... ok\ntest fixture_provider::maximal_cue_fields_fit_the_fixed_datagram_without_truncation ... ok\ntest diagnostics::replacement_directory_and_existing_final_marker_cannot_be_certified ... ok\ntest fixture_provider::fixture_rejects_a_start_bound_to_another_session ... ok\ntest diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap ... ok\ntest fixture_provider::deferred_input_keeps_original_age_and_cannot_wait_indefinitely_on_control ... ok\ntest fixture_provider::one_admitted_completed_input_gets_exact_reply_and_no_repeat ... ok\ntest first_control_message::a_first_control_message_may_wait_for_the_receiver_and_nothing_after_it ... ok\ntest fixture_provider::empty_second_drain_does_not_retry_an_input_without_matching_authority ... ok\ntest fixture_provider::no_audio_before_real_endpoint_or_without_admitted_authority ... ok\ntest fixture_provider::expired_lease_and_regressing_clock_latch_failure_before_output ... ok\ntest fixture_provider::bad_audio_order_privacy_shape_and_time_fail_closed ... ok\ntest privacy_controls::a_fence_never_reads_the_other_kind_of_state ... ok\ntest privacy_controls::low_retires_capture_lease_even_after_slow_drain_with_old_allowed_controller ... ok\ntest fixture_provider::privacy_close_and_coalesced_close_reopen_stop_without_revival ... ok\ntest privacy_controls::malformed_foreign_missing_future_stale_and_discontinuous_messages_are_rejected ... ok\ntest endpoint_confirmation::fallback_ends_every_turn_exactly_where_the_baseline_does ... ok\ntest fixture_provider::full_second_control_slice_retains_only_original_input_and_suppresses_output ... ok\ntest privacy_controls::no_slide_selects_the_route_and_reaches_the_worker_only_as_an_argument ... ok\ntest fixture_provider::invalid_occurrence_or_completion_metadata_latches_observation_failure ... ok\ntest privacy_controls::no_slide_without_the_persisted_mute_refuses_to_start ... ok\ntest privacy_controls::off_selects_original_worker_and_touches_no_path ... ok\ntest privacy_controls::only_an_enabled_controls_conversation_passes_the_worker_its_gap_ride ... ok\ntest fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying ... ok\ntest privacy_controls::rapid_low_high_must_complete_new_stable_open_interval ... ok\ntest privacy_controls::publisher_and_reader_restart_cannot_rebind_an_active_worker ... ok\ntest privacy_controls::repeated_publication_does_not_refresh_or_rename_acquisition ... ok\ntest privacy_controls::startup_low_and_faulted_hand_source_are_independent ... ok\ntest privacy_controls::up_to_the_first_datagram_a_fence_resyncs_and_after_it_a_gap_fails_closed ... ok\ntest diagnostics::processing_provenance_matches_pending_result_and_acknowledged_summary ... ok\ntest privacy_controls::with_no_slide_a_fresh_marker_permits_only_with_an_allowed_controller ... ok\ntest privacy_controls::with_no_slide_stale_restarted_or_unmarked_states_are_refused ... ok\ntest privacy_pipeline::a_different_controller_cannot_replace_the_workers_private_authority ... ok\ntest privacy_pipeline::controls_stopping_with_the_slide_open_closes_both_microphones_within_50_ms ... ok\ntest fixture_provider::separate_sockets_new_authority_in_empty_drain_gap_precedes_input_submission ... ok\ntest privacy_pipeline::repeated_publication_preserves_original_acquisition_and_cannot_extend_capture ... ok\ntest privacy_pipeline::low_then_high_needs_a_fresh_worker_and_restored_controller_generation ... ok\ntest privacy_pipeline::missing_controls_or_a_publisher_restart_cannot_renew_an_open_capture ... ok\ntest privacy_pipeline::unavailable_startup_has_no_capture_and_does_not_claim_a_deliberate_mute ... ok\ntest privacy_pipeline::stable_high_never_grants_a_software_denied_controller ... ok\ntest privacy_pipeline::stable_high_opens_then_low_discards_pcm_and_drops_the_actual_handle ... ok\ntest privacy_state::an_observation_gap_restarts_unmute_stability ... ok\ntest privacy_pipeline::with_no_slide_capture_ends_fifty_ms_after_the_last_marker ... ok\ntest privacy_pipeline::with_no_slide_steady_markers_open_capture_and_the_software_mute_closes_it ... ok\ntest privacy_pipeline::with_no_slide_missing_restarted_or_unmarked_controls_never_keep_capture ... ok\ntest privacy_state::invalid_reads_and_explicit_close_cannot_be_reported_as_user_mute ... ok\ntest privacy_state::only_a_fresh_ordered_switch_read_is_an_explicit_mute ... ok\ntest privacy_state::unmute_stabilizes_without_conflating_it_with_mute_or_a_fault ... ok\ntest process::the_voices_listed_helpers_are_the_ones_it_starts ... ok\ntest fixture_provider::loader_keeps_exact_pcm_and_hash_and_rejects_mismatch_format_size_and_symlink ... ok\ntest fixture_provider::separate_sockets_stop_or_privacy_in_empty_drain_gap_prevents_input_and_reply ... ok\ntest process::every_command_the_voice_dispatches_is_on_its_list_and_no_other_runs ... ok\ntest process::a_worker_role_not_on_the_voices_list_is_never_started ... ok\ntest process::real_worker_handshake_control_and_finite_shutdown ... ok\ntest fixture_provider::real_fixture_worker_exchanges_exact_pcm_and_stops_without_devices_or_cloud ... ok\ntest provider_config::a_key_pasted_into_an_enum_field_is_never_quoted ... ok\ntest provider_config::a_field_from_a_newer_build_is_read_past_and_named ... ok\ntest progress_news::a_task_that_finished_before_its_words_came_is_not_told_as_working ... ok\ntest provider_config::camera_instruction_is_explicit_without_changing_model_voice_or_turn_policy ... ok\ntest provider_config::a_key_written_in_the_provider_file_is_refused ... ok\ntest progress_news::words_of_an_older_change_are_not_told_under_a_newer_decision ... ok\ntest provider_config::configuration_must_be_private_bounded_regular_and_not_a_symlink ... ok\ntest provider_config::private_file_to_setup_preserves_explicit_model_thinking_and_language ... ok\ntest progress_news::stale_shadow_other_store_and_older_change_decisions_are_let_go ... ok\ntest progress_news::without_the_switch_no_progress_is_listened_for_asked_or_kept ... ok\ntest provider_config::omitted_or_null_options_preserve_existing_setup_and_authentication_choices ... ok\ntest reference_link::direct_control_remains_usable_when_actual_render_socket_is_full ... ok\ntest reference_link::terminal_notice_never_connects_an_unconnected_control_socket ... ok\ntest progress_news::after_a_restart_another_line_at_the_same_count_is_fetched_and_offered ... ok\ntest provider_config::credential_file_guards_and_redacted_failures_are_preserved ... ok\ntest reference_prime::buffered_ack_cannot_claim_analysed_or_extra_held_samples ... ok\ntest progress_news::queued_progress_is_withdrawn_when_its_task_goes_finishes_or_moves_on ... ok\ntest reference_prime::changed_hardware_cursor_privacy_deadline_and_reset_reject_ack ... ok\ntest progress_news::the_minute_counts_from_the_decision_not_from_the_fetching ... ok\ntest reference_prime::duplicate_prime_or_bad_ack_does_not_refresh_original_deadline ... ok\ntest provider_config::typed_load_rejects_malformed_levels_and_language_types ... ok\ntest reference_link::terminal_notice_reaches_capture_when_speaker_closes_first ... ok\ntest reference_prime::malformed_and_legacy_wire_ack_are_not_implicitly_upgraded ... ok\ntest reference_prime::malformed_or_wrong_owner_ack_cannot_consume_pending_prime ... ok\ntest review_2026_10_14::review_a_plain_hearing_just_before_a_request_is_not_lost_to_a_fainter_one_after_it ... ok\ntest provider_config::session_conversion_rejects_known_unsupported_combinations_and_invalid_tags ... ok\ntest review_2026_10_14::review_sound_a_name_heard_counts_for_its_own_request_only ... ok\ntest review_2026_10_14::review_sound_a_second_look_is_owed_once_and_its_own_turn_owes_nothing ... ok\ntest review_2026_10_14::review_sound_the_note_is_offered_once_for_the_request_the_name_began ... ok\ntest reference_link::terminal_notice_uses_an_existing_control_connection_without_connecting_data ... ok\ntest review_2026_10_14::review_the_lamps_own_second_look_does_not_use_up_a_new_sessions_held_requests ... ok\ntest reference_link::trusted_reference_peer_boot_cannot_be_learned_from_incoming_messages ... ok\ntest reference_link::terminal_notice_survives_capture_closing_first_without_relaxing_live_sends ... ok\ntest reference_prime::capture_clock_prime_handshake_and_reset_keep_analysis_truthful ... ok\ntest reference_prime::fixed_prime_handshake_and_reset_keep_analysis_truthful ... ok\ntest ring_worker::cancellation_arriving_after_real_data_receive_prevents_any_color ... ok\ntest ring_worker::exhausted_shared_control_budget_defers_pending_frame_until_revocation ... ok\ntest reference_prime::reset_requires_discard_evidence_and_old_ack_never_starts_new_epoch ... ok\ntest ring_worker::genuinely_older_expired_control_cannot_clear_a_newer_valid_cue ... ok\ntest ring_worker::heartbeat_overtaking_data_keeps_original_request_and_permit ... ok\ntest ring_worker::an_sd_mmc_retune_of_late_writes_is_kept_and_the_ring_goes_on ... ok\ntest ring_worker::a_late_run_past_two_seconds_faults_and_a_ring_started_again_writes_black_then_the_light ... ok\ntest light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them ... FAILED\ntest ring_worker::late_authorities_blank_once_and_a_fresh_one_brings_the_light_back ... ok\ntest ring_worker::invalid_frame_bounds_reject_without_a_write_and_speaking_requires_playback ... ok\ntest ring_worker::newer_expired_privacy_revocation_blanks_before_old_allowed_lease_expires ... ok\ntest ring_worker::malformed_control_blanks_and_reports_cleanup_failure_without_retry ... ok\ntest ring_worker::invalid_control_kind_or_malformed_frame_blanks_and_exits ... ok\ntest ring_worker::output_caps_start_dark_before_any_snapshot_even_with_a_valid_turn ... ok\ntest ring_worker::ring_wire_rejects_unknown_commands_and_unknown_nested_fields ... ok\ntest ring_worker::local_socket_request_to_fake_sink_latency_is_measured_without_physical_claim ... ok\ntest ring_worker::late_startup_black_write_is_reported_once_on_stderr ... ok\ntest ring_worker::future_data_snapshot_never_installs_or_renews_authority ... ok\ntest ring_worker::every_eye_mode_writes_and_says_the_shutdown_black_at_a_service_stop ... ok\ntest soft_start::a_soft_start_keeps_300_ms_more_only_with_the_switch_and_first_words ... ok\ntest soft_start::a_soft_start_keeps_the_same_300_ms_after_any_quiet ... ok\ntest ring_worker::permit_expires_without_another_frame_then_stop_remains_available ... ok\ntest soft_start::a_soft_start_never_reaches_into_the_lamps_own_sound ... ok\ntest soft_start::a_start_heard_all_with_the_lamp_sounding_begins_as_usual ... ok\ntest ring_worker::primary_and_cleanup_write_errors_are_both_reported_once ... ok\ntest soft_start::a_yields_start_is_not_a_soft_start ... ok\ntest unfinished_wait::a_finished_question_does_not_wait ... ok\ntest unfinished_wait::a_lines_holds_add_up_to_the_bound ... ok\ntest unfinished_wait::a_person_who_stopped_after_um_is_answered_at_the_bound ... ok\ntest unfinished_wait::finished_words_told_in_the_wait_end_the_line_at_once ... ok\ntest unfinished_wait::speech_in_the_wait_goes_on_with_the_same_line ... ok\ntest ring_worker::stale_owner_or_phase_cannot_blank_a_newer_valid_cue ... ok\ntest unfinished_wait::unfinished_words_wait_and_end_within_the_bound ... ok\ntest ring_worker::startup_stop_and_no_turn_never_invent_readiness_color ... ok\ntest typed_memory::a_text_keeps_and_reads_the_rooms_memory_not_the_person_at_the_lamp ... ok\ntest unfinished_wait::without_words_told_the_line_ends_as_before ... ok\ntest visual_options::camera_is_opt_in_and_cannot_leak_into_fixture_or_positional_arguments ... ok\ntest unfinished_wait::with_smart_turn_a_stop_after_um_is_answered_within_the_bound ... ok\ntest visual_options::explicit_small_native_mode_and_buffer_bound_reach_child_without_resizing_or_identity_guess ... ok\ntest voice_core::baseline_does_not_claim_to_recover_an_arbitrarily_quiet_onset ... ok\ntest voice_core::baseline_short_reply_has_a_finite_endpoint_and_reset_keeps_policy ... ok\ntest voice_core::baseline_keeps_a_mid_question_low_score_pause_in_one_input ... ok\ntest voice_core::dsp_boundary_discards_inactive_prefix_but_preserves_active_words_and_order ... ok\ntest ring_worker::startup_failure_never_reports_ready_and_stop_failure_is_visible ... ok\ntest voice_core::empty_control_commands_keep_wire_compatibility_but_reject_unknown_fields ... ok\ntest voice_core::ipc_replay_or_other_worker_cannot_replace_fresh_observation ... ok\ntest voice_core::missing_audio_or_invalid_probability_is_failure_not_a_silent_endpoint ... ok\ntest progress_news::work_that_finished_while_the_lamp_waited_for_its_moment_is_not_told ... ok\ntest voice_core::mute_is_immediate_reopening_stable_and_missing_samples_close ... ok\ntest voice_core::privacy_reorder_future_and_stale_fail_closed_without_rolling_back_highwater ... ok\ntest voice_core::retained_prefix_and_endpoint_include_every_active_frame_once ... ok\ntest ring_worker::output_caps_clamp_turn_frames_and_tightening_blanks_latched_pixels_without_a_new_frame ... ok\ntest ring_worker::repeated_stale_control_does_not_renew_authority_and_a_ring_run_out_waits_for_a_fresh_one ... ok\ntest news_told::news_heard_whole_closes_the_harness_it_was_of ... ok\ntest progress_news::a_change_then_a_say_now_from_the_acting_policy_then_one_note_to_tell ... ok\ntest news_told::news_heard_while_the_tasks_part_is_down_is_told_once_it_is_back ... ok\ntest ring_worker::output_caps_clamp_resting_frames_and_preserve_the_persons_light_off_setting ... ok\ntest ring_worker::a_flood_of_head_requests_never_holds_back_revocation_or_expiry ... ok\ntest music_turns::made_up_music_opens_turns_and_speech_still_does ... ok\n\nfailures:\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/src/coordinator/tests/second_route.rs",
+          "line": 387,
+          "column": 9,
+          "source_sha256": "5b6ec2c485137fd0f1b43650096588cbac8a9cd51b08c70e3544f647b37b9372",
+          "context": [
+            {
+              "line": 383,
+              "text": "    /// What every run keeps: it ended by the scripted mute, every child saw"
+            },
+            {
+              "line": 384,
+              "text": "    /// Stop and was reaped, and the speaker wrote nothing without authority."
+            },
+            {
+              "line": 385,
+              "text": "    fn assert_clean(&self) {"
+            },
+            {
+              "line": 386,
+              "text": "        eprintln!(\"{}\", self.summary());"
+            },
+            {
+              "line": 387,
+              "text": "        assert!("
+            },
+            {
+              "line": 388,
+              "text": "            self.result"
+            },
+            {
+              "line": 389,
+              "text": "                .as_ref()"
+            },
+            {
+              "line": 390,
+              "text": "                .err()"
+            },
+            {
+              "line": 391,
+              "text": "                .is_some_and(|e| e.downcast_ref::<PhysicalMute>().is_some()),"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    },
+    {
+      "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+      "raw_stdout": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/tests/tests.stdout.txt",
+      "raw_stdout_sha256": "f7f23e6679263c41257367a0400ebee1bbfe93d940ab148cee3a809af392eb1f",
+      "excerpt_start_byte": 1133087,
+      "excerpt_sha256": "10bf6e7d1327391c4c26fea0ea44266ba8b94175ba6b1a1ed48419c14e38dc86",
+      "excerpt": "light calls, fastest to slowest: [20.897177ms, 21.186095ms, 21.751625ms, 36.540597ms, 40.962156ms, 57.265317ms, 62.462496ms, 73.996791ms, 79.125099ms, 107.924285ms, 108.901643ms, 113.457422ms, 115.254682ms, 115.932664ms, 127.041341ms, 128.75757ms, 134.415686ms, 145.964158ms, 152.849438ms, 185.01426ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (11361046) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[20.897177ms, 21.186095ms, 21.751625ms, 36.540597ms, 40.962156ms, 57.265317ms, 62.462496ms, 73.996791ms, 79.125099ms, 107.924285ms, 108.901643ms, 113.457422ms, 115.254682ms, 115.932664ms, 127.041341ms, 128.75757ms, 134.415686ms, 145.964158ms, 152.849438ms, 185.01426ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n",
+      "panic_source_contexts": [
+        {
+          "file": "crates/voice/tests/it/light_call.rs",
+          "line": 90,
+          "column": 5,
+          "source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+          "context": [
+            {
+              "line": 86,
+              "text": "    // A few of the ring's passes, not a 50 ms look and a 15 ms read: the"
+            },
+            {
+              "line": 87,
+              "text": "    // middle call took about 55 ms before #1806 on the Intel Mac, and 3 ms"
+            },
+            {
+              "line": 88,
+              "text": "    // after."
+            },
+            {
+              "line": 89,
+              "text": "    let middle = took[took.len() / 2];"
+            },
+            {
+              "line": 90,
+              "text": "    assert!(middle < Duration::from_millis(25), \"{took:?}\");"
+            },
+            {
+              "line": 91,
+              "text": "}"
+            }
+          ]
+        }
+      ],
+      "classification": "Actual baseline failure; no inference of candidate reproduction unless separately phase-matched."
+    }
+  ],
+  "source_bodies": {
+    "lampOS/crates/voice/src/bus_out.rs": {
+      "sha256": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/bus_out.rs"
+    },
+    "lampOS/crates/voice/src/body_motion.rs": {
+      "sha256": "1c4798c6a5a2ed5b9849dc59434fca2ee978ac5bcebcc3f4e61eb2656a1ed2fd",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/body_motion.rs"
+    },
+    "lampOS/crates/voice/src/coordinator/motor/tests.rs": {
+      "sha256": "a4a2c75611c9c84b2587919d47d8a468687095cba0633101b7b8c8b0a7203328",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/coordinator/motor/tests.rs"
+    },
+    "lampOS/crates/voice/src/coordinator/optional_ring_tests.rs": {
+      "sha256": "4615229b2fe33afe00a42c03eb36e5fa8678abd31f0e7d39e6a2f2eebe0d8df8",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/coordinator/optional_ring_tests.rs"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs": {
+      "sha256": "97a0b9050347a6f81584ec9c640482509eb87a56a36376e89075b0af9ad41498",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/coordinator/tests/duplex.rs"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/termination.rs": {
+      "sha256": "dae0973e514ebbfcf076d83f23b9927815bbfcf5d14ac67805a69424e399db68",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/coordinator/tests/termination.rs"
+    },
+    "lampOS/crates/voice/src/hand_controls/tests.rs": {
+      "sha256": "3c3ce295763a7fe92c90535ca91fd4d5865a9effcb784963e09b2b77164cffaf",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/hand_controls/tests.rs"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs": {
+      "sha256": "5b6ec2c485137fd0f1b43650096588cbac8a9cd51b08c70e3544f647b37b9372",
+      "snapshot": "source-bodies/lampOS/crates/voice/src/coordinator/tests/second_route.rs"
+    },
+    "lampOS/crates/voice/tests/it/light_call.rs": {
+      "sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+      "snapshot": "source-bodies/lampOS/crates/voice/tests/it/light_call.rs"
+    }
+  }
+}

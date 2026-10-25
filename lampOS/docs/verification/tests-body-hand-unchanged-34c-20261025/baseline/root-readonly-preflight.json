@@ -1,0 +1,91 @@
+{
+  "read_only_preflight": true,
+  "no_Cargo_no_WT_write": true,
+  "input_bindings_valid": true,
+  "candidate_source": {
+    "canonical": "907ab7a6e28ea953dbaf6840db72333d9b1afe1161a9543032d5539253acd2c0"
+  },
+  "protected_witnesses": {
+    "entries": 146,
+    "manifest_sha256": "92803569911072770a0171c73e4c3802b8901aee52d8d47027b80196305a5b49"
+  },
+  "environment_comparison": {
+    "stable_relevant_equal": false,
+    "original": {
+      "CARGO_BUILD_JOBS": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "CARGO_TARGET_DIR": "39b741bf2e66dc8138ec4fb9063ba4e528f3bc825ebcbf28d0c0d9df317213a9",
+      "HOME": "27190ac24934972eae20178e7d7d6802b5f59e73a4c122d185e1a9e31d47660c",
+      "LANG": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+      "LC_ALL": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+      "LC_CTYPE": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+      "PATH": "d907a22e359ef499fa2bee852f0358def00623bf02d5e87e63d6316028c4004f",
+      "TMPDIR": "b401daa7e11b9ef6591fb61fb53d946efd103389f8daf85e35b2a0f7c03985e9"
+    },
+    "current": {
+      "HOME": "27190ac24934972eae20178e7d7d6802b5f59e73a4c122d185e1a9e31d47660c",
+      "LANG": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+      "LC_ALL": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+      "LC_CTYPE": "99fed2d548c2eb1022f4067f97fe838a2c3ea60ee0e0f53086788505c3ababad",
+      "PATH": "68c08512a936b34709e56dfd4460ab608735e3264e4a9b7c9ef4b1a43b54ace9",
+      "TMPDIR": "b401daa7e11b9ef6591fb61fb53d946efd103389f8daf85e35b2a0f7c03985e9",
+      "CARGO_TARGET_DIR": "39b741bf2e66dc8138ec4fb9063ba4e528f3bc825ebcbf28d0c0d9df317213a9",
+      "CARGO_BUILD_JOBS": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    },
+    "excluded_keys": [
+      "BROWSER",
+      "CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS",
+      "CODEX_CI",
+      "CODEX_HOME",
+      "CODEX_MANAGED_BY_NPM",
+      "CODEX_MANAGED_PACKAGE_ROOT",
+      "CODEX_SANDBOX",
+      "CODEX_SANDBOX_NETWORK_DISABLED",
+      "CODEX_SESSION_ID",
+      "CODEX_THREAD_ID",
+      "CODEX_TOOL_CALL_ID",
+      "CODEX_VERSION",
+      "COLORTERM",
+      "COMMAND_MODE",
+      "DISABLE_AUTO_UPDATE",
+      "GH_PAGER",
+      "GIT_PAGER",
+      "GRID_NO_UPDATE_CHECK",
+      "HARNESS_NATIVE_LAUNCH_TOKEN",
+      "HARNESS_PREVIOUS_BROWSER",
+      "LESS",
+      "LOGNAME",
+      "LSCOLORS",
+      "NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S",
+      "NO_COLOR",
+      "NVM_BIN",
+      "NVM_CD_FLAGS",
+      "NVM_DIR",
+      "NVM_INC",
+      "OLDPWD",
+      "OSLogRateLimit",
+      "PAGER",
+      "PWD",
+      "SHELL",
+      "SHLVL",
+      "SSH_AUTH_SOCK",
+      "TERM",
+      "TERM_PROGRAM",
+      "TERM_PROGRAM_VERSION",
+      "TMUX",
+      "TMUX_PANE",
+      "USER",
+      "XPC_FLAGS",
+      "XPC_SERVICE_NAME",
+      "ZSH",
+      "_",
+      "__CFBundleIdentifier",
+      "__CF_USER_TEXT_ENCODING",
+      "is_vim"
+    ],
+    "exclusion_scope": "Tool/session/Codex metadata and other non-relevant keys are not asserted stable."
+  },
+  "registry_readable_preflight": {
+    "known_nonlocal_units_checked": 653,
+    "all_actual_existing_input_output_bindings_equal": true
+  }
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "row": {
+      "path": "lampOS/crates/body/src/bus_out.rs",
+      "baseline_snapshot": "owned/baseline/lampOS/crates/body/src/bus_out.rs",
+      "baseline_sha256": "5650829e6b403508569004331eee18af3c082be2ec105a2c211b2ce2a01a7811",
+      "candidate_snapshot": "owned/candidate/lampOS/crates/body/src/bus_out.rs",
+      "candidate_sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+      "mode": 420
+    },
+    "before": {
+      "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+      "bytes": 64386,
+      "mode": 420,
+      "kind": "file",
+      "mtime_ns": 1792892798838988256
+    },
+    "backup": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/workspace-backup/lampOS/crates/body/src/bus_out.rs"
+  },
+  {
+    "row": {
+      "path": "lampOS/docs/body.md",
+      "baseline_snapshot": "owned/baseline/lampOS/docs/body.md",
+      "baseline_sha256": "936e01931c5ae0068f16d2d47bd8a0396ca2f966600d6e5f987d6c2a83128c12",
+      "candidate_snapshot": "owned/candidate/lampOS/docs/body.md",
+      "candidate_sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+      "mode": 420
+    },
+    "before": {
+      "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+      "bytes": 204107,
+      "mode": 420,
+      "kind": "file",
+      "mtime_ns": 1792892798951058564
+    },
+    "backup": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/body-hand-unchanged-34c-baseline-prep/run/workspace-backup/lampOS/docs/body.md"
+  }
+]

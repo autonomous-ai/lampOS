@@ -1,0 +1,10 @@
+footprint::tests::asymmetric_support_distinguishes_yaw_and_rotates_with_coordinates: test
+footprint::tests::diagonal_inset_uses_unit_normals: test
+footprint::tests::inset_removes_a_short_chamfer_edge: test
+footprint::tests::invalid_queries_cannot_report_positive_clearance: test
+footprint::tests::maximum_vertex_count_retains_the_analytic_regular_polygon: test
+footprint::tests::refuses_concave_crossed_clockwise_and_collinear_input: test
+footprint::tests::refuses_duplicates_short_edges_and_unbounded_input: test
+footprint::tests::rejects_empty_line_point_and_numerically_degenerate_insets: test
+footprint::tests::true_distance_to_inset_including_corners: test
+footprint::tests::zero_margin_and_maximum_declared_scale: test

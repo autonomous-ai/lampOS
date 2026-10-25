@@ -1,0 +1,61 @@
+{
+  "paths": 10460,
+  "all_candidate_bytes_full_modes_kinds_restored": true,
+  "mtime_changed_only": [
+    "lampOS/crates/body/src/bus_out.rs",
+    "lampOS/docs/body.md"
+  ],
+  "recorded_restoration": [
+    {
+      "path": "lampOS/docs/body.md",
+      "before": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792892798951058564
+      },
+      "after": {
+        "sha256": "8348d106821e0e7e166b9f560a7ef365af72376b40c27d9f15bc0846a572ee4f",
+        "bytes": 204107,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792905804308402756
+      },
+      "actual_new_mtime_not_restored": true
+    },
+    {
+      "path": "lampOS/crates/body/src/bus_out.rs",
+      "before": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792892798838988256
+      },
+      "after": {
+        "sha256": "ca08cc9cebf40ac67419edb3930d3407a464f57b098bbb5e717a5ea1ace9a76d",
+        "bytes": 64386,
+        "mode": 420,
+        "kind": "file",
+        "mtime_ns": 1792905804310725214
+      },
+      "actual_new_mtime_not_restored": true
+    }
+  ],
+  "candidate_before": {
+    "canonical": "907ab7a6e28ea953dbaf6840db72333d9b1afe1161a9543032d5539253acd2c0"
+  },
+  "baseline_source": {
+    "canonical": "0e4d6cbcf24eff682f21132560ff1335e169b34abdc842df372c488e1e20a503"
+  },
+  "restored_guard": {
+    "canonical": "9acfe5ccd7a06fa898fba7aeb25b5297ece33e301660010830e8efe9e4aaaa64"
+  },
+  "source_map_sha256s": {
+    "candidate-source-map.json": "884c6f1c5501b047bead8632f70778b6f7c9d7ee35e189c6def41445c6b13fd0",
+    "baseline-runtime-source-map.json": "645669302d498806b1af9800830e6517a8fac2ac9ca203879e9db9e14689d022",
+    "restored-runtime-source-map.json": "dfc97fe093320526031006819a35694f9d4e94e6a1a9adba9ad92e42a7295614"
+  },
+  "limit": "Closed captured maps/receipts only; no claim that original mtimes were restored, and no current WT rescan."
+}

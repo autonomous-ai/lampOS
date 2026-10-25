@@ -1,0 +1,45 @@
+{
+  "package": "lamp-skills",
+  "target": {
+    "kind": [
+      "test"
+    ],
+    "crate_types": [
+      "bin"
+    ],
+    "name": "release_pair",
+    "src_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events/lampOS/crates/skills/tests/release_pair.rs",
+    "edition": "2024",
+    "doc": false,
+    "doctest": false,
+    "test": true
+  },
+  "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/body-hand-events-cargo-target/debug/deps/release_pair-6a7b383b0db4d353",
+  "sha256": "59651c368145a0d3389f6bf091ce2504275f1364f10b9702e286b71d632c9bd8",
+  "compiled_cases": [
+    "fixture::complete_reply_finishes_inside_absolute_deadline",
+    "fixture::dribbling_reply_cannot_renew_absolute_deadline",
+    "release_6408_installs_6498_packages_and_6498_loads_the_replacement",
+    "release_6408_keeps_6498_daily_claims_and_6498_reads_them_back",
+    "release_6408_reads_6498_on_off_and_6498_reads_the_changes_back",
+    "release_6408_reads_6498_rested_night_and_6498_keeps_its_morning_spent",
+    "release_6498_installs_6408_packages_and_6408_loads_the_replacement",
+    "release_6498_keeps_6408_daily_claims_and_6408_reads_them_back",
+    "release_6498_reads_6408_on_off_and_6408_reads_the_changes_back",
+    "release_6498_reads_6408_rested_night_and_6408_keeps_its_morning_spent"
+  ],
+  "compiled_ignored_cases": [
+    "release_6408_installs_6498_packages_and_6498_loads_the_replacement",
+    "release_6408_keeps_6498_daily_claims_and_6498_reads_them_back",
+    "release_6408_reads_6498_on_off_and_6498_reads_the_changes_back",
+    "release_6408_reads_6498_rested_night_and_6498_keeps_its_morning_spent",
+    "release_6498_installs_6408_packages_and_6408_loads_the_replacement",
+    "release_6498_keeps_6408_daily_claims_and_6408_reads_them_back",
+    "release_6498_reads_6408_on_off_and_6408_reads_the_changes_back",
+    "release_6498_reads_6408_rested_night_and_6408_keeps_its_morning_spent"
+  ],
+  "compiled_case_count": 10,
+  "ignored_case_count": 8,
+  "custom_entrypoint": false,
+  "executed_tests_in_this_census": 0
+}

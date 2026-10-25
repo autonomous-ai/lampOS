@@ -1,0 +1,2 @@
+tests::a_pause_is_kept_on_the_bus_until_resumed: test
+tests::waiting_ends_when_it_is_done_or_after_the_longest: test

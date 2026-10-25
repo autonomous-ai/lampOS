@@ -1,0 +1,22 @@
+{
+  "case": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+  "candidate_excerpt": {
+    "start_byte": 1130442,
+    "text": "light calls, fastest to slowest: [2.596607ms, 2.967622ms, 3.499373ms, 3.518416ms, 3.577532ms, 3.960501ms, 34.087159ms, 38.140794ms, 40.063405ms, 56.156135ms, 57.608248ms, 58.046285ms, 72.659333ms, 73.977585ms, 74.452109ms, 76.843837ms, 77.470084ms, 93.306854ms, 94.90337ms, 95.165179ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (10295200) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[2.596607ms, 2.967622ms, 3.499373ms, 3.518416ms, 3.577532ms, 3.960501ms, 34.087159ms, 38.140794ms, 40.063405ms, 56.156135ms, 57.608248ms, 58.046285ms, 72.659333ms, 73.977585ms, 74.452109ms, 76.843837ms, 77.470084ms, 93.306854ms, 94.90337ms, 95.165179ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+  },
+  "baseline_excerpt": {
+    "start_byte": 1133087,
+    "text": "light calls, fastest to slowest: [20.897177ms, 21.186095ms, 21.751625ms, 36.540597ms, 40.962156ms, 57.265317ms, 62.462496ms, 73.996791ms, 79.125099ms, 107.924285ms, 108.901643ms, 113.457422ms, 115.254682ms, 115.932664ms, 127.041341ms, 128.75757ms, 134.415686ms, 145.964158ms, 152.849438ms, 185.01426ms]\n\nthread 'light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them' (11361046) panicked at crates/voice/tests/it/light_call.rs:90:5:\n[20.897177ms, 21.186095ms, 21.751625ms, 36.540597ms, 40.962156ms, 57.265317ms, 62.462496ms, 73.996791ms, 79.125099ms, 107.924285ms, 108.901643ms, 113.457422ms, 115.254682ms, 115.932664ms, 127.041341ms, 128.75757ms, 134.415686ms, 145.964158ms, 152.849438ms, 185.01426ms]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n"
+  },
+  "same_panic_site": true,
+  "same_source_sha256": "8231cccd78394bd64237cc376317ad53c29fa706b7a5758db7f6636a2190e7a8",
+  "predicate_lines_86_96": "    // A few of the ring's passes, not a 50 ms look and a 15 ms read: the\n    // middle call took about 55 ms before #1806 on the Intel Mac, and 3 ms\n    // after.\n    let middle = took[took.len() / 2];\n    assert!(middle < Duration::from_millis(25), \"{took:?}\");\n}",
+  "phase": "Sorted 20-call latency distribution median bound, after all light calls completed.",
+  "middle_index": 10,
+  "strict_bound_ms": 25,
+  "candidate_middle_ms": 57.608248,
+  "baseline_middle_ms": 108.901643,
+  "candidate_max_ms": 95.165179,
+  "baseline_max_ms": 185.01426,
+  "classification": "One matched assertion-site/predicate phase on the unchanged source; other 19 candidate failures did not reproduce in this one baseline. Not a causal attribution or current-head qualification."
+}
