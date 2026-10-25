@@ -45,6 +45,10 @@ Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
 # the other broker-held changes for the broker connection's TLS (LAMP_CLOUD_TLS, docs/cloud.md).
 Environment=LAMP_SETTINGS_CHANGE=on
 Environment=LAMP_SKILLS_PAGE=on
+# Install writes this shared, default-off switch; a separately provisioned Store key is
+# required too. Changing store.env and restarting cloud enables the next helper connection.
+Environment=LAMP_SKILLS_STORE=off
+EnvironmentFile=-/etc/lampOS/skills/store.env
 Environment=LAMP_APP_UPDATE=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service

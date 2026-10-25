@@ -532,6 +532,80 @@ fn the_exit_note_allowlist_is_exactly_clouds_product_services() {
 }
 
 #[test]
+fn install_prepares_store_off_and_keeps_the_lamps_store_choice() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let env = "/etc/lampOS/skills/store.env";
+    let drop_in = "/etc/systemd/system/lamp-skills-manage@.service.d/store.conf";
+    for (path, text) in install::STORE_SETTINGS {
+        assert_eq!(fs::read_to_string(lamp.on(path)).unwrap(), *text);
+        assert_eq!(mode_of(&lamp.on(path)), 0o644);
+        assert_eq!(lamp.state().settings[*path], sha256_hex(text.as_bytes()));
+    }
+    assert!(
+        fs::read_to_string(lamp.on(env))
+            .unwrap()
+            .lines()
+            .any(|l| l == "LAMP_SKILLS_STORE=off")
+    );
+    assert!(!lamp.on(lamp_skills::package::STORE_KEY).exists());
+    for unit in ["lamp-cloud.service", "lamp-skills-manage@.service"] {
+        let text = fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{unit}"))).unwrap();
+        assert!(section(&text, "Service").contains(&"Environment=LAMP_SKILLS_STORE=off"));
+    }
+    let helper =
+        fs::read_to_string(lamp.on("/etc/systemd/system/lamp-skills-manage@.service")).unwrap();
+    assert!(helper.contains(&format!("--key-file {}", lamp_skills::package::STORE_KEY)));
+    assert!(!helper.contains("/etc/lampOS/update/key.pub"));
+    let cloud = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-cloud.service")).unwrap();
+    let helper_drop_in = fs::read_to_string(lamp.on(drop_in)).unwrap();
+    for text in [&cloud, &helper_drop_in] {
+        assert!(
+            section(text, "Service").contains(&"EnvironmentFile=-/etc/lampOS/skills/store.env")
+        );
+    }
+    assert!(section(&helper_drop_in, "Service").contains(&"PrivateNetwork=no"));
+    assert!(lamp.install().unwrap().changed.is_empty());
+    // A deliberate switch or sandbox edit survives reinstall; no key is
+    // invented even if a lamp enabled the switch before provisioning it.
+    fs::write(lamp.on(env), "LAMP_SKILLS_STORE=on\n").unwrap();
+    fs::write(lamp.on(drop_in), "[Service]\nPrivateNetwork=yes\n").unwrap();
+    assert!(lamp.install().unwrap().changed.is_empty());
+    assert_eq!(
+        fs::read_to_string(lamp.on(env)).unwrap(),
+        "LAMP_SKILLS_STORE=on\n"
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.on(drop_in)).unwrap(),
+        "[Service]\nPrivateNetwork=yes\n"
+    );
+    assert!(!lamp.on(lamp_skills::package::STORE_KEY).exists());
+    // Store provision is installer-only until the OTA settings contract
+    // carries these paths. Its public key must never enter a build manifest.
+    let carried = install::product_settings();
+    assert!(
+        carried.iter().all(|s| s.path != env
+            && s.path != drop_in
+            && s.path != lamp_skills::package::STORE_KEY)
+    );
+}
+
+#[test]
+fn a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let drop_in = "/etc/systemd/system/lamp-skills-manage@.service.d/store.conf";
+    fs::remove_file(lamp.on(drop_in)).unwrap();
+    lamp.host.failing_enables = 1;
+    assert!(lamp.install().is_err());
+    assert!(lamp.state().systemd_owed);
+    assert!(lamp.on(drop_in).exists());
+    lamp.install().unwrap();
+    assert!(!lamp.state().systemd_owed);
+    assert!(lamp.install().unwrap().changed.is_empty());
+}
+
+#[test]
 fn install_places_every_exit_note_hook_and_keeps_other_drop_ins() {
     let mut lamp = Lamp::new(188, &[]);
     let other = "/etc/systemd/system/lamp-voice.service.d/30-local.conf";
