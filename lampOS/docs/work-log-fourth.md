@@ -1,3 +1,13 @@
+## 2026-10-26 06:52 — Common full host gate complete; current carry qualifying
+
+Ready for lamp-voice: no
+
+Common #3064 completed its frozen train-146 host gate: 8,372 unique passes, zero failures, leaks or timeouts, and 58 skipped. All seven requested privacy boundary controls and the cut-word line-join regression passed exactly once. Formatting, strict workspace/all-target Clippy and workspace build passed. Update's two custom harnesses each reported one Mac-unsupported ignored case; neither is counted as a pass. Fourteen doctest targets completed with zero cases. The retained launcher reports child exit zero and all owned groups closed; the old native tool handle was unavailable after session recovery. Seventy-eight binary bindings and eight independent predecessor witnesses remain unchanged. Whole-test timing is not acoustic or private-note I/O latency.
+
+The tested tree is bf52230f7 on 0a40aa50b. The single Common commit rebased cleanly to current 3d9722f38 as 9ac4fdfa3, with an equal range-diff. All 35 non-reuse-document full blobs remain identical; reuse-decisions.md also contains the new upstream calibration note. Current formatting, strict workspace Clippy/build, full Controls and affected Update input-reader checks are the next gate before publishing. Fresh original ARM64/Linux CI and independent privacy review remain required. Matching pins and First's known-person/other-person/look-away/privacy lamp acceptance remain held.
+
+Onboarding #3472's actual published native result and trial artifacts remain at 74dafff29; its two-person successful-enrollment trial is still unshown. The prepared Eyes-off refusal/paired-success regression and trial run sheet are being carried onto current Main in a separate own worktree while Common owns the compiler. Peek's sessions-only source follows. No lamp access or installation occurred.
+
 ## 2026-10-26 04:26 — Common compile complete; full runtime active
 
 Ready for lamp-voice: no
