@@ -6,6 +6,29 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 18:44 — Current Body build passed; Store boundary read
+
+Ready for lamp-voice: no (dependent tests and the current integration remain).
+
+On frozen `05b29451f` / `a786e0454`, fmt, strict all-target clippy for
+12 crates, workspace build and full Body tests have exited 0. The full
+normal-runtime dependent test command is still compiling; no terminal
+result is claimed. The earlier 7,337/0/52 full gate keeps its older
+`640198b2c` / `8e2405736` identity. Main advanced to `22d93d199` with
+Voice's note-at-turn wait and docs; its integration follows this command,
+without altering a running test's source.
+
+The focused Store integration read on OTA #3466 `42b4739bc` found no
+P1/P2: settings publication and validation exclude Store's switch,
+network drop-in and factory key; the helper template is outside the
+ordinary product unit carrier. An older lamp still needs Store's install
+preparation. [Source-only result](https://github.com/autonomous-ai/lampOS/pull/3466#issuecomment-6397176996),
+not a full READ-OK or independent execution. Its own original Linux
+ARM64 and clippy runs are green; Tests owns its latest-base carry.
+
+Next: finish Body's gate, preserve exact counts, carry the authored change
+onto the latest base, publish the replacement PR and qualify its Linux runs.
+
 ## 2026-10-25 18:28 — Complete Body gate passed; current carry qualifying
 
 Ready for lamp-voice: no (current carry gate and new original Linux runs remain).
