@@ -1,0 +1,29 @@
+{
+  "status": "UNEXECUTED fixed control design; no compilation/artifact/inventory/runtime claim",
+  "source_base": "7b7ceb9c3b081c4e932bb15529b677f7b5b41c3f",
+  "source_branch": "tests/1569-sleep-name-events",
+  "case": "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+  "schedule": [
+    {
+      "variant": "original-plus-same-private-gate",
+      "observations": 1
+    },
+    {
+      "variant": "queued-plus-same-private-gate",
+      "observations": 1
+    }
+  ],
+  "gate": "One cancellable absolute 260-ms intervention only on the first false-speech step, after its publishing wall sample and before its regular input batch. No normal completion sleep.",
+  "preserved": [
+    "Entire original case and delivery checks",
+    "Original final wall catch-up and refused/input-error assertions",
+    "Nominal typed Activity age 250 ms",
+    "Real 300-ms Activity limit and 50-ms transport grace",
+    "Real local bus; one publication per requested observation; no product clock/API change"
+  ],
+  "expected_controlled_gap": "Original typed Activity is born before the step. If the observed publishing interval is 260 ms, the existing catch-up makes its typed age 310 ms. The queued observation uses the projected step clock, with nominal age 250 ms. Actual header age, phase and bounds must be observed; this arithmetic is not a runtime result.",
+  "acceptance_pending": "Require the actual false-speech phase, valid gate/lifecycle, actual envelope freshness and original refused-count assertion with stale-input error for the old negative; the corrected observation must pass all original assertions. Unexpected PASS, phase, expiry or cleanup failure stops without resampling. Compiler/source/executable/inventory and exact original panic binding still require a concrete runner and separate grant.",
+  "limits": "The old 2/3 qualification has an unknown actual refused topic and step. The integration API exposes aggregate counts, not the actual consumed/refused topic; retained-frame diagnostics cannot silently replace that missing evidence. This future control will not be relabelled a historical reproduction.",
+  "test_observations_in_this_packet": 0,
+  "execution_authorized": false
+}

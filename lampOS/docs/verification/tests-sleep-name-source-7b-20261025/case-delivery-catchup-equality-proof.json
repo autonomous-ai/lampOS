@@ -1,0 +1,23 @@
+[
+  {
+    "section": "fn sleeping_name_requires_validated_speech_through_the_local_bus() {",
+    "before_sha256": "beffec0a8acf3bfbde7b7725558836ce4d38565df35cffe87fe261541228d4bc",
+    "after_sha256": "beffec0a8acf3bfbde7b7725558836ce4d38565df35cffe87fe261541228d4bc",
+    "byte_equal": true,
+    "text": "    fn sleeping_name_requires_validated_speech_through_the_local_bus() {\n        let mut lamp = SleepingService::new();\n        lamp.sleep();\n        lamp.name();\n        assert!(has(&lamp.step(), \"asleep\"));\n        lamp.speech(false);\n        assert!(has(&lamp.step(), \"asleep\"));\n        lamp.speech(true);\n        let output = lamp.step();\n        assert!(has(&output, \"waking\"));\n        assert!(!has(&output, \"asleep\"));\n    }"
+  },
+  {
+    "section": "fn name(&mut self) {",
+    "before_sha256": "44f45064e87a0bbc4877fb6d201dceba3b22410e4fd541a8cdc0e485c782b588",
+    "after_sha256": "44f45064e87a0bbc4877fb6d201dceba3b22410e4fd541a8cdc0e485c782b588",
+    "byte_equal": true,
+    "text": "        fn name(&mut self) {\n            let sent = self\n                .name\n                .publish_json(\n                    987_654_321,\n                    &NameHeard {\n                        score: 0.99,\n                        ago_ms: 400,\n                    },\n                )\n                .unwrap();\n            assert_eq!(sent.delivered, 1);\n            assert_eq!(sent.dropped, 0);\n        }"
+  },
+  {
+    "section": "#1198 finalwall/catchup/service.step/countassertions",
+    "before_sha256": "9bfd300e7dc926058bd6ef101e2506dfa837ca3ac3aa5753be41d2af3a4af6ee",
+    "after_sha256": "9bfd300e7dc926058bd6ef101e2506dfa837ca3ac3aa5753be41d2af3a4af6ee",
+    "byte_equal": true,
+    "text": "            // The wall clock just after publishing, as `populate` gives it.\n            let wall = runtime::unix_ms();\n            // The service places each bus input at `now` less its wall age.\n            // A host stall of more than a tick while publishing would place\n            // this step's room before the last one's, refused as out of\n            // order (#1196). Like a lamp's, this clock then keeps up with the wall.\n            self.now_us += (wall.saturating_sub(publishing) * 1_000).saturating_sub(TICK_US);\n            let output = self.service.step(|| self.now_us, wall);\n            assert_eq!(self.service.counts.refused, 0);\n            assert_eq!(self.service.counts.input_errors, 0);\n            output\n"
+  }
+]

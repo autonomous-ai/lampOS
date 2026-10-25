@@ -1,0 +1,53 @@
+{
+  "base": "7b7ceb9c3b081c4e932bb15529b677f7b5b41c3f",
+  "branch": "tests/1569-sleep-name-events",
+  "worktree": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-name-events",
+  "bare_repository": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-name-repairs.git",
+  "tracked_paths": 10460,
+  "all_outside_owned_paths_bytes_fullmode_actualmtime_unchanged": true,
+  "owned_files": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "before": {
+        "sha256": "ddcd5435c9b2b536ffdfbec0b7d81aaea4bf5286eff6db03924fb3caeef4db95",
+        "bytes": 47670,
+        "mode": 420,
+        "mtime_ns": 1792903153523950397,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "0ca1ffdd74dd24a54ca9198bb61510f276da76283eed213bfefdcb438bd9ff74",
+        "bytes": 48344,
+        "mode": 420,
+        "mtime_ns": 1792903219517663786,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/expression.md": {
+      "before": {
+        "sha256": "035177509f84ef1a2b5377b0a6ee45ffe93c87f22b3474b8e8e0c4145a99768e",
+        "bytes": 78279,
+        "mode": 420,
+        "mtime_ns": 1792903154225579618,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "8801dc27f795597670afbc0091adbb4d147c7762492d890c9ac4dbfea937dc88",
+        "bytes": 78851,
+        "mode": 420,
+        "mtime_ns": 1792903219438012215,
+        "kind": "file"
+      }
+    }
+  },
+  "index_unstaged": true,
+  "untracked_paths": [],
+  "rustfmt_exit_code": 0,
+  "diff_check_exit_code": 0,
+  "compilation_metadata_tests_commits_pushes": "UNRUN",
+  "shared_worktrees_and_refs": "No commands addressed shared repositories or worktrees; independent bare only",
+  "historical_cause_claim": false,
+  "applied_patch_sha256": "8026318d88789a9f27089e4318f7731531bfc7c1760a966df0b40ba7db5fce65",
+  "case_delivery_catchup_proof_sha256": "c005eee69b7763842dc73f5e8f55b4e3f83984a674fc6af407380019a9b5836d",
+  "before_source_map_sha256": "0f1fb4c68df2d4e415bb1296362ed5ad4fac49c1a9049ca6bd3ae601b4ccd220",
+  "after_source_map_sha256": "1096121e8d6f18106d341fb36dc8db3b4cc5839657e33e5040ea9fdcd043f11e"
+}

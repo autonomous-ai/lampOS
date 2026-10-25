@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "/Users/autonomous/.cargo/bin/rustup",
+    "run",
+    "1.96.0",
+    "rustfmt",
+    "--edition",
+    "2024",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/sleep-name-events/lampOS/crates/expression/tests/runtime.rs"
+  ],
+  "started_at": "2026-10-25T04:40:19.438391+00:00",
+  "finished_at": "2026-10-25T04:40:19.520075+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "scope": "Exact owned Rust integration file only; no compilation/tests"
+}

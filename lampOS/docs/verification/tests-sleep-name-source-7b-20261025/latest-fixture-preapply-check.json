@@ -1,0 +1,24 @@
+{
+  "latest_base": "7b7ceb9c3b081c4e932bb15529b677f7b5b41c3f",
+  "audited_base": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "functions": [
+    {
+      "function": "fn step(&mut self) -> Output {",
+      "audited_sha256": "92b68532317f56719d72d580122e448df4a241e7e2b2097ca8c6c96fa075b43a",
+      "latest_sha256": "92b68532317f56719d72d580122e448df4a241e7e2b2097ca8c6c96fa075b43a",
+      "byte_equal": true
+    },
+    {
+      "function": "fn speech(&mut self, speaking: bool) {",
+      "audited_sha256": "6adf4710947aaa15d94e4c0c90ec39f0f823adfff677d903715179b575d85e5d",
+      "latest_sha256": "6adf4710947aaa15d94e4c0c90ec39f0f823adfff677d903715179b575d85e5d",
+      "byte_equal": true
+    },
+    {
+      "function": "fn sleeping_name_requires_validated_speech_through_the_local_bus() {",
+      "audited_sha256": "beffec0a8acf3bfbde7b7725558836ce4d38565df35cffe87fe261541228d4bc",
+      "latest_sha256": "beffec0a8acf3bfbde7b7725558836ce4d38565df35cffe87fe261541228d4bc",
+      "byte_equal": true
+    }
+  ]
+}

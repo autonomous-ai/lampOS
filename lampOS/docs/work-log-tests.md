@@ -4510,3 +4510,9 @@ Frozen 34c plus the two-file Hand fixture completed formatting, strict all-targe
 Ready for lamp-voice: no
 
 [Controlled old/new source](verification/tests-fixture-control-sources-20261025/) now includes both cancellable gates, identity-owned cleanup, strict original-assertion acceptance and consumed-frame diagnostics. The Ready receipt explicitly binds the old d7 planning label to actual 4f originals and separately captured candidate source. Root pinned formatter checks on all six private controlled snapshots passed with raw streams retained; no compiler or test ran. The overlays remain unapplied and disabled pending whole-source/artifact/resource grants. The Hand baseline controller is reviewed and unstarted, with its PATH-only context difference explicit and all 146 witnesses and 653 registry unit bindings checked. Next: the unchanged-base full-context run when two jobs are actually released; no full-environment, cause or readiness claim.
+
+## 2026-10-25 05:02 UTC — SleepName typed observation queued for its intended step
+
+Ready for lamp-voice: no
+
+[Declared 7b source and checks](verification/tests-sleep-name-source-7b-20261025/) preserve the whole original case, delivery checks, wall catch-up and real bounds. The fixture queues one Activity and publishes it last with nominal typed age 250 ms; only test/doc files changed. Pinned formatting and diff checks passed. The original refused topic remains unknown; the fixed 260 ms old/new control is still unexecuted and is not a historical reproduction. No compiler or current-main readiness claim. Root’s unchanged-34c full twelve-package comparison remains active in its two jobs.

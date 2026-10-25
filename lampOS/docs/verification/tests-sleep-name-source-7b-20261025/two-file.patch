@@ -1,0 +1,45 @@
+diff --git a/lampOS/crates/expression/tests/runtime.rs b/lampOS/crates/expression/tests/runtime.rs
+index 0d05d426a..5a9646093 100644
+--- a/lampOS/crates/expression/tests/runtime.rs
++++ b/lampOS/crates/expression/tests/runtime.rs
+@@ -505,0 +506 @@ mod sleep_name {
++        pending_activity: Option<bool>,
+@@ -627,0 +629 @@ mod sleep_name {
++                pending_activity: None,
+@@ -755,0 +758,14 @@ mod sleep_name {
++            if let Some(speaking) = self.pending_activity.take() {
++                // Anticipate the same catch-up below; nominal typed age stays 250 ms.
++                // The original final wall sample still accounts for this publication.
++                let before_activity = runtime::unix_ms();
++                let projected_now = self.now_us.saturating_add(
++                    (before_activity.saturating_sub(publishing) * 1_000).saturating_sub(TICK_US),
++                );
++                self.activity
++                    .publish_json(
++                        987_654_321,
++                        &activity(projected_now.saturating_sub(250_000), speaking),
++                    )
++                    .unwrap();
++            }
+@@ -802,5 +818,2 @@ mod sleep_name {
+-            // The next step receives a 250 ms old typed observation, still
+-            // within the unchanged 300 ms activity bound. Its envelope is new.
+-            self.activity
+-                .publish_json(987_654_321, &activity(self.now_us - 50_000, speaking))
+-                .unwrap();
++            // This private fixture's next step publishes the one observation last.
++            assert!(self.pending_activity.replace(speaking).is_none());
+diff --git a/lampOS/docs/expression.md b/lampOS/docs/expression.md
+index 636ed176d..ddd338c5c 100644
+--- a/lampOS/docs/expression.md
++++ b/lampOS/docs/expression.md
+@@ -898,0 +899,9 @@ can still expire an input; the fixtures neither refresh it nor retry a step.
++The sleeping-name bus fixture queues each requested Activity for its next
++step and publishes that one observation after the room, voice, faces and
++joints. Its typed age remains nominally 250 ms with the same final wall-clock
++catch-up; the real 300 ms Activity limit and 50 ms transport grace are
++unchanged. The existing sleep, wake, delivery and input-refusal assertions
++remain. A stall in or after the last publication can still invalidate an
++input; this fixture change identifies no topic or cause for a historical
++refusal and does not refresh or retry an observation.
++

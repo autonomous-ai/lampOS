@@ -1,0 +1,67 @@
+{
+  "primaries": [
+    {
+      "path": "source-result.json",
+      "sha256": "de56deffe71b1846bc1dc7394917db5600863b418df381dfca122e6c53b5750e",
+      "bytes": 2182,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/source-result.json"
+    },
+    {
+      "path": "case-delivery-catchup-equality-proof.json",
+      "sha256": "c005eee69b7763842dc73f5e8f55b4e3f83984a674fc6af407380019a9b5836d",
+      "bytes": 2489,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/case-delivery-catchup-equality-proof.json"
+    },
+    {
+      "path": "latest-fixture-preapply-check.json",
+      "sha256": "55df988ddf5f88a521de776e7a7c726df31d71c4b9bab305ec7dde3098c6fec6",
+      "bytes": 1012,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/latest-fixture-preapply-check.json"
+    },
+    {
+      "path": "rustfmt.json",
+      "sha256": "1d925c382e18a65cd6281c291aba6ee791a082226e4ef41e49bbbfd492cff8ab",
+      "bytes": 664,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/rustfmt.json"
+    },
+    {
+      "path": "rustfmt.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/rustfmt.stdout.txt"
+    },
+    {
+      "path": "rustfmt.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/rustfmt.stderr.txt"
+    },
+    {
+      "path": "diff-check.json",
+      "sha256": "f96c9b51e1279b9e9a6d39cecf1bd3d73fbf4c83207ef8e07fbcd3447b3a0222",
+      "bytes": 405,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/diff-check.json"
+    },
+    {
+      "path": "diff-check.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/diff-check.stdout.txt"
+    },
+    {
+      "path": "diff-check.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "source": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/tests-recovery/evidence/sleep-name-applied-source/diff-check.stderr.txt"
+    },
+    {
+      "path": "two-file.patch",
+      "sha256": "a7a39797593ef41400c29acf5a09ee501c4c1c0832299acac75bc697952b9db1",
+      "bytes": 2504,
+      "source": "Derived zero-context patch, reverse-checked against applied source"
+    }
+  ],
+  "count": 10,
+  "test_observations": 0,
+  "code_ready": false
+}
