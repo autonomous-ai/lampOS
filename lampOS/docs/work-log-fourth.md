@@ -1,3 +1,13 @@
+## 2026-10-25 19:56 — Onboarding offered on the current release base
+
+Ready for lamp-voice: no
+
+Draft [#3472](https://github.com/autonomous-ai/lampOS/pull/3472) is pushed at 31f0824be on 86416a0d3. All six carried commits compare equal before the verification-only provenance amendment; the paired activation is unchanged. Current Linux Clippy 40194787029 passed and ARM64 40194787054 is running. Fresh current-head Mac gates are starting with ordinary child umask 0022 and separately private logs. The prerequisite #3437 and First's assigned two-person trial still gate readiness; no lamp was touched.
+
+The completed earlier host continuation keeps its original 0ce7b6789/83509fd04 identity and failed overall exit. Ten full package suites passed 3,070/0/29. Update's six completed targets passed 228/0/4; its incomplete round target had 29 passes, 20 failures and 118 unobserved outcomes. The preserved actual round executable later completed all 167/0/0 once. Setup's original 175/3/1 permission failures came with the launcher's inherited umask 0077; its four original test drivers completed 178/0/1 with ordinary child umask 0022 and the separately bound final-build CLI. These controls do not replace the original failed runs or establish a current-head full pass. The earlier full Voice 4,017/25/21 remains recorded alongside the corrected focused results.
+
+All old gate and diagnostic processes have terminal results. The authorized retirement of three old owned targets and the completed Root target finished with all independent failure executables preserved; measured free space afterward was 39,441,240,064 bytes. Source and index remained unchanged. Continuing current PR findings and the already claimed private-scope memory repair after its release-priority deferral.
+
 ## 2026-10-25 18:53 — Current-base carry prepared while checks continue
 
 Ready for lamp-voice: no
