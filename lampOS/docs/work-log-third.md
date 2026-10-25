@@ -5,6 +5,33 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+
+## 2026-10-26 07:00 — Face delivered; reminder retry qualified in focused tests
+
+Train 148 (#3514) delivered #3486 as lamp-voice **d21a854b6**. The old
+captured branch remains untouched. #3477's repaired **f2187822a** has my
+READ-OK: eleven exact-source detector observations match, including the
+three cases from my earlier HOLD. No provider or Schedule-write test is
+claimed by that extracted-source probe; its native checks remain separate.
+
+#3512's original ARM64 **40245910596** and Linux **40245910632** pass on
+**7a06aaf61**. The actual preview equals its offered tree: **11,321 unique
+PASS, zero leaks/failures/timeouts, 106 skipped**, both own tests once.
+[The receipt](verification/privacy-read-error-20261026/native-40245910596.json)
+retains original run and checkout identity. The train advanced meanwhile;
+#3512 and #3513 are rebased locally with equal patches, awaiting current
+Mac gates before push. Their previous native results are not relabelled.
+
+The reminder interruption regression failed on original 3d production at
+the intended missing-retirement assertion (0/1); its executable and all
+7,132 source hashes are retained. The repair passes the 103-case reminder
+scope (two ignored), including live successor admission, publish failure,
+known provider failure with unretired audio, and durable retry correlation.
+A first sandboxed attempt hit local fixture-socket PermissionDenied; the
+same source passed with approved socket access. Current d21 full Voice and
+Schedule qualification is running. Fault two has separate trigger/runner
+controls prepared; no source trigger change has been qualified yet.
+
 ## 2026-10-26 06:46 — Both fixes published; reminder ship faults taken
 
 Ready for lamp-voice: yes for #3486 at **77232b464**, nominated NEXT TRAIN.
