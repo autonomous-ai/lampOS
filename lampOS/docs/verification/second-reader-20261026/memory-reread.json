@@ -1,0 +1,42 @@
+{
+  "accepted_head": "3ed41f72a3343131cc2bf4c0c8cfab382effb7c0",
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "equal_owned_blobs": {
+    "lampOS/crates/memory/tests/voice_observe_forget.rs": {
+      "accepted": "ceb918d83c2deb25850f480b940bd688ce0bb66c",
+      "current": "ceb918d83c2deb25850f480b940bd688ce0bb66c"
+    },
+    "lampOS/crates/memory/tests/voice_observe_named_forget.rs": {
+      "accepted": "7e01b0cd9102435ad661ed36bc38a2f53243de43",
+      "current": "7e01b0cd9102435ad661ed36bc38a2f53243de43"
+    },
+    "lampOS/crates/memory/tests/voice_observe_room.rs": {
+      "accepted": "c978ecfb2479840e2d22da3a7119f70ddf89d824",
+      "current": "c978ecfb2479840e2d22da3a7119f70ddf89d824"
+    },
+    "lampOS/crates/update/tests/functions.rs": {
+      "accepted": "2ef3e92b3a14c14314c4a03c7608b608718e467d",
+      "current": "2ef3e92b3a14c14314c4a03c7608b608718e467d"
+    },
+    "lampOS/crates/voice/src/remember.rs": {
+      "accepted": "ffc99cdf3747c198d01b8a6838780c84b535cee1",
+      "current": "ffc99cdf3747c198d01b8a6838780c84b535cee1"
+    },
+    "lampOS/crates/voice/src/remember/needs_face.rs": {
+      "accepted": "d30b87fa7c15ebfefb82eaabb7bcc3692416aad1",
+      "current": "d30b87fa7c15ebfefb82eaabb7bcc3692416aad1"
+    },
+    "lampOS/deploy/product/lamp-voice.service": {
+      "accepted": "181520c3d326d12d68e259a91bdb262c01678327",
+      "current": "181520c3d326d12d68e259a91bdb262c01678327"
+    }
+  },
+  "head": "d887daceaed1b956a68f1872572fc9d189646a44",
+  "range_diff": "1:  31aa2bec8 = 1:  a3e326efd lampOS: the product voice keeps what matters without being asked, for the person seen saying it, and forgets it when they ask\n2:  36c9bf70e = 2:  5d7f8418b lampOS: a forget closes the observation jobs from before it unsent, and with LAMP_MEMORY_PERSONAL_NEEDS_FACE a room's conversation is not observed\n3:  3ed41f72a = 3:  d887dacea lampOS: every forget counts for the observation pass before any path returns, and a conversation takes its count from its first exchange",
+  "removed_symbols": [
+    "OPEN_BASE",
+    "OPEN_NONE",
+    "open_base"
+  ],
+  "scope": "Source/history reread only; no new runtime test. Earlier source hold removed with offending fourth commit. Existing native and physical acceptance remain separate."
+}

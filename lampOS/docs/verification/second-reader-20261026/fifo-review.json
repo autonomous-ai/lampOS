@@ -1,0 +1,108 @@
+{
+  "counts": {
+    "install-files": {
+      "failed": 0,
+      "filtered": 92,
+      "ignored": 0,
+      "passed": 9
+    },
+    "null-identity": {
+      "failed": 0,
+      "filtered": 122,
+      "ignored": 0,
+      "passed": 1
+    }
+  },
+  "gates": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 129294598144,
+      "elapsed_seconds": 29.847,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7136,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 129294307328,
+      "elapsed_seconds": 6.478,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7136,
+      "source_unchanged": true
+    },
+    "install-files": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "head_touch_preflight_files::",
+        "--",
+        "--test-threads=1"
+      ],
+      "disk_free_before": 129261305856,
+      "elapsed_seconds": 77.131,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e9656b6d4838621b0b96b7c5918cb658cb0cc96c62f875b118965fd54bf253b7",
+      "source_entries": 7136,
+      "source_unchanged": true
+    },
+    "null-identity": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "head_touch::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "disk_free_before": 129205583872,
+      "elapsed_seconds": 5.949,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "823877d087b4a6ef1dd99eedb8b24adebf52879c84b0bc198ed48635add593f1",
+      "source_entries": 7136,
+      "source_unchanged": true
+    }
+  },
+  "head": "b43cd9b1f79c518116e34b13e78b28bac054ca9f",
+  "scope": "Independent Mac focused peer review; no full Update suite or device claim.",
+  "source_manifest_sha256": "f2cecee903ef22c30327ecde1ce98b9e2a3dbfcf91dc1131a53efe11ddb277d1"
+}

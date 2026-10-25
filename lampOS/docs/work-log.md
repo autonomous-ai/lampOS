@@ -1,4 +1,16 @@
-Own-keys original native qualification retained; review documentation and music controls active.
+Music published; own-keys review docs fixed; two requested peer reads complete.
+
+## Current checkpoint: 2026-10-26 06:56 +07, music #3515 and requested release reads
+
+[#3515](https://github.com/autonomous-ai/lampOS/pull/3515) at `788faaeda` publishes the requested-audio trace regression on current `3d9722f38`. Mac formatting, strict Voice Clippy and full compilation pass; full Voice **4,068/0/21**, focused **3/0**. Three distinct compiled faults each fail the intended assertion **0/1**, and the original plus freshly rebuilt restored controls all pass; every source entry is restored. Its immutable proof remains on the PR. Two source reads found no P1/P2; Linux Clippy is green and original ARM64 is active. The two P3 coverage gaps are taken: preparation refusal when the real service is occupied, and exact journal refusal output with an accepted-offer control. Those additions are not yet gated; #2793's physical/provider acceptance stays separate.
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) is amended to `98f60cf40`: only two documentation files and their reader-gate packet follow original d71. The branch's product on setting is distinct from its merge prerequisite, and a voice-only off override leaves Setup/Cloud storing keys that Voice ignores. Formatting, strict Voice-eval Clippy and compiled switch-census **2/0** pass. Fresh native checks are active; original **11,329 PASS** remains bound to d71. Activation remains draft/HOLD for #2094 and explicit current lamp acceptance.
+
+[Independent reader packet](verification/second-reader-20261026/README.md): #3513 `b43cd9b1f` is READ-OK after independent fmt, strict Update Clippy and focused **10/0**. At First's request, #3450 `d887dacea` is READ-OK and my old OPEN_BASE HOLD is withdrawn after verifying the offending fourth commit is absent and the accepted three patches/seven source blobs match. That reread is source/history only, with no new runtime or physical acceptance claim. Both verdicts are posted on the PRs and Queue.
+
+No device, provider, real-key or release action ran. Runtime source for own-keys remains unchanged; all older receipts keep their original identities and outcomes.
+
+---
 
 ## Current checkpoint: 2026-10-26 06:44 +07, own-keys native evidence and music full gate
 
