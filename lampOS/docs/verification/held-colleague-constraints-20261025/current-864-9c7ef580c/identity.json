@@ -1,0 +1,22 @@
+{
+  "head": "9c7ef580cbaef2ad6ba2995187ce4b56fe414f23",
+  "parent": "92511dc092d46ccb40ca156d7ba3dc41d7975e2e",
+  "base": "86416a0d3ff5575c37b48943ada962445ec935f9",
+  "tree": "e89f4b65f64fbfd380c3834788b51559f847b326",
+  "original_head": "15b7c85af539a0e08a047a4196095d85bb54641b",
+  "exact_added_removed_lines_equal": {
+    "lampOS/crates/voice/src/second_provider/worker.rs": true,
+    "lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs": true,
+    "lampOS/docs/second-voice.md": true,
+    "lampOS/docs/switches.md": true
+  },
+  "earlier_source_head": "c1ff21357a63020ca75123c596a9b3b7cb374ced",
+  "execution": "Same owned worktree used for parent only after its full gate completed and parent was pushed; exact committed child tree, no concurrent compiler.",
+  "environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "RUST_TEST_THREADS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  }
+}
