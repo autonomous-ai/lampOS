@@ -6,6 +6,21 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 16:38 — Taking the stalled Body build carry
+
+Ready for lamp-voice: no (carry of #3449, gates running).
+
+Claimed on [the Queue](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6396023232)
+after the original author's last result at 12:53. Own branch
+`third/carry-body-run-loop` keeps the authored commit as `640198b2c` on
+`8e2405736`, with equal range-diff from `f430a182b`. The Body source bytes
+are identical to the original head; removing exactly its 18 inserted
+lines reproduces the whole original base file. No new behavior or switch.
+Mac native fmt passed; strict clippy, workspace build and full Body plus
+11 dependent crates run sequentially with one compiler job. No build-speed
+measurement, lamp timing or local ARM64 claim. Store #3459 remains ready
+with original Linux gates green while reviewer-two's independent read runs.
+
 ## 2026-10-25 16:35 — Store original Linux gates green
 
 Ready for lamp-voice: yes (#3459; independent read and train remain).
