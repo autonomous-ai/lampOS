@@ -1,0 +1,23 @@
+{
+  "public_packet": "cf762f38eb1d53b56456764368608e70c8b02536",
+  "base": "34c8b517c41c8d2a4099b87fe550d4eb25611ea2",
+  "reconstructed_tree": "bcbf05c3d05d315914a06ea56af18376a658a2d0",
+  "patch_sha256": "e78a535c1cb2c555afb42887f33af6dd9dab1486cb5d0d1ef439e1c8d5af9c97",
+  "files": [
+    {
+      "path": "lampOS/crates/skills/tests/it/addon.rs",
+      "sha256": "15db11e18468504635db4019862d1d5c4d35ecdacb60529c204aa28233b819c9",
+      "git_blob": "41a8e546e85ee4d435b003d6eb13e240e9584082",
+      "bytes": 31131
+    },
+    {
+      "path": "lampOS/docs/skills.md",
+      "sha256": "80f211e5ca968a7ee8a67833d5633d79dd261317eeb42a06972df42c90f5e473",
+      "git_blob": "d0e1c588802c72f986f20fc742372b775bb45c6a",
+      "bytes": 201988
+    }
+  ],
+  "base_records": 10460,
+  "all_other_base_entries_preserved": true,
+  "method": "Read-only Git inputs; apply exactly two public patch paths in private non-repository scratch, compare complete source bytes, independently compute complete Git tree hash. No working index/branch/object changes, compiler/test or historical-cause claim."
+}
