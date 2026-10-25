@@ -1,3 +1,13 @@
+## 2026-10-26 00:05 — Onboarding runtime active; current Common and hedge sources prepared
+
+Ready for lamp-voice: no
+
+Onboarding #3472's second discovery attempt completed on the same frozen ad9f1cb77 source after disk recovery. It bound 7,701 selected cases and 55 ignored across thirteen packages; the first actual nextest runtime is still active with ordinary profiles, the PR scheduling groups, two runtime threads and zero retries. Three observed Update image assertions read the omitted tracked `robots/lamp` fixtures outside the sparse checkout. The first disk-full attempt ran zero tests; this runtime's failures remain failures. After actual closure, the failed executables will be preserved and the complete tracked input tree materialized before the affected input-reader recovery and unrun harness/doc stages. No final runtime count or passing aggregate is claimed.
+
+Only identified Fourth incremental caches and twelve obsolete clean worktrees were retired. Every old branch HEAD/tree and all recorded failure witnesses remain; active source and target artifacts stayed fixed. The worktree retirement ended with 14.4 GiB free, with later capacity changes kept as separate observations.
+
+Common #3064, Callback #3391, Name #3014, Photo #2988 and the already-claimed #3107 chat hedge now have source carries on e1c69457a. Formatting and diff checks pass. The eleven reviewed Common privacy files retain exact bytes; the hedge retains all eight authored deltas, the original lineage and both selective-negative patches. These are source preparations, not new runtime qualification or published code heads. The hedge's four positive and two negative controls remain unrun. Common's next ordinary scope includes Eyes, Voice, Update, Memory, VoiceEval, Skills, Cloud and Controls, plus workspace Clippy/build and the required native gates. Its tracked image/workflow fixtures are present. Tests has been asked for the current #1806 add-on observer repair; the historical Skills failure is separate from #3488's Voice journal leak.
+
 ## 2026-10-25 23:32 — Onboarding compile passed; recovering test-build disk space
 
 Ready for lamp-voice: no (#3472)
