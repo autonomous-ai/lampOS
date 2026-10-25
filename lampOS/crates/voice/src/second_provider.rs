@@ -1027,6 +1027,42 @@ struct Shared {
     scope_seen: bool,
 }
 
+/// Who the eyes saw speaking a line from `begun` to `finishing`, and the
+/// known person with their face, as `speaking_faces::not_theirs` reads
+/// them. With `seen_only` (`LAMP_PERSON_SCOPE_SEEN`) each id is kept with
+/// the eyes' boot, the known face's too ([`SpeakingFaces::known_with_boot`]),
+/// as the held forget's sight is (#3037): after the eyes start again a
+/// reused id is someone else, and a known face with no boot is nobody's.
+/// Without it, the bare ids, as before.
+///
+/// [`SpeakingFaces::known_with_boot`]: crate::speaking_faces::SpeakingFaces::known_with_boot
+async fn line_sight(
+    eyes: &Arc<crate::speaking_faces::SpeakingFaces>,
+    known: &std::path::Path,
+    begun: Instant,
+    finishing: Instant,
+    seen_only: bool,
+) -> (crate::speaking_faces::Speakers, Option<(String, String)>) {
+    let known = known.to_owned();
+    if seen_only {
+        let speakers = eyes.speakers_with_boot(begun, finishing);
+        let eyes = eyes.clone();
+        let pair = tokio::task::spawn_blocking(move || eyes.known_with_boot(&known))
+            .await
+            .ok()
+            .flatten();
+        (speakers, pair)
+    } else {
+        let speakers = eyes.speakers(begun, finishing);
+        let pair =
+            tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
+                .await
+                .ok()
+                .flatten();
+        (speakers, pair)
+    }
+}
+
 /// How long after its end a line whose words end before a name waits for
 /// the name (`LAMP_SECOND_OPEN_NAME`, [`Engine::waiting_for_a_name`]), and
 /// how soon a sound must begin after it to go on from it
@@ -4483,13 +4519,7 @@ async fn spoken(
             .and_then(|scope| scope.person())
             .map(str::to_owned)
     {
-        let speakers = eyes.speakers(begun, finishing);
-        let known = known.clone();
-        let pair =
-            tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
-                .await
-                .ok()
-                .flatten();
+        let (speakers, pair) = line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
         if crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen) {
             scope.narrow_to_room();
             eprintln!(
@@ -4521,13 +4551,8 @@ async fn spoken(
             let found = late_face.await.ok().flatten();
             let keeper = match (found, speaking) {
                 (Some(person), Some((eyes, known))) => {
-                    let speakers = eyes.speakers(begun, finishing);
-                    let pair = tokio::task::spawn_blocking(move || {
-                        crate::speaking_faces::known_with_face(&known)
-                    })
-                    .await
-                    .ok()
-                    .flatten();
+                    let (speakers, pair) =
+                        line_sight(&eyes, &known, begun, finishing, seen_only).await;
                     if crate::speaking_faces::not_theirs(&speakers, &person, pair, seen_only) {
                         eprintln!(
                             "lamp-voice second: request {request}: {}: its keep stays the room's",

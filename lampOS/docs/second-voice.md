@@ -3294,7 +3294,11 @@ after a take-over, but now for every turn:
   a late look's keep (reviewer-three's P1 and P2 on #3435, Second's case).
   With the switch, one rule, `speaking_faces::not_theirs`, decides both the
   line's own admission and a late look's keeper: theirs only when their
-  face alone was seen speaking it (`seen_saying`), else the room's: `request
+  face alone was seen speaking it (`seen_saying`), each face id read with
+  the eyes' boot, the known face's too (`speakers_with_boot`,
+  `known_with_boot`, as the held forget's sight, #3037), so after the eyes
+  restart a reused `f1` is not the known person's (Second's P1 on #3437),
+  else the room's: `request
   N: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN): told and kept as
   the room's`. Every person scope taken from a line reads the lease this
   narrows (`remember::forget_everything` and `forget_face_memory`, the
