@@ -1,3 +1,13 @@
+## 2026-10-25 20:28 — Current onboarding native gates passed
+
+Ready for lamp-voice: no
+
+[Onboarding #3472](https://github.com/autonomous-ai/lampOS/pull/3472) remains at 31f0824be on 86416a0d3. ARM64 40194787054 and Linux Clippy 40194787029 passed. The native audit reconciles all 11,285 unique selected terminal cases across 46 packages: 11,284 PASS and the separately tracked same-voice journal LEAK, with 106 skipped; 35 repeated success-display rows are excluded. All 125 onboarding cases and 92 installation cases passed, as did the doc and own-harness steps. Current Mac formatting, strict workspace/all-target Clippy and the prerequisite workspace build also passed; full serial Voice is active, with later suites still pending. The original failures remain recorded. Parent #3437 now has green gates and reader readiness; its landing and the unassigned two-person lamp trial still hold this activation.
+
+The already claimed room-only forget repair now has a clean four-file carry plus verification note on 86416a0d3. Formatting and the independent source review pass; no fixed-binary test is claimed. Its three protocol regressions preserve adopted private entries and ordinary-forget provenance. The bounded first/repeated local protocol check is prepared, with actual runtime still unrun.
+
+Common #3064 has a separate current source carry. Its conflict preserves the 300 ms initial permission wait and at most 900 ms from wait entry for a fresh note; individual reads keep their original deadlines and neither retry nor pending proof renews the selected ceiling. The existing late-note regression remains. Formatting and two source reads pass; compiler/runtime gates are unrun for this composition. Callback #3391's complete three-path review correction carries onto that source without conflicts and preserves all other Common entries. Its formatting passes; historical failed Clippy and prior results remain distinct. Neither source preparation updates its published code head or relaxes privacy, parent or physical holds. One compiler job remains in use.
+
 ## 2026-10-25 19:56 — Onboarding offered on the current release base
 
 Ready for lamp-voice: no
