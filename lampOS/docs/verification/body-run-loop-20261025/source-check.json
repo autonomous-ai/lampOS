@@ -1,0 +1,74 @@
+{
+  "path": "lampOS/crates/body/src/body.rs",
+  "original_head": "f430a182ba081caab3840356fec2f9b1b5c9ca1f",
+  "original_base": "056a76132354f40f97eb5fbc519778c04f1ccb19",
+  "body_sha256": "43f389952267da8b31268bfb713493e59d3cb77f15ed87da1d24c49b1f396d83",
+  "gates": [
+    {
+      "label": "original",
+      "head": "640198b2c325a21aba80da3f9af6af4f865cca2d",
+      "base": "8e24057369ee40522cf8f690844454c66a1c86c1",
+      "tree": "983d4e979934fe4ee336c7605898e237f2abc9e3"
+    },
+    {
+      "label": "current-a786",
+      "head": "05b29451fd5de016a74b4c0a0335d377325b27f0",
+      "base": "a786e045479af68296df1deb49f21d86308de183",
+      "tree": "2b238377943e4ff6afb6755b3604300e352a1b1d"
+    },
+    {
+      "label": "latest-22d",
+      "head": "f2ddbc5f47b2f1376d930e939b3b9f3ca1a5a49e",
+      "base": "22d93d199ef4b0afd21e999d70f61006d7a1d831",
+      "tree": "47237911d0e6f391e7d3d6736a993379fdc36789"
+    },
+    {
+      "label": "final-864",
+      "head": "d29d8536ba7ad134ce791c923258716b659c7eb8",
+      "base": "86416a0d3ff5575c37b48943ada962445ec935f9",
+      "tree": "b885f4486e6dfaa1fef51d72705b2b0502a446a3"
+    }
+  ],
+  "source_equals_original_head": true,
+  "note_integration": {
+    "head": "f2ddbc5f47b2f1376d930e939b3b9f3ca1a5a49e",
+    "base": "22d93d199ef4b0afd21e999d70f61006d7a1d831",
+    "tree": "47237911d0e6f391e7d3d6736a993379fdc36789",
+    "body_sha256": "43f389952267da8b31268bfb713493e59d3cb77f15ed87da1d24c49b1f396d83",
+    "range_diff_equal": true,
+    "scope": "After the full six-crate runtime gate on a786, only Voice implementation and docs changed in the base. Repeat fmt, strict all-target clippy for all 12 crates, workspace build, and full Voice/VoiceEval tests. Earlier results keep their original identities.",
+    "environment": {
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0"
+    }
+  },
+  "final_integration": {
+    "head": "d29d8536ba7ad134ce791c923258716b659c7eb8",
+    "base": "86416a0d3ff5575c37b48943ada962445ec935f9",
+    "tree": "b885f4486e6dfaa1fef51d72705b2b0502a446a3",
+    "body_sha256": "43f389952267da8b31268bfb713493e59d3cb77f15ed87da1d24c49b1f396d83",
+    "range_diff_equal": true,
+    "scope": "After complete full Body/runtime and full Voice/VoiceEval gates, the new base adds the already reviewed memory-force repair, its product switch and docs. Final checks repeat fmt, clippy12, workspace build, full Body, affected memory/request-process/note regression groups and full VoiceEval; the new original PR native CI qualifies the combined integration.",
+    "cache": "Unmodified maintained CI source-times helper; only identical Git blobs recover recorded mtimes. Changed/new files retain checkout times. Original record preserved separately.",
+    "environment": {
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0"
+    }
+  },
+  "inverse_check": {
+    "head": "640198b2c325a21aba80da3f9af6af4f865cca2d",
+    "base": "8e24057369ee40522cf8f690844454c66a1c86c1",
+    "original_head": "f430a182ba081caab3840356fec2f9b1b5c9ca1f",
+    "original_base": "056a76132354f40f97eb5fbc519778c04f1ccb19",
+    "path": "lampOS/crates/body/src/body.rs",
+    "sha256": "43f389952267da8b31268bfb713493e59d3cb77f15ed87da1d24c49b1f396d83",
+    "removed_lines": 18,
+    "inverse_equals_original_base": true
+  }
+}
