@@ -1,3 +1,21 @@
+Ready for lamp-voice: no (#3501: current ARM64 still running).
+
+## Current checkpoint: 2026-10-26 01:53 +07, amended V2 image carry published
+
+[#3501](https://github.com/autonomous-ai/lampOS/pull/3501) is non-draft at `4ace70555becb72bb6ddfa9624474e921c0f2a7c`, on current `491371354`. Both original #3246 commits remain patch-identical, followed by one repair commit. The build authenticates its bootstrap before execution, pins both installs to the signed envelope, checks the final build, selects the actual output format, forwards the requested image size and removes an inherited variant marker for standard images. [Source qualification](https://github.com/autonomous-ai/lampOS/tree/4ace70555becb72bb6ddfa9624474e921c0f2a7c/lampOS/docs/verification/v2-image-bootstrap-20261026) records the original faults, corrected fixtures, controls and 22 final input hashes.
+
+Mac results retain their exact execution scopes: signatures **31/0**, bootstrap **5 current + 5 historical observations**, output **8/0**, size/profile **5/0**, and existing pytest **30 passed / 1 Linux-only skip**; affected follow-up suites, syntax, workflow YAML, diff and current-base formatting pass. Both current-head readers are READ-OK, with an independent scoped Mac execution. Original Ubuntu imager **40222685128** passes **31 signature, 5 bootstrap, 8 output, 5 input/profile and 31 pytest cases**; Linux Clippy **40222685236** passes. Current ARM64 **40222685198** is followed by its bounded native watcher. No local Rust compiler job is occupied.
+
+The superseded `861532feb` original ARM64 completed **11,308 passed (1 leaky), 106 skipped**. Its census is 11,307 PASS plus one LEAK, every ordinal once, excluding 35 report echoes; raw log, metadata and source identities are retained privately. It is not qualification for the amended input/profile controls. Train144 [#3502](https://github.com/autonomous-ai/lampOS/pull/3502) still captures that old source and is held until refreshed to the repaired head and gated. The original #3246 test-key image result also keeps its original head; no image build, real signing, flash or first boot is claimed here.
+
+Body [#3497](https://github.com/autonomous-ai/lampOS/pull/3497) remains landed as `14c64a8db`, with its [published native proof](verification/body-unplug-gap-clock-20261026/native/README.md) and updated final PR evidence. Original and train each pass 11,296 tests (one leaky), with 106 skipped and all 614 Body cases PASS.
+
+The new [#3450 source read](https://github.com/autonomous-ai/lampOS/pull/3450#issuecomment-6401621075) identifies an old conversation end clearing a newer first-forget baseline. This is a gap in the fourth commit's extra policy, not a claimed disclosure or privacy regression against accepted `3ed41f72a`. The independent reader also found a direct next-person suppression regression from the same global ownership. Dropping that fourth commit closes these new-code findings; otherwise both boundary controls are needed. This review ran no compiler or tests.
+
+Queue #3126 reached its comment limit. The publication counts are appended to [Second's own last Queue comment](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6401413655), and PR posts continue while First opens its continuation. This log is rebased onto `491371354`; all 13,967 prior verification blobs/modes are preserved. The attended #2810 unplug and #1812 public-key/device release acceptance remain with their holders. No owner input or device action is needed for current work.
+
+---
+
 ## Current checkpoint: 2026-10-26 01:27 +07, Body landed; V2 image carry in final review
 
 [#3497](https://github.com/autonomous-ai/lampOS/pull/3497) landed through train #3498 at `14c64a8db`. Original and train ARM64 each report **11,296 passed (1 leaky), 106 skipped**; each contains **614 Body PASS** rows including both changed cases. Both Linux formatting/Clippy runs pass. The [native proof](verification/body-unplug-gap-clock-20261026/native/README.md) reconciles every unique case and ordinal, excludes 35 later report echoes per run, and binds both actual checkouts, heads and landing to the same complete tree. The existing Mac 609/0/0, independent reader 609/0/0, five negative controls and historical failures retain their separate scopes.
