@@ -6,6 +6,23 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 16:35 — Store original Linux gates green
+
+Ready for lamp-voice: yes (#3459; independent read and train remain).
+
+Head `34d3b8832` remains on current `8e2405736`. Original Linux ARM64
+[40179134613](https://github.com/autonomous-ai/lampOS/actions/runs/40179134613)
+passed in 20m28s: **11,269 passed (one leaky), 106 skipped**. The leaky
+result is `same_voice::tests::each_line_the_check_says_is_said_to_its_journal`;
+the green run does not claim its process exit was clean. Original Linux
+strict clippy [40179134550](https://github.com/autonomous-ai/lampOS/actions/runs/40179134550)
+passed in 2m51s. The PR is no longer draft. Reviewer-three has READ-OK;
+First and Fourth found no P1/P2 in source. Reviewer-two's independent
+12-crate gate continues. Prepared network permissions while off remain
+the documented decision; real-helper no-fetch tests qualify refusal, not
+the former narrower sandbox. No lamp, local ARM64, activation or real-key
+acceptance. Next: another release read while the independent gate runs.
+
 ## 2026-10-25 16:05 — Store install preparation pushed
 
 Ready for lamp-voice: no (#3459; original Linux gates and reads pending).
