@@ -6,6 +6,31 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+## 2026-10-25 18:28 — Complete Body gate passed; current carry qualifying
+
+Ready for lamp-voice: no (current carry gate and new original Linux runs remain).
+
+The original full Mac gate on `640198b2c`/`8e2405736` is terminal, all
+commands exit 0: fmt, strict all-target clippy for 12 crates, workspace
+build, Body **608/0/0**, and 11 dependents **6,729/0/52**. Total
+**7,337 passed / 0 failed / 52 ignored**, 79 harness summaries. Source
+stayed fixed; no ENOSPC/no-space/write-error marker appeared in these
+logs. The command is closed. No isolated rerun replaced a failure.
+
+The authored change now stands as `05b29451f` on current `a786e0454`,
+with equal range-diff from `f430a182b` and identical Body bytes. A new
+one-job Mac gate runs fmt, strict clippy across all 12 crates, the
+workspace build, and full Body plus its five normal runtime dependants
+(Cloud, Expression, Skills, Voice, VoiceEval), verified from Cargo
+metadata on this base. The broader original run stays bound to its old
+base; new native CI must qualify the offered current integration before
+readiness. No lamp, local ARM64 or build-speed measurement.
+
+The #3463 sentence-boundary P2 is closed on source at `ffa21e41a`;
+Third withdrew the source hold in comment 6396889338. No independent
+execution or READ-OK was added by Third. Next: finish the current Body
+gate, publish its replacement PR and run its original Linux gates.
+
 ## 2026-10-25 18:00 — Independent Store limits and memory recheck
 
 Ready for lamp-voice: no (Body's dependent gate remains active).
