@@ -522,6 +522,17 @@ fn identity(reply: &Value) -> Result<(&str, u64), Failure> {
     let revision = reply["revision"].as_u64().ok_or(Failure::Unavailable)?;
     Ok((store, revision))
 }
+/// The due time's local wall clock, `HH:MM`, from `local` (RFC 9557,
+/// "2026-10-25T21:07:34.939+07:00[Asia/Ho_Chi_Minh]"): the time the model
+/// says. On lamp-4ace on 25 Oct it read "07:34" out of such a string and
+/// said "seven thirty-four" for a reminder due at 21:07, and "eight
+/// forty-seven" for a timer due at 21:08.
+pub fn clock_of(local: &str) -> Option<String> {
+    let hm = local.split_once('T')?.1.get(..5)?;
+    let b = hm.as_bytes();
+    (b[2] == b':' && b[..2].iter().all(u8::is_ascii_digit) && b[3..].iter().all(u8::is_ascii_digit))
+        .then(|| hm.to_owned())
+}
 fn resolved(reply: &Value) -> Result<(i64, &str), Failure> {
     let due = reply["due_unix_ms"].as_i64().ok_or(Failure::Uncertain)?;
     let local = reply["local"].as_str().ok_or(Failure::Uncertain)?;
@@ -553,7 +564,7 @@ fn committed(request: &Request, reply: &Value) -> Result<Value, Failure> {
         Request::Set { .. } if delivery == 1 => {
             let (due, local) = resolved(reply)?;
             Ok(
-                json!({"status":"committed","id":id,"delivery":delivery,"due_unix_ms":due,"local":local,"message":"The timer or reminder is saved for the returned local time."}),
+                json!({"status":"committed","id":id,"delivery":delivery,"due_unix_ms":due,"local":local,"clock":clock_of(local),"message":"The timer or reminder is saved. Say its time as `clock`, the local HH:MM it is due, never read from `local`."}),
             )
         }
         Request::Cancel { id: asked, .. } if *asked == id && reply["cancelled"] == true => Ok(
@@ -566,7 +577,7 @@ fn committed(request: &Request, reply: &Value) -> Result<Value, Failure> {
         } if *asked == id && old.checked_add(1) == Some(delivery) && reply["snoozed"] == true => {
             let (due, local) = resolved(reply)?;
             Ok(
-                json!({"status":"committed","id":id,"delivery":delivery,"snoozed":true,"due_unix_ms":due,"local":local,"message":"The current occurrence is postponed to the returned local time; its repeating schedule is unchanged."}),
+                json!({"status":"committed","id":id,"delivery":delivery,"snoozed":true,"due_unix_ms":due,"local":local,"clock":clock_of(local),"message":"The current occurrence is postponed; its repeating schedule is unchanged. Say its new time as `clock`, the local HH:MM, never read from `local`."}),
             )
         }
         _ => Err(Failure::Uncertain),
@@ -634,7 +645,7 @@ fn page(reply: &Value, after_id: u64, pending_only: bool) -> Result<Value, Failu
             return Err(Failure::Unavailable);
         }
         previous = i.id;
-        checked.push(json!({"id":i.id,"kind":i.kind,"text":i.text,"state":i.state,"local":i.local,"due_unix_ms":i.due_unix_ms,"repeat":i.repeat,"snoozed":i.snoozed,"late":i.late}));
+        checked.push(json!({"id":i.id,"kind":i.kind,"text":i.text,"state":i.state,"local":i.local,"clock":clock_of(&i.local),"due_unix_ms":i.due_unix_ms,"repeat":i.repeat,"snoozed":i.snoozed,"late":i.late}));
     }
     if server_next.is_some_and(|n| values.is_empty() || n != previous) {
         return Err(Failure::Unavailable);
