@@ -1,5 +1,29 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two Body repair delivered and current native reads at 01:11 +07)
+
+#3497 at 382e2573a has independent source/proof/host READ-OK 6401148944. Only tests/docs change: the real production tick uses one controlled timeline, preserving both 500 ms proof minima, gap recovery, moved-joint failure and latch checks; a separate enabled Adapter retains atomic encoding and actual publication/stop/join coverage. The possible unsafe-before-stop P3 is ruled out because this fixture never acquires Ready; the reviewer-lead withdrew it in 6401196578. A genuinely stuck join still requires the documented outer watchdog.
+
+Frozen published tree b6ecaf8e6 passes Mac/Rust 1.96 fmt (11.574 s), strict all-target Body Clippy (11.755 s), no-run compilation (26.180 s) and full serial Body tests (42.731 s): 609/0/0, eight summaries and 609 unique literal terminal cases. Both changed controls pass once, all 10,505 exported source entries remain fixed, command groups close, and seven actual executed binaries are hashed and copied before target reuse. Producer's separate direct 1/0 and five intended 0/1 controls remain their observations. Packet hashes, exact submitted patch, source census and 609/0/0 arithmetic reconcile; private witnesses are not independently attested. Compiler job returned in Queue 6401149277, with no new local gate active.
+
+Original current native audits are complete:
+
+| PR / run | Actual head / preview base | Unique selected cases | Result | Own controls |
+| --- | --- | ---: | --- | --- |
+| #3491 / 40217600967 | 948 / 9e9, preview 5258a95 | 11,297 | 11,296 PASS + tracked journal LEAK; 106 skipped | All six combined controls PASS |
+| #3420 / 40217901401 | c8 / 9e9, preview 52530a1 | 11,305 | 11,304 PASS + tracked journal LEAK; 106 skipped | All ten constraints PASS |
+| #3497 / 40218244607 | 382 / 9e9, preview 94c1950 | 11,296 | 11,295 PASS + tracked journal LEAK; 106 skipped | Both unplug controls PASS |
+| Train141 #3498 / 40218484025 | 2bc / 9e9, preview 4c62b45 | 11,296 | 11,295 PASS + tracked journal LEAK; 106 skipped | Both unplug controls PASS |
+| #3488 / 40218500495 | c58 / 9e9, preview 1085947 | 7,437 | All PASS, zero LEAK/FAIL/TIMEOUT; 53 skipped | Exact journal fixture PASS |
+
+All corresponding strict Linux Clippy gates pass. #3491 READ-OK 6401148350 and #3420 READ-OK 6401193615 verify actual current ancestry and carry identity, preserving old host scopes; their PR bodies were refreshed afterward. #3488 source READ-OK 6401194238 verifies the entire two-file authored binary diff is exactly the prior d94/e1 patch, with unchanged worker and corrected 200 ms README. Its completed native selection is separate from the earlier full workspace pair and controlled local pair.
+
+Train141 landed #3497 through the bot at 01:07 as 14c64a8db. Constituent 382, train 2bc and actual landing have identical full tree b6ecaf8e6, matching the host execution. The new actual merge candidate for remaining PRs must include this current base and pass its own native gate; completed 9e9 runs are not renamed. No manual merge was performed.
+
+#3486 current a5/9e9 source/proof READ-OK 6401245770 preserves the original authored history and all three runtime added/removed-line deltas. Correct cadence is 7/4/4 looks at 250/500/600 ms; helper clock assertions do not prove the live bus immune to wall-clock expiry. Producer full 5,613/0/29 on a497/e1 and affected 840/0/0 on 7ed/9e9 reconcile, with final a5 adding only four proof files. Original native 40218880202 is followed. My earlier full 4,674/1/21 and isolated identical-binary diagnostic remain separate under recorded #3315 disposition.
+
+#3477 latest 8a/9e9 retains the cancellation HOLD 6401113697; all three commits equal held 463. Original 463 ARM run was cancelled, with only 7,936 terminal PASS of 11,298 planned and no final summary, not a full pass or demonstrated test failure. Third's additional ambiguous/quoted/recurring detector findings have separate exact-source probe evidence. #3450 latest 3ed still retains the first-turn forget HOLD. Only this log is committed/pushed; inherited pr.json is untouched, with no product/protected push or device/provider action.
+
 ## 2026-10-26 (reviewer-two current carries and withdrawal read at 00:47 +07)
 
 #3488 original d94 native ARM64 40215706180 is terminal success and independently audited in 6400901499: preview 15addd8 combines d94 with 1ee, 7,437 unique PASS, zero LEAK/FAIL/TIMEOUT, 53 skipped, and the exact journal fixture passes in 0.227 s. Linux Clippy passes. The builder's refreshed PR body was then read and correctly retains the 200 ms correction, whole-workspace 11,288-case before/after comparison and distinct affected-run scope; my earlier body-refresh request is satisfied. The actual latest-base carry is still pending. Completed controlled Mac pair and prior native whole comparison retain their original source identities.
