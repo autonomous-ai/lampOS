@@ -2478,41 +2478,15 @@ pub fn serve(
     // and files each turn for its lease (Second on #2008); the reader stops
     // when this worker returns. Its faces are kept for a held forget's
     // sight below, so one thread reads the topic.
-    let mut speaking_eyes = None;
-    // A line is a known person's only when their own face was seen
-    // speaking it (`LAMP_PERSON_SCOPE_SEEN=on`), installed whether or not
-    // the reader below starts: without it no face is seen speaking, so the
-    // line is the room's (reviewer-two's P2 on #3437).
-    let seen = crate::speaking_faces::from_environment()
-        && std::env::var(crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT)
-            .is_ok_and(|value| value == "on");
-    if seen {
-        eprintln!(
-            "lamp-voice second: a line is a known person's only when their own face was seen speaking it, else the room's (LAMP_PERSON_SCOPE_SEEN)"
-        );
-    }
-    engine = engine.scoping_by_sight(seen);
-    let _speaking_reader = match (&scope_file, files.bus_root.as_deref()) {
-        (Some(known), Some(root))
-            if crate::speaking_faces::from_environment() && engine.scopes_context() =>
-        {
-            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
-            let reader = crate::speaking_faces::read_from(eyes.clone(), root);
-            if reader.is_some() {
-                engine = engine.seeing_who_speaks(eyes.clone(), known.clone());
-                speaking_eyes = Some(eyes);
-            }
-            reader
-        }
-        _ => {
-            if crate::speaking_faces::from_environment() && !engine.scopes_context() {
-                eprintln!(
-                    "lamp-voice second: seeing who speaks is not on: it needs LAMP_SECOND_SCOPED_CONTEXT=on"
-                );
-            }
-            None
-        }
-    };
+    let (engine_seeing, speaking_eyes, _speaking_reader) = see_who_speaks(
+        engine,
+        scope_file.as_ref(),
+        files.bus_root.as_deref(),
+        crate::speaking_faces::from_environment(),
+        std::env::var(crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT)
+            .is_ok_and(|value| value == "on"),
+    );
+    engine = engine_seeing;
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
     // forget's yes counts only from the held person's face seen saying it.
     // The faces seeing who speaks reads, when it is on, or else its own
@@ -4727,6 +4701,52 @@ struct Waiting {
 /// schedule's words, a line let out only as the conversation going on is
 /// then not told it may be people's talk (`Heeding::asks_its_work`).
 const MEMORY_WORDS: [&str; 2] = ["remember", "forget"];
+
+/// Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE`, `speaking`) for
+/// `engine`, with `LAMP_PERSON_SCOPE_SEEN` (`scope_seen`): the policy is
+/// installed whether or not the eyes' reader starts, so with no reader no
+/// face is seen and every line is the room's (reviewer-two's P2 on #3437).
+/// The eyes and their reader, when it started.
+pub(super) fn see_who_speaks(
+    mut engine: Engine,
+    known: Option<&std::path::PathBuf>,
+    root: Option<&std::path::Path>,
+    speaking: bool,
+    scope_seen: bool,
+) -> (
+    Engine,
+    Option<Arc<crate::speaking_faces::SpeakingFaces>>,
+    Option<crate::speaking_faces::Reader>,
+) {
+    // A line is a known person's only when their own face was seen
+    // speaking it (`LAMP_PERSON_SCOPE_SEEN=on`).
+    let seen = speaking && scope_seen;
+    if seen {
+        eprintln!(
+            "lamp-voice second: a line is a known person's only when their own face was seen speaking it, else the room's (LAMP_PERSON_SCOPE_SEEN)"
+        );
+    }
+    engine = engine.scoping_by_sight(seen);
+    match (known, root) {
+        (Some(known), Some(root)) if speaking && engine.scopes_context() => {
+            let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+            let reader = crate::speaking_faces::read_from(eyes.clone(), root);
+            if reader.is_some() {
+                engine = engine.seeing_who_speaks(eyes.clone(), known.clone());
+                return (engine, Some(eyes), reader);
+            }
+            (engine, None, None)
+        }
+        _ => {
+            if speaking && !engine.scopes_context() {
+                eprintln!(
+                    "lamp-voice second: seeing who speaks is not on: it needs LAMP_SECOND_SCOPED_CONTEXT=on"
+                );
+            }
+            (engine, None, None)
+        }
+    }
+}
 
 /// The rule's hook for each spoken line's sound ([`Engine::hearing`]), when
 /// it needs one: for the same-voice check (`voice_judged`), or to know which
