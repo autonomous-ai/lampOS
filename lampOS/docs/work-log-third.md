@@ -5,6 +5,26 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-25 22:27 — Current two-face carry published
+
+Ready for lamp-voice: no (#3486; original Linux gates and current reads pending).
+
+Replacement #3486 `d9fa4c79c` preserves #3355's original `031990a89`
+and the exact five-file patch on `bf39e4188`. Runtime merge `1429ba89d`
+commits exactly the tested tree `52dbd9ebe`, with both parents preserved.
+Native Mac formatting, strict all-target Voice/Eval clippy, workspace build
+and full Voice/Eval passed **4,675/0/21**, eleven summaries; all three
+new controls passed once. [Current proof](https://github.com/autonomous-ai/lampOS/tree/d9fa4c79c/lampOS/docs/verification/two-faces-held-carry-20261025).
+The previous **4,662/0/21** gate and original restricted failure stay
+separately scoped. No product activation or physical result is claimed.
+
+#3408 `c609cdb9c` now has both current READ-OKs and original Linux
+gates green, and is ready for the train. #3420 remains parent-first
+for actual-base retargeting and qualification. The unchanged-production
+reminder admission regression is executing in the single compiler lane;
+its production patch remains unapplied. Reviewer-two independently reproduced
+the separate reset/say mismatch, retained by Second.
+
 ## 2026-10-25 22:19 — Current parent original Linux gates green
 
 Ready for lamp-voice: yes (#3408; current reader and train disposition remain).
