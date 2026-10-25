@@ -1,0 +1,67 @@
+{
+  "head_before_merge": "66cab67e8f4e8ca07fb61948431940c2ebfba9c2",
+  "merge_base_input": "bf39e4188aeccdcd7e2258911ca21fdff2ff842a",
+  "prepared_index_tree": "52dbd9ebe60aff131cd6bc0fe4b1ee65d4cf2417",
+  "original_authored_head": "031990a89093ae5e205c65156f32a1b79d2eb934",
+  "own_changed_paths": [
+    "lampOS/crates/voice/src/process.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/switches.md"
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "RUST_TEST_THREADS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "committed_merge_head": "1429ba89d98d5539af70f574776d163ecebe9b5f",
+  "committed_tree_matches_executed_tree": true,
+  "source_clean_after_gate": true,
+  "new_control_pass_counts": {
+    "with_two_faces_held_two_faces_must_stay": 1,
+    "with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room": 1,
+    "with_two_faces_held_looks_between_lines_make_the_first_line_busy": 1
+  },
+  "line_check": {
+    "exact_added_removed_lines_equal": {
+      "lampOS/crates/voice/src/process.rs": true,
+      "lampOS/crates/voice/src/second_provider.rs": true,
+      "lampOS/crates/voice/src/second_provider/worker.rs": true,
+      "lampOS/docs/second-voice.md": true,
+      "lampOS/docs/switches.md": true
+    },
+    "conflict_resolution": "Both independent census entries at all three conflicts and both documentation paragraphs retained. No authored line changed."
+  },
+  "previous_gate_binding": {
+    "committed_merge_head": "66cab67e8f4e8ca07fb61948431940c2ebfba9c2",
+    "merge_tree_matches_tested_index": true,
+    "authored_parent_preserved": true,
+    "base_parent": "86416a0d3ff5575c37b48943ada962445ec935f9",
+    "tree": "0daa4c4a02b6c50d7050774d5c15d189273130ee",
+    "own_paths": [
+      "lampOS/crates/voice/src/process.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md"
+    ],
+    "status": "",
+    "new_control_pass_counts": {
+      "with_two_faces_held_two_faces_must_stay": 1,
+      "with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room": 1,
+      "with_two_faces_held_looks_between_lines_make_the_first_line_busy": 1
+    },
+    "raw_log_sha256": {
+      "build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "clippy-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test-voice-eval.log": "5b78556f36a9633ee9efbb12fd2463c36c2f6d46f57a28bbb84d0eeea28a6759"
+    },
+    "audit_limit": "Pre-commit write-tree audit was denied by the sandbox index lock; post-commit read-only exact-tree and parent verification passed. Full gate itself was authorized and passed before commit."
+  },
+  "state_at_gate_start": "Resolved latest-base merge; fresh full gate pending.",
+  "state": "Full gate passed on the frozen tree; committed tree and both parents verified."
+}
