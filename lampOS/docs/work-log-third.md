@@ -5,6 +5,33 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 01:53 — Held native proof complete; factory coverage tests continue
+
+Ready for lamp-voice: no (#3486 and the factory correction remain in qualification).
+
+The delivered held-constraint change's supplemental 7daf native runs passed:
+ARM64 **40220836258**, Linux clippy **40220836264**. The actual preview
+605ce9a57 has 14c/7daf parents and exactly the offered tree. There were
+**11,305 PASS plus one tracked journal LEAK, 106 skipped**, with all ten
+new controls once. [Native receipt](verification/held-colleague-constraints-20261025/native-40220836258.json).
+This is separate from the successful train142 integration and reminder
+91a's failed Settings executable-identity assertion. That failure was
+routed to Second and Tests on its owning #3347; no cause or waiver is claimed.
+
+Reviewer-two accepted the independent full Voice/Eval gate for #3486's
+public a5 + abc composition, tree 9a4f383da. The author keeps its independent
+execution separate. Controls' frozen abc correction passed formatting,
+strict all-target clippy across all 14 affected packages and the workspace
+build; the full serial suite is still running. No full-suite result is
+claimed before its terminal status. Latest lamp-voice is now 491371354;
+its only code delta is the same-voice journal test worker's exit handling.
+That delta will be qualified before either active branch is offered current.
+
+Queue #3126 remains full with no linked continuation. Relevant PR posts
+and this log push continue while First opens the successor. The scheduling
+fix #3477 has a new head; the earlier four source findings are being read
+against it. No lamp action or local ARM64 linking occurred.
+
 ## 2026-10-26 01:37 — Reminder and held constraints delivered; calibration gate active
 
 Ready for lamp-voice: no (#3486's combined current-source gate and the new
