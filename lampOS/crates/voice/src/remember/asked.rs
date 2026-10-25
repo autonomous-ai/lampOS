@@ -78,11 +78,20 @@ const WITHDRAWN: &[&[&str]] = &[
 const ABOUT_SOMEONE: &[&str] = &["i", "we", "they", "he", "she", "you", "it"];
 const NOT_FORGET: &[&str] = &["don't", "dont", "not", "never"];
 
-/// Whether the line takes a keep back anywhere ([`WITHDRAWN`]). It errs
-/// toward taken back: then nothing is forced, and the model answers as
-/// without the switch.
+/// Whether the line takes a keep back anywhere ([`WITHDRAWN`]), clause by
+/// clause: the word before a withdrawal is read only within its own clause,
+/// so a sentence ending "… in it." never makes the next one's "Don't save
+/// that." content (reviewer-two's P2 on `aa533296e`). It errs toward taken
+/// back: then nothing is forced, and the model answers as without the
+/// switch.
 fn withdrawn(said: &str) -> bool {
-    let words = lower_words(&said.replace('\u{2019}', "'"));
+    said.replace('\u{2019}', "'")
+        .split(['.', '!', '?', ';', ',', ':', '\u{2014}', '\u{2013}'])
+        .any(|clause| clause_withdraws(&lower_words(clause)))
+}
+
+/// [`withdrawn`] for one clause's words.
+fn clause_withdraws(words: &[String]) -> bool {
     (0..words.len()).any(|at| {
         WITHDRAWN.iter().any(|phrase| {
             let matched = words.len() >= at + phrase.len()
@@ -206,6 +215,11 @@ mod tests {
             "Remember that I'm away on Monday. Scratch that.",
             "Remember that the code is 42, actually forget it.",
             "Remember that I like jazz. Don't keep that, though.",
+            // A sentence ending in a pronoun doesn't make the next one's
+            // withdrawal content (reviewer-two's P2 on `aa533296e`).
+            "Remember that I take my coffee without sugar in it. Don't save that.",
+            "Remember that I left the keys with you. Don't save that.",
+            "Remember that the spare key is under it, do not keep that.",
         ] {
             assert!(!asks_to_keep(said), "{said}");
         }
@@ -254,8 +268,17 @@ mod tests {
         for said in [
             "Lamp, remember that I take my coffee black. Actually, do not save that.",
             "Remember that the plant needs water on Fridays, but do not save that.",
+            "Remember that I take my coffee without sugar in it. Don't save that.",
+            "Remember that I left the keys with you. Don't save that.",
         ] {
             assert_eq!(choice(&forcing, said), None, "{said}");
+        }
+        // Content negations and "don't forget" are still asks on the wire.
+        for said in [
+            "Remember that I don't keep cash at home.",
+            "Lamp, don't forget that I'm away on Monday.",
+        ] {
+            assert_eq!(choice(&forcing, said), remember, "{said}");
         }
     }
 }
