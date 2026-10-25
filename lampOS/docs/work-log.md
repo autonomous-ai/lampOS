@@ -1,3 +1,13 @@
+## Current checkpoint: 2026-10-25 13:04 +07, ship-candidate text consistency checked
+
+Ready for lamp-voice: no (#3427 awaits reviewer-two and final Main guard; reviewer-three carries at 6394113926).
+
+[Release6786 text consistency](verification/release6786-text-consistency-20261025/README.md): exact envelope/manifest bytes, 31 binary checksum declarations, separate skills bundle, 32 payload/28 unit asset sizes and all 28 Git-source unit hashes agree. The initial overstrong checksum-list assertion is retained and corrected against publisher source. Trusted public key is still absent, so no cryptographic signature, downloaded binary integrity, lamp or release acceptance claim. No Second compiler is active.
+
+Unplug prepared source was rebased from train118 to119 with both dirty files byte-identical; its controller was rebound and remains UNRUN/unallocated. Scope matched controls read at 6394159166, with original failed epoch retained and current-Main requirement noted.
+
+---
+
 ## Current checkpoint: 2026-10-25 12:50 +07, latest Body original CI audited green
 
 Ready for lamp-voice: no (#3427 awaits current-head reader dispositions and final Main guard).

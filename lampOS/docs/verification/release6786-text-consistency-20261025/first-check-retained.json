@@ -1,0 +1,10 @@
+{
+  "check": "Every manifest file must be in SHA256SUMS",
+  "result": "assertion failed",
+  "observed_checksum_rows": 31,
+  "observed_manifest_files": 32,
+  "manifest_only": [
+    "lamp-product-skills"
+  ],
+  "scope": "Initial overstrong consistency check; publisher contract inspection follows. No runtime or signature failure observed."
+}
