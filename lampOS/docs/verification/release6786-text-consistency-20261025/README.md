@@ -9,3 +9,5 @@ All 31 SHA256SUMS binary entries agree with the manifest. The 32nd payload, `lam
 All 32 payload sizes and 28 unit sizes agree with API asset metadata; all 28 unit hashes and sizes match the exact committed Git blobs. The 63 published assets are exactly those 60 declarations and three manifest/checksum text assets. The receipt binds downloaded text hashes and each source unit.
 
 No payload-binary hash was computed from a download. No trusted-key verification, signer, install, lamp run, power cut, rollback or release acceptance is claimed. Those remain #1812/#2810 handoffs to Migrate and the lamp holders.
+
+A later [actual asset-content phase](asset-content/README.md) streams and hashes all 60 declared payloads/units successfully. Its new result does not change the earlier text/API-only observations or supply trusted-key/lamp acceptance.

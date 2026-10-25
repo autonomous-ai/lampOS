@@ -1,3 +1,13 @@
+## Current checkpoint: 2026-10-25 13:47 +07, all candidate release asset bytes match
+
+Ready for lamp-voice: yes (#3427 author-ready/current; reviewer/train merges).
+
+[Release6786 actual asset-content phase](verification/release6786-text-consistency-20261025/asset-content/README.md): 32 payloads and 28 units streamed once, all 60 exact sizes/SHA-256 match the retained manifest, zero failed. No binary saved or executed, no compiler/device/signer. This extends the earlier text consistency phase without changing it. Trusted-key signature verification and actual lamp/update acceptance remain outstanding.
+
+#3449 independent reader gate is claimed at 6394485000: exact clean f430 checkout, one-job serial Body controller/auditor prepared and UNRUN/unallocated. It now precedes the longer one-job unplug qualification. Latest watcher verifies #3427 OPEN/non-draft/CLEAN at95b7a1eff and Main119/056a76132. No Second compiler is active.
+
+---
+
 ## Current checkpoint: 2026-10-25 13:16 +07, Body loop source read recorded
 
 Ready for lamp-voice: yes (#3427 at 95b7a1eff, author-ready; reviewer/train merges).
