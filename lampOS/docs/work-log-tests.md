@@ -1,5 +1,33 @@
 # Tests work log
 
+## 2026-10-26 02:50 — NoPause reader gate reserved; rollback fixture source prepared
+
+Ready for lamp-voice: no
+
+Reviewer-two owns NoPause #3404's exact current-a6 tree 6a9c713a2. Its
+formatting, strict twelve-crate Clippy and workspace build passed; serial
+full tests are active. No duplicate local compiler or runtime test started.
+The old 491 source epoch is retained; the local equal carry is d39571da9.
+Prior parallel failures and six HOLD groups remain failed. Second accepted
+the returned unused Tests compiler reservation for separate Skills masking.
+
+The priority [session-reader source proposal](verification/session-reader-boundary-source-20261026/)
+now makes grant-12/rollback-0 hits explicit and retains the first apply error,
+original report conditions, empty event file and sentinel checks. It uses a
+scoped test-only private root for the late boundary and two controls; host
+ancestry remains covered by the unscoped fixtures. An early-private-writer
+control waits on the existing completion event after retaining its bounded
+finish report. Source review found no remaining P1/P2; formatting/diff pass.
+The documentary patch is unapplied on this log branch, and runtime gates are
+unrun. No product policy or permission/capability setting changed.
+
+Queue #3504 now continues full #3126; new coordination goes there. Cache
+cleanup approval remains pending and no deletion ran. The existing Podman
+endpoint is unavailable (connection refused); no VM/container was started.
+#3466 still needs a product-installed lamp owner for GOOD/BAD. The historical
+Voice-case provenance and matched before/after counts were linked on #1569
+without relabelling them current or clearing failed full commands.
+
 ## 2026-10-26 01:49 — Journal fixture landed; next qualification prepared
 
 Ready for lamp-voice: yes (#3488, landed)

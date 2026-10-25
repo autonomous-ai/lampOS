@@ -1,0 +1,32 @@
+{
+  "apply_option": "--unidiff-zero; exact base file hashes are mandatory",
+  "base": "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+  "compiler_runs": 0,
+  "existing_test_names_removed": 0,
+  "files": {
+    "lampOS/crates/voice/src/session_reader.rs": {
+      "base_bytes": 18532,
+      "base_sha256": "c4f76b716b2e7d1b606a901537327f6212c1303073f816c2b0689940d9ceb712",
+      "candidate_bytes": 19983,
+      "candidate_sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c"
+    },
+    "lampOS/crates/voice/src/session_reader/tests.rs": {
+      "base_bytes": 30147,
+      "base_sha256": "94940c5bcdaa9cffb7e7cf69b5f682249edb18308e804b6de404223136d5063a",
+      "candidate_bytes": 36539,
+      "candidate_sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+    },
+    "lampOS/docs/realtime-tests.md": {
+      "base_bytes": 111464,
+      "base_sha256": "3576e290348395231bd58771e86bff422467bd5c703c9b86f455979f1eb6288f",
+      "candidate_bytes": 113354,
+      "candidate_sha256": "58e22a21096070a2bd5a0cc73d413a903c7da8820c10e3e976cb03bf2eeef467"
+    }
+  },
+  "kind": "UNAPPLIED documentary source proposal for qualification; no runtime result",
+  "new_linux_tests": 2,
+  "patch_sha256": "15102285605bcf129f626c8f1e0d1f1c275f34ea241d10e72d10fd07ed935d15",
+  "scope": "Linux cfg(test) instrumentation and scoped fixture root; default production root/validator/limits unchanged. Three scoped fixtures deliberately exclude host ancestry; every other case uses original root.",
+  "source_review": "No remaining P1/P2 in the source-only review; runtime/type qualification remains required",
+  "tests_allocated": 0
+}

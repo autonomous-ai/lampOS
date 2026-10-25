@@ -1,0 +1,246 @@
+diff --git a/lampOS/crates/voice/src/session_reader.rs b/lampOS/crates/voice/src/session_reader.rs
+index 66e7f75a9..4f86863d0 100644
+--- a/lampOS/crates/voice/src/session_reader.rs
++++ b/lampOS/crates/voice/src/session_reader.rs
+@@ -95,0 +96,8 @@ fn group_from(name: &str, source: impl Read) -> io::Result<u32> {
++#[cfg(all(test, target_os = "linux"))]
++#[derive(Clone, Debug, Default)]
++struct FailureObservation {
++    injected_grant_hit: bool,
++    injected_rollback_hit: bool,
++    apply_error: Option<String>,
++}
++
+@@ -104,0 +113,2 @@ pub(crate) struct Reader {
++    #[cfg(all(test, target_os = "linux"))]
++    failure_observation: Option<std::sync::Arc<std::sync::Mutex<FailureObservation>>>,
+@@ -147,0 +158,2 @@ impl Reader {
++                #[cfg(test)]
++                failure_observation: None,
+@@ -175,0 +188,2 @@ impl Reader {
++        #[cfg(all(test, target_os = "linux"))]
++        let observation = self.failure_observation.clone();
+@@ -184,0 +199,9 @@ impl Reader {
++                #[cfg(target_os = "linux")]
++                if let Some(observation) = &observation {
++                    let mut observation = observation.lock().unwrap();
++                    if rollback {
++                        observation.injected_rollback_hit = true;
++                    } else {
++                        observation.injected_grant_hit = true;
++                    }
++                }
+@@ -269,0 +293,12 @@ impl Reader {
++        #[cfg(all(test, target_os = "linux"))]
++        if self.failure.is_some()
++            && let Some(observation) = &self.failure_observation
++        {
++            observation.lock().unwrap().apply_error = apply.as_ref().err().map(|error| {
++                format!(
++                    "{error} (kind={:?}, os={:?})",
++                    error.kind(),
++                    error.raw_os_error()
++                )
++            });
++        }
+@@ -342,0 +378,2 @@ fn trusted_directory(path: &Path) -> io::Result<File> {
++    #[cfg(all(test, target_os = "linux"))]
++    let path = tests::fixture_root(&mut file, path)?;
+diff --git a/lampOS/crates/voice/src/session_reader/tests.rs b/lampOS/crates/voice/src/session_reader/tests.rs
+index 4cbeab4bc..2b3ea6284 100644
+--- a/lampOS/crates/voice/src/session_reader/tests.rs
++++ b/lampOS/crates/voice/src/session_reader/tests.rs
+@@ -3,0 +4,57 @@ use std::fs as stdfs;
++#[cfg(target_os = "linux")]
++thread_local! {
++    static FIXTURE_ROOT: std::cell::RefCell<Option<(PathBuf, File)>> = const {
++        std::cell::RefCell::new(None)
++    };
++}
++
++/// Only the rollback boundary fixtures replace the filesystem root. The
++/// original ancestor, owner, mode, ACL and component checks still run at and
++/// below this pinned private root. These cases do not test host `/` or `/tmp`
++/// ancestry; every unscoped security fixture still uses the original `/`.
++#[cfg(target_os = "linux")]
++pub(super) fn fixture_root<'a>(file: &mut File, path: &'a Path) -> io::Result<&'a Path> {
++    FIXTURE_ROOT.with(|slot| {
++        let slot = slot.borrow();
++        let Some((root, pinned)) = slot.as_ref() else {
++            return Ok(path);
++        };
++        let relative = path
++            .strip_prefix(root)
++            .map_err(|_| invalid("fixture path escaped its owned root"))?;
++        let current: File = fs::open(root, flags(), Mode::empty())?.into();
++        same(&current, pinned)?;
++        *file = pinned.try_clone()?;
++        Ok(relative)
++    })
++}
++
++#[cfg(target_os = "linux")]
++struct FixtureRoot {
++    _thread: std::marker::PhantomData<std::rc::Rc<()>>,
++}
++
++#[cfg(target_os = "linux")]
++impl FixtureRoot {
++    fn enter(root: &Path) -> Self {
++        let pinned: File = fs::open(root, flags(), Mode::empty()).unwrap().into();
++        FIXTURE_ROOT.with(|slot| {
++            let mut slot = slot.borrow_mut();
++            assert!(slot.is_none(), "fixture root scopes must not nest");
++            *slot = Some((root.to_owned(), pinned));
++        });
++        Self {
++            _thread: std::marker::PhantomData,
++        }
++    }
++}
++
++#[cfg(target_os = "linux")]
++impl Drop for FixtureRoot {
++    fn drop(&mut self) {
++        FIXTURE_ROOT.with(|slot| {
++            slot.borrow_mut().take();
++        });
++    }
++}
++
+@@ -519,0 +577 @@ if rm "$1" 2>/dev/null; then exit 14; fi
++        let _root = FixtureRoot::enter(&fixture.root);
+@@ -521,0 +580,2 @@ if rm "$1" 2>/dev/null; then exit 14; fi
++        let observation = std::sync::Arc::new(std::sync::Mutex::new(FailureObservation::default()));
++        reader.failure_observation = Some(observation.clone());
+@@ -531 +591,18 @@ if rm "$1" 2>/dev/null; then exit 14; fi
+-        assert!(report.initialization_failed && report.degraded && report.dropped_events == 1);
++        let observation = observation.lock().unwrap().clone();
++        eprintln!(
++            "private rollback fixture: grant_hit={} rollback_hit={} apply_error={:?}; report={report:?}",
++            observation.injected_grant_hit,
++            observation.injected_rollback_hit,
++            observation.apply_error,
++        );
++        assert!(
++            observation.injected_grant_hit,
++            "grant step 12 was not exercised: {observation:?}; report={report:?}"
++        );
++        assert!(
++            observation.injected_rollback_hit,
++            "rollback step 0 was not exercised: {observation:?}; report={report:?}"
++        );
++        assert!(report.initialization_failed, "{report:?}; {observation:?}");
++        assert!(report.degraded, "{report:?}; {observation:?}");
++        assert_eq!(report.dropped_events, 1, "{report:?}; {observation:?}");
+@@ -540,0 +618,75 @@ if rm "$1" 2>/dev/null; then exit 14; fi
++    #[test]
++    fn an_earlier_reader_refusal_keeps_a_verified_private_writer() {
++        let fixture = Fixture::new();
++        let _root = FixtureRoot::enter(&fixture.root);
++        let mut reader = fixture.prepare();
++        reader.failure = Some((12, Some(0)));
++        let observation = std::sync::Arc::new(std::sync::Mutex::new(FailureObservation::default()));
++        reader.failure_observation = Some(observation.clone());
++        fixture.create();
++        // A deterministic, real privacy refusal before any grant checkpoint.
++        let loose = fixture.voice.join("loose-state");
++        stdfs::write(&loose, b"synthetic").unwrap();
++        stdfs::set_permissions(&loose, Permissions::from_mode(0o644)).unwrap();
++        let mut state =
++            crate::session_state::SessionState::service_with_reader(&fixture.output, Ok(reader));
++        assert!(state.continuous());
++        state
++            .record(serde_json::json!({"kind":"synthetic"}))
++            .unwrap();
++        state.flush(&mut None, 1);
++        let bounded = state.finish_logging().unwrap();
++        let observation = observation.lock().unwrap().clone();
++        eprintln!("early private reader refusal: {observation:?}; bounded={bounded:?}");
++        assert!(!observation.injected_grant_hit, "{observation:?}");
++        assert!(observation.injected_rollback_hit, "{observation:?}");
++        assert!(
++            observation
++                .apply_error
++                .as_deref()
++                .is_some_and(|error| error.starts_with("untrusted session record")),
++            "{observation:?}"
++        );
++        assert!(!bounded.initialization_failed, "{bounded:?}");
++        assert!(bounded.degraded && !bounded.writer_failed, "{bounded:?}");
++        assert!(bounded.finish_attempted, "{bounded:?}");
++        let report = state
++            .writer_for_test()
++            .observe_completion_for_test(&bounded, std::time::Duration::from_secs(5));
++        eprintln!("early private reader completion: {report:?}; bounded={bounded:?}");
++        assert!(
++            !report.initialization_failed && report.degraded,
++            "{report:?}"
++        );
++        assert!(report.acknowledged && !report.writer_failed, "{report:?}");
++        assert_eq!(report.dropped_events, 0, "{report:?}");
++        assert_eq!(report.written_events, 1, "{report:?}");
++        assert_private(&fixture.output);
++        fixture.sentinel();
++    }
++
++    #[test]
++    fn a_fixture_root_retains_ancestor_mode_acl_and_path_checks() {
++        let fixture = Fixture::new();
++        let _root = FixtureRoot::enter(&fixture.root);
++        let escaped = Reader::prepare(Path::new("/outside/voice/sessions/new"), fixture.gid)
++            .err()
++            .expect("an escaped fixture path must be refused");
++        assert_eq!(escaped.to_string(), "fixture path escaped its owned root");
++        stdfs::set_permissions(&fixture.root, Permissions::from_mode(0o777)).unwrap();
++        let unsafe_mode = Reader::prepare(&fixture.output, fixture.gid)
++            .err()
++            .expect("an unsafe fixture ancestor must be refused");
++        assert_eq!(unsafe_mode.to_string(), "untrusted session ancestor");
++        stdfs::set_permissions(&fixture.root, Permissions::from_mode(0o700)).unwrap();
++        acl(&fixture.root, false);
++        let with_acl = Reader::prepare(&fixture.output, fixture.gid)
++            .err()
++            .expect("a fixture ancestor with an ACL must be refused");
++        assert_eq!(
++            with_acl.to_string(),
++            "session reader ACL cannot be verified absent"
++        );
++        fixture.sentinel();
++    }
++
+diff --git a/lampOS/docs/realtime-tests.md b/lampOS/docs/realtime-tests.md
+index ad3664771..b746ad2b4 100644
+--- a/lampOS/docs/realtime-tests.md
++++ b/lampOS/docs/realtime-tests.md
+@@ -1739,0 +1740,30 @@ of host-scheduled safe samples. No physical motion or latency is measured.
++
++## Session-reader rollback fixtures prove their injected boundary
++
++`failed_private_rollback_disables_only_metadata` requires evidence that grant
++checkpoint 12 and rollback checkpoint 0 both ran. Its test-only observer keeps
++the first apply error, including its kind and OS error, and prints the actual
++report before asserting each original report field separately. The unchanged
++empty event file and private sentinel checks remain. An earlier verified
++private fallback is a different outcome, not a successful observation of this
++late failure.
++
++The focused Linux rollback fixtures use a thread-local, pinned filesystem root
++at their own private fixture directory. The common ancestor and no-follow
++component walk still checks real owners, modes, ACLs and identities at and
++below that root. This deliberately excludes host `/` and `/tmp` ancestry from
++these focused cases; every unscoped security fixture still uses the original
++root and path walk. The scope rejects paths outside its component prefix,
++checks the named root against its pinned identity, cannot move between
++threads, and restores the default on unwind. It needs no chroot capability or
++process-wide environment change.
++
++A separate real early-refusal case leaves a readable voice sibling after
++reader preparation. It requires that checkpoint 12 was not reached, preserves
++the original refusal diagnostic, and checks a degraded but initialized writer
++with private metadata. It retains the production-bounded finish report and
++uses the existing test-only completion event for eventual data assertions;
++the production finish bound is not extended. Another control retains refusal
++of an unsafe root mode, a real ACL and an escaped path. No production privacy
++validation, grant or rollback action, report policy or finish bound changes. These tests establish
++neither the cause of earlier CI failures nor physical-lamp acceptance.
