@@ -1,0 +1,22 @@
+{
+  "scope": "declarative parser-only schema difference; no helper body",
+  "before": {
+    "unique_complete_NUL_environment_required": true,
+    "key_schema": "[A-Za-z_][A-Za-z_0-9]*"
+  },
+  "after": {
+    "unique_complete_NUL_environment_required": true,
+    "key_schema": "Same POSIX identifier schema OR the known generated CARGO_BIN_EXE_lamp-skills key",
+    "existing_capture_compiler_CLI_value_binding_verified_separately": true,
+    "duplicate_empty_missing_separator_or_wrong_executable_rejected": true
+  },
+  "existing_capture": {
+    "keys": 34,
+    "unique": true,
+    "only_rejected_key_name": "CARGO_BIN_EXE_lamp-skills",
+    "values_public": false
+  },
+  "source_binary_profile_case_bounds_or_declared_argv_changed": false,
+  "new_execution_for_parser_recovery": false,
+  "original_125_rewritten": false
+}

@@ -6,6 +6,12 @@ results here are from the development machine unless explicitly attributed
 to the first builder's lamp measurements. There is no lamp access here.
 
 
+## 2026-10-25 07:21: Skills setup retained; existing full audited without repeat
+
+- [Selected launcher/setup and existing-full evidence](verification/skills-launcher-and-existing-full-selected-20261025/README.md) preserves first setup125/zero attempts and revision2 terminal125 after one actual519/0/9 baseline full run. The context parser falsely rejected Cargo's generated hyphenated bin-exe key; all34 keys are distinct. Separate read-only29-check supplement qualifies that existing run; original states remain unchanged and no baseline-full repeat is permitted.
+- Actual image tool versions/paths/hashes and declarative launcher argument changes are published; hashes are post-run observations from the pinned image, not initial execution witnesses. Private helper bodies/raw environments/binaries stay private; no external implementation-integrity approval is claimed.
+- Three observations remain unrun: baseline exact, candidate full/exact. A minimal guarded continuation is being sealed, with current live artifact validation and Root grant pending. Name Mac five-stage pass and separate Linux failure remain distinct; parent/order/privacy/native/physical holds persist. No lamp action.
+
 ## 2026-10-25 06:47: Name Mac complete; current carries and Skills preparation
 
 - [Selected Name Mac receipt](verification/name-d60-mac-selected-20261025/README.md): five stages pass, Voice 4150/0/21 and Update 396/0/6; six controls/fresh 46/source/cleanup/release verify. The separate Linux 101/four capture failures stay failed. No native/current-base/readiness or physical transfer; child order holds remain.

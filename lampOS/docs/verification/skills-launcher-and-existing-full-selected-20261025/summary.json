@@ -1,0 +1,57 @@
+{
+  "format": "Skills-launcher-setup-and-existing-full-selected/1",
+  "base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "patch_sha256": "c7495fa8ae6ecec00958acb26a0201277017e87e8f7e5775ea2a6b3327aea611",
+  "baseline_tree": "c5b58fe5507007068a15d7bec0a83b6ee453ea98",
+  "candidate_staged_tree": "4d8aec77ca6f1b8a05d88e006d4f3790e075b6f9",
+  "revision1": {
+    "seal_sha256": "1c2d2f6a8c9147a0c5346fd75e4133b9962b92a9e17371a97ac07a20186fa653",
+    "terminal_sha256": "e57ae9f4202920a7f2234073e083d363724b2799ad207e0bb5e4c5bfa96ea819",
+    "exit": 125,
+    "Cargo_build_or_test_stages": 0,
+    "primary_attempts": 0,
+    "source_cleanup_release": true,
+    "failure_kind": "Missing rustup resolver in direct-toolchain image"
+  },
+  "revision2": {
+    "seal_sha256": "2de4d5944f487263b356e9e1be388ee3ccda288db60bd5a52583ae863114c3f9",
+    "terminal_sha256": "08871f9ba450141742a95aaf8e27889d30bbec1f46c2a5eeb32b27a6fa1a533c",
+    "exit": 125,
+    "primary_attempts": 1,
+    "original_qualified_observations": 0,
+    "underlying_Cargo_exit": 0,
+    "raw_full_counts": {
+      "passed": 519,
+      "failed": 0,
+      "ignored": 9
+    },
+    "observer_and_wrapper_exit_zero": true,
+    "source_cleanup_release": true,
+    "failure_kind": "Host parser rejected known generated hyphenated Cargo bin-exe key"
+  },
+  "supplemental_read_only_audit": {
+    "report_sha256": "07ea948c193a26efffa1234e12c1755854de016187b4dac38c603d2388903d49",
+    "checks_passed": 29,
+    "recorded_ELF_count": 114,
+    "existing_full_qualified": true,
+    "new_executions": 0,
+    "environment_keys": 34,
+    "environment_unique": true,
+    "only_non_POSIX_key": "CARGO_BIN_EXE_lamp-skills",
+    "environment_values_published": false,
+    "live_target_revalidation_pending": true
+  },
+  "remaining_primary_observations": [
+    "baseline/exact",
+    "candidate/full",
+    "candidate/exact"
+  ],
+  "baseline_full_repeat_permitted": false,
+  "candidate_tests_or_workspace_build_completed": false,
+  "ready_or_cause_or_old_failure_waiver": false,
+  "curated_command_diff_sha256": "596cb9f39846c1ca64782fcd914949192aa97787eb81f58554377782d3ff4d42",
+  "curated_tools_sha256": "905217c20caf16ad0da60eca4dab741ddc1a3657d7b94e1d418ea2937689ac49",
+  "helper_bodies_raw_environments_and_binary_witnesses_public": false,
+  "baseline_receipts_sha256": "2b684ef202cf9f51578f5491e2a44df4e890bf6af48ff5c7edf231db4dc95307",
+  "parser_schema_diff_sha256": "a31d0e10908f88c90bc3527d631c75d1feadeb2776d5862f23e6099bc06ba9f3"
+}

@@ -1,0 +1,99 @@
+{
+  "image": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "platform": "linux/amd64",
+  "tool_records": [
+    {
+      "tool": "cargo",
+      "image_path": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/cargo",
+      "sha256": "f30f9fd1b1d0b8fd10dc33219eb4cd4bec3543f40e434ac71f5a03fd0359063f",
+      "bytes": 42865872,
+      "image_file_uid": 0,
+      "image_file_gid": 0,
+      "mode": "755"
+    },
+    {
+      "tool": "rustc",
+      "image_path": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "sha256": "ba4b837efb6612dfa8d941c5a72b8a50d1d03a0f36216743b173949aa8d9eb75",
+      "bytes": 646032,
+      "image_file_uid": 0,
+      "image_file_gid": 0,
+      "mode": "755"
+    },
+    {
+      "tool": "rustfmt",
+      "image_path": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/rustfmt",
+      "sha256": "342c3d56e8958da0b108108a39e37ceac64ebdd42e6eefafa237d219e5b7eb0c",
+      "bytes": 5288720,
+      "image_file_uid": 0,
+      "image_file_gid": 0,
+      "mode": "755"
+    },
+    {
+      "tool": "cargo-fmt",
+      "image_path": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/cargo-fmt",
+      "sha256": "a4de43380ee9346aa1e336f3fede81cdba710dd6dee788c0a5fdd4baa85bec1d",
+      "bytes": 3717472,
+      "image_file_uid": 0,
+      "image_file_gid": 0,
+      "mode": "755"
+    },
+    {
+      "tool": "cargo-clippy",
+      "image_path": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/cargo-clippy",
+      "sha256": "dbadbd2a606ee9287460a5d287b7577a66bd304e7fe5570868e2a2eb4eed8fad",
+      "bytes": 1268064,
+      "image_file_uid": 0,
+      "image_file_gid": 0,
+      "mode": "755"
+    },
+    {
+      "tool": "clippy-driver",
+      "image_path": "/root/.rustup/toolchains/1.96.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+      "sha256": "a257170cec8a94b74792022936c574fc602330ce1c53b041074666f3f8977de2",
+      "bytes": 20956416,
+      "image_file_uid": 0,
+      "image_file_gid": 0,
+      "mode": "755"
+    }
+  ],
+  "versions": {
+    "cargo": [
+      "cargo 1.96.0 (30a34c682 2026-05-25)",
+      "release: 1.96.0",
+      "commit-hash: 30a34c6821b57de0aaec83a901aca39f88f6778c",
+      "commit-date: 2026-05-25",
+      "host: x86_64-unknown-linux-gnu",
+      "libgit2: 1.9.2 (sys:0.20.4 vendored)",
+      "libcurl: 8.19.0-DEV (sys:0.4.87+curl-8.19.0 vendored ssl:OpenSSL/3.5.4)",
+      "ssl: OpenSSL 3.5.4 30 Sep 2025",
+      "os: Debian 12.0.0 [64-bit]"
+    ],
+    "rustc": [
+      "rustc 1.96.0 (ac68faa20 2026-05-25)",
+      "binary: rustc",
+      "commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+      "commit-date: 2026-05-25",
+      "host: x86_64-unknown-linux-gnu",
+      "release: 1.96.0",
+      "LLVM version: 22.1.2"
+    ],
+    "rustfmt": [
+      "rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)"
+    ],
+    "cargo-fmt": [
+      "rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)"
+    ],
+    "cargo-clippy": [
+      "clippy 0.1.96 (ac68faa20c 2026-05-25)"
+    ],
+    "clippy-driver": [
+      "clippy 0.1.96 (ac68faa20c 2026-05-25)"
+    ]
+  },
+  "observed_after_revision2_baseline_full": true,
+  "initial_execution_hashes_retroactively_observed": false,
+  "tool_probe_compilation_or_test_observations": 0,
+  "owned_container_absent": true,
+  "immutable_image_and_direct_toolchain_directory_binding": true
+}

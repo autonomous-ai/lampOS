@@ -1,0 +1,136 @@
+{
+  "scope": "reviewed producer-derived receipts; private raw authenticity not independently established by publication",
+  "source_guard_before": {
+    "head": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+    "semantic_index_sha256": "38e7c209514a7755a96b12f6905c17186a32668dfeb82d385da0f0306b6ed807",
+    "source_files": 10446,
+    "source_stable": true,
+    "tree": "c5b58fe5507007068a15d7bec0a83b6ee453ea98"
+  },
+  "source_guard_after": {
+    "head": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+    "semantic_index_sha256": "38e7c209514a7755a96b12f6905c17186a32668dfeb82d385da0f0306b6ed807",
+    "source_files": 10446,
+    "source_stable": true,
+    "tree": "c5b58fe5507007068a15d7bec0a83b6ee453ea98"
+  },
+  "actual_fixture_source_sha256": "3c866284cc865f76077999c47718ed9cec2997f6c429bb5f36304893818a2d07",
+  "artifacts": [
+    {
+      "kind": "integration_test",
+      "target_name": "it",
+      "target_kind": [
+        "test"
+      ],
+      "source_path": "crates/skills/tests/it/main.rs",
+      "source_sha256": "a501e8a910fa65091b055e273b89fb9510aa34b265881cc6510c00498ff7b13e",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "compiler_fresh": false,
+      "ELF_sha256": "309b54b6176f6fc980bc3a08605b706b9d80f944b1e40e4daf1bd9e23ab6f61a",
+      "ELF_bytes": 27491632,
+      "before_after_identity_and_hash_equal": true
+    },
+    {
+      "kind": "normal_cli",
+      "target_name": "lamp-skills",
+      "target_kind": [
+        "bin"
+      ],
+      "source_path": "crates/skills/src/main.rs",
+      "source_sha256": "a4bb122ca5326280e1626f5e1f9c94dde4a26bf9f5a93910ae364e2339b63777",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "compiler_fresh": false,
+      "ELF_sha256": "1f1b525b5be7e2900155792005e5f877c48aa0051585d2db734130414d91e57f",
+      "ELF_bytes": 26363592,
+      "before_after_identity_and_hash_equal": true
+    }
+  ],
+  "full_target_census": [
+    {
+      "status": "ok",
+      "passed": 157,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "cargo_target": "unittests src/lib.rs"
+    },
+    {
+      "status": "ok",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "cargo_target": "unittests src/main.rs"
+    },
+    {
+      "status": "ok",
+      "passed": 306,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0,
+      "cargo_target": "tests/it/main.rs"
+    },
+    {
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 8,
+      "measured": 0,
+      "filtered": 0,
+      "cargo_target": "tests/release_pair.rs"
+    },
+    {
+      "status": "ok",
+      "passed": 31,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "cargo_target": "tests/requested_audio.rs"
+    },
+    {
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "cargo_target": "Doc-tests lamp_skills"
+    }
+  ],
+  "targeted_case_seen_once": true,
+  "targeted_case_status": "ok",
+  "ELF_records_equal_before_after_and_recorded_witness": 114,
+  "recorded_inventory_sha256": "7c67c4fd80e48a953e53e9d54c703baa46c6987df5cac5f61fb3754a3dbb586e",
+  "wrapper": {
+    "exit": 0,
+    "elapsed_seconds": 77.6480415019978,
+    "timeout_seconds": 3600,
+    "process_group_absent": true
+  },
+  "cleanup_remove_exit": 0,
+  "cleanup_host_group_absent": true,
+  "container_absence_exit": 1,
+  "absence_probe_group_absent": true,
+  "original_R2_terminal_exit": 125,
+  "supplement_existing_full_exit": 0,
+  "new_test_executions": 0,
+  "live_target_guard_still_pending": true
+}

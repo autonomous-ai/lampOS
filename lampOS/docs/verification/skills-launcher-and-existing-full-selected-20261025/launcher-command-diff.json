@@ -1,0 +1,349 @@
+{
+  "scope": "declarative command-vector difference; no scratch helper bodies",
+  "published_base": "42f08cf038660ff60b3415f7c3a64740ce782fcc",
+  "source_patch_sha256": "c7495fa8ae6ecec00958acb26a0201277017e87e8f7e5775ea2a6b3327aea611",
+  "rustc_version_probe_before": [
+    "rustc",
+    "+1.96.0",
+    "-vV"
+  ],
+  "rustc_version_probe_after": [
+    "rustc",
+    "-vV"
+  ],
+  "old_resolver": [
+    "rustup",
+    "which",
+    "--toolchain",
+    "1.96.0",
+    "cargo"
+  ],
+  "new_resolver_description": "Resolve and canonicalize image PATH cargo/rustc; require same toolchain directory and native Rust/Cargo1.96 version; direct Cargo path is bound to proc observer.",
+  "commands": {
+    "baseline": {
+      "revision1": [
+        {
+          "stage": "fmt",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "cap_seconds": 300
+        },
+        {
+          "stage": "no-run",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json",
+            "--no-run"
+          ],
+          "cap_seconds": 2400
+        },
+        {
+          "stage": "full",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json"
+          ],
+          "cap_seconds": 3600
+        },
+        {
+          "stage": "exact",
+          "argv": [
+            "<compiler-bound-it>",
+            "--exact",
+            "addon::says_the_judge_dropped_do_not_spend_the_hour",
+            "--nocapture"
+          ],
+          "cap_seconds": 120
+        }
+      ],
+      "revision2": [
+        {
+          "stage": "fmt",
+          "argv": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "cap_seconds": 300
+        },
+        {
+          "stage": "no-run",
+          "argv": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json",
+            "--no-run"
+          ],
+          "cap_seconds": 2400
+        },
+        {
+          "stage": "full",
+          "argv": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json"
+          ],
+          "cap_seconds": 3600
+        },
+        {
+          "stage": "exact",
+          "argv": [
+            "<compiler-bound-it>",
+            "--exact",
+            "addon::says_the_judge_dropped_do_not_spend_the_hour",
+            "--nocapture"
+          ],
+          "cap_seconds": 120
+        }
+      ]
+    },
+    "candidate": {
+      "revision1": [
+        {
+          "stage": "fmt",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "cap_seconds": 300
+        },
+        {
+          "stage": "clippy",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--all-targets",
+            "--message-format=json",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "cap_seconds": 2400
+        },
+        {
+          "stage": "no-run",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json",
+            "--no-run"
+          ],
+          "cap_seconds": 2400
+        },
+        {
+          "stage": "full",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json"
+          ],
+          "cap_seconds": 3600
+        },
+        {
+          "stage": "exact",
+          "argv": [
+            "<compiler-bound-it>",
+            "--exact",
+            "addon::says_the_judge_dropped_do_not_spend_the_hour",
+            "--nocapture"
+          ],
+          "cap_seconds": 120
+        },
+        {
+          "stage": "workspace-build",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "build",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "--workspace",
+            "--message-format=json"
+          ],
+          "cap_seconds": 3600
+        }
+      ],
+      "revision2": [
+        {
+          "stage": "fmt",
+          "argv": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "cap_seconds": 300
+        },
+        {
+          "stage": "clippy",
+          "argv": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--all-targets",
+            "--message-format=json",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "cap_seconds": 2400
+        },
+        {
+          "stage": "no-run",
+          "argv": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json",
+            "--no-run"
+          ],
+          "cap_seconds": 2400
+        },
+        {
+          "stage": "full",
+          "argv": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "-p",
+            "lamp-skills",
+            "--no-fail-fast",
+            "--message-format=json"
+          ],
+          "cap_seconds": 3600
+        },
+        {
+          "stage": "exact",
+          "argv": [
+            "<compiler-bound-it>",
+            "--exact",
+            "addon::says_the_judge_dropped_do_not_spend_the_hour",
+            "--nocapture"
+          ],
+          "cap_seconds": 120
+        },
+        {
+          "stage": "workspace-build",
+          "argv": [
+            "cargo",
+            "build",
+            "--offline",
+            "--locked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--jobs",
+            "2",
+            "--workspace",
+            "--message-format=json"
+          ],
+          "cap_seconds": 3600
+        }
+      ]
+    }
+  },
+  "unchanged_four_observations": true,
+  "new_image_or_toolchain_download": false,
+  "source_profiles_case_and_bounds_changed": false
+}
