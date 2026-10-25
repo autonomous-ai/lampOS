@@ -3315,7 +3315,9 @@ after a take-over, but now for every turn:
   `LAMP_SECOND_PREPARED`, a person-scoped line is not prepared on its early
   words (`prepared_on`): no memory, context or chat for them before its end
   is read; the final words are asked as ever, and a room's line still
-  prepares (Second's P2 on #3437).
+  prepares (Second's P2 on #3437). Cost: the owner's own lines lose the
+  early start too, even when their face is seen speaking (reviewer-three's
+  P3 on #3437).
 - **A session's trust is the caller's** (with `LAMP_QUIET_GOING_ON_SAME_ONE=on`
   or `LAMP_GOING_ON_NOT_OWN=on` and `LAMP_SAME_VOICE_MODEL`, the first
   builder at 09:40 on #2428). Past its first two lines a session is trusted
