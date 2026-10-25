@@ -1,0 +1,18 @@
+{
+  "from": "2f48b0edd24c07c0fda0e67c8985addc8a40cdf2",
+  "to": "a176e66d96dd73aa9330da5d3f0e876402dc74c2",
+  "changed_paths": [
+    "lampOS/deploy/product/lamp-cloud.service",
+    "lampOS/docs/switches.md"
+  ],
+  "voice_eval_runtime_rust_and_manifests_unchanged": true,
+  "affected_voice_eval_fixture": "crates/voice-eval/tests/it/switches.rs includes docs/switches.md",
+  "planned_gate": "Clean current source snapshot; fmt, strict all-target Voice/Eval Clippy, workspace build, affected Eval switches census; original full native then current reader carry before ready",
+  "execution_scope": "All completed full Voice/Eval tests remain frozen2f; latest source carry will not be labelled a repeated full local suite.",
+  "prior_head": "7faa37cdf3495776e8d5f7b78caf291da3c53265",
+  "current_head": "15b7c85af539a0e08a047a4196095d85bb54641b",
+  "complete_frozen_map_delta": [
+    "lampOS/deploy/product/lamp-cloud.service",
+    "lampOS/docs/switches.md"
+  ]
+}

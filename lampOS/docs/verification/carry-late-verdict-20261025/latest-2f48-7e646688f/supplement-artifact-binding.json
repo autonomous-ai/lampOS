@@ -1,0 +1,100 @@
+{
+  "initial_artifact_count": 7,
+  "supplemental_records": [
+    {
+      "log": "voice-library-complement.txt",
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/src/lib.rs",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": true,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "executable_sha256": "de1bb6dad6407a5d4c5fa87cb0bb58a09a84b40bca45bccd80de2b7a0d3636c6",
+      "dep_info_sha256": "b3861cd6b57d8bae22c7c0b5b9160661c3186faa5c69ddf97eb4e563947ce463",
+      "matches_initial_library_artifact": true
+    },
+    {
+      "log": "voice-test-examples.txt",
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/render_line_second.rs",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/examples/render_line_second-d52e8b12a523439f",
+      "executable_sha256": "a2eabd4b44444fb6d7f6197e713080a2e441e082fdbfbb7ca6054459e21fa43c",
+      "dep_info_sha256": "8a2ef952fa7a797f11c1674eb71d1b1ac4d57fd8728cb9c08a15d3341cb89ad7",
+      "matches_initial_library_artifact": null
+    },
+    {
+      "log": "voice-test-examples.txt",
+      "package_id": "path+file:///private/tmp/third-carry-late-current/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/third-carry-late-current/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "executable_sha256": "f10c33a9405f8ccc55684780cfccf72f12c9ceedb27bf06d7ab6d98cad1ec77c",
+      "dep_info_sha256": "fc36635f94f1ea6d618d49ef077dbbd7ad8075371ec2c233fc0f315f6081061e",
+      "matches_initial_library_artifact": null
+    }
+  ],
+  "unique_test_artifact_paths": 9,
+  "scope": "Producer post-compile snapshot; separate raw invocations retained, same fixed worktree/exclusive target; no independent private-byte or pre-exec claim. Complement library artifact matches the first selection exactly."
+}

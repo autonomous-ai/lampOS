@@ -1,0 +1,47 @@
+{
+  "head": "7e646688f38ed435a65cda02e022a7fca13ba144",
+  "base": "2f48b0edd24c07c0fda0e67c8985addc8a40cdf2",
+  "argv": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "-q",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--message-format=json",
+    "--",
+    "--test-threads=1",
+    "--skip",
+    "second_provider",
+    "--skip",
+    "room_told",
+    "--skip",
+    "tools::",
+    "--skip",
+    "process::",
+    "--skip",
+    "switch_census",
+    "--skip",
+    "same_voice"
+  ],
+  "exit": 0,
+  "seconds": 575.72,
+  "source_unchanged": true,
+  "complement_summary": {
+    "passed": 2807,
+    "failed": 0,
+    "ignored": 13,
+    "filtered": 943
+  },
+  "initial_library_summary": {
+    "passed": 941,
+    "failed": 0,
+    "ignored": 2,
+    "filtered": 2820
+  },
+  "disjoint_complete_library_coverage": true,
+  "reason": "Completes full Voice library coverage without repeating any initially selected library test. Every Voice bin/integration/doc and full Eval already ran in the original scoped gate. Runs retain their actual commands and are not relabelled as one invocation."
+}

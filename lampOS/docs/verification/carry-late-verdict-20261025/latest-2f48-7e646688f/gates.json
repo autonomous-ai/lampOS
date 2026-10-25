@@ -1,0 +1,255 @@
+{
+  "worktree": "/private/tmp/third-carry-late-current",
+  "base": "2f48b0edd24c07c0fda0e67c8985addc8a40cdf2",
+  "carried_head": "7e646688f38ed435a65cda02e022a7fca13ba144",
+  "target": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
+  "target_scope": "Exclusive existing target belonging to this fixed worktree, reused within it; no imported compiled cache or cross-worktree reuse",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-carry-late-current-target-s_bxddkc",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "source_count": 7041,
+  "scope_reason": "Focused rebase qualification: complete second-provider/worker, tools, process, room/census/same-voice library selection; every Voice bin/integration target; full Eval; Voice docs; strict all-target Voice/Eval Clippy and whole workspace build. Covers owned behavior and changed upstream worker/tools request bound. Not a new full Voice library execution; older producer fulls and started reader fulls retain their actual source scope; new full ARM gate remains required before ready.",
+  "voice_library_filters": [
+    "second_provider",
+    "room_told",
+    "tools::",
+    "process::",
+    "switch_census",
+    "same_voice"
+  ],
+  "voice_integration_targets": [
+    "it",
+    "release_pair"
+  ],
+  "checks": [
+    {
+      "name": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 13.106,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-fmt.txt"
+    },
+    {
+      "name": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 128.95,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-clippy.txt"
+    },
+    {
+      "name": "build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 125.412,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-build.txt"
+    },
+    {
+      "name": "tests",
+      "argv": [
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--test-threads=1",
+          "second_provider",
+          "room_told",
+          "tools::",
+          "process::",
+          "switch_census",
+          "same_voice"
+        ],
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--bins",
+          "--test",
+          "it",
+          "--test",
+          "release_pair",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice-eval",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ],
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--doc",
+          "--message-format=json",
+          "--",
+          "--test-threads=1"
+        ]
+      ],
+      "exit": 0,
+      "seconds": 591.3,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-tests.txt"
+    }
+  ],
+  "test_parts": [
+    {
+      "name": "voice-library",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--message-format=json",
+        "--",
+        "--test-threads=1",
+        "second_provider",
+        "room_told",
+        "tools::",
+        "process::",
+        "switch_census",
+        "same_voice"
+      ],
+      "exit": 0,
+      "seconds": 239.362,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-test-voice-library.txt"
+    },
+    {
+      "name": "voice-bin-integration",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--bins",
+        "--test",
+        "it",
+        "--test",
+        "release_pair",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 99.134,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-test-voice-bin-integration.txt"
+    },
+    {
+      "name": "eval",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 248.75,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-test-eval.txt"
+    },
+    {
+      "name": "voice-doc",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--doc",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 4.022,
+      "source_unchanged": true,
+      "log": "/private/tmp/third-parent-2f48-p3-current-test-voice-doc.txt"
+    }
+  ]
+}

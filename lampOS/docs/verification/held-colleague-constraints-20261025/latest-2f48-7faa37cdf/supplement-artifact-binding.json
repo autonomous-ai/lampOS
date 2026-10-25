@@ -1,0 +1,100 @@
+{
+  "initial_artifact_count": 7,
+  "supplemental_records": [
+    {
+      "log": "voice-library-complement.txt",
+      "package_id": "path+file:///private/tmp/third-carry-colleague-window/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/src/lib.rs",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": true,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "executable_sha256": "fb1653bac1a17c426e6f92fecb405864247d4caf16d0e55a6b765eed74bc4dbd",
+      "dep_info_sha256": "864217f2a177eef3523f59f81c1bdbe7e33b9944f806eeb4f41c0836253856fb",
+      "matches_initial_library_artifact": true
+    },
+    {
+      "log": "voice-test-examples.txt",
+      "package_id": "path+file:///private/tmp/third-carry-colleague-window/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "stop_words_stt_replay",
+        "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "executable_sha256": "45518a7277226fc46a81648bd40732016e2a4ca9b9e53865cc7fa341130c8623",
+      "dep_info_sha256": "8799eb067a4286a37fa2c990a6f6b294928ae907ac43f252a34c7c975b1875de",
+      "matches_initial_library_artifact": null
+    },
+    {
+      "log": "voice-test-examples.txt",
+      "package_id": "path+file:///private/tmp/third-carry-colleague-window/lampOS/crates/voice#lamp-voice@0.1.0",
+      "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/examples/render_line_second.rs",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_line_second",
+        "src_path": "/private/tmp/third-carry-colleague-window/lampOS/crates/voice/examples/render_line_second.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "executable": "/private/var/folders/cm/6rf6j7pn1ys698mtjh434zsw0000gp/T/third-held-42f-recovery-target-sjkcfelx/debug/examples/render_line_second-d52e8b12a523439f",
+      "executable_sha256": "5459b249955090feebf0a5189f28c59ebc6e87d112318ccb2c88bf9f1a01536f",
+      "dep_info_sha256": "16d657ab17c49425041184fd2c344945629f77a018e11ea7a87ba0d00c57013d",
+      "matches_initial_library_artifact": null
+    }
+  ],
+  "unique_test_artifact_paths": 9,
+  "scope": "Producer post-compile snapshot; separate raw invocations retained, same fixed worktree/exclusive target; no independent private-byte or pre-exec claim. Complement library artifact matches the first selection exactly."
+}

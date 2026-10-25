@@ -1,0 +1,280 @@
+diff --git a/lampOS/crates/voice/src/second_provider/worker.rs b/lampOS/crates/voice/src/second_provider/worker.rs
+index 155e1806f6..458c9c57ba 100644
+--- a/lampOS/crates/voice/src/second_provider/worker.rs
++++ b/lampOS/crates/voice/src/second_provider/worker.rs
+@@ -6513,8 +6513,37 @@ impl Heeding {
+                 .sure_of_another_only(self.sure_other_samples, crate::same_voice::DIFFERENT_BELOW);
+         }
+         let going_on_unheard = signs.going_on;
+-        let (mut going_on, mut other_voice, same_voice, likeness) =
+-            self.voice_going_on_in(request, going_on_unheard, busy);
++        let extended_before =
++            self.carries && self.carrying && self.carry_window.extra_allows(began_us);
++        let mut voice = self.voice_going_on_in(request, going_on_unheard, busy);
++        // That poll may first identify the earlier colleague. Reconsider
++        // this line's start against the newly known end, then read this
++        // line's own identity through the same check. Neither is a wait or
++        // an admission: the classifier below still requires a sure owner.
++        let late_window = self.carries
++            && self.carrying
++            && !extended_before
++            && self.carried.is_none()
++            && self.carry_window.extra_allows(began_us);
++        if late_window {
++            self.carried = Some((request, false));
++            // An active thread may already have consumed this line's one
++            // likeness before reporting the colleague's late print. Keep
++            // that evidence for the owner/nearness check below; polling a
++            // second time must not replace it with an empty judgement.
++            let likeness = voice.3;
++            voice = self.voice_going_on_in(request, true, busy);
++            voice.3 = likeness.or(voice.3);
++            if self.voice_ends_going_on
++                && let Some(likeness) = likeness
++            {
++                // The first lookup consumed this evidence. Keep the same
++                // classification as voice_going_on_in for downstream rules.
++                voice.1 = likeness < crate::same_voice::DIFFERENT_BELOW;
++                voice.2 = !voice.1;
++            }
++        }
++        let (mut going_on, mut other_voice, same_voice, likeness) = voice;
+         let (speakers, turned_speakers) = speakers_between(self.eyes.as_ref(), began_us, ended_us);
+         // Whether a carry still stands for the caller after this line.
+         let mut carry_stands = false;
+@@ -6571,7 +6600,19 @@ impl Heeding {
+                     }
+                 }
+             }
+-            if busy {
++            // A newly opened late window is only eligibility, in every
++            // room. A generic same-voice continuation must not bypass the
++            // owner's stricter nearness check. An unsure held line is no
++            // talk for the room, just as in the existing quiet-room path.
++            if late_window && !busy && carried.goes_on != Some(true) {
++                held_here = true;
++                if carried.goes_on.is_none()
++                    && let Ok(mut room) = crate::room_told::room().lock()
++                {
++                    room.colleague_held(request);
++                }
++            }
++            if busy || late_window {
+                 // No sure sign: past the 8 s held; within them the ordinary
+                 // follow-up rule, the legacy exception, whenever the print
+                 // comes.
+@@ -10391,6 +10432,169 @@ mod tests {
+         );
+     }
+ 
++    /// Synthetic sure-other bar, as the existing late-print control: the
++    /// first colleague print is learned only at the owner's +25 s verdict.
++    /// Production calibration and activation are unchanged.
++    #[test]
++    fn a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner() {
++        let _one = crate::provider_worker::tests::one_thread();
++        for answered_s in [30, 60] {
++            for room in ["busy", "unknown", "quiet"] {
++                for (voice, owner) in [(1, true), (4, false), (3, false), (0, false), (-1, false)] {
++                    for after_s in [25, 45] {
++                        let mut desk = CarryDesk::new(true);
++                        desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
++                        desk.answered(answered_s);
++                        let answer = desk.heeding.said_until_us.unwrap();
++                        desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
++                        assert_eq!(
++                            desk.line_at(
++                                -1,
++                                "",
++                                "I sent the slides to the client this morning.",
++                                answer + 3_000_000
++                            ),
++                            None
++                        );
++                        // Keep the initial legacy follow-up's admission, then
++                        // vary the room observed at the owner's later verdict.
++                        {
++                            let mut told = crate::room_told::room().lock().unwrap();
++                            let expected = match room {
++                                "unknown" => {
++                                    *told = crate::room_told::RoomTold::new();
++                                    told.count_only_talk(true);
++                                    told.count_held_talk(true);
++                                    told.end_busy_sooner(true);
++                                    told.end_busy_once_answered(true);
++                                    crate::room_told::Room::Unknown
++                                }
++                                "quiet" => {
++                                    told.set_quiet();
++                                    crate::room_told::Room::Quiet
++                                }
++                                _ => crate::room_told::Room::Busy,
++                            };
++                            assert_eq!(told.at(monotonic_us()), expected, "fixture room {room}");
++                        }
++                        desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
++                        assert_eq!(
++                            desk.line_at(
++                                voice,
++                                "",
++                                "Will it rain in the afternoon?",
++                                answer + after_s * 1_000_000
++                            )
++                            .is_none(),
++                            owner && after_s == 25,
++                            "answer {answered_s} s, room {room}, voice {voice}, +{after_s} s"
++                        );
++                        if after_s == 25 && voice != -1 {
++                            let expected = match room {
++                                "unknown" => crate::room_told::Room::Unknown,
++                                "quiet" => crate::room_told::Room::Quiet,
++                                _ => crate::room_told::Room::Busy,
++                            };
++                            assert_eq!(
++                                crate::room_told::room().lock().unwrap().at(monotonic_us()),
++                                expected,
++                                "room unchanged: answer {answered_s} s, {room}, voice {voice}"
++                            );
++                        }
++                    }
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn a_late_window_keeps_the_same_voice_sign_for_going_on_same_one() {
++        let _one = crate::provider_worker::tests::one_thread();
++        for answered_s in [30, 60] {
++            let mut desk = CarryDesk::new(true);
++            desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
++            desk.answered(answered_s);
++            let answer = desk.heeding.said_until_us.unwrap();
++            desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
++            assert_eq!(
++                desk.line_at(
++                    -1,
++                    "",
++                    "I sent the slides to the client this morning.",
++                    answer + 3_000_000
++                ),
++                None
++            );
++            desk.heeding.going_on_same_one = true;
++            desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
++            let request = desk.request + 1;
++            let began = answer + 25_000_000;
++            let line = (began, began + 2_000_000);
++            desk.heeding.hear(
++                request,
++                crate::second_provider::Heard::Began {
++                    over_the_lamps_voice: false,
++                },
++            );
++            desk.heeding.hear(
++                request,
++                crate::second_provider::Heard::Samples(&[1; 48_000]),
++            );
++            desk.heeding
++                .hear(request, crate::second_provider::Heard::Ended);
++            let mut signs = desk.heeding.signs_begun(request, line, began);
++            assert!(
++                desk.heeding.carried.is_none(),
++                "the late window is not known yet"
++            );
++            // Exercise an independently supplied continuation sign: the
++            // first lookup consumes the owner print before opening the
++            // late window, so the second lookup cannot classify it again.
++            signs.going_on = true;
++            assert_eq!(
++                desk.heeding
++                    .judge(request, line, "Will it rain in the afternoon?", signs),
++                None,
++                "voice-only owner with the same-speaker rule, answer {answered_s} s"
++            );
++        }
++    }
++
++    #[test]
++    fn a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry() {
++        let _one = crate::provider_worker::tests::one_thread();
++        for end in ["stop", "privacy", "forget", "off"] {
++            let mut desk = CarryDesk::new(end != "off");
++            desk.heeding.sure_other_samples = crate::same_voice::RATE * 3 / 2;
++            desk.answered(60);
++            let answer = desk.heeding.said_until_us.unwrap();
++            desk.late.store(true, std::sync::atomic::Ordering::Relaxed);
++            assert_eq!(
++                desk.line_at(
++                    -1,
++                    "",
++                    "I sent the slides to the client this morning.",
++                    answer + 3_000_000
++                ),
++                None
++            );
++            match end {
++                "stop" => desk.heeding.lamp_did(crate::second_provider::Did::Stopped),
++                "privacy" => desk.heeding.privacy_changed(),
++                "forget" => crate::thread::THREAD.lock().unwrap().forget(),
++                _ => {}
++            }
++            desk.late.store(false, std::sync::atomic::Ordering::Relaxed);
++            let began = answer + 25_000_000;
++            assert!(
++                desk.line_at(1, "", "Will it rain in the afternoon?", began)
++                    .is_some(),
++                "{end}"
++            );
++            assert!(!desk.heeding.carry_window.extra_allows(began), "{end}");
++        }
++    }
++
+     /// The owner's P1 on Queue #3126 (lamp-4ace, 23 Oct 18:51): in a busy
+     /// room, each line begun 12 s after the lamp's words, past the 8 s a
+     /// follow-up has, five turns of the owner are all answered with
+diff --git a/lampOS/docs/second-voice.md b/lampOS/docs/second-voice.md
+index 2c68c681a1..c6c23d8b9d 100644
+--- a/lampOS/docs/second-voice.md
++++ b/lampOS/docs/second-voice.md
+@@ -3151,7 +3151,26 @@ after a take-over, but now for every turn:
+   actual answer renews the allowance; admitting a line does not. At most
+   four recent eligible line ends are kept, and missing, future or evicted
+   ends give no extension. Identity checks and the switch-off path remain
+-  unchanged. A stop (`Did::Stopped`, from the next line's `after_stop`) and
++  unchanged. When that colleague print is first learned at the current
++  owner's verdict, the worker rechecks the current line's captured start
++  against the newly available window. It always reads the cached reply
++  again and retains any own-voice likeness consumed by the first lookup
++  in preference to the second result, including its same/other-voice
++  classification for the downstream same-speaker rule. Neither lookup
++  waits for a print. A line admitted only by this newly opened late window
++  is not recorded as another eligible colleague end: a later print for
++  that line gives no further extension. This fails closed.
++  In Busy, Unknown and Quiet, that new eligibility still needs the owner's
++  positive face or sufficiently nearer voice; missing, uncertain or
++  confusable voice evidence is held for this verdict without turning a
++  quiet or unknown room busy. A +25 s owner start can pass; +45 s cannot.
++  The chronological control covers both an active 30 s thread and an
++  expired 60 s thread. It uses a synthetic 1.5 s sure-other bar only;
++  the production 2.5 s bar and the 1.5 s print limit are unchanged.
++  The answer clock is existing `Did::Said` queued-PCM duration bookkeeping,
++  not acoustic drain attestation. Physical last-word timing and activation
++  still need the lamp's attended check.
++  A stop (`Did::Stopped`, from the next line's `after_stop`) and
+   a privacy change end it, and a forgetting leaves no words to carry from.
+   The caller's own face seen speaking turned away from the lamp is someone
+   talking to a colleague (reviewer-two at 03:01): held, and it ends the
+diff --git a/lampOS/docs/switches.md b/lampOS/docs/switches.md
+index 26b9a48c32..e30b22d777 100644
+--- a/lampOS/docs/switches.md
++++ b/lampOS/docs/switches.md
+@@ -207,7 +207,7 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
+ | LAMP_NAMED_ALWAYS | `on`; off. On the second route, with `--attention`, a line that begins with the lamp's name (heard by `lamp-name` from 1.5 s before the line to 1 s into it, or its words opening with "Lamp" set off as a call, after a greeting or before a pause, never a stand-in like "man") while the eyes' newest fresh look has a face turned to the lamp is answered in a busy room: the strict busy rule's and `busy_bar`'s holds are not kept for it, and the model's `not_for_me` on it is not taken once (it is asked again, told it was called by name while faced) | — | — | #2191 (#1722 hw-first-P1 finding 4: a production floor's named, faced lines all held or declined) | played lines over room noise on the second route, before and after, and the busy-room hold test unchanged for talk without the name | off until that run | A colleague's "Lamp, …" said while someone faces the lamp is answered | until |
+ | LAMP_NOT_FOR_ME_WORDS | `on`; off. On the second route, a reply to a line told `CONVERSATION_ALONE` whose text is "not for me" as the whole reply, or followed straight away by the refusal's own clause ("that's/that is/it's about me", "not to me"; "to answer"/"to reply" only at a sentence end), case, punctuation, quotes, dashes and leading speech tags aside, is taken as `not_for_me`: nothing said, the line told held back. Its first piece waits only until the opening is known; no other line waits. Any other words after "not for me" ("Not for me, thanks…", "Not for me to say, but…", "Not for me to answer, but…") are an answer and said | — | — | #3103 (lamp-4ace r06, request 131: "Not for me — that's about me, not to me." spoken) | on lamp-4ace, talk past the lamp after a conversation: no "not for me" spoken, and named lines and answers to the lamp's own question answered as before | off until that run | The model's refusal written as words is never said aloud | until |
+ | LAMP_BUSY_ENDS_SOONER | `on` exactly; off. The second route only, with `LAMP_SPOKEN_TO`: a busy room ends a minute after the last talk between people when nothing since was talk or answered (lines held, sounds, silence), not three minutes after; a line held only because the room is busy and it wasn't called (`BUSY_UNCALLED`, `BUSY_NAMED_UNTURNED`) is talk, so two people talking on keep it busy and the minute runs from their last line; once the lamp answers, a minute after its first answer since the talk (`end_busy_once_answered`, as Live with `LAMP_GOING_ON_ASKS`), never later than three minutes after the talk | — | — | The first builder on Queue #1722 (21 Oct, 04:00) | Tests only: talk to 36 s, lines held at 120/137/159 s, busy without the switch and quiet with it; talk at 100 s keeps it busy; a held line every 10 s (`BUSY_UNCALLED`/`BUSY_NAMED_UNTURNED`) keeps it busy with the switch, quiet a minute after the last; an answer 30 s after the talk ends it at 90 s with the switch, not without | off until a run on lamp-4ace (b0333's switches): two people talk, then one says "Hey Lamp, good morning!" a minute later, answered with the switch and held without | A room is busy while people are talking, not for three minutes after; people who stop for a minute and then talk again without the lamp are in a quiet room until their talk makes it busy again | until |
+-| LAMP_SAME_SPEAKER_CARRIES | `on` exactly; off. The second route only, with `LAMP_ATTENTION` and `LAMP_NAME_OR_FOLLOW_UP`: in a busy room, a line begun within 20 s (`SAME_SPEAKER_CARRIES_FOR`) of the end of the lamp's last words, by its start, past a follow-up's 8 s or after talk past the lamp, goes on as the conversation when it is the one the lamp answered: the caller's face alone seen speaking it turned to the lamp (the eyes' speaking faces), or the conversation's voice at `SAME_FROM` (0.70) or over. Another face seen speaking it, or a sure other voice (under 0.30 from 2.5 s of speech or more, `CARRY_SURE_OTHER_SPEECH_SAMPLES`, which no print reaches today), is held; one such line, or one held past a still turned face, or a print known late as a sure other voice, ends nothing, does not make the room busy by voice alone and is no talk (`RoomTold::colleague_held`), and the owner goes on (the first builder at 09:34 on #3296, replacing 03:46's one-line end); two lines in a row from someone else end the carry until the lamp answers again, as two lines left alone end a conversation; a colleague who calls the lamp by name is the caller from then on; the 20 s run from the later of the lamp's last words and the actual audio end of one held colleague line, once per actual answer, capped at 40 s from the lamp's last words (First's decision on Queue #3126, 24 Oct 12:57); delayed classification uses that recorded end, never its processing time; so do a stop and a privacy change, and a forgetting leaves no words to carry from. The caller's face seen speaking turned away is held and ends the carry, their voice sure or not; turning back needs a fresh call or answer. These signs are read in any room: in a room not busy, unknown or quiet, such a line, or one in a voice not surely the owner's, is held as in a busy room, the room unchanged. The owner's carried line is no reply to a colleague's question held before it (no `AFTER_QUESTION` hold). Once a colleague line is held in a carry, the owner's voice alone carries only when nearer the conversation's than the held line's print by `CARRY_NEARER_BY` (0.10, provisional); else only their face does. A short print under 0.70 is no sign either way, so with short lines the face carries. A line begun within the 8 s while the carry stands is read the same way: another face seen speaking it is held, and a line with no sure sign either way follows the ordinary follow-up rule whatever the print's arrival (at the verdict, late or never), an unsure print taken for no print. In short, the first 8 s are not identity-gated; past 8 s only a sure same-speaker sign carries; always held, inside the 8 s too: another face seen speaking, the caller turned away, and a sure other voice (not reachable today: prints carry at most 1.5 s of speech, under the provisional 2.5 s). A print that was no evidence never becomes evidence: a going-on line's print joins the conversation's voice only at 0.70 or over or seen spoken by the caller's face, at its verdict or late, caller-only on or off. Each answer renews the 20 s, so a chain of turns has no overall cap, but outside the 8 s window each carried turn needs its own sure sign. Such a line the model leaves unanswered is no talk (`RoomTold::carried`) | — | — | Sixth, the owner's P1 on Queue #3126 (23 Oct) | Tests only: five turns at 12 s gaps carried by voice and face, voice alone, face alone and face with 0.27 / 0.00 short prints; held without the switch; a colleague's line, face seen, any print, held and the owner goes on, two in a row end it until a new answer; the owner's five turns with one colleague line between turns 2 and 3 all answered, busy (face) and quiet (an off-camera voice, the room not made busy; without the switch it is); in a quiet room the colleague's held line closes as held, no talk, the room not busy; a late sure other voice (a synthetic control) is one line, the owner going on, and with the colleague's next line two in a row; a colleague's call makes them the caller; the owner turned away held and the carry ended, in busy, unknown and quiet rooms, turning back held until a fresh call; a colleague's face (-1/0/1 prints) held in unknown and quiet rooms, the room unchanged and the owner going on; a colleague's question held and the owner's next line carried; owner and colleague alternating, the owner by voice alone, a colleague voice at 0.75 off camera held after their face was held once; 19.99 s carried and 20.01 s held by the line's start; stop, privacy and forget end it; the owner's face with a 0.27 print at 7 s carried, the print back at the verdict or after it; a colleague's face at 3 s held, the owner at 12 s going on, two in a row ending the carry until a fresh call, a short print (0.27, 0.00, 0.50) or none, no face, at once or late: let out by the follow-up at 3 s, held at 12 s, the carry standing; an unknown voice, no face, 0.27 at 3 s let out, at once or late, then the same voice with no face at 12 s held while the owner's face at 12 s carries, caller-only on and off; a sure other voice at 3 s held (a synthetic control, the sure bar lowered to 1.5 s) | off until a played five-turn back-and-forth on lamp-52e6 or lamp-75c9, quiet and with desk talk | One person talking with the lamp in an office keeps talking with it by their own face and voice, while a colleague's line beside them is not answered | until |
++| LAMP_SAME_SPEAKER_CARRIES | `on` exactly; off. The second route only, with `LAMP_ATTENTION` and `LAMP_NAME_OR_FOLLOW_UP`: in a busy room, a line begun within 20 s (`SAME_SPEAKER_CARRIES_FOR`) of the end of the lamp's last words, by its start, past a follow-up's 8 s or after talk past the lamp, goes on as the conversation when it is the one the lamp answered: the caller's face alone seen speaking it turned to the lamp (the eyes' speaking faces), or the conversation's voice at `SAME_FROM` (0.70) or over. Another face seen speaking it, or a sure other voice (under 0.30 from 2.5 s of speech or more, `CARRY_SURE_OTHER_SPEECH_SAMPLES`, which no print reaches today), is held; one such line, or one held past a still turned face, or a print known late as a sure other voice, ends nothing, does not make the room busy by voice alone and is no talk (`RoomTold::colleague_held`), and the owner goes on (the first builder at 09:34 on #3296, replacing 03:46's one-line end); two lines in a row from someone else end the carry until the lamp answers again, as two lines left alone end a conversation; a colleague who calls the lamp by name is the caller from then on; the 20 s run from the later of the lamp's last words and the actual audio end of one held colleague line, once per actual answer, capped at 40 s from the lamp's last words (First's decision on Queue #3126, 24 Oct 12:57); delayed classification uses that recorded end, never its processing time; if it first opens the window at the current verdict, that line is rechecked by its captured start and its own positive owner/nearness evidence in Busy, Unknown and Quiet, with no wait for a missing print; a current-line likeness consumed by the first lookup is retained for that check rather than replaced by a second empty lookup (the answer clock is `Did::Said` queued-PCM bookkeeping, not an acoustic drain receipt); so do a stop and a privacy change, and a forgetting leaves no words to carry from. The caller's face seen speaking turned away is held and ends the carry, their voice sure or not; turning back needs a fresh call or answer. These signs are read in any room: in a room not busy, unknown or quiet, such a line, or one in a voice not surely the owner's, is held as in a busy room, the room unchanged. The owner's carried line is no reply to a colleague's question held before it (no `AFTER_QUESTION` hold). Once a colleague line is held in a carry, the owner's voice alone carries only when nearer the conversation's than the held line's print by `CARRY_NEARER_BY` (0.10, provisional); else only their face does. A short print under 0.70 is no sign either way, so with short lines the face carries. A line begun within the 8 s while the carry stands is read the same way: another face seen speaking it is held, and a line with no sure sign either way follows the ordinary follow-up rule whatever the print's arrival (at the verdict, late or never), an unsure print taken for no print. In short, the first 8 s are not identity-gated; past 8 s only a sure same-speaker sign carries; always held, inside the 8 s too: another face seen speaking, the caller turned away, and a sure other voice (not reachable today: prints carry at most 1.5 s of speech, under the provisional 2.5 s). A print that was no evidence never becomes evidence: a going-on line's print joins the conversation's voice only at 0.70 or over or seen spoken by the caller's face, at its verdict or late, caller-only on or off. Each answer renews the 20 s, so a chain of turns has no overall cap, but outside the 8 s window each carried turn needs its own sure sign. Such a line the model leaves unanswered is no talk (`RoomTold::carried`) | — | — | Sixth, the owner's P1 on Queue #3126 (23 Oct) | Tests only: five turns at 12 s gaps carried by voice and face, voice alone, face alone and face with 0.27 / 0.00 short prints; held without the switch; a colleague's line, face seen, any print, held and the owner goes on, two in a row end it until a new answer; the owner's five turns with one colleague line between turns 2 and 3 all answered, busy (face) and quiet (an off-camera voice, the room not made busy; without the switch it is); in a quiet room the colleague's held line closes as held, no talk, the room not busy; a late sure other voice (a synthetic control) is one line, the owner going on, and with the colleague's next line two in a row; a colleague's call makes them the caller; the owner turned away held and the carry ended, in busy, unknown and quiet rooms, turning back held until a fresh call; a colleague's face (-1/0/1 prints) held in unknown and quiet rooms, the room unchanged and the owner going on; a colleague's question held and the owner's next line carried; owner and colleague alternating, the owner by voice alone, a colleague voice at 0.75 off camera held after their face was held once; 19.99 s carried and 20.01 s held by the line's start; stop, privacy and forget end it; the owner's face with a 0.27 print at 7 s carried, the print back at the verdict or after it; a colleague's face at 3 s held, the owner at 12 s going on, two in a row ending the carry until a fresh call, a short print (0.27, 0.00, 0.50) or none, no face, at once or late: let out by the follow-up at 3 s, held at 12 s, the carry standing; an unknown voice, no face, 0.27 at 3 s let out, at once or late, then the same voice with no face at 12 s held while the owner's face at 12 s carries, caller-only on and off; a sure other voice at 3 s held (a synthetic control, the sure bar lowered to 1.5 s) | off until a played five-turn back-and-forth on lamp-52e6 or lamp-75c9, quiet and with desk talk | One person talking with the lamp in an office keeps talking with it by their own face and voice, while a colleague's line beside them is not answered | until |
+ | LAMP_BUSY_CALLED_STRICT | `on`; off. On the second route, with `--attention`, in a busy room with nobody turned to the lamp, a line's text shows the lamp was called only as "Lamp" or "Lamb" set off as a call (after a greeting or before a pause, `attention::begins_with_the_name`) or with the name heard by `lamp-name` for the line; a stand-in ("Man, …", "Plan …", "Mom, …") or "Lamp is broken, …" alone is not a call, and the strict busy rule holds it. Quiet rooms unchanged. Limits: "set off" needs the text's comma ("Lamp what time is it" counts only with the name heard), and a hearing at `called::LEAST_SCORE` (0.9) counts, which office false hearings reach (#829) | — | — | #1712 (the first builder on #1722, 16:11: five office lines let out in a busy room as "the text shows it was called") | Tests only: the five office lines held in a busy room with no name heard and no face, let out without the switch; "Hey Lamp, …" and "Lamp, …" still called; a stand-in with the name heard or a face turned still called; a quiet room unchanged | off until a busy office on lamp-4ace, before and after: office talk let out, and called lines held | A call heard only as a stand-in, with no `lamp-name` hearing and nobody facing the lamp, is held in a busy room | until |
+ | LAMP_SECOND_SKILL_LOOK | `on`; off. On the second route, a skills call (`skills/`, or `use_skill`) answered with `"look": true` (`skills/look-for-things`' `look_for`) asks the coordinator for the turn's full look as `take_a_look` does: the lamp says "Let me look." if nothing was said, the turn ends, the eyes are asked once the answer's first audio plays, and the still goes as the `lamp_looks` turn to the second route's own session, with the skill's note after "When the picture comes:" after its question; dropped if the person speaks first, and in a turn the lamp wrote itself, which goes on to its next round. A search's own written turns (its look's, the look note's) take the skill's next look; every other turn the lamp wrote takes none (#1146). Needs a full look (LAMP_LOOK_FULL and LAMP_EYES_LOOK_FILE); reaches the second route's worker only | — | — | #941 on the second route (#1712) | "Lamp, where are my keys?" with look-for-things installed on lamp-4ace, LAMP_VOICE_ROUTE=second: `look_full_asked` after the answer's first audio, `look_full_still` with the still, and the model saying what it sees; not run | off until that run | Off, the look rests on the model saying "Let me take a look." in a further round (the phrase rule); on, the turn ends without that round, and the lamp's words are "Let me look." | until |
+ | LAMP_SECOND_LOOK_NOTE | `on`; off. With LAMP_SECOND_SKILL_LOOK on, a skill's search on the second route (`skills/look-for-things`' `look_for`) whose look got an answer that called nothing is sent one written note on the same session once that answer has played and the room has been quiet a second: "Not found yet? Call look_for with the next place: left, right, far_left, then far_right. If you can see it, say where and stop." Once a search; never after the person speaks or another turn begins (`look_note_sent`, `look_note_dropped` with why); reaches the second route's worker and the coordinator | — | — | the first builder's step 2 for look-for-things (20 Oct: DeepSeek calls look_for once and never again) | "Lamp, where are my keys?" with look-for-things installed on lamp-4ace, LAMP_VOICE_ROUTE=second, keys off the desk: one `look_note_sent` after the first look's answer, and look_for called with the next place; not run | off until that run | One more turn after a look the model left: its words come a second after the lamp's | until |

@@ -1,0 +1,15 @@
+{
+  "head": "7e646688f38ed435a65cda02e022a7fca13ba144",
+  "base": "2f48b0edd24c07c0fda0e67c8985addc8a40cdf2",
+  "selection": "All default Voice/Eval test targets: two disjoint Voice-library selections plus Voice bin/integration/doc/test-enabled-example targets and full Eval. Distinct invocations retained; no repeated library test.",
+  "passed": 4657,
+  "failed": 0,
+  "ignored": 21,
+  "summaries": 12,
+  "source_unchanged": true,
+  "disjoint_complete_library_coverage": true,
+  "example_targets_included": [
+    "render_line_second",
+    "stop_words_stt_replay"
+  ]
+}

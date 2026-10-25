@@ -1,0 +1,18 @@
+{
+  "gate_start_head": "7faa37cdf3495776e8d5f7b78caf291da3c53265",
+  "head": "7faa37cdf3495776e8d5f7b78caf291da3c53265",
+  "tree": "69cd19efaf3e67e24aa293385ba953012245858b",
+  "base": "2f48b0edd24c07c0fda0e67c8985addc8a40cdf2",
+  "source_count": 7042,
+  "every_source_matches_frozen_map_and_committed_blob_mode": true,
+  "summary": {
+    "selection": "Scoped Voice library + all Voice bins/integration/docs + full Eval, not full Voice lib",
+    "summaries": 9,
+    "passed": 1850,
+    "failed": 0,
+    "ignored": 8,
+    "source_unchanged": true
+  },
+  "worktree_clean": true,
+  "scope": "Focused rebase qualification: complete second-provider/worker, tools, process, room/census/same-voice library selection; every Voice bin/integration target; full Eval; Voice docs; strict all-target Voice/Eval Clippy and whole workspace build. Covers owned behavior and changed upstream worker/tools request bound. Not a new full Voice library execution; older producer fulls and started reader fulls retain their actual source scope; new full ARM gate remains required before ready."
+}
