@@ -91,6 +91,21 @@ async fn one_line(
     boot: &'static str,
     seen: bool,
 ) -> Outcome {
+    one_line_eyes(what, words, chats, f1_speaks, boot, seen, true).await
+}
+
+/// [`one_line`], with `eyes_up` false as when the eyes' reader never
+/// started (`speaking_faces::read_from` gave None): the engine is not
+/// given them.
+async fn one_line_eyes(
+    what: &str,
+    words: &str,
+    chats: Vec<Vec<net::Result<ChatEvent>>>,
+    f1_speaks: bool,
+    boot: &'static str,
+    seen: bool,
+    eyes_up: bool,
+) -> Outcome {
     let eyes = Arc::new(SpeakingFaces::default());
     let path = known_file(what, &eyes);
     let script = Arc::new(Script {
@@ -110,16 +125,18 @@ async fn one_line(
             .push(lease.scope().unwrap().person().map(str::to_owned));
         Box::pin(async { json!({"ok":true}) })
     });
+    let mut engine = engine.with_memory_scope(
+        lamp_turn_owner::BootId::new([41; 16]).unwrap(),
+        cache.clone(),
+        runner,
+        Some(Arc::new(|lease: &ScopeLease| {
+            Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+        })),
+    );
+    if eyes_up {
+        engine = engine.seeing_who_speaks(eyes.clone(), path.clone());
+    }
     let mut engine = engine
-        .with_memory_scope(
-            lamp_turn_owner::BootId::new([41; 16]).unwrap(),
-            cache.clone(),
-            runner,
-            Some(Arc::new(|lease: &ScopeLease| {
-                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
-            })),
-        )
-        .seeing_who_speaks(eyes.clone(), path.clone())
         .scoping_by_sight(seen)
         .remembering(Arc::new(move |_, _, lease: Option<&ScopeLease>| {
             seen_leases.lock().unwrap().extend(lease.cloned());
@@ -245,6 +262,37 @@ async fn a_reused_id_after_the_eyes_restart_is_not_the_known_persons_face() {
     assert_eq!(got.calls, [Some(a)]);
 }
 
+/// Reviewer-two's P2 on #3437: the eyes' reader never started (the bus
+/// would not open), so nothing reads who spoke. With the switch that is no
+/// face seen speaking it: the line is the room's. Off, it stays A's.
+#[tokio::test]
+async fn with_no_eyes_to_read_a_line_is_the_rooms() {
+    let a = crate::remember::person_id("A");
+    let got = one_line_eyes(
+        "blind",
+        FORGET_ME,
+        forget_everything(),
+        true,
+        BOOT,
+        true,
+        false,
+    )
+    .await;
+    assert_eq!(got.calls, [None], "the forget runs as the room's");
+    assert_eq!(got.lease, None);
+    let got = one_line_eyes(
+        "blind-off",
+        FORGET_ME,
+        forget_everything(),
+        true,
+        BOOT,
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(got.calls, [Some(a)]);
+}
+
 /// Off, nothing changes: the silent owner's line stays theirs, as on
 /// lamp-voice before the switch.
 #[tokio::test]
@@ -273,14 +321,24 @@ async fn without_the_switch_an_off_camera_line_stays_the_silent_owners() {
 #[tokio::test]
 async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
     let a = crate::remember::person_id("A");
-    for (what, f1_speaks, boot, seen, expected) in [
-        ("silent, on", false, BOOT, true, None),
-        ("silent, off", false, BOOT, false, Some(a.clone())),
-        ("speaking, on", true, BOOT, true, Some(a.clone())),
+    for (what, f1_speaks, boot, seen, eyes_up, expected) in [
+        ("silent, on", false, BOOT, true, true, None),
+        ("silent, off", false, BOOT, false, true, Some(a.clone())),
+        ("speaking, on", true, BOOT, true, true, Some(a.clone())),
         // Second's P1 on #3437: the eyes started again and their new `f1`,
         // a different face, says it.
-        ("restarted, on", true, "restarted", true, None),
-        ("restarted, off", true, "restarted", false, Some(a.clone())),
+        ("restarted, on", true, "restarted", true, true, None),
+        (
+            "restarted, off",
+            true,
+            "restarted",
+            false,
+            true,
+            Some(a.clone()),
+        ),
+        // Reviewer-two's P2 on #3437: the eyes' reader never started.
+        ("no eyes, on", true, BOOT, true, false, None),
+        ("no eyes, off", true, BOOT, false, false, Some(a.clone())),
     ] {
         let eyes = Arc::new(SpeakingFaces::default());
         let path = known_file("late", &eyes);
@@ -321,18 +379,18 @@ async fn a_late_looks_keeper_needs_the_owners_own_face_seen_speaking() {
                 json!({"ok":true})
             })
         });
-        let mut engine = engine
-            .with_memory_scope(
-                lamp_turn_owner::BootId::new([42; 16]).unwrap(),
-                cache.clone(),
-                runner,
-                Some(Arc::new(|lease: &ScopeLease| {
-                    Told::from(format!("for {:?}", lease.scope().unwrap().person()))
-                })),
-            )
-            .seeing_who_speaks(eyes.clone(), path.clone())
-            .scoping_by_sight(seen)
-            .announcing(false);
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([42; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        );
+        if eyes_up {
+            engine = engine.seeing_who_speaks(eyes.clone(), path.clone());
+        }
+        let mut engine = engine.scoping_by_sight(seen).announcing(false);
         engine.memory_camera(true, 1);
         // Cold: the voice restarted a second ago and nobody is named yet.
         cache.cold_since(Instant::now() - Duration::from_secs(1));

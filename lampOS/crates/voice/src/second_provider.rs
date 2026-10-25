@@ -2120,10 +2120,11 @@ impl Engine {
         self
     }
 
-    /// With [`Self::seeing_who_speaks`], a line is in a known person's
-    /// scope only when their own face was seen speaking it, else the room's,
-    /// at its admission and for a late look's keeper alike
-    /// (`LAMP_PERSON_SCOPE_SEEN=on`, `speaking_faces::not_theirs`).
+    /// A line is in a known person's scope only when their own face was
+    /// seen speaking it, else the room's, at its admission and for a late
+    /// look's keeper alike (`LAMP_PERSON_SCOPE_SEEN=on`,
+    /// `speaking_faces::not_theirs`). Without [`Self::seeing_who_speaks`]
+    /// (its reader never started) no face is seen: every line the room's.
     pub fn scoping_by_sight(mut self, on: bool) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.scope_seen = on;
@@ -4513,28 +4514,35 @@ async fn spoken(
     // Seeing someone speak: a line admitted as the known person's that any
     // other face spoke is the room's, before anything is told or filed with
     // it. Only ever narrowed (the first builder, #1722 00:23).
-    if let (Some((eyes, known)), Some(scope)) = (&shared.speaking, scope.as_ref())
+    // With `LAMP_PERSON_SCOPE_SEEN`, no eyes to read is no face seen
+    // speaking it: the room's (reviewer-two's P2 on #3437).
+    if let Some(scope) = scope.as_ref()
         && let Some(person) = scope
             .scope()
             .and_then(|scope| scope.person())
             .map(str::to_owned)
-    {
-        let (speakers, pair) = line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
-        if crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen) {
-            scope.narrow_to_room();
-            eprintln!(
-                "lamp-voice second: request {request}: {}: told and kept as the room's",
-                if speakers.is_empty() {
-                    "no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)"
-                } else {
-                    "a face not the known person's was seen speaking it"
-                }
-            );
-            if prepared.take().is_some() {
-                eprintln!(
-                    "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
-                );
+        && let Some(why) = match &shared.speaking {
+            Some((eyes, known)) => {
+                let (speakers, pair) =
+                    line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
+                crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen)
+                    .then_some(if speakers.is_empty() {
+                        "no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)"
+                    } else {
+                        "a face not the known person's was seen speaking it"
+                    })
             }
+            None => shared
+                .scope_seen
+                .then_some("no eyes read who spoke it (LAMP_PERSON_SCOPE_SEEN)"),
+        }
+    {
+        scope.narrow_to_room();
+        eprintln!("lamp-voice second: request {request}: {why}: told and kept as the room's");
+        if prepared.take().is_some() {
+            eprintln!(
+                "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+            );
         }
     }
     // A late look's keeper (#2807): the known face named by the line's end
@@ -4566,6 +4574,12 @@ async fn spoken(
                     } else {
                         Some(person)
                     }
+                }
+                (Some(_), None) if seen_only => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: no eyes read who spoke it (LAMP_PERSON_SCOPE_SEEN): its keep stays the room's"
+                    );
+                    None
                 }
                 (found, _) => found,
             };
