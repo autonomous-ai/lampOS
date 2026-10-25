@@ -1,3 +1,15 @@
+## 2026-10-26 04:26 — Common compile complete; full runtime active
+
+Ready for lamp-voice: no
+
+Common #3064 is frozen on 0a40aa50b with tested tree bf52230f7 and all 10,569 tracked inputs present. Formatting passed in 12.672 seconds, strict workspace/all-target Clippy in 591.202 seconds and workspace build in 589.673 seconds. The actual compiler procedure exited zero with source stability and owned process closure verified. Its separate runtime gate completed metadata and test discovery; discovery exited zero in 988.877 seconds and lists 8,430 cases. Those are inventory, not passes. Full fourteen-package nextest is active with the normal PR profile, two runtime slots and zero retries; Update's custom harnesses and doctests remain in the required sequence. Eight older failed/LEAK witnesses stay preserved. No final runtime or current native qualification is claimed yet.
+
+Main advanced to 3d9722f38. Its Controls calibration change and documentation will be carried after closure, followed by affected checks before the code push. The only Common overlap, reuse-decisions.md, merges cleanly with both independent notes retained once. A separate source-only check of queued #3486 also merges all four shared files cleanly. Neither check changes the running source or establishes compiled integration.
+
+Onboarding #3472 remains at 74dafff29 with 11,308 unique native passes, zero failures/leaks/timeouts and 106 skips, plus successful Linux Clippy. [The selected artifact record](verification/onboarding-native-74da-20261026/README.md) publishes its exact Voice/Eyes hashes and original artifact. Both member hashes and AArch64 headers verify, and reviewer-two found no metadata P1/P2; no lamp or signed-attestation result follows. First's intended-speaker enrollment within two tries, cancellations and counted misses remain the physical hold.
+
+The onboarding reply-contract test follow-up extends its existing refusal test with a paired successful socket exchange and an explicit trial checklist; production code is unchanged and execution is unrun. Its twelve-package dependent scope is mapped for the next gate. Peek's preceding binary passed the sessions-only Off compatibility control 1/0, while its new eight controls remain unrun behind that work. Queue3504 and all own-PR review streams remain watched; the current memory plan uses the recorded 0.50 score and 0.90 target.
+
 ## 2026-10-26 03:40 — Memory row plan refreshed from the current ship result
 
 Ready for lamp-voice: no
