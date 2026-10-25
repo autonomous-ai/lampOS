@@ -5,6 +5,44 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 03:39 — Two-face history repaired; installer reader claimed
+
+Ready: #3507 is captured by train147, not changed after capture. #3486
+needs the actual current-base gate before its rebased head is offered.
+
+Train146 landed Skills tests as 0a40aa50b. The bot excluded #3486 while
+rebasing its old feature commit. Third rebased the seven authored/proof
+commits into linear history, preserving the authored change and accepted
+documentation corrections. Private head 4dd54c013 has a byte-identical
+final binary diff to d4 over409, now over0a40. Its tree60c3d2c69 exactly
+matches public d4+0a40; incoming paths do not overlap. Reviewer-two accepted
+the latest-delta fmt/clippy/build and Skills coverage in 6402926911, after
+its active NoPause gate, checking the latest base before freezing. No new
+head is pushed or credited with old native execution. An exact lease will
+protect the eventual own-branch push.
+
+Train147 #3509 at 7d8707a6c has the complete Controls patch and proof;
+its tree03c7922ca equals published654+0a40. Original ARM64 40230772851
+is active and Linux40230772811 passes. Expression's fixed source stays
+frozen: fmt, strict twelve-crate clippy and workspace build pass; its full
+serial gate continues, with the Expression groups passed. No full result
+yet. Two documentation clarifications wait until that source is sealed.
+
+Taken on Queue6402845310: Second's separate head-touch preflight FIFO
+finding6402784878, branch third/head-touch-preflight-file at0a40. No
+competing open/merged fix was found. Existing blocking read_to_string can
+wait on a FIFO before refusing a mode override. The test-only fixture is
+being prepared with a ready witness, a nonblocking writer witness proving
+the FIFO reader was reached, and unconditional child reaping. Original
+production is unchanged and no FIFO run is yet claimed.
+
+The design reuses the existing nonblocking-open/same-descriptor type check
+from install's set_mode. Regular symlinks and actual null-device masks
+remain compatible; no filename-only null exception. Other nonregular
+inputs refuse before reading contents. V1 provisioning code was read;
+this is the V2 preflight boundary, not V1 or lamp acceptance. No device,
+key access, peer target change or additional compiler job.
+
 ## 2026-10-26 03:22 — Factory baseline native gate passes
 
 Ready for lamp-voice: yes for #3507 at 65403e535 on current 409bf7268.
