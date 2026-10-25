@@ -1,0 +1,28 @@
+{
+  "status": "Design only, unapplied and unexecuted; separate source claim and root execution grant required.",
+  "exact case": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+  "package target": "lamp-expression:lib:lamp_expression",
+  "source baseline": "d7ca8b1b230119515161ca56d8982003362efe93 on lamp-voice",
+  "variants": [
+    "exact current baseline",
+    "same base plus two proposed test/docs patches"
+  ],
+  "fixed observations": "Exactly one old and one new existing-case observation, each with the same 1,100 ms post-constructor/pre-Ready controlled gate. No warmup or repeated observation.",
+  "gate entry": "Immediately after Fixture constructor returns, before any Ready request/state or new-phase publication. The baseline constructor has published its single Speaking; the revised constructor has not.",
+  "owned gate": "Private control-only overlay. An owned controller receives one entered marker, holds release until its monotonic 1,100 ms deadline from that marker, then writes exactly one release token. Its cancel channel/close wakes the gate on failure. Join/reap and direct group/session absence are required; an outer120s watchdog bounds the exact-case process. No product clock API or source change.",
+  "timing qualification": "Actual held duration must be at least1,100 ms. Record late controller/gate releases, source/pre-step spans and raw outcomes; excessive post-release delays that also age Ready or the new Voice make the causal control inconclusive, never grounds to rerun.",
+  "old after release": "Publish Ready request/state with their original500ms lifetimes and original at_us=1,000,000, then one unchanged fixture.step(unix_ms()). Original constructor Voice envelope has aged beyond500ms+50ms transport grace.",
+  "new after release": "Create all test publishers before Ready; publish Ready request/state, then exactly one original Speaking payload last, and one unchanged fixture.step(unix_ms()).",
+  "diagnostics before original unwrap": "Output.state missing/warnings/behaviours; output light/body presence; Service accepted/refused/input_errors counts; every input Subscriber topic/received/expired/repeated/wrong_type counters; gate enter/release and publication/step host timestamps. Retained Voice/Ready headers can be inspected after the step to bind stamp, wall timestamp, expiry and expired flag without adding another step or publication. No controller environment values.",
+  "expected discriminating result": "Old missing light with VoiceTiming expiry counter and fresh Ready, new original light/Resting/asleep/body/ack assertions pass with no extra initial Voice sample. This tests the deliberate setup-age intervention only; no historical cause claim.",
+  "unqualified outcomes": "Unexpected old pass, new failure, stale Ready, input/refusal error, cleanup failure or missing diagnostic boundary is retained and reviewed; no retry, deadline inflation or sampling until green.",
+  "invariants": [
+    "All original assertions byte-identical.",
+    "One service step only, no poll until light and no retry.",
+    "Same Voice payload/typed logicalstamp at1,000,000/sequence1; no second sample.",
+    "Voice real envelope500ms and bus50ms grace unchanged.",
+    "Ready source/clock/request/header/at_us/wall/500ms checks unchanged.",
+    "No product code, runtime clock API or shared default-fixture behaviour change."
+  ],
+  "remaining risk": "Any host stall during transport setup, between Ready and Voice publication, or after publication can still expire one input. This scoped setup-order correction does not guarantee arbitrary real-clock stalls."
+}

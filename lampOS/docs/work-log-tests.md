@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-25 10:13 — Claimed light and Ready fixture sources prepared
+
+Ready for lamp-voice: no
+
+TakenatQueue6392503431 beforecode: [two separate test-only patches](verification/tests-next-fixture-source-20261025/) nowpreparedon4f. Lightmovesonlyelapsedstartafterringjoin; allotherRustbytes/assertions/boundsidentical. ReadydefersonlyitsinitialVoice, publishesoneoriginalSpeakinglastafterReady, keepsdefaultcallersandone-step/assertiontail unchanged; selectedpublisherlifetimeexplicit. Exactfileformat/diffchecks0. Future1700msshutdowngate and1100mspreReadygate are designs only/nohooks/compiler/control/test. Latestbase/rootgates remainseparate; no cause/qualification claim.
+
+RootHandcanonical47816stillfrozen34c: fmt/strict12pass, fullteststageprogressingthroughUpdateinstall. ChangedHandliteralPASS; preliminarymemory/Skillsfailuresretained/notgreen. Workspacebuild/diffpending. Currentpeerlanesreservedforcurrentcarrywork; Fourthcfsource/runnerpreparedwithoutnewallocation. No localARM/device/product/APIchanges. No broadclockscopeanswer.
+
+
 ## 2026-10-25 09:02 — Current Skills source frozen; Body canonical gates active
 
 Ready for lamp-voice: no

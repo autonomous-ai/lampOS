@@ -1,0 +1,22 @@
+{
+  "base": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "branch": "tests/1806-light-refusal-clock",
+  "claim": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6392503431",
+  "files": [
+    {
+      "path": "lampOS/crates/cloud/src/lamp.rs",
+      "sha256": "d0980ef240b6f8d977ca690c0ea9faad569b83865c742a236e540124de77dbb4",
+      "mode": 420,
+      "mtime_ns": 1792896901012261745
+    },
+    {
+      "path": "lampOS/docs/cloud.md",
+      "sha256": "a01fed0169b51ab1d6722a11be4602b7bbd00368b4e1318ecd86cedbb94c6afb",
+      "mode": 420,
+      "mtime_ns": 1792896901048622338
+    }
+  ],
+  "only_one_Instant_declaration_moved_in_Rust": true,
+  "all_other_Rust_bytes_unchanged": true,
+  "no_compile_test": true
+}

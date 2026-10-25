@@ -1,0 +1,48 @@
+{
+  "execution_authorized": false,
+  "source_base": "d7ca8b1b230119515161ca56d8982003362efe93",
+  "fixed_observations": [
+    {
+      "variant": "baseline-original-plus-private-gate",
+      "repetition": 1
+    },
+    {
+      "variant": "candidate-timestampmove-plus-same-private-gate",
+      "repetition": 1
+    }
+  ],
+  "case_key": [
+    "lamp-cloud",
+    "lib",
+    "lamp_cloud",
+    "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back"
+  ],
+  "intervention": "Exactlyone1700ms owned-channel hold afterring finalLightRequestdrain and beforethreadreturns; enableonlyselectedcase/one-shot perprocess. Interventionnotcompletion sleep.",
+  "protocol": [
+    "Initialize entered/release/cancel ownedchannels and anownedcontrollerthread; ring shutdown sendsentered then awaitsrelease orcancel.",
+    "Controller waits for actualentered event underfinite failureguard, holdsatleast1700ms bymonotonic timedchannelwait interruptiblebycancel, then releasesonce; record entered/hold/release receipt.",
+    "Main test keeps originalstop.store/ringing.join; completionisactualRingjoin, thenunchanged set_light.is_err andsaved.elapsed<SHOWN_WITHIN+500ms assertions.",
+    "PrivateRAIIowner onallpaths setsstop,cancels/releasesgate,joinsringandcontroller,records eachjoin andcleanup; preserveoriginalpanic ratherthanassertduringunwind. OwnedfixtureRoot identity iscaptured andremoved afterthreadsclose, includingexpectednegativepanic.",
+    "Originalcase has onlyin-processring+controlthreads, no compiled/systemchild. Outerownedprocess-group watchdog120s; setup/cleanup error or timeoutSTOP, no retry."
+  ],
+  "prediction_baseline": "The exactowned shutdown-returngate holds at least1700ms, exceeding the unchanged1500ms elapsed bound by itself. Becauseoldtimer startsbeforestop/join, iftheearlieroriginalassertions andset_light.is_err assertioncomplete, the ORIGINALsaved.elapsed assertion mustfail without assuming anyset_light duration. Differentpanic/APIresult/missinggate orcleanupinvalidity staysunexpectedretained evidence, not resampled.",
+  "prediction_candidate": "Identical1700ms controlledshutdown isjoinedbeforetimerstarts. The entireactualset_light call muststillmeet unchangedSHOWN_WITHIN1s+500ms allowance andeveryoriginalassertion. No duration or failure-reason assumption substitutesforactualobservedoutcome.",
+  "preserved": [
+    "Alloriginalassertions andorder otherthan movingthe oneInstant declaration",
+    "ProductSHOWN_WITHIN1s,20ms methodpoll,existing500ms allowance,5s startupreadinessguard",
+    "Preview10s/clock/source/priority/requestcount/bothlightvalues/until_us checks",
+    "No normalpath gate, fixedcompletionsleep, productchange or API change in submittedpatch"
+  ],
+  "future_only_prerequisites": [
+    "Rootclaimafterfinalownership recheck; sharedDoccoordination withPR3004/2988; no sourceappliednow.",
+    "Currentactualsource/metadata/profile/features/target/case-census binding and2separateactualcompiledCloudtestexewitnesses; useCloudsource, notoldfc31witness.",
+    "SelectedCloudcfgtestartifact fresh:false anddep-info includesactualchangedlamp.rs; candidateSHA differentbaseline beforecandidateconsumption; no source-mtime-only cache assumption.",
+    "Samesourcebase/profile2/runtimeenvironment andprivategatebytes bothvariants, exactsourceguards/finalrestore ofownedsource bytes/fullmodes andactualnewmtimes; initiallynewexclusive targetorRoot-reviewed supportedclean/producers ledger.",
+    "Rootcompilerresource/quiet-case-window allocation separatefromcurrentlyACTIVEcanonical47816; no newCargo/test allocation granted.",
+    "Concreteownedgateimplementation andfinitecleanupreviewbeforeanyexecution; thisfile is adesignproposal only."
+  ],
+  "no_extra_observations": "No unpausedwarmup/extra mutant/3tryloop. Exactlyoneplannedbaseline andonecandidate; all0/101/invalid/unrun preserved. Latercanonicalgates/nativeCI separate.",
+  "limits": "Oldfc31case2/3 remainsunchanged. A controlledmeasurement-boundary result establishesonlythatshutdownmeasurementgap, not historicalcause, all-hostdeterminism, speed or isolated-host claim.",
+  "actual_set_light_path_review": "Real::set_light can return early on missingBus, publishercreation failure or publication error beforeitsinternalaskedInstant. InthisfixtureBus/commandwerealreadyprepared,butI/Oerrorcanstillbeimmediate. Successfulpublication thenpollslightuntilmatchor1s timeout. Thus1100ms+assumed1s was conditional;1700ms independentlycrossesold1.5s measurementbound.",
+  "prior_design": "Earlier1100msproposal preservedwhole at siblingcloud-light-refusal-next-piece-proposed-1100ms-unexecuted; neverexecuted, no outcome renaming/retry or sourcepatch change."
+}

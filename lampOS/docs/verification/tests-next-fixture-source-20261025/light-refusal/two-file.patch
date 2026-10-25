@@ -1,0 +1,35 @@
+diff --git a/lampOS/crates/cloud/src/lamp.rs b/lampOS/crates/cloud/src/lamp.rs
+index 19208ae8be..365a644257 100644
+--- a/lampOS/crates/cloud/src/lamp.rs
++++ b/lampOS/crates/cloud/src/lamp.rs
+@@ -1076,11 +1076,11 @@ mod tests {
+         let after = lamp_ipc::monotonic_us();
+         assert_eq!(lamp.set_light(&blue), Ok(blue.clone()));
+         assert_eq!(lamp.light(), Ok(blue.clone()));
+-        let saved = Instant::now();
+         let dropped = Light::new(true, "red", 2).unwrap();
+         stop.store(true, std::sync::atomic::Ordering::Relaxed);
+         let requests = ringing.join().unwrap();
+         // A ring that has stopped shows nothing asked of it: said in time.
++        let saved = Instant::now();
+         assert!(lamp.set_light(&dropped).is_err());
+         assert!(saved.elapsed() < SHOWN_WITHIN + Duration::from_millis(500));
+         assert_eq!(requests.len(), 2, "{requests:?}");
+diff --git a/lampOS/docs/cloud.md b/lampOS/docs/cloud.md
+index 122246d2e4..bbfdf43802 100644
+--- a/lampOS/docs/cloud.md
++++ b/lampOS/docs/cloud.md
+@@ -1351,6 +1351,13 @@ connection made and subscribed again. A backend in the test checks the ping's
+ bearer and body, a failure said once, and a rotated broker kept. Not yet run
+ against the company's broker or on a lamp.
+ 
++The stopped-ring fixture joins its ring thread before starting the timer
++for a refused saved light. The call still has the product's one-second
++window plus the existing 500 ms test allowance; preview, saved-light,
++request and expiry assertions are unchanged. Thread shutdown is outside
++that measured call. This fixture boundary does not identify a historical
++failure's cause.
++
+ The three Wi-Fi reconnect fixtures keep their setup-helper socket open
+ until the scenario has stopped and awaited `lamp-cloud`, then signal the
+ helper to finish and join it. A fifteen-second bound diagnoses a missing

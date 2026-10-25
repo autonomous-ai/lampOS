@@ -1,0 +1,24 @@
+{
+  "base": "4f286bcc9669d72c7e075e2543065fe2d60da7b8",
+  "branch": "tests/1806-ready-voice-last",
+  "claim": "https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6392503431",
+  "files": [
+    {
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "sha256": "249a30c8dd8ef4f67c30b8888d9fc4f44d2ced5d550b4c4fbb852087fd1fc1b7",
+      "mode": 420,
+      "mtime_ns": 1792897557231786091
+    },
+    {
+      "path": "lampOS/docs/expression.md",
+      "sha256": "f2174f7141b8ecb332f2d2f1cd3adeabceb319cf215216571836433840482dfb",
+      "mode": 420,
+      "mtime_ns": 1792897557329983405
+    }
+  ],
+  "original_single_step_and_all_following_assertions_byte_identical": true,
+  "private_constructor_default_true_preserved": true,
+  "one_original_Speaking_published_last_no_duplicate": true,
+  "publisher_kept_through_step": true,
+  "no_compile_test": true
+}
