@@ -6,7 +6,10 @@
 //! that `LAMP_MEMORY_ROOM_AFTER_FORGET`'s detector
 //! ([`super::about_someone`]) marks as about a person. A room fact ("the
 //! plant needs water on Fridays") is kept as before, and a known face's own
-//! is kept to them. Off, both are what they were.
+//! is kept to them. A conversation nobody known was seen in is not given to
+//! the observation pass at all ([`observes`]): the room's would keep a
+//! guest's news worded without a pronoun (reviewer-three's P2 on #3450).
+//! Off, all three are what they were.
 use lamp_gemini::ToolCall;
 use serde_json::{Value, json};
 
@@ -43,6 +46,17 @@ pub(crate) fn withheld(call: &ToolCall, person: Option<&str>, on: bool) -> Optio
         json!({"remembered": false, "note": NOT_KEPT})
     })
 }
+
+/// Whether a conversation that ended is given to the observation pass: when
+/// `on`, only one a known person was seen in (`person` is `Some`); a room's
+/// conversation is closed with nothing kept, as an explicit `remember` of a
+/// room fact still keeps it. Off, every conversation is.
+pub(crate) fn observes(person: Option<&str>, on: bool) -> bool {
+    !on || person.is_some()
+}
+
+/// The journal's line for a room's conversation not observed; counts only.
+pub const ROOM_NOT_OBSERVED: &str = "lamp-voice provider: observation pass: a conversation nobody known was seen in is not observed, closed with nothing kept";
 
 /// The observation pass's proposals as they go to the memory: when `on` and
 /// nobody is known, without those about a person; with how many were

@@ -965,8 +965,19 @@ pub fn observe_on() -> bool {
 /// observation thread alone, never on a turn's path.
 pub type Observer = Box<dyn Fn(&Value) -> Option<Value> + Send + Sync>;
 static OBSERVER: OnceLock<Observer> = OnceLock::new();
-/// The jobs waiting for the model, one at a time ([`observe_jobs`]).
-static OBSERVING: OnceLock<SyncSender<(Option<String>, Value)>> = OnceLock::new();
+/// The jobs waiting for the model, one at a time ([`observe_jobs`]), each
+/// with [`OBSERVE_FORGETS`] as it was before its conversation was ended.
+static OBSERVING: OnceLock<SyncSender<(Option<String>, Value, u64)>> = OnceLock::new();
+/// Forgets asked of this process's memory (`forget`, `forget_everything`),
+/// counted as each begins. A job waiting for the model, or with it, from
+/// before a forget is closed with nothing kept: its words are never sent,
+/// or its proposals never given, after the person asked for them to go
+/// (reviewer-two's P2 on #3450).
+static OBSERVE_FORGETS: AtomicU64 = AtomicU64::new(0);
+
+/// The journal's line for a job closed by a forget asked after its
+/// conversation ended; counts only.
+pub const OBSERVE_FORGOTTEN: &str = "lamp-voice provider: observation pass: a forget came after the conversation ended; closed with nothing kept";
 
 /// Gives the observation pass its model: from the route that has one (the
 /// second route's chat, `second_provider::worker`). Once for a process.
@@ -5672,6 +5683,7 @@ impl DaysClient {
             // it is written after it, and what the writer has in hand is
             // let finish first, within a little of the call's time.
             if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
+                OBSERVE_FORGETS.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.forgotten.fetch_add(1, Ordering::AcqRel);
                 self.hand_ons.settle(
                     deadline
@@ -7206,7 +7218,8 @@ impl Conversation {
 /// Hands a conversation's frozen job to the observation thread, started on
 /// the first; with it busy, the job is closed with nothing kept, so the
 /// memory's bounded queue never fills with jobs nobody will finish.
-fn observe(socket: &Path, person: Option<String>, input: Value) {
+/// `forgets` is [`OBSERVE_FORGETS`] from before the conversation was ended.
+fn observe(socket: &Path, person: Option<String>, input: Value, forgets: u64) {
     let jobs = OBSERVING.get_or_init(|| {
         let (jobs, work) = sync_channel(OBSERVE_QUEUE);
         let path = socket.to_owned();
@@ -7219,9 +7232,9 @@ fn observe(socket: &Path, person: Option<String>, input: Value) {
         jobs
     });
     if let Err(
-        std::sync::mpsc::TrySendError::Full((person, input))
-        | std::sync::mpsc::TrySendError::Disconnected((person, input)),
-    ) = jobs.try_send((person, input))
+        std::sync::mpsc::TrySendError::Full((person, input, _))
+        | std::sync::mpsc::TrySendError::Disconnected((person, input, _)),
+    ) = jobs.try_send((person, input, forgets))
     {
         let job = input["job"].as_str().unwrap_or_default();
         let closed = close_job(socket, person.as_deref(), job);
@@ -7249,15 +7262,23 @@ fn close_job(socket: &Path, person: Option<&str>, job: &str) -> bool {
 /// proposes given to the memory, which checks it as it checks any pass
 /// (`tidy_apply`). A proposal the memory refuses, or a model that fails,
 /// closes the job with nothing kept. The journal has counts only.
-fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value)>) {
+fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value, u64)>) {
     let events = events_on();
     let needs_face = needs_face::on();
-    for (person, input) in jobs {
+    // A forget since the conversation ended: the job is closed unsent, or
+    // its proposals are not given (`OBSERVE_FORGETS`).
+    let forgotten = |forgets: u64| OBSERVE_FORGETS.load(Ordering::Acquire) != forgets;
+    for (person, input, forgets) in jobs {
         let Some(job) = input["job"].as_str().map(str::to_owned) else {
             continue;
         };
         let input = observe_input(&input, events, unix_ms(), crate::local_time::system());
         let started = Instant::now();
+        if forgotten(forgets) {
+            let closed = close_job(socket, person.as_deref(), &job);
+            eprintln!("{OBSERVE_FORGOTTEN} (before it was sent; closed={closed})");
+            continue;
+        }
         let proposed = OBSERVER
             .get()
             .and_then(|observer| observer(&input))
@@ -7269,6 +7290,11 @@ fn observe_jobs(socket: &Path, jobs: &Receiver<(Option<String>, Value)>) {
             })
             .map(|observations| observations_for_memory(observations, events));
         let asked_ms = started.elapsed().as_millis();
+        if forgotten(forgets) {
+            let closed = close_job(socket, person.as_deref(), &job);
+            eprintln!("{OBSERVE_FORGOTTEN} (while it was with the model; closed={closed})");
+            continue;
+        }
         let Some(observations) = proposed else {
             let closed = close_job(socket, person.as_deref(), &job);
             eprintln!(
@@ -7669,6 +7695,7 @@ fn days_writer(
         // With a model for the pass, the frozen job comes back to be sent
         // to it (#1693 (2)); without, the memory is told there is none.
         let observing = OBSERVER.get().is_some();
+        let forgets = OBSERVE_FORGETS.load(Ordering::Acquire);
         let answer = bounded_exchange_up_to(
             socket,
             &for_person(
@@ -7687,7 +7714,16 @@ fn days_writer(
                 .and_then(|answer| answer.get("input").cloned())
                 .filter(|input| input["job"].is_string())
             {
-                Some(input) => observe(socket, ended.person, input),
+                // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, a conversation
+                // nobody known was seen in is not observed: a guest's, or
+                // the owner's unseen, would be kept as the room's and told
+                // to every later session (reviewer-three's P2 on #3450).
+                Some(input) if !needs_face::observes(ended.person.as_deref(), needs_face::on()) => {
+                    let job = input["job"].as_str().unwrap_or_default();
+                    let closed = close_job(socket, None, job);
+                    eprintln!("{} (closed={closed})", needs_face::ROOM_NOT_OBSERVED);
+                }
+                Some(input) => observe(socket, ended.person, input, forgets),
                 None => eprintln!(
                     "lamp-voice provider: memory conversation end gave no job; no observation pass"
                 ),
