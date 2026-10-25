@@ -1,0 +1,114 @@
+{
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "source_patch_sha256": "7edefc7fb71353acefd98113e66b35c8bceff93db42539d1adc40fc9e3542d2e",
+  "source_count": 7132,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "c927e8aa810a3661cd263b0267989627a214c3553a96d6058bcf1dc8134364c6",
+  "changed_source_sha256": {
+    "lampOS/crates/update/src/head_touch.rs": "a198bf77a8aa299915f9575826023c1139a7ed90844462a38b5e92f14119be92",
+    "lampOS/crates/update/tests/install.rs": "c95384a2088f6acfdb728f1b2a43cf226a6fa486bbe2ca44823f6a7fe6983e24",
+    "lampOS/docs/install.md": "f2431eda1c855ede542bc78c97751b4646f2f991703419ab0b3880579ffa79ec",
+    "lampOS/docs/reuse-decisions.md": "52672acb56d9e081dcf354c8c403540846d6d46f61b5416c3c85abaa8dfdc2fa",
+    "lampOS/docs/updates.md": "a0caf4fb0f48ab1ab9df30b7ed773b0176502651a9d1b4f0c5c714c180fe22f6"
+  },
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-25T21:38:48Z",
+      "finished": "2026-10-25T21:39:00Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-update --all-targets -- -D warnings",
+      "started": "2026-10-25T21:39:00Z",
+      "finished": "2026-10-25T21:39:59Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-25T21:39:59Z",
+      "finished": "2026-10-25T21:41:19Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-install": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --test install -- --test-threads=1",
+      "started": "2026-10-25T21:41:19Z",
+      "finished": "2026-10-25T21:51:50Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 101,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-round-head": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --test round head_touch:: -- --test-threads=1",
+      "started": "2026-10-25T21:51:50Z",
+      "finished": "2026-10-25T22:02:34Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 34,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-apply": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --lib apply::tests:: -- --test-threads=1",
+      "started": "2026-10-25T22:02:34Z",
+      "finished": "2026-10-25T22:02:48Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-head-reader": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --lib head_touch::tests:: -- --test-threads=1",
+      "started": "2026-10-25T22:02:48Z",
+      "finished": "2026-10-25T22:02:49Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "new_install_control_pass_counts": {
+    "fifo_drop_in_is_refused_before_mutation": 1,
+    "fifo_without_a_writer_is_refused_before_mutation": 1,
+    "fifo_body_calibration_is_refused_before_mutation": 1,
+    "directory_drop_in_is_refused_before_mutation": 1,
+    "regular_benign_drop_in_is_preserved": 1,
+    "symlink_to_regular_drop_in_is_preserved": 1,
+    "missing_local_files_keep_install_compatibility": 1,
+    "dangling_drop_in_keeps_missing_file_compatibility": 1,
+    "dev_null_drop_in_mask_is_preserved": 1
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-install": "97f348ce23377945a845bf682b984c7f1a47977a4d376c27a57153c9ba89149f",
+    "test-round-head": "b73317e676769694509563be2a2900f26ff532ee8b2ec10584c9b61818d9ca71",
+    "test-apply": "5bf1e5a7d0bd52be4f2c99fac83254effc2cd2e7837c633aaa8e00a7f3e12e78",
+    "test-head-reader": "d2a16cadb7400e67b22511df9189d7af322ed8e370cbe7019fcb0e6baea72250"
+  },
+  "limits": "Native x86_64 Mac file/channel/host stand-ins. No systemd, lamp, global regular-file deadline or physical latency claim. Original FIFO failure is retained separately."
+}

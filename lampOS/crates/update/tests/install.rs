@@ -4654,3 +4654,431 @@ fn install_head_body_refuses_calibration_environment_overrides_before_mutation()
         assert!(lamp.host.calls.is_empty(), "{:?}", lamp.host.calls);
     }
 }
+
+#[cfg(unix)]
+mod head_touch_preflight_files {
+    use super::*;
+    use std::{
+        io::{self, Read},
+        os::unix::fs::{FileTypeExt, MetadataExt, symlink},
+        process::{Child, Command, ExitStatus, Stdio},
+        time::{Duration, Instant},
+    };
+
+    const CHILD_ROOT: &str = "LAMP_UPDATE_HEAD_PREFLIGHT_TEST_ROOT";
+    const DROP_IN: &str = "/etc/systemd/system/lamp-voice.service.d/30-local.conf";
+    const TARGET: &str = "/etc/lampOS/head-preflight-local.conf";
+    const BENIGN: &str = "[Service]\nEnvironment=LOCAL_PREFLIGHT_MARKER=kept\n";
+
+    #[derive(Clone, Copy, Debug)]
+    enum Case {
+        Fifo,
+        FifoNoWriter,
+        BodyFifo,
+        Directory,
+        Regular,
+        RegularSymlink,
+        Missing,
+        DanglingSymlink,
+        NullMask,
+    }
+
+    impl Case {
+        fn refuses(self) -> bool {
+            matches!(
+                self,
+                Self::Fifo | Self::FifoNoWriter | Self::BodyFifo | Self::Directory
+            )
+        }
+
+        fn local_path(self) -> &'static str {
+            match self {
+                Self::BodyFifo => "/etc/lampOS/body/lamp.env",
+                _ => DROP_IN,
+            }
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct Kept {
+        device: u64,
+        inode: u64,
+        mode: u32,
+        bytes: Option<String>,
+        target: Option<PathBuf>,
+    }
+
+    // Never open a special node while taking the fixture's before/after image.
+    fn kept(path: &Path) -> io::Result<Option<Kept>> {
+        let meta = match fs::symlink_metadata(path) {
+            Ok(meta) => meta,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        Ok(Some(Kept {
+            device: meta.dev(),
+            inode: meta.ino(),
+            mode: meta.mode(),
+            bytes: if meta.is_file() {
+                Some(sha256_hex(&fs::read(path)?))
+            } else {
+                None
+            },
+            target: if meta.file_type().is_symlink() {
+                Some(fs::read_link(path)?)
+            } else {
+                None
+            },
+        }))
+    }
+
+    fn image(root: &Path) -> BTreeMap<PathBuf, Kept> {
+        let mut result = BTreeMap::new();
+        let mut folders = vec![root.to_owned()];
+        while let Some(folder) = folders.pop() {
+            for entry in fs::read_dir(folder).unwrap() {
+                let path = entry.unwrap().path();
+                if fs::symlink_metadata(&path).unwrap().is_dir() {
+                    folders.push(path.clone());
+                }
+                result.insert(
+                    path.strip_prefix(root).unwrap().to_owned(),
+                    kept(&path).unwrap().unwrap(),
+                );
+            }
+        }
+        result
+    }
+
+    struct Running(Child);
+
+    impl Running {
+        fn reap(&mut self) -> io::Result<ExitStatus> {
+            if let Ok(Some(status)) = self.0.try_wait() {
+                return Ok(status);
+            }
+            // Even if the status probe or kill reports an error, attempt wait;
+            // the child may have exited between the probe and the signal.
+            let _ = self.0.kill();
+            self.0.wait()
+        }
+    }
+
+    impl Drop for Running {
+        fn drop(&mut self) {
+            // These direct children create no processes or threads of their
+            // own beyond the test harness. Reap even on an unexpected error.
+            let _ = self.reap();
+        }
+    }
+
+    fn make_fifo(path: &Path) -> io::Result<()> {
+        // rustix does not expose mkfifoat on Apple. Finish and reap this
+        // portable fixture utility before starting the install process.
+        let mut child = Running(
+            Command::new("mkfifo")
+                .args(["-m", "600"])
+                .arg(path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()?,
+        );
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(status) = child.0.try_wait()? {
+                return if status.success() {
+                    Ok(())
+                } else {
+                    Err(io::Error::other(format!("mkfifo fixture exited {status}")))
+                };
+            }
+            if Instant::now() >= deadline {
+                child.reap()?;
+                return Err(io::Error::other("mkfifo fixture setup deadline"));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    fn install_child(case: Case, work: &Path) {
+        let mut lamp = Lamp::new(188, &[]);
+        assert!(lamp.root.starts_with(work), "parent owns all child scratch");
+        let path = lamp.on(case.local_path());
+        let target = lamp.on(TARGET);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        match case {
+            Case::Fifo | Case::FifoNoWriter | Case::BodyFifo => {
+                fs::rename(work.join("prepared-fifo"), &path).unwrap();
+                assert!(fs::symlink_metadata(&path).unwrap().file_type().is_fifo());
+            }
+            Case::Directory => fs::create_dir(&path).unwrap(),
+            Case::Regular => fs::write(&path, BENIGN).unwrap(),
+            Case::RegularSymlink => {
+                fs::write(&target, BENIGN).unwrap();
+                symlink(&target, &path).unwrap();
+            }
+            Case::Missing => {}
+            Case::DanglingSymlink => symlink(&target, &path).unwrap(),
+            Case::NullMask => {
+                assert!(
+                    fs::metadata("/dev/null")
+                        .unwrap()
+                        .file_type()
+                        .is_char_device()
+                );
+                symlink("/dev/null", &path).unwrap();
+            }
+        }
+        let mut pins: serde_json::Value =
+            serde_json::from_str(SETTINGS.iter().find(|(p, _)| *p == PINS).unwrap().1).unwrap();
+        pins["legacy_head"] = true.into();
+        pins["preflight_owned_marker"] = "keep".into();
+        fs::create_dir_all(lamp.on(PINS).parent().unwrap()).unwrap();
+        fs::write(lamp.on(PINS), serde_json::to_vec(&pins).unwrap()).unwrap();
+        // The updater may create its lock before preflight. Precreate it so
+        // the refusal image tests all subsequent mutation, including records.
+        drop(Records::new(lamp.on(&lamp.config.records)).lock().unwrap());
+        if case.refuses() {
+            fs::create_dir_all(lamp.on("/etc/systemd/system")).unwrap();
+            fs::write(lamp.on("/var/lib/lampos-update/state.json"), "{not json").unwrap();
+            let current = lamp.on("/opt/lampOS/body/current");
+            fs::create_dir_all(current.parent().unwrap()).unwrap();
+            symlink("b".repeat(64), &current).unwrap();
+            for name in [
+                "lamp-voice.service",
+                "lamp-expression.service",
+                "lamp-controls.service",
+                "lamp-body.service",
+            ] {
+                fs::write(
+                    lamp.on(&format!("/etc/systemd/system/{name}")),
+                    format!("old local {name}\n"),
+                )
+                .unwrap();
+            }
+        }
+        let before = image(&lamp.root);
+        let drop_in = kept(&path).unwrap();
+        let target_file = kept(&target).unwrap();
+        assert!(lamp.host.calls.is_empty());
+        // Publish atomically, after all setup and the snapshot, immediately
+        // before the real install call. No FIFO has been opened yet.
+        fs::write(work.join("ready.tmp"), lamp.root.to_str().unwrap()).unwrap();
+        fs::rename(work.join("ready.tmp"), work.join("ready")).unwrap();
+        let result = lamp.install();
+        if case.refuses() {
+            let error = result.unwrap_err();
+            assert!(error.contains(case.local_path()), "{error}");
+            assert_eq!(image(&lamp.root), before, "{case:?}: refusal mutated files");
+            assert!(lamp.host.calls.is_empty(), "{:?}", lamp.host.calls);
+            assert!(lamp.host.steps.is_empty() && lamp.host.boot_steps.is_empty());
+        } else {
+            assert_eq!(result.unwrap().sequence, 188);
+            assert_eq!(kept(&path).unwrap(), drop_in, "{case:?}: kept override");
+            assert_eq!(kept(&target).unwrap(), target_file, "{case:?}: kept target");
+            let after: serde_json::Value =
+                serde_json::from_slice(&fs::read(lamp.on(PINS)).unwrap()).unwrap();
+            pins.as_object_mut().unwrap().remove("legacy_head");
+            assert_eq!(after, pins, "normal head-pins migration still happens");
+            assert!(!lamp.on("/etc/lampOS/body/lamp.env").exists());
+            assert!(
+                lamp.host
+                    .calls
+                    .iter()
+                    .any(|call| call.starts_with("enable "))
+            );
+        }
+        fs::write(work.join("finished"), format!("{case:?}")).unwrap();
+    }
+
+    fn ready_root(work: &Path) -> io::Result<Option<PathBuf>> {
+        let root = match fs::read_to_string(work.join("ready")) {
+            Ok(root) => PathBuf::from(root),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        if !root.starts_with(work) {
+            return Err(io::Error::other("ready witness is outside parent scratch"));
+        }
+        Ok(Some(root))
+    }
+
+    fn parent(case: Case, name: &str, work: &Path) -> io::Result<()> {
+        if matches!(case, Case::Fifo | Case::FifoNoWriter | Case::BodyFifo) {
+            make_fifo(&work.join("prepared-fifo"))?;
+        }
+        let log = work.join("child.log");
+        let output = fs::File::create(&log)?;
+        let mut child = Running(
+            Command::new(std::env::current_exe()?)
+                .args(["--exact", name, "--nocapture", "--test-threads=1"])
+                .env(CHILD_ROOT, work)
+                .env("TMPDIR", work)
+                .stdin(Stdio::null())
+                .stdout(Stdio::from(output.try_clone()?))
+                .stderr(Stdio::from(output))
+                .spawn()?,
+        );
+        let setup_deadline = Instant::now() + Duration::from_secs(15);
+        let mut install_deadline = None;
+        let mut fifo = None;
+        let mut writer: Option<fs::File> = None;
+        let status = loop {
+            if install_deadline.is_none()
+                && let Some(root) = ready_root(work)?
+            {
+                fifo = Some(root.join(case.local_path().trim_start_matches('/')));
+                install_deadline =
+                    Some(Instant::now() + Duration::from_secs(if case.refuses() { 5 } else { 30 }));
+            }
+            if let Some(status) = child.0.try_wait()? {
+                break Some(status);
+            }
+            if matches!(case, Case::Fifo | Case::BodyFifo)
+                && writer.is_none()
+                && let Some(path) = &fifo
+            {
+                match rustix::fs::open(
+                    path,
+                    rustix::fs::OFlags::WRONLY
+                        | rustix::fs::OFlags::NONBLOCK
+                        | rustix::fs::OFlags::CLOEXEC,
+                    rustix::fs::Mode::empty(),
+                ) {
+                    Ok(fd) => {
+                        let file: fs::File = fd.into();
+                        if !file.metadata()?.file_type().is_fifo() {
+                            return Err(io::Error::other("FIFO witness changed file type"));
+                        }
+                        // A nonblocking FIFO writer opens only once a reader
+                        // has arrived. Hold it without data: old read_to_string
+                        // is now blocked in its read, not fixture preparation.
+                        writer = Some(file);
+                    }
+                    Err(rustix::io::Errno::NXIO | rustix::io::Errno::NOENT) => {}
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            if Instant::now() >= install_deadline.unwrap_or(setup_deadline) {
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        let fifo_reader_reached = writer.is_some();
+        let reaped = child.reap()?;
+        drop(writer);
+        // A fast child can publish ready and exit between the witness read
+        // and try_wait. Consume its final witness after a witnessed exit.
+        // A setup timeout still cannot be relabelled as a post-ready timeout.
+        let ready = install_deadline.is_some() || (status.is_some() && ready_root(work)?.is_some());
+        let mut journal = String::new();
+        fs::File::open(&log)?
+            .take(4096)
+            .read_to_string(&mut journal)?;
+        if !ready {
+            return Err(io::Error::other(format!(
+                "{case:?}: fixture never reached its ready witness; reaped={reaped}; {journal}"
+            )));
+        }
+        if status.is_none() {
+            return Err(io::Error::other(format!(
+                "{case:?}: install exceeded its post-ready deadline; FIFO-reader-reached={fifo_reader_reached}; reaped={reaped}; {journal}"
+            )));
+        }
+        if !reaped.success() || !work.join("finished").is_file() {
+            return Err(io::Error::other(format!(
+                "{case:?}: install child failed after ready; FIFO-reader-reached={fifo_reader_reached}; reaped={reaped}; {journal}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn run(case: Case, name: &str) {
+        if let Some(work) = std::env::var_os(CHILD_ROOT) {
+            install_child(case, Path::new(&work));
+            return;
+        }
+        let work = tempfile::tempdir().unwrap();
+        let result = parent(case, name, work.path());
+        // parent has killed/reaped its child before scratch removal or an
+        // assertion panic; no blocked thread or orphaned fixture is left.
+        work.close().unwrap();
+        result.unwrap();
+    }
+
+    #[test]
+    fn fifo_drop_in_is_refused_before_mutation() {
+        run(
+            Case::Fifo,
+            "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+        );
+    }
+
+    #[test]
+    fn fifo_without_a_writer_is_refused_before_mutation() {
+        // The separate original-code witness supplies a writer. This case
+        // must refuse with no writer at all, including during open itself.
+        run(
+            Case::FifoNoWriter,
+            "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+        );
+    }
+
+    #[test]
+    fn fifo_body_calibration_is_refused_before_mutation() {
+        run(
+            Case::BodyFifo,
+            "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+        );
+    }
+
+    #[test]
+    fn directory_drop_in_is_refused_before_mutation() {
+        run(
+            Case::Directory,
+            "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+        );
+    }
+
+    #[test]
+    fn regular_benign_drop_in_is_preserved() {
+        run(
+            Case::Regular,
+            "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+        );
+    }
+
+    #[test]
+    fn symlink_to_regular_drop_in_is_preserved() {
+        run(
+            Case::RegularSymlink,
+            "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+        );
+    }
+
+    #[test]
+    fn missing_local_files_keep_install_compatibility() {
+        run(
+            Case::Missing,
+            "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+        );
+    }
+
+    #[test]
+    fn dangling_drop_in_keeps_missing_file_compatibility() {
+        run(
+            Case::DanglingSymlink,
+            "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+        );
+    }
+
+    #[test]
+    fn dev_null_drop_in_mask_is_preserved() {
+        run(
+            Case::NullMask,
+            "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+        );
+    }
+}

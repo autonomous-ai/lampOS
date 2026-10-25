@@ -783,6 +783,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    happens before reading or repairing state, making users, moving links,
    or writing units or head files. Local drop-ins and head files remain
    untouched on that refusal; benign unrelated drop-ins remain supported.
+   The local reader opens without waiting for a FIFO writer and checks the
+   type of that same open file before reading contents. Regular files and
+   links to regular files remain supported. An actual null-device drop-in
+   mask remains empty, checked by its character-device identity without
+   reading the device; a filename alone does not grant that exception.
+   FIFOs, directories and other nonregular inputs are refused. Missing
+   files, including dangling links, keep their existing absence behavior.
+   This covers the local units, drop-ins, known Body calibration and pins
+   that the head-pair reader inspects; it does not add a deadline for
+   regular-file storage or work in the live touch path.
 2. Makes the users `lampos` (in `audio`, `video`, `dialout`, `i2c` and
    `gpio`, each only if the image has that group, and says which it has
    not) and `lampos-memory` (in `lampos`), unless they are there.
