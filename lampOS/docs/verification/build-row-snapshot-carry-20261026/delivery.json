@@ -1,0 +1,13 @@
+{
+  "original_pr": 3482,
+  "carry_pr": 3495,
+  "carry_head": "ea45bd280f73e44d3bbbf7ae87a6b08a99f422f5",
+  "train_pr": 3496,
+  "landed_commit": "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+  "whole_tree_equal": true,
+  "landed_changed_paths": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "qualification": "Non-build-read Markdown-only snapshot; reader-two and reader-three READ-OK on ea45; original closed after verifying preserved authored commit and replacement.",
+  "limits": "Historical row snapshot; not a fresh lamp measurement."
+}

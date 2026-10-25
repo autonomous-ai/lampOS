@@ -1,0 +1,33 @@
+{
+  "offered_head": "c8be4d3375e71c8886073b3cc3f99971ff38d3a0",
+  "arm64_run": 40217901401,
+  "linux_clippy_run": 40217901388,
+  "conclusions": "Both success",
+  "executed_preview": "52530a10fc63084e534555914d1ec5e85b4c6e10",
+  "preview_tree": "565e0b4df724ea8cc2256f83b471d3f3323aeb45",
+  "preview_parents": [
+    "9e9e6733a1ed32ba1a14b6920f7120035b89396a",
+    "c8be4d3375e71c8886073b3cc3f99971ff38d3a0"
+  ],
+  "passed": 11305,
+  "tracked_leaks_in_passed": 1,
+  "skipped": 106,
+  "unique_terminal_cases": 11305,
+  "repeated_equal_rows": 35,
+  "own_control_pass_counts": {
+    "two_held_colleagues_keep_the_older_voice_constraint": 1,
+    "held_voice_constraints_close_with_the_carry_and_reject_old_callbacks": 1,
+    "a_full_held_voice_bound_keeps_the_owner_by_face_until_a_fresh_call": 1,
+    "a_recent_call_can_resume_after_forget_without_a_stale_closed_scope": 1,
+    "a_fresh_call_clears_the_previous_callers_held_voice_constraints": 1,
+    "every_held_print_constrains_the_voice_without_eviction": 1,
+    "a_missing_held_print_needs_its_own_cached_reply": 1,
+    "duplicates_fill_missing_evidence_without_replacing_known_evidence": 1,
+    "capacity_exhaustion_stays_face_only_until_a_fresh_call": 1,
+    "closed_scopes_and_old_callbacks_cannot_restore_constraints": 1
+  },
+  "raw_log_sha256": "25393740385dadcce2f8e07b6ba5e06329b3cc9eab1b9cc32cfd89d164eef26d",
+  "limits": "Original run on offered c8be4d337 and the actual recorded merge preview; later base changes remain separate. No lamp, acoustic latency or activation claim.",
+  "offered_tree": "565e0b4df724ea8cc2256f83b471d3f3323aeb45",
+  "preview_equals_offered_tree": true
+}

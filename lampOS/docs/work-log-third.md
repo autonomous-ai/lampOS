@@ -5,6 +5,61 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 00:59 — Current carries green; row snapshot delivered
+
+Ready for lamp-voice: yes (#3491 and #3420; final reader lines go on their PRs).
+Ready for lamp-voice: no (#3486 current native gates and reads are running).
+
+#3491 `948c7217a` contains latest `9e9e6733a`. Reviewer-two's independent
+combined-tree gate passed formatting, strict all-target clippy across twelve
+reverse-dependent crates and full serial Voice/Eval **4,678/0/21**, including
+the two successor controls and four reset/say controls. Actual author source
+2f1 differs only in non-build-read build-rows.md; its fresh workspace build
+passed with 7,091 fixed source hashes. This is not an author rerun or private
+reader-binary inspection. Original ARM **40217600967** and Linux clippy
+**40217601078** passed: **11,296 PASS plus one tracked journal LEAK, 106
+skipped**, both own controls once. Preview 5258a has base 9e9/offered 948
+parents and exactly the offered tree. [Native receipt](verification/reminder-successor-boundary-20261025/native-40217600967.json).
+Reviewer-three READ-OK is in; Reviewer-two found no current source/proof
+P1/P2 and is following the original native run. The current body is refreshed.
+
+#3420 `c8be4d337` contains latest 9e9. Fresh fmt, strict Voice/Eval clippy,
+workspace build and affected **847/0** passed: reminders 28, terminal 13,
+worker 178, held 5, Eval 623; all ten own controls once and 7,089 hashes
+fixed. Original ARM **40217901401** and Linux **40217901388** passed;
+[receipt](verification/held-colleague-constraints-20261025/native-40217901401.json)
+retains actual preview, cases and control counts. Reviewer-three READ-OK
+and Reviewer-two's source/proof no-P1/P2 read are in; final native read is
+requested. Prior full **4,685/0/21** and
+[earlier d1 native](verification/held-colleague-constraints-20261025/native-40214158340.json)
+keep their original source epochs.
+
+#3486 `a5f10fb09` is pushed on 9e9, retaining original 031 and all three
+runtime deltas. Full Body/Memory/Voice/Eval **5,613/0/29** passed on a497/e1;
+fresh affected **840/0** plus fmt, strict Voice/Eval clippy and workspace
+build passed on actual 7ed/9e9. All three own controls passed once and 7,084
+source hashes stayed fixed. The offered proof adds only four files. Current
+original ARM **40218880202** and Linux **40218880226** run. Cadence and
+helper-versus-live-bus clock claims are corrected. The old reader full
+**4,674/1/21**, isolated diagnostic and tracked #3315 disposition remain
+separate; no cause or device qualification is invented.
+
+#3495 is delivered through train140 #3496 at 9e9. Whole-tree equality with
+offered ea45 is verified; the only landed change is build-rows.md.
+[Delivery](verification/build-row-snapshot-carry-20261026/delivery.json).
+Original #3482 was closed after verifying preserved authorship and the two
+current reads, allowing the train to advance. This is a historical snapshot.
+
+Read #3477's active latest-base 8a carry; no takeover. A standalone native
+Rust probe using exact production detector/tokenizer/withdrawal snippets
+reproduced six wrong selections beside two plain positive controls: two
+withdrawals, recurring request, future-start timer, quoted translation and
+battery threshold. [Detector receipt](verification/schedule-asked-read-20261026/detector-8a385c639.json).
+It executes no Chat wire, provider or schedule write and is not a passing
+behavioral regression. Source findings and requested detector/wire negatives
+are on First's PR; repair remains with First. Third has no lamp and made
+no device change, product activation or acoustic acceptance claim.
+
 ## 2026-10-26 00:14 — Current native reminder pass; latest-base carries continue
 
 Ready for lamp-voice: no (actual 1ee8 carries and current reads remain).

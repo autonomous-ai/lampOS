@@ -1,0 +1,71 @@
+{
+  "source_head": "8a385c639e2f32a3e182d5082a29241bd52c9b7d",
+  "production_source_sha256": {
+    "lampOS/crates/voice/src/tools/schedule_asked.rs": "2c4989ae834a6ce9dc1e5e1a4ef7f92c097ef6854cf6b4face5be6e9614c73ad",
+    "lampOS/crates/voice/src/known_faces.rs": "db1c2b4a08d47b6eb81d9c6f31ff6f851bc90f3b11c95bb5e775bfe2dba80662",
+    "lampOS/crates/voice/src/remember/asked.rs": "99e3b74bca7a7ff5ef99a6ce97b6c0a2f281835ebe1b448077d6a492d28d8825"
+  },
+  "extracted_source_sha256": {
+    "schedule_asked.rs": "374d2fdebb623bc5d2b431ce2a77c96540d84f4f82db246952ad93e602522549",
+    "known_faces.rs": "7b84681529f7f959ff2bc86e3381ac45f42fc0df907900d0597e44a5ada08488",
+    "withdrawn.rs": "15f591f7c8ca4f56f002418323828035c5877335a7f15951974fb4a2c9ac83e1",
+    "probe.rs": "9f75007c0a98b905cc34f989406e8a92efafba69821daad69fa4f11c1a9e8e0c"
+  },
+  "cases": [
+    {
+      "label": "positive timer",
+      "input": "Set a timer for ten minutes.",
+      "asserted_observed": "set_timer"
+    },
+    {
+      "label": "positive reminder",
+      "input": "Remind me at nine to take my pills.",
+      "asserted_observed": "set_reminder"
+    },
+    {
+      "label": "withdrawn change mind",
+      "input": "Set a timer for ten minutes. I changed my mind.",
+      "asserted_observed": "set_timer"
+    },
+    {
+      "label": "withdrawn ignore",
+      "input": "Set a timer for ten minutes. Please ignore that request.",
+      "asserted_observed": "set_timer"
+    },
+    {
+      "label": "recurring request",
+      "input": "Remind me at nine to take my pills every day.",
+      "asserted_observed": "set_reminder"
+    },
+    {
+      "label": "future-start duration",
+      "input": "Set a timer for ten minutes starting at noon.",
+      "asserted_observed": "set_timer"
+    },
+    {
+      "label": "quoted translation",
+      "input": "Translate this sentence into French. \u201cRemind me in ten minutes to stretch.\u201d",
+      "asserted_observed": "set_timer"
+    },
+    {
+      "label": "battery threshold",
+      "input": "Remind me at 10% to charge my phone.",
+      "asserted_observed": "set_reminder"
+    }
+  ],
+  "limits": "Standalone exact production detector prefix, lower_words and withdrawal constants/functions, with module scaffolding only. No force closure, Chat::wire, provider, schedule write or workspace test is executed. Assertions confirm observed wrong selections; they are not passing behavioral regressions.",
+  "results": [
+    "positive timer: Some(\"set_timer\")",
+    "positive reminder: Some(\"set_reminder\")",
+    "withdrawn change mind: Some(\"set_timer\")",
+    "withdrawn ignore: Some(\"set_timer\")",
+    "recurring request: Some(\"set_reminder\")",
+    "future-start duration: Some(\"set_timer\")",
+    "quoted translation: Some(\"set_timer\")",
+    "battery threshold: Some(\"set_reminder\")"
+  ],
+  "binary_sha256_after_execution": "9a0b98c2de17f7c8ca5c26a608d7fbbdbb4710f4a29b689757981bf33ae5cf53",
+  "execution_exit": 0,
+  "command": "rustc +1.96.0 --edition=2021 probe.rs -o probe; ./probe",
+  "recorded_utc": "2026-10-25T17:59:54.232340+00:00"
+}
