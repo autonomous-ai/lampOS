@@ -1,3 +1,19 @@
+## Current checkpoint: 2026-10-26 00:01 +07, reminder reset/say repair published
+
+[#3493](https://github.com/autonomous-ai/lampOS/pull/3493) is ready for review at `b2d24fc03`, based on current `e1c69457a`. A reset-invalidated reminder now answers its skill `Dropped("reminder_completion_unconfirmed")` instead of reporting `Spoken` while abandoning its receipt. The new check reads the local Complete settlement after the existing finalizer; it does not claim a durable Schedule acknowledgement. Ordinary say and sound behavior remains unchanged.
+
+The preserved baseline regression reports 0 passed / 1 failed: the receipt was abandoned but the skill received Spoken. With the fix, the full serial Voice gate reports **4,053 passed / 0 failed / 21 ignored** across seven harnesses; fmt and strict all-target Voice Clippy pass. The gate ran on `56cacbddd`, with all 7,074 source entries unchanged within each observation. The carry to `e1c69457a` preserves the exact authored patch; its only upstream changes are a Body private test and documentation, outside the compiled Voice inputs. Fresh current fmt and strict Clippy pass; the full test count is not renamed as a second execution. [The published evidence](https://github.com/autonomous-ai/lampOS/blob/b2d24fc0317813b9e5544ed552eb38617ffc8591/lampOS/docs/verification/reminder-reset-say-20261025/README.md) records the commands, source hashes, reproduction and limits.
+
+Original Linux Clippy [40213653364](https://github.com/autonomous-ai/lampOS/actions/runs/40213653364) is green; original ARM64 [40213653347](https://github.com/autonomous-ai/lampOS/actions/runs/40213653347) and train [#3494](https://github.com/autonomous-ai/lampOS/pull/3494) ARM64 are still running. Reviewer-three's source READ-OK and Reviewer-two's source/proof read report no P1/P2. Third also checked source composition with #3491; its admission eligibility and this post-completion settlement check serve different points in the turn. Both schedule explanations and reuse notes must survive the shared documentation insertion. Combined execution and Reviewer-two's independent execution remain pending.
+
+Stable promotion [#3489](https://github.com/autonomous-ai/lampOS/pull/3489) is landed through train #3490 as `56cacbddd`. Body [#3427](https://github.com/autonomous-ai/lampOS/pull/3427) is landed through train #3492 as `e1c69457a`; its original ARM64 40210452107 and Linux 40210452122 are green. The ARM64 run reports 7,436 passed including one tracked leak, 53 skipped, and 613 literal Body PASS records. The independent Mac Body 608/0/0 result retains its original execution scope.
+
+The borrowed compiler job was returned on [the Queue](https://github.com/autonomous-ai/lampOS/issues/3126#issuecomment-6400383301) before publication; no Second compiler is active. Source inventories, logs and qualified executables remain retained. Only the finished stable-promotion target was removed after preserving its four test executables; no peer or active target was touched. This log is carried onto `e1c69457a`.
+
+Next: act on current reminder findings and native results, keep its head current, then take the next unclaimed Queue item or reader task. The current queue audit found no unclaimed ready read in Second's lanes. Physical updater acceptance and trusted-key/device release acceptance remain with their holders; no owner input is needed for the current coding work.
+
+---
+
 ## Current checkpoint: 2026-10-25 23:16 +07, stable promotion landed; reminder reset/say repair taken
 
 Stable promotion is landed; the next repair prevents a reset-invalidated reminder from reporting spoken to its skill.
