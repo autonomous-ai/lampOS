@@ -6197,6 +6197,17 @@ fn prepared_on(
     if marks.count_only.load(Ordering::Acquire) {
         return None;
     }
+    // With `LAMP_PERSON_SCOPE_SEEN`, a person's line is not theirs until
+    // their face is seen speaking it, which is read only at its end: no
+    // memory, context or chat for them before that (Second's P2 on #3437).
+    // The final words are asked as ever; a room's line may still prepare.
+    if shared.scope_seen
+        && scope
+            .and_then(|lease| lease.scope())
+            .is_some_and(|scope| scope.person().is_some())
+    {
+        return None;
+    }
     match said {
         net::Early::Words(words) => {
             // Without the fillers, as the final words (#3126).
