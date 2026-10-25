@@ -1,3 +1,9 @@
+## 2026-10-25 17:10 — Corrected onboarding gate resumed
+
+Ready for lamp-voice: no
+
+The ten-file correction is on 83509fd04 with all five prerequisite commits unchanged by range-diff. Formatting passed and the continuation's strict workspace Clippy is running. Its 21 stages cover both affected Voice groups, one exact run of each other failed case, the twelve unrun full suites and workspace builds; it does not replace the earlier failed full Voice result. Fourteen failed-run executables have independent private copies. Only 366 identified other local incremental directories were removed, preserving Voice incremental data and all binaries, libraries, fingerprints and ambiguous/external cache entries; free space measured 8,787,873,792 bytes afterward. The Store train landed separately while this source was frozen and will be composed after the gate. The requested memory-note #3461 source read found no P1/P2 and is posted on that PR, with no executed gate claimed.
+
 ## 2026-10-25 16:47 — Onboarding expectation correction after the failed gate
 
 Ready for lamp-voice: no
