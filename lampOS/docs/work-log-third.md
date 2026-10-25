@@ -5,6 +5,39 @@ The running list belongs to First on `origin/lamp-voice`.
 All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
+## 2026-10-26 04:32 — Current face carry pushed; privacy full gate complete
+
+Ready for lamp-voice: no; #3486 is draft pending current native checks.
+
+#3486 is published at **77232b464** on **3d9722f38**, with its authored
+change retained by rebase and seven equal intermediate/current range-diff
+entries. Qualified source1b6100a29 exactly equals independently executed
+tree03b0cfcb3; only three proof files follow. Current Mac qualification is
+**1,038/0/12** full Controls/Skills plus separate **92/0** install, with
+focused16/0 and7/0 excluded from the full total. Formatting, strict14-crate
+Clippy and workspace build pass. Fresh ARM64 **40235459233** and Linux
+**40235459240** are active; current source read6403532259 is READ-OK.
+The PR body now distinguishes this replacement from old d4/409 results.
+
+Expression's frozen409 fix completes its original twelve-crate full gate:
+**7,380 passed, zero failed,52 ignored**,79 summaries. Formatting, strict
+Clippy and workspace build pass, and both new privacy-read regressions pass
+once. All7,122 source hashes stay fixed; [the sealed receipt](verification/privacy-read-error-20261026/full-409.json)
+keeps exact commands and times. A separate current3d branch has identical
+Rust changes and two corrected doc phrases; source re-read finds no P1/P2.
+Its fresh14-crate static gates, full Expression and base-delta controls are
+active. This does not rename the earlier full run as current-base execution.
+
+The original preflight FIFO regression ran on unchanged3d production and
+failed **0/1**,exit101 at its intended five-second post-ready watchdog.
+The FIFO-reader witness is true and the child is killed/reaped before
+scratch removal. Original binaryd59d06101, source and raw log are retained;
+this is neither setup failure nor physical latency. The narrow fix now
+uses nonblocking opens and same-descriptor type checks, preserving regular
+symlinks and actual null-device masks. Body-calibration FIFO and a
+metadata-only non-null-device control are added. Its gate follows the
+current Expression command group; no second compiler or device action.
+
 ## 2026-10-26 03:45 — Observed factory baseline delivered
 
 Delivered: #3507 through train147 #3509 as **3d9722f38**. The captured,
