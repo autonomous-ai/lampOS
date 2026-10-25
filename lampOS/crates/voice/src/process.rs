@@ -1533,6 +1533,7 @@ fn second_route_worker_environment(
         crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
         crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
         crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
+        crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
         crate::remember::FORGET_ASKED_ENVIRONMENT,
         crate::second_provider::WRITTEN_WAIT_ENVIRONMENT,
         crate::second_provider::CUE_AFTER_ENVIRONMENT,
@@ -1621,6 +1622,7 @@ mod tests {
             crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT,
             crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT,
             crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT,
+            crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT,
             crate::second_provider::LOOK_NOTE_ENVIRONMENT,
             crate::second_provider::LOOK_WALK_ENVIRONMENT,
             crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT,
@@ -2225,6 +2227,7 @@ mod tests {
                     || name == crate::second_provider::BUSY_ENDS_SOONER_ENVIRONMENT
                     || name == crate::second_provider::SAME_SPEAKER_CARRIES_ENVIRONMENT
                     || name == crate::second_provider::TURNED_FACE_SPEAKS_ENVIRONMENT
+                    || name == crate::second_provider::PERSON_SCOPE_SEEN_ENVIRONMENT
                     || name == crate::second_provider::LOOK_NOTE_ENVIRONMENT
                     || name == crate::second_provider::LOOK_WALK_ENVIRONMENT
                     || name == crate::second_provider::NOT_FOR_ME_WORDS_ENVIRONMENT
@@ -2341,6 +2344,7 @@ mod tests {
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
+                    "LAMP_PERSON_SCOPE_SEEN=on",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_QUIET_GOING_ON_SAME_ONE=on",
                     "LAMP_RELAY_ROUTES=on",
