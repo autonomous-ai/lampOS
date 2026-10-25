@@ -1,8 +1,8 @@
 # Stuffy air (#1021; lampOS/docs/creature.md: "first its posture droops a
 # little and its eye dims a shade while it lasts; it says ... only if someone
-# talks to it"). Speech is the voice's, from its air facts, never this
-# skill's. Written to lamp-skills' schema (docs/skills.md, "The schema, as
-# lamp-skills reads it").
+# talks to it"); since the owner's 25 Oct "talk to the user" it also says one short line with the
+# droop, and what the air is when asked stays the voice's, from its air facts. Written to
+# lamp-skills' schema (docs/skills.md, "The schema, as lamp-skills reads it").
 needs = ["air", "body", "light", "voice"]
 # Comes with the lamp and is always there (docs/skills.md, "Core and
 # installable skills"): on a lamp whose sensor doesn't answer it does
