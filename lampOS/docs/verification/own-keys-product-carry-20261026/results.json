@@ -1,0 +1,1370 @@
+{
+  "build_jobs": 1,
+  "current_base_continuation": {
+    "changes_from_original_candidate": [
+      "lampOS/crates/controls/src/head_discovery.rs",
+      "lampOS/crates/controls/tests/it/head_discovery.rs",
+      "lampOS/docs/controls.md",
+      "lampOS/docs/install.md",
+      "lampOS/docs/own-keys.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/selftest.md",
+      "lampOS/docs/verification/head-rest-coverage-20261026/README.md",
+      "lampOS/docs/verification/head-rest-coverage-20261026/focused.json",
+      "lampOS/docs/verification/head-rest-coverage-20261026/full-abc.json",
+      "lampOS/docs/verification/head-rest-coverage-20261026/latest-409.json",
+      "lampOS/docs/verification/head-rest-coverage-20261026/negative-tests.json",
+      "lampOS/docs/verification/head-rest-coverage-20261026/negative.json"
+    ],
+    "compiled_doc_reader": {
+      "ci_paths_include_occurrence": "Raw-string test sample, not a document content reader.",
+      "document": "lampOS/docs/install.md",
+      "test": "every_part_of_the_lamp_waits_for_setups_marker_itself"
+    },
+    "documentation_corrections": [
+      "lampOS/docs/install.md",
+      "lampOS/docs/own-keys.md",
+      "lampOS/docs/selftest.md"
+    ],
+    "exact_template_move": {
+      "from": "lampOS/deploy/product/own-keys-voice.conf",
+      "mode": 420,
+      "sha256": "0d301205f8b182039ec5bea38691d3f3aff43cf69ca433341cd428a6e08ea619",
+      "source_absent_from_both_candidate_inventories": true,
+      "to": "lampOS/crates/update/src/retired-own-keys-voice.conf"
+    },
+    "final_source_equals_continuation_inventory": true,
+    "full_nine_crate_tests_rerun": false,
+    "identity": {
+      "authored_carry": "9dd71279d11161f2eeef0a205dfe204d21b7242b",
+      "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+      "head": "4c2ecaeeac3997cfd061d18b2f277704d2940d62",
+      "packages": [
+        "lamp-update",
+        "lamp-voice",
+        "lamp-selftest",
+        "lamp-setup",
+        "lamp-cloud",
+        "lamp-health",
+        "lamp-controls",
+        "lamp-skills",
+        "lamp-voice-eval"
+      ],
+      "previous_base": "0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5"
+    },
+    "owned_paths_including_deleted": [
+      "lampOS/crates/selftest/src/voice_route.rs",
+      "lampOS/crates/update/src/install.rs",
+      "lampOS/crates/update/src/retired-own-keys-voice.conf",
+      "lampOS/crates/update/tests/install.rs",
+      "lampOS/crates/voice/src/second_config.rs",
+      "lampOS/deploy/product/README.md",
+      "lampOS/deploy/product/lamp-cloud.service",
+      "lampOS/deploy/product/lamp-setup-keys.socket",
+      "lampOS/deploy/product/lamp-setup.service",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/deploy/product/own-keys-voice.conf",
+      "lampOS/docs/cloud.md",
+      "lampOS/docs/install.md",
+      "lampOS/docs/own-keys.md",
+      "lampOS/docs/selftest.md",
+      "lampOS/docs/setup.md",
+      "lampOS/docs/switches.md"
+    ],
+    "owned_source_unchanged_except_documentation_corrections": true,
+    "rebase_evidence": {
+      "authored_carry": "9dd71279d11161f2eeef0a205dfe204d21b7242b",
+      "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+      "base_diff_paths": [
+        "lampOS/crates/controls/src/head_discovery.rs",
+        "lampOS/crates/controls/tests/it/head_discovery.rs",
+        "lampOS/docs/controls.md",
+        "lampOS/docs/install.md",
+        "lampOS/docs/reuse-decisions.md",
+        "lampOS/docs/verification/head-rest-coverage-20261026/README.md",
+        "lampOS/docs/verification/head-rest-coverage-20261026/focused.json",
+        "lampOS/docs/verification/head-rest-coverage-20261026/full-abc.json",
+        "lampOS/docs/verification/head-rest-coverage-20261026/latest-409.json",
+        "lampOS/docs/verification/head-rest-coverage-20261026/negative-tests.json",
+        "lampOS/docs/verification/head-rest-coverage-20261026/negative.json"
+      ],
+      "head": "4c2ecaeeac3997cfd061d18b2f277704d2940d62",
+      "owned_blob_checks": {
+        "lampOS/crates/selftest/src/voice_route.rs": true,
+        "lampOS/crates/update/src/install.rs": true,
+        "lampOS/crates/update/src/retired-own-keys-voice.conf": true,
+        "lampOS/crates/update/tests/install.rs": true,
+        "lampOS/crates/voice/src/second_config.rs": true,
+        "lampOS/deploy/product/README.md": true,
+        "lampOS/deploy/product/lamp-cloud.service": true,
+        "lampOS/deploy/product/lamp-setup-keys.socket": true,
+        "lampOS/deploy/product/lamp-setup.service": true,
+        "lampOS/deploy/product/lamp-voice.service": true,
+        "lampOS/docs/cloud.md": true,
+        "lampOS/docs/own-keys.md": true,
+        "lampOS/docs/selftest.md": true,
+        "lampOS/docs/setup.md": true,
+        "lampOS/docs/switches.md": true
+      },
+      "owned_blob_checks_excluded": {
+        "lampOS/docs/install.md": "Also changed upstream; authored and repair patch continuity is recorded by range-diff."
+      },
+      "owned_changed_paths": [
+        "lampOS/crates/selftest/src/voice_route.rs",
+        "lampOS/crates/update/src/install.rs",
+        "lampOS/crates/update/src/retired-own-keys-voice.conf",
+        "lampOS/crates/update/tests/install.rs",
+        "lampOS/crates/voice/src/second_config.rs",
+        "lampOS/deploy/product/README.md",
+        "lampOS/deploy/product/lamp-cloud.service",
+        "lampOS/deploy/product/lamp-setup-keys.socket",
+        "lampOS/deploy/product/lamp-setup.service",
+        "lampOS/deploy/product/lamp-voice.service",
+        "lampOS/docs/cloud.md",
+        "lampOS/docs/install.md",
+        "lampOS/docs/own-keys.md",
+        "lampOS/docs/selftest.md",
+        "lampOS/docs/setup.md",
+        "lampOS/docs/switches.md"
+      ],
+      "previous_base": "0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5",
+      "previous_head": "3296b8e78476906af61edd731a61b250219825a2",
+      "range_diff_sha256": "73e509a0276437f7a5902b159014d3fe6f3210d42ae970fff21e83f089950db1"
+    },
+    "rebase_evidence_sha256": "5eb13df529906f47ab3256dc90517f14071963d799fad2b61e81f6fbe6865b2a",
+    "source_inventory": {
+      "entries": 7132,
+      "sha256": "8a08b50027328ede6b3697ba5ce5316bb42909fdda432fb6f5ddfddbd19d1fe6"
+    },
+    "stages": {
+      "ci-paths": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--test",
+          "it",
+          "ci_paths::",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 2.011,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "4c927a520b6fe4e4df7a317f679c3a9c34362d6381b6aef92b76f660903723c7",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 2
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 2
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      },
+      "clippy": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-health",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-voice-eval",
+          "--all-targets",
+          "--message-format=short",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "elapsed_seconds": 69.324,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      },
+      "controls": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-controls",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 48.776,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "f28e64754c8e884a5ec2224a0a1da6e87baf4a683b9c6bd2df0a398cc1aeeda1",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 34
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 2
+            },
+            {
+              "failed": 0,
+              "ignored": 1,
+              "passed": 470
+            },
+            {
+              "failed": 0,
+              "ignored": 2,
+              "passed": 1
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 9
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 3,
+            "passed": 516
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      },
+      "doc-reader": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--test",
+          "install",
+          "every_part_of_the_lamp_waits_for_setups_marker_itself",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 0.531,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "7c75d8213ac59328e2ba1b00dbc5143baf4d3d029d46ba43431fc249460c075f",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 1
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      },
+      "fmt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "elapsed_seconds": 5.923,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      },
+      "focused-matcher": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "retired_drop_in_matcher_",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 5.423,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "5f610b2252a8f30132cafb100e1b8379be7cf2c8ea93c48cf270d978648159c2",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 1
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      },
+      "focused-own-keys": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--test",
+          "install",
+          "own_keys",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 53.357,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "f3b9456d004bd9dc1c786daa4ed56ad099548792211d443c34196984deee9c50",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 7
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 7
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      },
+      "voice": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 681.669,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "b15531a6143f5d65c42c1f6907772f0350923d0b27db9d840b1aceb03f7d4189",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 15,
+              "passed": 3779
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 275
+            },
+            {
+              "failed": 0,
+              "ignored": 6,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 4
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 6
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 21,
+            "passed": 4065
+          }
+        },
+        "source_entries": 7132,
+        "source_unchanged": true
+      }
+    },
+    "status": "PASS",
+    "upstream_runtime_changes": [
+      "lampOS/crates/controls/src/head_discovery.rs",
+      "lampOS/crates/controls/tests/it/head_discovery.rs"
+    ]
+  },
+  "deleted_paths": [
+    "lampOS/deploy/product/own-keys-voice.conf"
+  ],
+  "first_failed_fixture": {
+    "artifact": {
+      "bytes": 16249272,
+      "sha256": "0a572f97a8b25de1c4b45ab74eb804d19617107dfd4a39752a00d3e289a54e40",
+      "source_fixture_sha256": "110dc562fe66fc4709bde88c0ff21917d26e130e61930cf1bd86b1e98901afee",
+      "target": "install"
+    },
+    "source_inventory": {
+      "entries": 7122,
+      "sha256": "4a4ed781a11a9d7198176457cb2310f2551dd2ac88075cc3bee7dc0dbda98234"
+    },
+    "stage": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "own_keys",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 140.852,
+      "error": null,
+      "exit_code": 101,
+      "log_sha256": "faea93062163304cb448b827c3882083f6344fb1f22c343d6a51741d060ab814",
+      "results": {
+        "summaries": [
+          {
+            "failed": 1,
+            "ignored": 0,
+            "passed": 6
+          }
+        ],
+        "totals": {
+          "failed": 1,
+          "ignored": 0,
+          "passed": 6
+        }
+      },
+      "source_entries": 7122,
+      "source_unchanged": true
+    }
+  },
+  "historical_template": {
+    "bytes": 919,
+    "sha256": "0d301205f8b182039ec5bea38691d3f3aff43cf69ca433341cd428a6e08ea619"
+  },
+  "host": "aarch64-apple-darwin",
+  "limits": [
+    "The original full nine-crate run failed; it is retained as failed evidence, not qualification.",
+    "Current-base qualification is the separately recorded continuation, not a full nine-crate rerun.",
+    "The first Voice failure has an unproven root cause; exact replay results are not causal proof.",
+    "No clock or message-header capture was collected; the failing assertion was not weakened.",
+    "install.md is compiled by an Update integration test; its current content reader is rerun.",
+    "No local Linux ARM64, provider, real key, systemd or lamp execution.",
+    "The Linux-only FIFO test exercises the matcher, not the full installer preflight.",
+    "Directory integration proves existing preflight refusal, not successful nonregular-file installation.",
+    "Cleanup is not atomic against concurrent privileged edits; no power-cut or interleaving injection is claimed.",
+    "Product activation remains held for #2094 and fresh current-base acceptance."
+  ],
+  "negative_control": {
+    "artifact_sha256": {
+      "baseline": "0915ff7a7d596cf201f6372c8391778b5c15f86a7f7d359603d7038778189a82",
+      "existence-only-compile": "9a0ca615cd94439c7b9555a2012b66350eb19e1374e447d5ddd6f1ceff18ba0a",
+      "restored-compile": "263a8c9a5c96117493665700087540adc730fb5db35d147d8c8ae242e43fe7eb"
+    },
+    "bound_to_original_full_gate_source": true,
+    "qualified": true,
+    "source_before_sha256": "fa881cb3edb10a2e2b14d9b1a96c9d22620492737bdd1a2aa58a624bd6bd1348",
+    "source_mutated_sha256": "43c8b0e0a916f629681263619b74def4be2b1b904c63123fc53fa29d3021b121",
+    "source_restored_sha256": "fa881cb3edb10a2e2b14d9b1a96c9d22620492737bdd1a2aa58a624bd6bd1348",
+    "stages": {
+      "baseline": {
+        "command": [
+          "<compiled test executable>",
+          "--exact",
+          "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 2.297,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "db758a7b245d834125fe5a4826a06f8fb75444e573549d6c721eed0b5cded1f3",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 1
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "existence-only-compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--test",
+          "install",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 39.986,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "6dab982f6c44a4322ce89fbace70a78e34d63a817ccfe241a24786ae2868292f",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "existence-only-test": {
+        "command": [
+          "<compiled test executable>",
+          "--exact",
+          "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 3.42,
+        "error": null,
+        "exit_code": 101,
+        "log_sha256": "deca42b6e714f1b2b4bc7a0726ff7fe67266dbbe26326d874b2dd1e6d7fca54f",
+        "results": {
+          "summaries": [
+            {
+              "failed": 1,
+              "ignored": 0,
+              "passed": 0
+            }
+          ],
+          "totals": {
+            "failed": 1,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "restored-compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--test",
+          "install",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 11.78,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "221bc7b4253fb2dc89eaf7af8136a9cb24fa5532ce57750ad588939db25e2e0c",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "restored-test": {
+        "command": [
+          "<compiled test executable>",
+          "--exact",
+          "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 2.89,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "7a4865a7c8f9514897e036da4839131f7ebf9110b8c1831ddbe1f6482bdd857d",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 1
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      }
+    },
+    "test": "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+    "verdict_sha256": "07ea6ee6f838434fc6efd31a94b6befed964cceb0fa0cce3d573ed7cbcce7860"
+  },
+  "original_authored_commit": "2cb2ea1e5ae7c6bf3305906c34add9c37d2fe60c",
+  "original_full_gate": {
+    "compiled_artifact_manifest_sha256": "adf09210ac6034a71fec2af173ad19711824e89b621fd4794e22276e7b90b475",
+    "compiled_artifacts_count": 41,
+    "failed_target": "lamp-voice --lib",
+    "identity": {
+      "base": "0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5",
+      "head": "4674cd4baf4d0e63d4a5535ff54c9343850ef8d0",
+      "packages": [
+        "lamp-update",
+        "lamp-voice",
+        "lamp-selftest",
+        "lamp-setup",
+        "lamp-cloud",
+        "lamp-health",
+        "lamp-controls",
+        "lamp-skills",
+        "lamp-voice-eval"
+      ]
+    },
+    "other_completed_packages": [
+      "lamp-update",
+      "lamp-selftest",
+      "lamp-setup",
+      "lamp-cloud",
+      "lamp-health",
+      "lamp-controls",
+      "lamp-skills",
+      "lamp-voice-eval"
+    ],
+    "qualifies_full_nine_crate_gate": false,
+    "source_inventory": {
+      "entries": 7126,
+      "sha256": "fa881cb3edb10a2e2b14d9b1a96c9d22620492737bdd1a2aa58a624bd6bd1348"
+    },
+    "stages": {
+      "clippy": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-health",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-voice-eval",
+          "--all-targets",
+          "--message-format=short",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "elapsed_seconds": 151.344,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-health",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-voice-eval",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 327.725,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e7d71edbeae671424cdc6a252b32974f1043516c69a81f79da09f3810fc8e6b0",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "fmt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "elapsed_seconds": 5.858,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "focused-matcher": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "retired_drop_in_matcher_",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 5.722,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "823877d087b4a6ef1dd99eedb8b24adebf52879c84b0bc198ed48635add593f1",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 1
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "focused-own-keys": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--test",
+          "install",
+          "own_keys",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 54.115,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "d61f6092e776006c003ab5ee60169f1c55849c64415c64e7d789f6c921f5209e",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 7
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 7
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "full-selected": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-health",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-voice-eval",
+          "--no-fail-fast",
+          "--",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 1495.891,
+        "error": null,
+        "exit_code": 101,
+        "log_sha256": "b318a84438915ccbb7b2fd190b5487697c52b166f960a89890651156875a92e7",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 2,
+              "passed": 166
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 30
+            },
+            {
+              "failed": 0,
+              "ignored": 2,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 34
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 2
+            },
+            {
+              "failed": 0,
+              "ignored": 1,
+              "passed": 464
+            },
+            {
+              "failed": 0,
+              "ignored": 2,
+              "passed": 1
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 9
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 42
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 3
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 46
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 77
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 16
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 1,
+              "passed": 156
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 6
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 157
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 20
+            },
+            {
+              "failed": 0,
+              "ignored": 1,
+              "passed": 312
+            },
+            {
+              "failed": 0,
+              "ignored": 8,
+              "passed": 2
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 31
+            },
+            {
+              "failed": 0,
+              "ignored": 2,
+              "passed": 121
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 5
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 99
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 13
+            },
+            {
+              "failed": 0,
+              "ignored": 2,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 167
+            },
+            {
+              "failed": 0,
+              "ignored": 1,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 1,
+              "passed": 0
+            },
+            {
+              "failed": 1,
+              "ignored": 15,
+              "passed": 3778
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 275
+            },
+            {
+              "failed": 0,
+              "ignored": 6,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 4
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 6
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 378
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 7
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 238
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            },
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 0
+            }
+          ],
+          "totals": {
+            "failed": 1,
+            "ignored": 44,
+            "passed": 6667
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      }
+    },
+    "status": "FAILED"
+  },
+  "schema": 2,
+  "test_threads": 1,
+  "toolchain": "1.96.0",
+  "unresolved_voice_observation": {
+    "assertion_unchanged": true,
+    "candidate_exact": {
+      "artifact": {
+        "bytes": 141020088,
+        "sha256": "9f291460b0388adb379f011cdf8b0c7768590cfa30024875928d5213fcd3aa9f",
+        "target": "lamp_voice"
+      },
+      "result": "passed",
+      "source_inventory": {
+        "entries": 7126,
+        "sha256": "fa881cb3edb10a2e2b14d9b1a96c9d22620492737bdd1a2aa58a624bd6bd1348"
+      },
+      "stage": {
+        "command": [
+          "<compiled test executable>",
+          "--exact",
+          "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 5.684,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "fee8a57306a72efbc0219884203d3ea9e1389afa39f122b90f23bb0edeed01ca",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 1
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      }
+    },
+    "clean_baseline_exact": {
+      "artifact": {
+        "bytes": 141082008,
+        "sha256": "b22860fc587653c2075b1cab86b69940b9a0487db8458f1d6ad5778955e1d6f6",
+        "target": "lamp_voice"
+      },
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 160.94,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "ff7c4588ef8589a87795a5fbe8e42428cf52ca8675b14502526fafdb34b5df4e",
+        "results": {
+          "summaries": [],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 0
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      },
+      "compiler_record_fresh": false,
+      "identity": {
+        "clean": true,
+        "head": "0a40aa50bf6de3eeaf81a2a9d3e69920da55a2c5",
+        "test": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short"
+      },
+      "result": "passed",
+      "source_inventory": {
+        "entries": 7126,
+        "sha256": "5f345e9c8e1cf3c94fa5b18350e98b777996a42f2e0859bd544b7769bcc5820e"
+      },
+      "stage": {
+        "command": [
+          "<compiled test executable>",
+          "--exact",
+          "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "elapsed_seconds": 5.787,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "d9c032786e98058242bb87e9d3b3a49eafc2e7f04e3777e710eda22436a0d423",
+        "results": {
+          "summaries": [
+            {
+              "failed": 0,
+              "ignored": 0,
+              "passed": 1
+            }
+          ],
+          "totals": {
+            "failed": 0,
+            "ignored": 0,
+            "passed": 1
+          }
+        },
+        "source_entries": 7126,
+        "source_unchanged": true
+      }
+    },
+    "clock_or_header_capture": false,
+    "follow_up": "One complete current-base Voice run, required to pass separately.",
+    "inherited_failure_claimed": false,
+    "investigative_hypothesis": "Look freshness; no causal connection to this change established.",
+    "original_assertion_location": "crates/voice/src/second_provider/worker.rs:17231:9",
+    "original_full_run_status": "FAILED",
+    "root_cause": "unproven",
+    "test": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+    "worker_source_sha256": "12d560d45570886b17de42845047c552d14bae343d4e002774b591b6043b990b"
+  }
+}
