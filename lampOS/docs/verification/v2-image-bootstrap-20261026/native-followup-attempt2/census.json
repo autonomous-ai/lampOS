@@ -1,0 +1,218 @@
+{
+  "arm64": {
+    "full_log_bytes": 2710762,
+    "full_log_sha256": "1467d8837943f303f727255570650381240478ef77482ed33f226e619b9d4a12",
+    "nextest": {
+      "announced_binaries": 179,
+      "distinct_binary_labels_with_terminal_rows": 153,
+      "excluded_post_summary_echoes": {
+        "PASS": 35,
+        "all_already_counted": true
+      },
+      "executed": 11308,
+      "ordinals": {
+        "each_exactly_once": true,
+        "maximum": 11308,
+        "minimum": 1
+      },
+      "previously_failed_case": {
+        "binary": "lamp-voice",
+        "case": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+        "denominator": 11308,
+        "duration": "0.006s",
+        "ordinal": 10000,
+        "status": "PASS"
+      },
+      "selected": 11308,
+      "selected_unrun": 0,
+      "skipped_binaries": 2,
+      "skipped_tests": 106,
+      "summary": "2026-10-25T19:23:03.2368817Z      Summary [ 207.400s] 11308 tests run: 11308 passed, 106 skipped",
+      "terminal_counts": {
+        "FAIL": 0,
+        "LEAK": 0,
+        "PASS": 11308,
+        "TIMEOUT": 0
+      },
+      "unique_binary_test_pairs": 11308
+    },
+    "run_metadata": {
+      "attempt": 2,
+      "conclusion": "success",
+      "databaseId": 40224140937,
+      "event": "pull_request",
+      "headSha": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+      "job": {
+        "completedAt": "2026-10-25T19:23:26Z",
+        "conclusion": "success",
+        "databaseId": 121265228357,
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "startedAt": "2026-10-25T19:17:03Z",
+        "status": "completed",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140937/job/121265228357"
+      },
+      "startedAt": "2026-10-25T19:16:56Z",
+      "status": "completed",
+      "test_steps": [
+        {
+          "completedAt": "2026-10-25T19:23:03Z",
+          "conclusion": "success",
+          "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+          "number": 17,
+          "startedAt": "2026-10-25T19:19:34Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-25T19:23:16Z",
+          "conclusion": "success",
+          "name": "doc tests and the own-harness tests (nextest runs neither)",
+          "number": 18,
+          "startedAt": "2026-10-25T19:23:03Z",
+          "status": "completed"
+        }
+      ],
+      "updatedAt": "2026-10-25T19:23:27Z",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140937/attempts/2"
+    },
+    "separate_doc_and_custom_tests": {
+      "doctests": {
+        "command": "cargo test --locked --release --workspace --doc -- --test-threads=1",
+        "failed": 0,
+        "ignored": 0,
+        "passed": 4,
+        "summary_count": 46
+      },
+      "relay_signals": {
+        "command": "cargo test --locked --release -p lamp-ipc --test relay_signals",
+        "literal_result": "2026-10-25T19:23:12.3211837Z relay_signals: ok"
+      },
+      "step_conclusion": "success",
+      "turn_end_wire_process": {
+        "command": "cargo test --locked --release -p lamp-turn-end-wire --test process",
+        "failed": 0,
+        "literal_result": "2026-10-25T19:23:16.8776256Z test result: 12 passed; 0 failed",
+        "passed": 12,
+        "unique_ok_cases": 12
+      }
+    }
+  },
+  "audited_at": "2026-10-26T02:29:33+07:00",
+  "clippy": {
+    "run_metadata": {
+      "attempt": 1,
+      "conclusion": "success",
+      "databaseId": 40224140931,
+      "event": "pull_request",
+      "headSha": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+      "jobs": [
+        {
+          "completedAt": "2026-10-25T19:06:14Z",
+          "conclusion": "success",
+          "databaseId": 121261831536,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "startedAt": "2026-10-25T19:02:58Z",
+          "status": "completed",
+          "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140931/job/121261831536"
+        }
+      ],
+      "startedAt": "2026-10-25T19:02:54Z",
+      "status": "completed",
+      "updatedAt": "2026-10-25T19:06:15Z",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140931"
+    },
+    "scope": "Separate completed run/job metadata; full log not downloaded for this packet."
+  },
+  "imager": {
+    "complete_job_log_sha256": "9cffe78531c77259f9720004d11cd5b5525363d552e7c47cb6282fc1e15b375a",
+    "job": {
+      "completed_at": "2026-10-25T19:03:20Z",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140951/job/121261831403",
+      "id": 121261831403,
+      "name": "Image builder \u2014 signatures \u00b7 bootstrap \u00b7 output",
+      "started_at": "2026-10-25T19:02:56Z",
+      "status": "completed"
+    },
+    "results": {
+      "bootstrap": {
+        "failed": 0,
+        "historical_cases_ran": false,
+        "passed": 5
+      },
+      "inputs": {
+        "failed": 0,
+        "passed": 5
+      },
+      "output": {
+        "failed": 0,
+        "passed": 8
+      },
+      "pytest": {
+        "passed": 31,
+        "seconds": 0.28
+      },
+      "signature": {
+        "failed": 0,
+        "passed": 31
+      }
+    },
+    "run_metadata": {
+      "conclusion": "success",
+      "created_at": "2026-10-25T19:02:54Z",
+      "event": "pull_request",
+      "head_sha": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140951",
+      "id": 40224140951,
+      "run_attempt": 1,
+      "status": "completed",
+      "updated_at": "2026-10-25T19:03:36Z"
+    },
+    "runner": "ubuntu-24.04",
+    "scope": "Existing independent imager audit reused; no image build, flash, device or updater execution qualification."
+  },
+  "limits": [
+    "Success on retry does not establish the first failure cause or constitute a source repair.",
+    "Nextest, later doc/custom harnesses, imager suites and Clippy remain separate scopes.",
+    "No physical lamp, first boot, real image, attended power-cut or signed-release acceptance is established."
+  ],
+  "retained_attempt1": {
+    "actual_checkout": "fdda2e3eecfa647460696759afa505c29e0c686c",
+    "attempt": 1,
+    "classification": "Missing fixture precondition: intended grant-step-12 failure was not witnessed; observed path retained verified private metadata. Exact early refusal cause remains unknown.",
+    "current_assignment": "https://github.com/autonomous-ai/lampOS/pull/3503#issuecomment-6401991844",
+    "failure": {
+      "binary": "lamp-voice",
+      "case": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "denominator": 11308,
+      "duration": "0.008s",
+      "ordinal": 10001,
+      "status": "FAIL"
+    },
+    "failure_packet_manifest_sha256": "51d864222f0848d9b3818c9b6d42117e60cb04f94f25516cf31cf7d9a1796ca4",
+    "full_log_sha256": "1e5573d867451cb7edbaf7910e3e85cb76b7568bf5611f9d950c0b1e3ee73e75",
+    "head": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+    "investigation": "https://github.com/autonomous-ai/lampOS/issues/1806",
+    "investigation_owner": "Tests",
+    "prior_source_report": "https://github.com/autonomous-ai/lampOS/pull/3394#issuecomment-6386376127",
+    "result": {
+      "failed": 1,
+      "leaky": 0,
+      "passed": 10003,
+      "selected_unrun": 1304,
+      "skipped": 106
+    },
+    "retry_request": "https://github.com/autonomous-ai/lampOS/pull/3503#issuecomment-6401994268",
+    "run": 40224140937,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40224140937/attempts/1"
+  },
+  "schema": 1,
+  "scope": "Successful bounded ARM64 retry, attempt 2, on unchanged #3503 head; retained attempt 1 remains a separate failure. Audit itself ran no tests.",
+  "source": {
+    "arm64_attempt2_actual_checkout": "fdda2e3eecfa647460696759afa505c29e0c686c",
+    "checkout_base": "a6ccb1aa3d8d27be64b9030dc814fc2f44e43fdb",
+    "complete_tree": "dc94a4d8faf269ffcbca2e2a7ec8431256965da2",
+    "head": "d8cf817d6f6a6beb53fe10647683d6d9e94dd7a7",
+    "imager_actual_checkout": "fdda2e3eecfa647460696759afa505c29e0c686c",
+    "tree_evidence": "Immutable checkout commit API and head tree equality; no claim of a runtime source-hash guard."
+  }
+}

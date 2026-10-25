@@ -1,4 +1,16 @@
-Ready for lamp-voice: no (#3503: retained ARM64 failure, one bounded retry pending; new Skills controls unrun).
+Ready for lamp-voice: yes (#3503); Skills masking controls remain unqualified while their full gate runs.
+
+## Current checkpoint: 2026-10-26 02:33 +07, image repair ready; Skills gate running
+
+[#3503](https://github.com/autonomous-ai/lampOS/pull/3503) is non-draft and ready at `d8cf817d6` on current `a6ccb1aa3`, with both READ-OKs and the lead's no-finding read. Its original ARM64 **40224140937 attempt 2** passes **11,308 literal PASS, zero LEAK/FAIL, 106 skipped, zero selected unrun**; every identity/ordinal reconciles and 35 report echoes are excluded. The previously failing rollback fixture passes once. Later controls separately report four doctests, relay success and process **12/0**. [The attempt-2 packet](verification/v2-image-bootstrap-20261026/native-followup-attempt2/README.md) binds the actual checkout `fdda2e3eecfa647460696759afa505c29e0c686c` to the reviewed full tree, own imager **31/5/8/5 plus 31 pytest** and Linux Clippy success.
+
+Attempt 1 remains [a retained failure](verification/v2-image-bootstrap-20261026/native-followup-attempt1/README.md), with **10,003 PASS, 1 FAIL, 106 skipped and 1,304 unrun**. The successful retry does not identify the earlier refusal. Tests has resumed its already-owned #1806 fixture-precondition repair; no privacy validation, timeout or assertion was weakened here. Reviewer-two explicitly cleared the current-native HOLD. Main's separate ARM64 succeeds too, with metadata-only scope in Second's audit. Train [#3505](https://github.com/autonomous-ai/lampOS/pull/3505), head `20c049127`, has captured #3503; actual source identity and its own native results are being checked before any landing claim.
+
+The five new private `welcome_stuck::drop_mask_` tests are source-read clear. They use owned fixtures and logical time to check exact held-condition descriptions, text/list/object/face masking, safe scalar descriptions and one refused event with no action or repeat. The typed face fixture passes source schema review. The two existing tests and runtime remain unchanged. Tests returned its unused compiler reservation at 02:21; Second uses one build job in its own target, with a 20 GiB disk reserve and no assumption about another seat's storage. Current checks: formatting, strict all-target Skills Clippy and full Skills test compilation pass. All **7,122** tracked lampOS source entries remain unchanged through each phase; the full serial Skills suite is running. Negative controls remain UNRUN and will execute separately after the positive result is known.
+
+The current Queue is now [#3504](https://github.com/autonomous-ai/lampOS/issues/3504). [Second's first post](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6402170791) gives NEXT TRAIN, exact counts, compiler ownership and the still-open #3450 fourth-commit findings. The old full Queue and all earlier appended updates remain records. No device, image build, real signing or release action ran.
+
+---
 
 ## Current checkpoint: 2026-10-26 02:20 +07, ARM64 fixture failure retained; journal controls taken
 

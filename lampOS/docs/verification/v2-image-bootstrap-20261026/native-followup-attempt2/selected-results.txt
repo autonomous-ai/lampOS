@@ -1,0 +1,29 @@
+ARM64 run 40224140937, attempt 2
+2026-10-25T19:17:32.9776701Z fdda2e3eecfa647460696759afa505c29e0c686c
+2026-10-25T19:19:35.8368134Z     Starting 11308 tests across 179 binaries (106 tests and 2 binaries skipped)
+2026-10-25T19:22:46.8353236Z         PASS [   0.006s] (10000/11308) lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata
+2026-10-25T19:23:03.2368817Z      Summary [ 207.400s] 11308 tests run: 11308 passed, 106 skipped
+
+Later doc/custom-harness step; separate from nextest totals
+2026-10-25T19:23:04.5824860Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-25T19:23:05.9675496Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-25T19:23:07.2049099Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-25T19:23:12.3211837Z relay_signals: ok
+2026-10-25T19:23:16.8776256Z test result: 12 passed; 0 failed
+
+Own imager run 40224140951, attempt 1
+2026-10-25T19:03:04.0432520Z fdda2e3eecfa647460696759afa505c29e0c686c
+2026-10-25T19:03:17.3322411Z Tests: 31 passed, 0 failed
+2026-10-25T19:03:17.5089497Z PASS current/attacker: exit=1, installs=0
+2026-10-25T19:03:17.7620966Z PASS current/mutable-retry: exit=0, installs=2
+2026-10-25T19:03:17.9638838Z PASS current/wrong-record: exit=1, installs=1
+2026-10-25T19:03:18.1183936Z PASS current/tampered: exit=1, installs=0
+2026-10-25T19:03:18.3227251Z PASS current/local: exit=0, installs=1
+2026-10-25T19:03:18.3970992Z 8 passed; 0 failed
+2026-10-25T19:03:18.4158969Z PASS: explicit_size_is_forwarded
+2026-10-25T19:03:18.4248602Z PASS: empty_size_keeps_8G_default
+2026-10-25T19:03:18.4334630Z PASS: stale-standard
+2026-10-25T19:03:18.4388448Z PASS: fresh-standard
+2026-10-25T19:03:18.4456442Z PASS: selected-pro
+2026-10-25T19:03:18.4456822Z 5 passed; 0 failed
+2026-10-25T19:03:19.1006015Z 31 passed in 0.28s
