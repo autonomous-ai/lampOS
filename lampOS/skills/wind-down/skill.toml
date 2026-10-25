@@ -7,8 +7,8 @@
 # Morning's, if that is on the lamp. Written to lamp-skills' schema
 # (docs/skills.md, "The schema, as lamp-skills reads it").
 needs = ["eyes", "body", "light", "voice"]
-# Its owner puts it on (`lamp-skills install`) and takes it off; not in the
-# product's install.
+# Comes with the lamp since 25 Oct, in the product's install (docs/skills.md, "Core and
+# installable skills"); it can be turned off by voice (`wellbeing_nudges`) or in the app.
 kind = "core"
 version = "1.0.0"
 # Once an evening, counted from the local midnight.
