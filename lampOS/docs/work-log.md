@@ -1,4 +1,16 @@
-Music review controls complete; both current-base continuations prepared.
+Both current carries pushed; next nonwaiting fixture in validation.
+
+## Current checkpoint: 2026-10-26 08:02 +07, music and own-keys on the stable-feed base
+
+[#3515](https://github.com/autonomous-ai/lampOS/pull/3515) is pushed as `ee9b6253d` on current `756be347e`. Three earlier patches remain equal; all crate inputs, the product Voice unit and twelve prior proof files are unchanged. [Latest continuation](https://github.com/autonomous-ai/lampOS/tree/ee9b6253d29f9ac4c4c591a9d1eb19617920d1e5/lampOS/docs/verification/music-refusal-trace-20261026/current-756) passes fmt, strict Voice/Voice-eval Clippy and two compiled switch-census tests. The initial private preflight expected thirteen files instead of twelve and stopped before Cargo; that attempt is retained. Earlier full Voice **4,073/0/21**, fault controls and 274's thirteen selected passes remain bound to their recorded sources. The rejected zero-test selection is separate. Reviewer-three is READ-OK on ee9; Reviewer-two finds no P1/P2 on the current carry, with independent full Voice still running. Current Linux Clippy **40251274240** passes; ARM64 **40251274254** is active. The previous b04 ARM64 run was cancelled without a terminal test summary and is [not qualification](verification/music-refusal-trace-20261026/native-b04-cancelled/README.md).
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) is pushed as `9941a11c4` on `756be347e`. All crate inputs remain unchanged across that final carry. Six prior commits have identical changed content; literal range-diff context changes from the neighboring waking-face row are retained. [Latest continuation](https://github.com/autonomous-ai/lampOS/tree/9941a11c49e98c8624c3c6d78ccae246410a0afd/lampOS/docs/verification/own-keys-product-carry-20261026/current-756): fmt/strict nine-crate Clippy pass; installer **99/0**, installed-product/startup-graph/updater-fallback **1/0 each**, waking **7/0**, switch census **2/0**, imager syntax pass. The completed 274 reader gate and d21 full Voice **4,068/0/21** remain separate. Original ARM64 **40251804763** and Linux Clippy **40251804817** are active. Draft activation HOLD remains for #2094 and explicit current-lamp acceptance.
+
+[#1339](https://github.com/autonomous-ai/lampOS/issues/1339)'s missing-executable row is [taken](https://github.com/autonomous-ai/lampOS/issues/1339#issuecomment-6405765049) on `second/turn-end-wire-no-wait`, after checking open and merged work. The existing launch-failure/unavailable/zero-spawn assertions remain; the 20 ms stopwatch is replaced by a companion that holds startup before Ready and requires spawn-return before release. Success also checks Ready, reaped teardown and scenario exit. The owned process-group fixture and endpoint documentation are test-only; product code and timing limits remain unchanged. Local validation is active; deliberate blocking and 400 ms host-stall controls are prepared next, with no passing result claimed yet.
+
+The log rebase preserves 14,060 earlier verification blobs and modes. No local ARM64, provider, key, device or release action ran.
+
+---
 
 ## Current checkpoint: 2026-10-26 07:34 +07, music review controls and current release base
 

@@ -1,0 +1,36 @@
+{
+  "arm64": {
+    "conclusion": "cancelled",
+    "head_sha": "b04c78803e6fc8180270d91a6052527bc44d0598",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40250300313",
+    "id": 40250300313,
+    "run_attempt": 1,
+    "status": "completed"
+  },
+  "arm64_artifact_count": 0,
+  "arm64_selected_tests": 11330,
+  "arm64_terminal_summary_present": false,
+  "authored_and_preview_tree": "49213aa42b4e428b67003458d73be8d5a89c6114",
+  "clippy": {
+    "conclusion": "success",
+    "head_sha": "b04c78803e6fc8180270d91a6052527bc44d0598",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40250300310",
+    "id": 40250300310,
+    "run_attempt": 1,
+    "status": "completed"
+  },
+  "head": "b04c78803e6fc8180270d91a6052527bc44d0598",
+  "log_sha256": {
+    "arm64": "53f4561b0a7f9fedaf1cfae3119a07dbdcfe279086df62fd03a498c1f2346c5d",
+    "clippy": "2191438d116537dafd2f271dfc22c724fe39201562670d91d8b80699f0cec40a"
+  },
+  "pr": 3515,
+  "preview": "cbc0a54c162e3ee04cd4358f4ded4ae60f4916ca",
+  "preview_parents": [
+    "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+    "b04c78803e6fc8180270d91a6052527bc44d0598"
+  ],
+  "qualifies": false,
+  "reason": "ARM64 was cancelled before a terminal test summary; no completed passing gate is claimed.",
+  "schema": 1
+}
