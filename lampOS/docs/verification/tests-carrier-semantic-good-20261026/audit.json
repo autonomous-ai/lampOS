@@ -1,0 +1,59 @@
+{
+  "committed_head": "c7006af27eef606e811be4ccf0b91e1f72f3aca2",
+  "tested_precommit_head": "806418f838293cd6524d62f344c615b09aa288dd",
+  "base": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "committed_tree": "2871a38df3ad3f0ba8c0f3da9ab258471c9f5310",
+  "changed_paths": {
+    "lampOS/crates/update/tests/round/product_carrier.rs": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+    "lampOS/docs/verification/product-carrier-20261025/README.md": "6bbc00a2e51a02e4ba949991625f061cf3cc561a6c45e4ea956235d87764b7d9"
+  },
+  "all_tracked_source_bytes_match_gate": true,
+  "tracked_files_checked": 10670,
+  "focused_gate": {
+    "fmt": "Prior same-source PASS bound by receipt; not replayed",
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-eyes",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-turn-end",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build": true,
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "runtime_attempts": 1,
+    "source_unchanged": true,
+    "inherited_frozen_unchanged": 167,
+    "new_frozen_unchanged": 2
+  },
+  "prior_attempt": {
+    "status": "FAIL",
+    "stage": "strict Clippy",
+    "exit": 101,
+    "runtime_attempts": 0,
+    "source_unchanged": true,
+    "inherited_frozen_unchanged": 167,
+    "recovery": "Supported cargo clean --offline --locked -p lamp-update only; successful fresh strict proof retained"
+  },
+  "receipt_sha256": {
+    "terminal.json": "f2c2de83a3dbac6a5730727f1212bc86aaa22a26874844b2ee7dea4e0d932f80",
+    "source-after.json": "26d0a96f7df4633c204979535fa1ac644cc4f8931b667aba7856d3eaabde5d18",
+    "frozen.json": "077eb5f0b6ba7dc68501fee3ab579b68343aa403cdc25edbb4a2e8a2b1a7dce1",
+    "tests.json": "41c706daa8d0db9220978fae420da9ae73aeb22b72a5eb596fb160df791862f1"
+  },
+  "limitations": [
+    "Focused 12 carrier cases only, not full Update or head-touch runtime",
+    "Native c700 and installed-lamp GOOD/BAD acceptance are separate",
+    "No device action or publication performed by this gate"
+  ]
+}
