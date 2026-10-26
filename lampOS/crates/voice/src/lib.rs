@@ -174,3 +174,4 @@ mod session_state;
 mod scenario_clock;
 mod service_privacy;
 mod service_privacy_controls;
+// devops007 trial: one appended line, to rebuild lamp-voice and what depends on it (never merged)
