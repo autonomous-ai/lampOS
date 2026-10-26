@@ -1199,14 +1199,17 @@ pub fn run_for(
     person: Option<&str>,
     line: Option<&crate::speaking_faces::LineSeen>,
 ) -> (Value, bool) {
-    run_for_fenced(socket, call, switches, person, line, &|| true)
+    run_for_with(socket, call, switches, person, line, None)
 }
 
-/// [`run_for`], sending to the eyes only while `fence` holds, read right
-/// before the request is sent: a forget made on someone's authority sends
-/// nothing once that authority is gone (Fourth's P2 on #3564: a line
-/// narrowed to the room, or revoked, between the scope's check and the
-/// send). Refused there, nothing is sent and the eyes are not asked.
+/// [`run_for`], sending to the eyes only while `fence` holds: a forget made
+/// on someone's authority sends nothing once that authority is gone
+/// (Fourth's P2 on #3564: a line narrowed to the room, or revoked, between
+/// the scope's check and the send). `fence` is read before the request is
+/// sent, and the request goes on the guarded transport
+/// ([`crate::remember::bounded_exchange_fenced`]), which reads it again
+/// after the connect and before each write, and never blocks in the
+/// connect. Refused before the write, nothing reaches the eyes.
 pub fn run_for_fenced(
     socket: &Path,
     call: &ToolCall,
@@ -1214,6 +1217,18 @@ pub fn run_for_fenced(
     person: Option<&str>,
     line: Option<&crate::speaking_faces::LineSeen>,
     fence: &dyn Fn() -> bool,
+) -> (Value, bool) {
+    run_for_with(socket, call, switches, person, line, Some(fence))
+}
+
+/// [`run_for`], fenced on `fence` when one is given ([`run_for_fenced`]).
+fn run_for_with(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    fence: Option<&dyn Fn() -> bool>,
 ) -> (Value, bool) {
     if switches.remember_speaker && call.name == REMEMBER {
         return (json!({"error": crate::remember_speaker::NOT_SEEN}), true);
@@ -1336,13 +1351,13 @@ pub fn run_scoped(
     }
 }
 
-/// What the model is told when "forget my face" names no face of the person
-/// whose line it is, or, on a room's line, no face seen saying it
-/// ([`forget_name`]): nothing is sent.
 /// What the model is told when a face request's authority went before it
 /// was sent ([`run_for_fenced`]): nothing was done.
 pub const AUTHORITY_GONE: &str =
     "That was not done: I could no longer be sure it was theirs to ask, so nothing was sent.";
+/// What the model is told when "forget my face" names no face of the person
+/// whose line it is, or, on a room's line, no face seen saying it
+/// ([`forget_name`]): nothing is sent.
 pub const NOT_THEIRS: &str = "I can only forget the face of the person asking, while I can see them at the lamp. They should look at me and ask again.";
 
 /// The name "forget my face" asks the eyes to forget, on a line whose
@@ -1405,7 +1420,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             remember_speaker: false,
         },
         said,
-        &|| true,
+        None,
     )
 }
 
@@ -1414,7 +1429,7 @@ fn run_switched(
     call: &ToolCall,
     switches: FaceSwitches,
     said: &Said,
-    fence: &dyn Fn() -> bool,
+    fence: Option<&dyn Fn() -> bool>,
 ) -> (Value, bool) {
     let checked = switches.checked;
     let Some(name) = call
@@ -1458,13 +1473,17 @@ fn run_switched(
         FORGET => json!({"forget": name}),
         _ => return (crate::tools::unavailable(), false),
     };
-    if !fence() {
+    if fence.is_some_and(|fence| !fence()) {
         eprintln!(
             "lamp-voice: a face request's authority was gone before it was sent; nothing was sent"
         );
         return (json!({"error": AUTHORITY_GONE}), true);
     }
-    match crate::tools::exchange(socket, &line, DEADLINE) {
+    let answer = match fence {
+        Some(fence) => crate::remember::bounded_exchange_fenced(socket, &line, DEADLINE, fence),
+        None => crate::tools::exchange(socket, &line, DEADLINE),
+    };
+    match answer {
         Some(answer) => (told_asking(&answer, switches.visits), true),
         None => (
             json!({"error": "My eye is not answering right now, so I could not do that."}),

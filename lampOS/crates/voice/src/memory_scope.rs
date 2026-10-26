@@ -613,6 +613,14 @@ impl ScopeLease {
         self.context.narrowed.store(true, Ordering::Release);
     }
 
+    /// The known person this line was admitted as, whatever came after:
+    /// revoked, or narrowed to the room. Never authority to act, only to say
+    /// what could not be done for them (reviewer-three's P2 on #3564); every
+    /// send rechecks [`Self::scope`].
+    pub fn admitted_person(&self) -> Option<&str> {
+        self.context.scope.person()
+    }
+
     /// A face was remembered in this line: the face cache it was admitted
     /// from has not answered for it yet ([`FaceCache::face_remembered`]).
     pub fn face_remembered(&self) {
