@@ -1,0 +1,175 @@
+{
+  "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+  "base": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+  "aggregate_distinct_targets": [
+    538,
+    4,
+    9
+  ],
+  "scopes": {
+    "first_full_attempt_library": [
+      156,
+      3,
+      0
+    ],
+    "first_unrun_main_plus_it": [
+      349,
+      1,
+      1
+    ],
+    "remaining_release_and_audio": [
+      33,
+      0,
+      8
+    ],
+    "docs": [
+      0,
+      0,
+      0
+    ]
+  },
+  "controls_all21_once_pass": {
+    "skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": 1,
+    "skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": 1,
+    "skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": 1,
+    "skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": 1,
+    "skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": 1,
+    "skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": 1,
+    "skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "tests::a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "tests::a_change_trigger_requires_a_scalar_comparison": 1,
+    "skills::every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "runs": {
+    "runtime": {
+      "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "returncode": 101,
+      "signal": null,
+      "deadline_seconds": 1800,
+      "timed_out": false,
+      "elapsed_seconds": 265.4881699999969,
+      "driver_reaped": true,
+      "process_group_absent": true,
+      "pid": 9373,
+      "source_unchanged": true,
+      "six_actual_and_preserved_executables_unchanged": true,
+      "log_sha256": "9e575a08eab650acf94b68e400ad6debec9f2301e530b34c1435f151e7717733"
+    },
+    "unrun": {
+      "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--bin",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--test",
+        "requested_audio",
+        "--test",
+        "release_pair",
+        "--",
+        "--test-threads=1"
+      ],
+      "returncode": 101,
+      "signal": null,
+      "deadline_seconds": 1800,
+      "timed_out": false,
+      "elapsed_seconds": 622.6752130000095,
+      "driver_reaped": true,
+      "process_group_absent": true,
+      "pid": 14286,
+      "source_unchanged": true,
+      "six_actual_and_preserved_executables_unchanged": true,
+      "log_sha256": "da8a83e6ce9036c97ab58a72a0ae2bc215f951d6723cc257d8cb1c501e5e3dba"
+    },
+    "last-unrun": {
+      "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "requested_audio",
+        "--test",
+        "release_pair",
+        "--",
+        "--test-threads=1"
+      ],
+      "returncode": 0,
+      "signal": null,
+      "deadline_seconds": 1800,
+      "timed_out": false,
+      "elapsed_seconds": 8.998202000002493,
+      "driver_reaped": true,
+      "process_group_absent": true,
+      "pid": 26061,
+      "source_unchanged": true,
+      "six_actual_and_preserved_executables_unchanged": true,
+      "log_sha256": "c96295509a46bdcee7811e3f37ce88ade0e3ec80efc47993c0bb529808c7fba8"
+    },
+    "docs": {
+      "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--doc",
+        "--",
+        "--test-threads=1"
+      ],
+      "returncode": 0,
+      "signal": null,
+      "deadline_seconds": 1800,
+      "timed_out": false,
+      "elapsed_seconds": 0.6969140000001062,
+      "driver_reaped": true,
+      "process_group_absent": true,
+      "pid": 26638,
+      "source_unchanged": true,
+      "six_actual_and_preserved_executables_unchanged": true,
+      "log_sha256": "d35aa34e0a3f4745a7fb38cc05459ed3d8f9a21f86e5c57b7af38dcef79788b9"
+    }
+  },
+  "source_unchanged": true,
+  "all_six_actual_and_preserved_executables_unchanged": true,
+  "no_retry_of_failed_targets": true,
+  "compiler_gates": "clean48/fmt/strictSkillsClippy/workspacebuild/testcompile all exit0",
+  "prior_clean_byte_identical": "a02/666; 542/0/9, initial library-copy caveat retained; savedlibrary separately159/0",
+  "limits": "FOUR FAILURES remain unresolved. This is not a green full run. Cargo stopped on failures; later commands ran only previously unrun targets. Carry unpublished; Tests owns Routine fixture, tool-call timeout source audit underway."
+}

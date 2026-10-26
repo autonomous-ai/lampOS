@@ -1,0 +1,59 @@
+{
+  "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+  "terminal": {
+    "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--bin",
+      "lamp-skills",
+      "--test",
+      "it",
+      "--test",
+      "requested_audio",
+      "--test",
+      "release_pair",
+      "--",
+      "--test-threads=1"
+    ],
+    "returncode": 101,
+    "signal": null,
+    "deadline_seconds": 1800,
+    "timed_out": false,
+    "elapsed_seconds": 622.6752130000095,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "pid": 14286,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "da8a83e6ce9036c97ab58a72a0ae2bc215f951d6723cc257d8cb1c501e5e3dba"
+  },
+  "actual_completed_targets": {
+    "main": [
+      20,
+      0,
+      0
+    ],
+    "it": [
+      329,
+      1,
+      1
+    ]
+  },
+  "failure": "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+  "assertion": "tests/it/call_wait.rs:123 actual application error My skills did not answer in time; median25ms assertion not reached",
+  "unrun_targets": [
+    "release_pair",
+    "requested_audio",
+    "docs"
+  ],
+  "source_unchanged": true,
+  "six_executables_unchanged": true,
+  "no_retry": true,
+  "limits": "Cause not established. First library failure156/3 and this first integration failure remain separate. Carry is unpublished."
+}

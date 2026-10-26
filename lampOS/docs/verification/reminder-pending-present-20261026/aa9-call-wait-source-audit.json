@@ -1,0 +1,112 @@
+{
+  "kind": "read-only source audit; no test execution or retry",
+  "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+  "base": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+  "source_clean_and_matches_before_receipt": true,
+  "source_sha256": {
+    "lampOS/crates/skills/src/main.rs": "d43fedb99fa40c05ac32ceb413ede3b723a5ee2f992ebba103d9f9c343be486e",
+    "lampOS/crates/skills/src/lib.rs": "beda2e9fea2e84f88cc85bfb54aa3b1312a9d9bf91d411c4cca46822f2a7d5c1",
+    "lampOS/crates/skills/src/requested_audio.rs": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+    "lampOS/crates/skills/tests/it/call_wait.rs": "b2167b2c4b7712d93553bf596adaf204e75de405da04c5cd447400b050dc3b0e",
+    "lampOS/crates/bus/src/lib.rs": "3ab858b5195382e190b4988415177c7cf0b567cae33ecdbf097167eb7978b919",
+    "lampOS/crates/bus/src/subscribe.rs": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+    "lampOS/crates/bus/src/publish.rs": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+    "lampOS/crates/bus/src/live.rs": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+    "lampOS/crates/bus/src/wire.rs": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+    "lampOS/crates/ipc/src/log_relay.rs": "45e32867938eb0c93cab3a8444451d70fe0ec1831b130f1d830922958d2ab44f"
+  },
+  "retained_observation": {
+    "log": "unrun.log",
+    "log_sha256": "da8a83e6ce9036c97ab58a72a0ae2bc215f951d6723cc257d8cb1c501e5e3dba",
+    "test": "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+    "assertion": "lampOS/crates/skills/tests/it/call_wait.rs:123",
+    "application_result": {
+      "error": "My skills did not answer in time.",
+      "ok": false
+    },
+    "median_25ms_assertion_reached": false,
+    "main": {
+      "passed": 20,
+      "failed": 0
+    },
+    "integration": {
+      "passed": 329,
+      "failed": 1,
+      "ignored": 1
+    },
+    "driver_exit": 101,
+    "driver_elapsed_seconds": 622.6752130000095,
+    "six_binaries_equal_prior_receipt": true,
+    "prior_actual_runtime": "a02dd8c67de51a087380e309e98307efb8f612d4",
+    "limits": "No call ordinal, per-call elapsed value, enqueue/dequeue/commit timestamps, scheduling trace or filesystem duration was retained. The diagnostic is not itself a measured 1 s timeout. No binary drift or host-load cause is established."
+  },
+  "startup_order": [
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:1000",
+      "fact": "Create waking ToolAsk channel, then listen() binds call.sock and spawns the serial listener. listen() does not publish tools.json."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:1075",
+      "fact": "First main-loop reload scans assets, fingerprints and loads the four fixture skills, replaces Engine and permissions. This work precedes initial registry publication."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:1177",
+      "fact": "write_tools publishes tools.json by temporary write and rename (2774-2785), before bus subscriber setup. Registry existence is not an acknowledgement that the main request queue is being serviced."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:1192",
+      "fact": "Build topic list, create missing subscriptions through 1209, check tool socket at 1212, refresh publisher liveness at 1214, then clock/routine/Engine work before wait_any at 1278 and first asks.try_recv at 1293."
+    },
+    {
+      "ref": "lampOS/crates/bus/src/subscribe.rs:190",
+      "fact": "Each new subscription synchronously reads declaration, creates directories, binds, chmods, hard-links and unlinks a Unix socket (190-239), then allocates a 60,001-byte buffer at 258. No deadline wraps that filesystem work."
+    }
+  ],
+  "timeout_and_reply": [
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:59",
+      "fact": "TOOL_TIMEOUT is 1 s. Listener sends ToolAsk then waits at 2976; timeout/disconnection cancels admission when still pending, otherwise waits another 1 s. A missing result produces the observed error at 2987. Invalid requests or failed channel send also share this generic error; this fixture sends a valid wave call."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/lib.rs:6964",
+      "fact": "Admission uses atomic PENDING -> COMMITTED or CANCELLED. A cancellation that wins prevents later tool_call commit (main 2700-2703). This is a cancellation bound, not evidence of where the failed run waited."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:2707",
+      "fact": "The fixture wave has only Say. It sends the reply at 2714 before publishing Triggered/Done events. No Actions/Mood/provider connection or look-readiness wait is required for that response."
+    },
+    {
+      "ref": "lampOS/crates/skills/tests/it/call_wait.rs:105",
+      "fact": "Fixture waits only for tools.json existence, then sleeps 30 ms before each of 10 sequential calls. The first response assertion fails before printing durations or evaluating median 25 ms; the failed ordinal is not recorded."
+    }
+  ],
+  "other_main_thread_work": [
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:603",
+      "fact": "Sending a ToolAsk queues it then writes a nonblocking wake pipe. wait_any polls all topics plus that pipe once (640-710); WAIT_AT_MOST is 250 ms. Even wake-error fallback sleeps only the remaining 250 ms; it does not intentionally wait 250 ms for each topic. Scheduling suspension can exceed requested waits, but no such suspension is measured here."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:470",
+      "fact": "Every 2 s the same main loop fingerprints the skills tree and performs reload checks before draining asks (1075-1214). Normal filesystem calls have no wall-time limit; a slow scan can delay already-queued calls even after startup."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:2716",
+      "fact": "After replying, Triggered/Done event publication may synchronously scan subscribers/refresh presence (bus/publish.rs646-680,713-740). Later calls can queue behind this work. The isolated fixture has no event subscribers, so ordinary work is small; no long duration was observed."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:1325",
+      "fact": "Between call-drain passes, each subscriber recv(Duration::ZERO) uses a nonblocking socket but can check retained latest files (bus/subscribe.rs611-617,759-772; wire.rs166-177). Fixture creates an otherwise empty private bus. No retained-message flood is established."
+    },
+    {
+      "ref": "lampOS/crates/skills/src/main.rs:249",
+      "fact": "Fixture provides no zone/offset, so sample_clock performs no time-zone/synchronization lookup; it has no clock trigger, watch, requested-audio asset or look. Initial state/known/daily setup precedes registry publication. The retained environment receipt lists build/test variables only and is not a complete inherited runtime-switch inventory."
+    }
+  ],
+  "assessment": {
+    "established_source_exposure": "tools.json becomes visible before subscription construction and main-loop request service; synchronous filesystem work is also interleaved with subsequent requests. Both can consume the listener deadline if they stall.",
+    "not_established": "No deterministic 1 s stall, broken wake, dropped handle, changes-trigger regression, deadlock, device/provider wait or attribution to startup was demonstrated. Source-only review cannot assign this particular failure to I/O or scheduling. Missing Triggered lines are insufficient to identify the first failed call because the process uses a dropping log relay and the fixture kills it on panic.",
+    "disposition": "Preserve first failure as unresolved. No timeout change, test retry or product correction performed."
+  },
+  "bounded_next_diagnostic_not_run": "Record call ordinal and monotonic boundaries for registry rename, end of subscriptions/startup, ToolAsk enqueue, dequeue, admission commit and reply reception; retain independent I/O durations or a main-thread sample if a stall occurs. A controlled post-registry startup-work barrier would test readiness ordering without increasing the 1 s product timeout or the 25 ms response target. Moving registry publication after startup work would narrow only the startup exposure; it would not resolve periodic filesystem stalls.",
+  "scope_limits": "No source/test edits, builds, Cargo, reruns, device access, network calls or public posts. The separate Tests-owned Routine 50 ms investigation is untouched."
+}
