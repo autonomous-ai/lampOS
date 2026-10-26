@@ -1,0 +1,495 @@
+{
+  "artifact_receipt_sha256": "0e3ec5ccdc0e2240cc93d9440231fb1203ccb67a5f1ea14f515a758283b9f52e",
+  "audit_scope": "Retained receipts and binaries read/hashed only; no test, build or binary execution during packaging.",
+  "compiled_artifacts": [
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "975d82a6a2e7432a956daf8f6c1333ac61d4b4adab5815d261fd90482f3906aa",
+      "target": "reference_pace",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "bin"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "30641481999c33307750466b7a4476b735af185ad7916105115340982ce5286d",
+      "target": "lamp-voice",
+      "test_profile": true
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "1cf5e54ac55b679cf1766fa9b4e77e9d65eed9fd6513b3aad9fee9e3b45cf3ae",
+      "target": "release_pair",
+      "test_profile": true
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "f684f010c6e35317e554db81d1485bc247a74cd57658a82c74f2048da4006d47",
+      "target": "duplex_lab",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "3e14d37a58c4621e537d2c1777dd9176079079a1a17dd851755adea3ad0a0fc4",
+      "target": "ring_process_probe",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "c3efd5f0b611a954945a21779e54c316e704280fe148e237a74d00f5f239b6c4",
+      "target": "stop_words_stt_replay",
+      "test_profile": true
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "3417b0a614f25402385572b770448166d5882898f6d77cfbdf61347164d33137",
+      "target": "hearing_replay",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "5a3c6476cc4f4a6de1119da406fff58c8953b8337db173c6e3b8a280972476d1",
+      "target": "probe_handover",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "2c7b06cf4ac76fd04e80449dc100c0f96be1f10b968c46cedab414347b48b7ac",
+      "target": "it",
+      "test_profile": true
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "2032593d73f1f99192a72f3878b4d797b88d3f466bc4d55dd75077fcc66c1538",
+      "target": "admission_latency",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "36da1404e4b1fad85868ccb0ed9aabbbe383b8ab8faaf08514af7f57a6b127b8",
+      "target": "lamp_voice",
+      "test_profile": true
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "e1ec6bb03e302cca87387c24d73f76e7c14363b2cfb2f9d760a2fbdc8946fd22",
+      "target": "head_qualification_operator",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "example"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "ea80abdf00281373e21748aeb935f50a55cf9ee9b456c8f20b3e27ffefe76627",
+      "target": "render_line_second",
+      "test_profile": true
+    },
+    {
+      "compile_phase": "compile-voice",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "bin"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "bfbb77167a148d0797959b9c6fb8d84a80d092d97f641211be2fd5d2b1529adc",
+      "target": "lamp-voice",
+      "test_profile": false
+    },
+    {
+      "compile_phase": "compile-census",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "16d338c86fdff88594ea7a42da0b942b7e6ad98765156bc52bf3ce7bc4bc70d9",
+      "target": "it",
+      "test_profile": true
+    },
+    {
+      "compile_phase": "compile-census",
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "bin"
+      ],
+      "preserved_copy_matches": true,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "ebbd2f8ec9d203cd447b57ffbc5068669d27b4abd78b0205e873dd36cc1889c5",
+      "target": "lamp-voice-eval",
+      "test_profile": false
+    }
+  ],
+  "full_voice": {
+    "failed": 0,
+    "ignored": 21,
+    "passed": 4076,
+    "scope": "Full lamp-voice package; not full lamp-voice-eval or workspace.",
+    "terminal_groups": [
+      [
+        3790,
+        0,
+        15,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        275,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        6,
+        0,
+        0
+      ],
+      [
+        4,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        6,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "head": "e6fa2a668649b0e710c27bd9658a3d66592b0899",
+  "plan_receipt_sha256": "4748aa77c3bcf981b105e02e115ab2bd1e934ec41dde2c621789eb717b9c7c35",
+  "platform": "macOS",
+  "schema": 1,
+  "stages": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 54.216,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "36722e24c67f4005b8705deba5a7e2166fe6af1d8b403bbee7ea5cc5cd9b6aca",
+      "source_entries": 7179,
+      "source_unchanged": true
+    },
+    "compile-census": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 52.612,
+      "exit_code": 0,
+      "log_sha256": "8baea4d5fd81c7852f356ba867746a3270092b64cbf83851bf526a9614391f66",
+      "receipt_sha256": "af8a3a8135788681ff161d0ed666dd1f9e2ddc884aa985e587c311bd0782d94d",
+      "source_entries": 7179,
+      "source_unchanged": true
+    },
+    "compile-voice": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 118.174,
+      "exit_code": 0,
+      "log_sha256": "4507745d85bf1a7a14f86f98cee13461e3d25782172cdc6c8c3983f52ff45872",
+      "receipt_sha256": "d5d230af57132d37f47793fedb04351bf00f8e5a2fa7374f9b0275fa5aa49d1c",
+      "source_entries": 7179,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.87,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "c34a5b8bcf99790321c8881f81dfc273d06fcd955e0368b6e86d81efc827b77e",
+      "source_entries": 7179,
+      "source_unchanged": true
+    },
+    "full-voice": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 577.646,
+      "exit_code": 0,
+      "log_sha256": "bc065c4939a04de9f1ec1a21f63f59a6ce5a7d8b9c83cbd74639651c8dff866d",
+      "receipt_sha256": "2c09c27c67b1416f4891037c1f1c6a30941d8dc357d6806e0f9f68e009f05e57",
+      "source_entries": 7179,
+      "source_unchanged": true
+    },
+    "switch-census": {
+      "command": [
+        "it-1253a8d74d54cde9",
+        "switches::",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 1.279,
+      "exit_code": 0,
+      "log_sha256": "639db423b2a94af15cd0049096e01594686b39b94a2947393145e005d106822d",
+      "receipt_sha256": "0cb34eeeaecaaa050615956611b14787d01c3d887bffd9b4df76c8302055d3a2",
+      "source_entries": 7179,
+      "source_unchanged": true
+    }
+  },
+  "switch_census": {
+    "binary_sha256": "16d338c86fdff88594ea7a42da0b942b7e6ad98765156bc52bf3ce7bc4bc70d9",
+    "failed": 0,
+    "filtered_out": 236,
+    "ignored": 0,
+    "passed": 2,
+    "scope": "Two compiled lamp-voice-eval switch tests, separate from full Voice totals."
+  }
+}

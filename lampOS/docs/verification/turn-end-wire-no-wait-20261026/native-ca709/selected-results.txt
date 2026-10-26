@@ -1,0 +1,35 @@
+Authored: ca70965343208bf64f8be03d53eb5705b811ec72
+Base: 41233c1b6954abc812186d7014a7adb19422e29e
+Actual preview: e4d5a3cd372909e7cb079dd3efe9fc873efa53fd
+Equal complete tree: 142244e86997e692b7fe250b837947d3538bf8cc
+Summary [ 209.442s] 11328 tests run: 11328 passed, 106 skipped
+Unique terminal rows: 11328; display echoes excluded: 35
+
+PASS (6145/11328) lamp-turn-end-wire client::tests::native_reap_is_visible_while_reader_and_teardown_are_pending
+PASS (6146/11328) lamp-turn-end-wire frame::tests::long_reasons_are_truncated_on_a_character_boundary
+PASS (6147/11328) lamp-turn-end-wire frame::tests::malformed_frames_are_rejected_before_allocation
+PASS (6148/11328) lamp-turn-end-wire frame::tests::request_round_trips_and_keeps_only_the_latest_window
+PASS (6149/11328) lamp-turn-end-wire frame::tests::responses_round_trip
+
+test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2012 ms)
+test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)
+test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)
+test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)
+test missing_model_is_final_and_never_restarted ... ok (162 ms)
+test missing_executable_fails_at_once ... ok (2 ms)
+test spawn_returns_while_worker_startup_is_held ... ok (6 ms)
+test startup_failures_are_final ... ok (411 ms)
+test serving_failures_are_replaced_within_budget ... ok (514 ms)
+test protocol_violations_are_replaced ... ok (177 ms)
+test cancelled_answers_are_never_delivered ... ok (155 ms)
+test close_during_inference_never_waits ... ok (233 ms)
+test sustained_requests_stay_bounded ... ok (690 ms)
+test result: 13 passed; 0 failed
+relay_signals: ok
+Workspace doctests: 4 passed / 0 failed across 46 summaries
+Whole promotion helper: 25 passed / 0 failed (2+0+22+1+0)
+
+cargo +1.96.0 fmt --all --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings

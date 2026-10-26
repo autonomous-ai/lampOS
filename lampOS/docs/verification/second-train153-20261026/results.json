@@ -1,0 +1,226 @@
+{
+  "artifact_metadata": [
+    {
+      "created_at": "2026-10-26T02:03:50Z",
+      "digest": "sha256:b238ec550d482fd1fd2d24889a09364ec1adf269ef167767b06fb633452d62cc",
+      "expired": false,
+      "expires_at": "2026-11-02T02:03:43Z",
+      "id": 12623067070,
+      "name": "lampos-arm64-37af2e19941fec1742130ba4ce26a1df451b64d6",
+      "size_in_bytes": 116062946
+    }
+  ],
+  "artifact_scope": "Metadata only; binary archive neither downloaded nor executed.",
+  "authored_and_preview_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+  "base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "commit_metadata_sha256": {
+    "authored": "9d09e7a3091c530e91c8cdffd438d1a2c68e7a4d76f8f479aff2234bb66e899c",
+    "base": "c349bcd586a5169472ef8f22a4091bbe4778d7bb46f64c1a06c6d4f033e1520c",
+    "landing": "2c17255caf5117920dc82f217d85abd4e9f5aa415a27da73755901241465f735",
+    "preview": "adfba9c8b3d9636d74ccc68c122389984d1c1b997820e06a728105b1314e57b9"
+  },
+  "head": "37af2e19941fec1742130ba4ce26a1df451b64d6",
+  "landing": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "landing_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+  "limits": [
+    "Original attempt 1 native CI only; no workflow rerun or local compiler during audit.",
+    "PR profile skipped tests remain skipped, not nightly full qualification.",
+    "Earlier c5 receipts remain at their original identities; this packet qualifies only the recorded authored head and preview.",
+    "No artifact execution, release promotion, device, acoustic or physical-latency acceptance.",
+    "Raw logs/API metadata retained privately; access and retention depend on GitHub."
+  ],
+  "music_boundary_controls": [
+    {
+      "binary": "lamp-voice",
+      "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_a_safe_fixed_refusal_without_offer_data",
+      "ordinal": 7468,
+      "status": "PASS",
+      "total": 11343
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_acceptance_with_explicit_null_and_one_repeat_refusal",
+      "ordinal": 7469,
+      "status": "PASS",
+      "total": 11343
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+      "ordinal": 7470,
+      "status": "PASS",
+      "total": 11343
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+      "ordinal": 7472,
+      "status": "PASS",
+      "total": 11343
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_unavailable_and_stale_envelope_refusals",
+      "ordinal": 7485,
+      "status": "PASS",
+      "total": 11343
+    }
+  ],
+  "nextest": {
+    "binaries": 182,
+    "excluded_custom_harness_binaries": 2,
+    "identical_echo_rows_excluded": 35,
+    "literal_summary": "Summary [ 214.228s] 11343 tests run: 11343 passed, 106 skipped",
+    "ordinal_coverage": "1 through 11343 exactly once",
+    "selected": 11343,
+    "skipped": 106,
+    "unique_counts": {
+      "FAIL": 0,
+      "LEAK": 0,
+      "PASS": 11343,
+      "TIMEOUT": 0
+    },
+    "unrun": 0,
+    "wire_library_cases": [
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "client::tests::native_reap_is_visible_while_reader_and_teardown_are_pending",
+        "ordinal": 6146,
+        "status": "PASS",
+        "total": 11343
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::long_reasons_are_truncated_on_a_character_boundary",
+        "ordinal": 6147,
+        "status": "PASS",
+        "total": 11343
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::malformed_frames_are_rejected_before_allocation",
+        "ordinal": 6148,
+        "status": "PASS",
+        "total": 11343
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::request_round_trips_and_keeps_only_the_latest_window",
+        "ordinal": 6149,
+        "status": "PASS",
+        "total": 11343
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::responses_round_trip",
+        "ordinal": 6150,
+        "status": "PASS",
+        "total": 11343
+      }
+    ],
+    "wire_library_count_already_included": 5
+  },
+  "pr": 3529,
+  "preview": "80c919ebb60ec68a2ccce05474c7a328725e7406",
+  "preview_parents": [
+    "41233c1b6954abc812186d7014a7adb19422e29e",
+    "37af2e19941fec1742130ba4ce26a1df451b64d6"
+  ],
+  "promotion_helper": {
+    "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+    "failed": 0,
+    "ignored": 0,
+    "passed": 25,
+    "scope": "Whole separate helper command; library 2 + main 0 + promotion integration 22 + workflow integration 1 + docs 0. Not added to workspace nextest.",
+    "summary_pass_counts": [
+      2,
+      0,
+      22,
+      1,
+      0
+    ]
+  },
+  "runs": {
+    "arm64": {
+      "actual_checkout": "80c919ebb60ec68a2ccce05474c7a328725e7406",
+      "attempt": 1,
+      "completed_at": "2026-10-26T02:03:52Z",
+      "conclusion": "success",
+      "job_id": 121357836276,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40255994955/job/121357836276",
+      "jobs_metadata_sha256": "1fc0592167d4448c75f58d72b36bd06774473cd19ad7a0e6a15efddd42b4f05c",
+      "other_jobs": [
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "report-full-run-failure"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        }
+      ],
+      "raw_log_sha256": "df62f7c0361c818cca44f365d7a58631b927ea7ddb4ddac583c2f59927648ac9",
+      "run_id": 40255994955,
+      "run_metadata_sha256": "35de22c463795434953f48505372af3dfe04499451d6e9f0156517bd508b2b7b",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40255994955",
+      "started_at": "2026-10-26T01:48:22Z"
+    },
+    "clippy": {
+      "actual_checkout": "80c919ebb60ec68a2ccce05474c7a328725e7406",
+      "attempt": 1,
+      "commands": [
+        "cargo +1.96.0 fmt --all --check",
+        "cargo clippy --locked --workspace --all-targets -- -D warnings",
+        "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+        "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings"
+      ],
+      "completed_at": "2026-10-26T01:51:33Z",
+      "conclusion": "success",
+      "job_id": 121357836032,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40255994925/job/121357836032",
+      "jobs_metadata_sha256": "a8438b8f6cf02da91b6d5e4b57983eeae8285510e0b9b3a6d8be5126ea391d39",
+      "other_jobs": [],
+      "raw_log_sha256": "10fc51cbe4c115bc80e786461647c57c4d01ce8123b0b04a5895050797047b03",
+      "run_id": 40255994925,
+      "run_metadata_sha256": "84a008115b6c9a5676d0819781dee53beaaf412c4bd5bf53954c95c9d23b7fda",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40255994925",
+      "started_at": "2026-10-26T01:48:20Z"
+    }
+  },
+  "schema": 1,
+  "separate_workspace_checks": {
+    "doctests": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4,
+      "summary_count": 46
+    },
+    "process_harness": {
+      "cases": [
+        "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2011 ms)",
+        "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+        "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+        "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+        "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+        "test missing_executable_fails_at_once ... ok (2 ms)",
+        "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+        "test startup_failures_are_final ... ok (409 ms)",
+        "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+        "test protocol_violations_are_replaced ... ok (177 ms)",
+        "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+        "test close_during_inference_never_waits ... ok (233 ms)",
+        "test sustained_requests_stay_bounded ... ok (691 ms)"
+      ],
+      "failed": 0,
+      "passed": 13
+    },
+    "relay_signals": "ok",
+    "scope": "Custom harnesses and doctests are separate from the nextest census."
+  },
+  "train_pr_merged": true,
+  "train_pr_metadata_sha256": "6d60ed23e4dfd4528dddaf98600d1c29eaa94cbc0f659697bdbb88acbac5a7fc"
+}

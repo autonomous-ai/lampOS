@@ -1,0 +1,143 @@
+{
+  "base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "base_changed_paths": [
+    "lampOS/crates/memory/tests/voice_observe_forget.rs",
+    "lampOS/crates/memory/tests/voice_observe_named_forget.rs",
+    "lampOS/crates/memory/tests/voice_observe_room.rs",
+    "lampOS/crates/update/tests/functions.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/remember/needs_face.rs",
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/switches.md"
+  ],
+  "complete_receipt_sha256": "ab123925b69323bdc020cf8049f2b6ec6593962c2295e0e27ca00bd9e0f81c06",
+  "head": "e6fa2a668649b0e710c27bd9658a3d66592b0899",
+  "head_publicly_pushed": false,
+  "old_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "old_head": "dde97152c1f214fb8b7c2dd5121f608273ff9fa7",
+  "pr": 3515,
+  "public_source_basis": {
+    "authored_blobs": [
+      {
+        "git_blob": "8268158cba698b4fec65e6b4a3b12103b774e8a4",
+        "mode": "100644",
+        "path": "lampOS/crates/voice/src/coordinator.rs",
+        "sha256": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede"
+      },
+      {
+        "git_blob": "04c28791b5ab4e632248f56be4c83ae268f2d69b",
+        "mode": "100644",
+        "path": "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs",
+        "sha256": "5ae99f09a6e20756671608093eaedcd8dcb49bb82dabb38724977272fa63c460"
+      },
+      {
+        "git_blob": "28dffe718f1f0eab8406ade99e3a70d4178e729b",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/README.md",
+        "sha256": "3ac69d591dc9afb241d55091130226171b19f197ff380631f1bedc6e34ee5ed7"
+      },
+      {
+        "git_blob": "beff5e79c8f60ed506cae22df029961b2b9f45dc",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/SHA256SUMS",
+        "sha256": "057abf1968e09245174b16b46ea865be1aa8271a475c4b28b74de41c1c05774e"
+      },
+      {
+        "git_blob": "6428356cbce89701431ffe6dfcb6b0dc645ff22c",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/census.json",
+        "sha256": "847bd0e43038d65b129ba5ee7d6ab50610ab6a9b91bc6998fb678c7d03ee1983"
+      },
+      {
+        "git_blob": "e301f7116002be81c771d38664da9931f72c6711",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-274/README.md",
+        "sha256": "a38624a127b755081b2de808bd62b0e2b49b3f45e2e1e8099623cdafa4dd1984"
+      },
+      {
+        "git_blob": "02320164c2ea3f448cbccd04f95a6bd5497edab4",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-274/SHA256SUMS",
+        "sha256": "d3c766e989ace97de5921fd78e60a55c7c5547ce29514852e793186f62df89ed"
+      },
+      {
+        "git_blob": "55c0b35f8e2fe51449bb57cd21c333df578f4619",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-274/inputs.sha256",
+        "sha256": "abf472a6a3c36ed9837d019c77c53788112d20f4d579988ad408dae7eee0ec9c"
+      },
+      {
+        "git_blob": "95e13b901cf22e0c617e7443986c7e1350e0c8fd",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-274/results.json",
+        "sha256": "7e64eecabbb899168b2f16cf4170a7a73de05bce520bbd6d6216f0d0fc11de43"
+      },
+      {
+        "git_blob": "f213811fff8ff4753f7c33eb2a3f7803680f5a62",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-756/README.md",
+        "sha256": "8a7c2f08f767e76ea3c397ebb9ec0c1a9cf2db05ff153d16a4059aa9a403f2b8"
+      },
+      {
+        "git_blob": "38fcf3e497f4217982c7d9156926f197e0e7ed06",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-756/SHA256SUMS",
+        "sha256": "fb39ef5079a8cb109c295a7d14eb97e5025124fbe3b3bd14bb46576c3916a1b9"
+      },
+      {
+        "git_blob": "69783799f1ccc2dd7c306a160e50a6aab55a1cf7",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-756/range-diff.txt",
+        "sha256": "e8daea2ba5043c4f9f2d75ab2c2aae9ca9d6162fb6cebfb3cbe2375db6e5ff77"
+      },
+      {
+        "git_blob": "f1658f94220da5e15f581701c3e7795aff9b3fa4",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/current-756/results.json",
+        "sha256": "21492487a92fe5f1fa55ae00e56d52595d4594cf821b77e658141e3670fc82e5"
+      },
+      {
+        "git_blob": "6f018b903de85cf528b3db0bd3c74d80c2b2f4a0",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/README.md",
+        "sha256": "c4369e52f033f123863964cbf7c15d1eaa5d3a42b568a1a5442f545e41f01b46"
+      },
+      {
+        "git_blob": "052386c9393e9051cfe0ef03ab86e2f570215d33",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/SHA256SUMS",
+        "sha256": "e2756d160b3786719aedde72b973d56a5c7f2df68bd9408973435b16bf3746e2"
+      },
+      {
+        "git_blob": "8602231784dcd23db3586f36e47e3989993f46b1",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/census.json",
+        "sha256": "1dcbfb689a8f80d06fc4fc2c0f61c96f04ce07d941d362bacd781d3b1e758ee0"
+      },
+      {
+        "git_blob": "833e6c618cff2430a647f87424b4bd6a902745e9",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/selected-results.txt",
+        "sha256": "ad39c6326a961dfe4a4d1188451f47978a358788235c5f2271ab6fe2478aee9b"
+      },
+      {
+        "git_blob": "ed96a90e21e446d7c62860d36af44ed7be188fb7",
+        "mode": "100644",
+        "path": "lampOS/docs/verification/music-refusal-trace-20261026/selected-results.txt",
+        "sha256": "ee3b7d88ff74571c1bc202cf23cb39a80ecefdc8e8c69c7c4b16216fa1d23393"
+      }
+    ],
+    "authored_blobs_identical": true,
+    "patch_base": "c5c7603a743690e291f85a664a7ee18624232581",
+    "patch_head": "dde97152c1f214fb8b7c2dd5121f608273ff9fa7",
+    "range_diff": "1:  07bec863cb = 1:  400a9c4aec lampOS: test requested-audio admission trace boundaries\n2:  3b51fca719 = 2:  f2708bffde lampOS: verify requested-audio preparation refusal and stderr\n3:  7ae00715dc = 3:  1a47de7a4b lampOS: retain current-base music boundary checks\n4:  dde97152c1 = 4:  e6fa2a6686 lampOS: qualify music trace tests on the stable-feed base",
+    "rebase_onto": "41233c1b6954abc812186d7014a7adb19422e29e"
+  },
+  "scope": "Historical unpublished local Mac composition only. Train153 tested and landed a different composed tree; no native qualification of this local head is claimed.",
+  "source_inventory": {
+    "current_bytes_and_modes_verified": true,
+    "entries": 7179,
+    "sha256": "7e32241888b638ce1d0bc56c5830db6903cd5ba882e0f64a27919c5559c8e6c9"
+  },
+  "tested_tree": "34925d19f5804f611186a29a2a6bd4c853004bb3"
+}

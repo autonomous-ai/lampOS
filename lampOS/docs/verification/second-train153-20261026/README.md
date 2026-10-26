@@ -1,0 +1,11 @@
+# Train 153 / PR #3529: original native qualification
+
+Head `37af2e19941fec1742130ba4ce26a1df451b64d6` is based on `41233c1b6954abc812186d7014a7adb19422e29e`. Both original attempt-1 jobs checked out `80c919ebb60ec68a2ccce05474c7a328725e7406`, whose exact parents are that base and head. Its complete tree `038dd6224095e0cb646a99f5757c042d394fdcf8` equals both the authored train tree and landed commit `0c1f6437ee57eae3416e3281d91b813d1c3bec1d`. The train PR is merged; constituent PR closure is not direct-merge evidence.
+
+[ARM64 run 40255994955](https://github.com/autonomous-ai/lampOS/actions/runs/40255994955/job/121357836276) succeeds: **11,343 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**. All ordinals reconcile exactly once; 35 identical displayed echoes are excluded. The five Turn-end-wire library cases and all five requested-audio boundary controls each pass once and are already included in that census.
+
+The separate process harness passes **13/0**, including missing-executable and held-startup return cases. Workspace doctests pass **4/0 across 46 summaries**, and relay-signals succeeds. The separate whole promotion-helper command passes **25/0**, comprising library 2, main 0, promotion integration 22, workflow integration 1 and docs 0. None of these separate scopes is added to the nextest count.
+
+[Linux Clippy run 40255994925](https://github.com/autonomous-ai/lampOS/actions/runs/40255994925/job/121357836032) succeeds, including pinned workspace formatting, strict workspace/all-target Clippy and the helper's separate formatting/strict Clippy.
+
+[results.json](results.json) binds terminal jobs, checkout parents/tree, unique counts, original log/metadata hashes and artifact metadata. [selected-results.txt](selected-results.txt) retains compact outcomes. Both original runs were already terminal when this audit began. No workflow was rerun or local test/build launched for this audit. Earlier constituent-head evidence, including the separate ca709 run, remains bound to those heads and is not train qualification. PR-profile skips are not full-nightly coverage; artifact metadata is not an independently downloaded or executed binary, and no release, lamp or latency acceptance is claimed. Raw logs and metadata remain privately retained.

@@ -1,3 +1,21 @@
+Delivered through train153: #3515 and #3524. Remaining #3528 and #3510 are not ready.
+
+## Current checkpoint: 2026-10-26 09:26 +07, music and endpoint landed; IPC current carry pushed
+
+[Train153 #3529](https://github.com/autonomous-ai/lampOS/pull/3529) delivered the music and endpoint work, alongside #3520 and #3513, as `0c1f6437e`. All eighteen music and seven endpoint authored files match the landing. [Train evidence](verification/second-train153-20261026/README.md) binds both original job checkouts to the exact base/train parents; tested, authored and landed complete trees equal `038dd6224`. ARM64 **40255994955** passes **11,343 unique cases / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**, all five music boundary controls and five wire library cases once. The separate wire process harness passes **13/0**, docs **4/0**, relay succeeds and the whole promotion helper passes **25/0**. Linux Clippy **40255994925** passes. The constituent PRs were closed by the train, not directly merged; no release/device action follows from these jobs.
+
+The [separate ca709 native packet](verification/turn-end-wire-no-wait-20261026/native-ca709/README.md) keeps its original ARM64 **40256859060** result **11,328/0**, 106 skipped, and Clippy **40256859116**, with exact preview/tree binding. [Music's frozen local 41233 gate](verification/music-refusal-trace-20261026/current-41233-host/README.md) finished **4,076/0/21**, plus census **2/0**, fmt and strict Voice/Voice-eval Clippy. Its `e6fa2a668` local composition was never pushed after the train landed; it is identified by the public DDE patch series carried onto 41233, and is not the train's full tree. Actual source and all sixteen executable/copy bindings remain preserved.
+
+[#3528](https://github.com/autonomous-ai/lampOS/pull/3528) is pushed as `6e177dee0` on latest 0c1. [Current Mac continuation](verification/ipc-log-no-wait-20261026/current-0c1f/README.md): fmt, strict IPC Clippy and complete **26 ordinary tests + one doctest + relay signal success**, all source and eight executable hashes unchanged. One equal patch preserves all seven authored blobs. New native ARM64 **40258770126** and Clippy **40258770130** are active. [Prior 7f7 native](verification/ipc-log-no-wait-20261026/native-7f7/README.md) passes **11,328 unique cases**, zero failures/leaks/timeouts, 106 skipped, the changed IPC case exactly once, with original Clippy success and exact preview identity. [Initial f0 ARM64 cancellation](verification/ipc-log-no-wait-20261026/native-f0-cancelled/README.md) occurred before nextest and supplies no workspace or changed-case result. Third's limited source/proof read found no P1/P2 on identical source; current full reader decisions remain pending.
+
+Own-keys #3510 is locally carried as `3654d62d0` on 0c1 with seven equal patches, including the newly landed nonregular-input preflight unchanged. Its current fmt/strict nine-crate Clippy pass and full Voice is active; complete Update functions/install, three Memory integrations and census follow. The prior 41233 preparation remains unrun. It is not pushed yet, and activation remains HOLD for #2094 and explicit current-lamp acceptance.
+
+The model-loader FIFO fixture stays uncommitted on 0c1 and awaits its compiler slot. Review caught an Apple-excluded Rustix FIFO-creation API before any compiler/test run; the fixture now uses the already-pinned Nix filesystem wrapper to create the FIFO and Rustix for nonblocking opens. The lockfile adds only the existing Nix0.29 dependency edge. Full offline workspace metadata encountered an uncached unrelated package after lock resolution; locked no-deps metadata succeeded. These are preparation observations, not test results. Both landed endpoint documentation and the new model paragraph are preserved. Its frozen controls will qualify an actual synchronous-spawn fault and a 400 ms pause; neither is run yet.
+
+This log rebase preserves **14,101** earlier proof blobs and modes. No full local workspace/ARM64 gate, model download, provider, key, physical lamp or release action ran.
+
+---
+
 Ready for lamp-voice: no; current-base qualifications replace the earlier ready state.
 
 ## Current checkpoint: 2026-10-26 09:04 +07, all pieces carried onto the memory landing

@@ -1,0 +1,231 @@
+{
+  "artifacts": {
+    "all_compiler_rows_match": true,
+    "all_current_executable_hashes_match": true,
+    "count": 8,
+    "entries": [
+      {
+        "fresh": false,
+        "kind": [
+          "bin"
+        ],
+        "sha256": "e796bbb35dfdd57a8937fe3ed410503e448722c213e4669fe49663697769cfc8",
+        "source": "lampOS/crates/ipc/src/bin/lamp-ipc-probe.rs",
+        "target": "lamp-ipc-probe",
+        "test_profile": true
+      },
+      {
+        "fresh": false,
+        "kind": [
+          "test"
+        ],
+        "sha256": "5cee78eab3c040cbb8046784fdd33caffbb259cac8b659e4d25f54e42446d616",
+        "source": "lampOS/crates/ipc/tests/relay_exit.rs",
+        "target": "relay_exit",
+        "test_profile": true
+      },
+      {
+        "fresh": false,
+        "kind": [
+          "test"
+        ],
+        "sha256": "5d3818fa0db1825b01a32df4879f48673fafb2c95fd6b9260622534771a9abf7",
+        "source": "lampOS/crates/ipc/tests/probe.rs",
+        "target": "probe",
+        "test_profile": true
+      },
+      {
+        "fresh": false,
+        "kind": [
+          "test"
+        ],
+        "sha256": "49859607ff921cddc97d31abcd2d73a7c80c77757a1ec6d9ed9cc67e17aaecc5",
+        "source": "lampOS/crates/ipc/tests/relay_shared.rs",
+        "target": "relay_shared",
+        "test_profile": true
+      },
+      {
+        "fresh": false,
+        "kind": [
+          "test"
+        ],
+        "sha256": "40070bbb6686e92fad2ebbd0cb1ab35bc88fedfd10054bf80448f4e5ec96c58a",
+        "source": "lampOS/crates/ipc/tests/relay_signals.rs",
+        "target": "relay_signals",
+        "test_profile": true
+      },
+      {
+        "fresh": false,
+        "kind": [
+          "bin"
+        ],
+        "sha256": "ebfaf00875ac855a372d2c7e46a82c4ac9dd970f40519d60fff5deed802f2fe9",
+        "source": "lampOS/crates/ipc/src/bin/lamp-ipc-probe.rs",
+        "target": "lamp-ipc-probe",
+        "test_profile": false
+      },
+      {
+        "fresh": false,
+        "kind": [
+          "test"
+        ],
+        "sha256": "88890f45d607af8d4fd5eb60fa8895263b7e937dd436d85e7d1436f5a213b18d",
+        "source": "lampOS/crates/ipc/tests/sockets.rs",
+        "target": "sockets",
+        "test_profile": true
+      },
+      {
+        "fresh": false,
+        "kind": [
+          "lib"
+        ],
+        "sha256": "aaebadc42c77b6a3fd92d01afd24f733d379bac37f5a89045c74c5d58ff71c82",
+        "source": "lampOS/crates/ipc/src/lib.rs",
+        "target": "lamp_ipc",
+        "test_profile": true
+      }
+    ],
+    "gate_recorded_unchanged_after_tests": true,
+    "inventory_sha256": "f9e3cdd6ebbf39ba7f82cfff9402999e60f9b989c9ddf3d5e30cdd8c8328c8a0",
+    "limit": "Read-only audit verifies retained compiler rows and current executable hashes; no artifacts or tests executed by this audit."
+  },
+  "audited_at_utc": "2026-10-26T02:24:25.351691+00:00",
+  "base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "carry": {
+    "all_base_changed_blobs_modes_equal_to_new_base": true,
+    "all_seven_authored_blobs_and_modes_unchanged": true,
+    "author_identity_date_and_message_unchanged": true,
+    "authored_paths": [
+      "lampOS/crates/ipc/src/log_relay.rs",
+      "lampOS/docs/logging.md",
+      "lampOS/docs/verification/ipc-log-no-wait-20261026/README.md",
+      "lampOS/docs/verification/ipc-log-no-wait-20261026/SHA256SUMS",
+      "lampOS/docs/verification/ipc-log-no-wait-20261026/inputs.sha256",
+      "lampOS/docs/verification/ipc-log-no-wait-20261026/results.json",
+      "lampOS/docs/verification/ipc-log-no-wait-20261026/selected-results.txt"
+    ],
+    "base_changed_paths": 40,
+    "literal_equal_patches": 1,
+    "range_diff_sha256": "20cc3d7bbeb21851c042f5b7462c83a61c0339366c2dbb08334bb952c5326169"
+  },
+  "gates": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 1.004,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "a824b81fcfd515a2f902a171f7e7a80887f7837ca973cd10ec0a1d0a9ea89a1b",
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 2.14,
+      "exit_code": 0,
+      "log_sha256": "357b809715a566ff91459959842f5bc5e16ccf20c25e816ed04c3daa2edd0609",
+      "receipt_sha256": "638c04fad66a24df14dc8df31bca88999901d5cec621735bccba81677e9fb71c",
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.868,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "37cde3e3b5f2f8ba1e5ac1b3ef48eacd91f0a022438ae0287fa42a59c3d68d1b",
+      "source_unchanged": true
+    },
+    "full": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 9.122,
+      "exit_code": 0,
+      "log_sha256": "d3ef3e62c6a6ade9da6e87fb521680b51e60253a95cb492cf62e59799b9bc345",
+      "receipt_sha256": "0a1c5588bf56d49e5c705eebdecf6d135d92c22657cae934076ecc3d046103ad",
+      "source_unchanged": true
+    }
+  },
+  "head": "6e177dee0c40557fe7ceedc9b414734c26add031",
+  "head_tree": "41533c6ef7fba4703d1327f5706ada8193b759c2",
+  "limits": [
+    "Host crate gate only; no new ARM64 result claimed.",
+    "No provider/device/systemd action or acoustic latency acceptance.",
+    "This audit ran no compiler or test and made no repository changes."
+  ],
+  "native_scope": {
+    "current_head": "Not audited in this packet; original runs for this new head remain separately tracked.",
+    "historical_head": "7f7dfe42759a7d637e708804e13b78bee7e3c10e",
+    "historical_result": "Earlier original7f7 native11328-success evidence keeps its original tested head; not counted as current qualification."
+  },
+  "previous_base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "previous_head": "7f7dfe42759a7d637e708804e13b78bee7e3c10e",
+  "private_receipt_hashes": {
+    "carry_identity": "3044119a5df8f8e5ddc768694f3f8f98f2a3d43a23cfca5a46e7128dada45285",
+    "controller": "d5487cb23ac1c8ed7d61353a6ff43897745e1593275f6fd75706ad986125bb78",
+    "gate_complete": "20e02cafb5792d53ad6e40d8c67138bf401ebf67a0dbe7fc31d82433670db692"
+  },
+  "schema": 1,
+  "source_binding": {
+    "entries": 7197,
+    "every_inventory_entry_matches_committed_blob_and_mode": true,
+    "inventory_sha256": "c61a03991a4136bf60144df2f003db8626fff20bb30e79d2cbc0d89952158310",
+    "source_unchanged_in_all_gate_receipts": true,
+    "working_tree_matches_full_inventory": true
+  },
+  "tests": {
+    "doctest_failed": 0,
+    "doctest_passed": 1,
+    "literal_summary_lines": [
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.13s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s",
+      "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    ],
+    "ordinary_failed": 0,
+    "ordinary_passed": 26,
+    "relay_signals_ok": 1,
+    "separation": "Last summary precedes the doctest completion footer. Relay custom harness is not added to ordinary or doctest totals; quiet ordinary summaries are retained without invented per-target assignments."
+  }
+}

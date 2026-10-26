@@ -1,0 +1,13 @@
+Full Voice:
+test result: ok. 3790 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 546.67s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.94s
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Compiled switch census:
+test switches::every_switch_says_how_it_is_counted ... ok
+test switches::the_counts_by_table_and_in_all ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 236 filtered out; finished in 0.01s

@@ -1,0 +1,54 @@
+{
+  "arm64": {
+    "artifact_export_upload": "skipped",
+    "attempt": 1,
+    "completed_at": "2026-10-26T02:00:14Z",
+    "conclusion": "cancelled",
+    "doctests_process_relay": "skipped; not run",
+    "helper_ordered_passed_groups": [
+      2,
+      0,
+      22,
+      1,
+      0
+    ],
+    "helper_overall_failed": 0,
+    "helper_overall_passed": 25,
+    "job": 121357616152,
+    "nextest_complete": false,
+    "nextest_pass_fail_leak_timeout_skip_counts": null,
+    "observed_nextest_terminal_rows": 0,
+    "run": 40255922947,
+    "scope": "Cancelled during compilation in test step; no nextest starting/summary or indexed terminal cases. Cannot claim a test pass or zero failures for this unrun suite."
+  },
+  "authored_head": "f0c7072be3582eda1d1ca6bf7464031b3e2b0434",
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "clippy": {
+    "attempt": 1,
+    "conclusion": "success",
+    "job": 121357616836,
+    "run": 40255923159
+  },
+  "parents": [
+    "c5c7603a743690e291f85a664a7ee18624232581",
+    "f0c7072be3582eda1d1ca6bf7464031b3e2b0434"
+  ],
+  "pr": 3528,
+  "preview": "a924c69a24dfab1d6da5a93d2e44a7a2d3afe938",
+  "raw_receipt_sha256": {
+    "arm64-job.log": "94a01298002bc0580befac95aee01fb1719fe77ef9e7dd307f86a119f1d7f162",
+    "arm64-jobs-final.json": "c912ebd91471de609be83aeb1b04d5d0c8bfc820f46d7302813ad3ca85457951",
+    "arm64-run-final.json": "8ae733f06d02a0d76521929096c4df56cf509b7e17cc553b2750509112160703",
+    "arm64-watch.json": "ce4705fa27c626b3b2d899121b75cc5483b0fef408df12d73e69e34d0ac16586",
+    "authored-commit.json": "817317770aca928aae19b484376c4abd42ab66ee200664d68d7d0f34f7727837",
+    "base-commit.json": "488b1922843e0f94f99e16d8b21a70c56106ae0f7797cf00c31f18c2898ad5e7",
+    "clippy-job.log": "3f46a7a33a96ac1d51182feac0132f9fd3851c835bd9b2b2acda39ff10069617",
+    "clippy-jobs-final.json": "b432f0e74c84705babfaf9604be2d91282e394d4f4afd1d118d342e146e63e90",
+    "clippy-run-final.json": "5937e6d02f39b60b3084b62f4aa52ae44750c9870f66e60a18d63ab90fcd81ff",
+    "clippy-watch.json": "b75ac68d38cc7f42a596884cbbcce2797fdf6942d755a5d7eae560494a41e0d6",
+    "preview-commit.json": "15cc272721a274caf9411af12ccaf1f360789c94cca09a6ad5d96761376e2c6c"
+  },
+  "scope": "Superseded original attempt retained. No workflow rerun or local compilation. Current rebased head has an independent audit.",
+  "tree": "637dfd238199bddd55abd25a92979359f30b6e8a",
+  "tree_equals_authored": true
+}

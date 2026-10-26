@@ -1,0 +1,198 @@
+{
+  "artifact_metadata": [
+    {
+      "created_at": "2026-10-26T02:14:53Z",
+      "digest": "sha256:2416d53d976c200e5a1935d11e31b963d323798fea164bbc5a1cafc4c57edf35",
+      "expired": false,
+      "expires_at": "2026-11-02T02:14:46Z",
+      "id": 12623263300,
+      "name": "lampos-arm64-ca70965343208bf64f8be03d53eb5705b811ec72",
+      "size_in_bytes": 116057193
+    }
+  ],
+  "artifact_scope": "Metadata only; binary archive neither downloaded nor executed.",
+  "authored_and_preview_tree": "142244e86997e692b7fe250b837947d3538bf8cc",
+  "base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "commit_metadata_sha256": {
+    "authored": "213432fa6b532db135f0d85b47e34c5d96a2e0666ae0d1f4289f5f739e7a841a",
+    "base": "c349bcd586a5169472ef8f22a4091bbe4778d7bb46f64c1a06c6d4f033e1520c",
+    "preview": "3a26ff62b35bf7d43228b370e8e21f74a2f3ee19cff105c4cdc77a60c97f3e12"
+  },
+  "head": "ca70965343208bf64f8be03d53eb5705b811ec72",
+  "limits": [
+    "Original attempt 1 native CI only; no workflow rerun or local compiler during audit.",
+    "PR profile skipped tests remain skipped, not nightly full qualification.",
+    "Earlier c5 receipts remain at their original identities; this packet qualifies only the recorded authored head and preview.",
+    "No artifact execution, release promotion, device, acoustic or physical-latency acceptance.",
+    "Raw logs/API metadata retained privately; access and retention depend on GitHub."
+  ],
+  "nextest": {
+    "binaries": 182,
+    "excluded_custom_harness_binaries": 2,
+    "identical_echo_rows_excluded": 35,
+    "literal_summary": "Summary [ 209.442s] 11328 tests run: 11328 passed, 106 skipped",
+    "ordinal_coverage": "1 through 11328 exactly once",
+    "selected": 11328,
+    "skipped": 106,
+    "unique_counts": {
+      "FAIL": 0,
+      "LEAK": 0,
+      "PASS": 11328,
+      "TIMEOUT": 0
+    },
+    "unrun": 0,
+    "wire_library_cases": [
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "client::tests::native_reap_is_visible_while_reader_and_teardown_are_pending",
+        "ordinal": 6145,
+        "status": "PASS",
+        "total": 11328
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::long_reasons_are_truncated_on_a_character_boundary",
+        "ordinal": 6146,
+        "status": "PASS",
+        "total": 11328
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::malformed_frames_are_rejected_before_allocation",
+        "ordinal": 6147,
+        "status": "PASS",
+        "total": 11328
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::request_round_trips_and_keeps_only_the_latest_window",
+        "ordinal": 6148,
+        "status": "PASS",
+        "total": 11328
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::responses_round_trip",
+        "ordinal": 6149,
+        "status": "PASS",
+        "total": 11328
+      }
+    ],
+    "wire_library_count_already_included": 5
+  },
+  "pr": 3524,
+  "preview": "e4d5a3cd372909e7cb079dd3efe9fc873efa53fd",
+  "preview_parents": [
+    "41233c1b6954abc812186d7014a7adb19422e29e",
+    "ca70965343208bf64f8be03d53eb5705b811ec72"
+  ],
+  "promotion_helper": {
+    "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+    "failed": 0,
+    "ignored": 0,
+    "passed": 25,
+    "scope": "Whole separate helper command; library 2 + main 0 + promotion integration 22 + workflow integration 1 + docs 0. Not added to workspace nextest.",
+    "summary_pass_counts": [
+      2,
+      0,
+      22,
+      1,
+      0
+    ]
+  },
+  "runs": {
+    "arm64": {
+      "actual_checkout": "e4d5a3cd372909e7cb079dd3efe9fc873efa53fd",
+      "attempt": 1,
+      "completed_at": "2026-10-26T02:14:56Z",
+      "conclusion": "success",
+      "job_id": 121360471018,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40256859060/job/121360471018",
+      "jobs_metadata_sha256": "26e100f521babddbe34ffbb52fdb43f476ea6eac2d1b42c2f59cfaec7594dd4d",
+      "other_jobs": [
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "report-full-run-failure"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        }
+      ],
+      "raw_log_sha256": "fc6abab92c493b33a0970f9e3ca5e569447bd6d73beb882219beb197443fe300",
+      "run_id": 40256859060,
+      "run_metadata_sha256": "f7015547f04b3bd1eb6696dd5981bd6f5752eaf12fd96b2c046fa2badc38c7b2",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40256859060",
+      "started_at": "2026-10-26T01:59:27Z",
+      "watcher": {
+        "deadline_seconds": 3600,
+        "elapsed_seconds": 911.147,
+        "exit_code": 0,
+        "interval_seconds": 300,
+        "receipt_sha256": "c5bf40c7162f128c458afe95a67eae605aefb5e15d4e07629ecaae21248eb25c"
+      }
+    },
+    "clippy": {
+      "actual_checkout": "e4d5a3cd372909e7cb079dd3efe9fc873efa53fd",
+      "attempt": 1,
+      "commands": [
+        "cargo +1.96.0 fmt --all --check",
+        "cargo clippy --locked --workspace --all-targets -- -D warnings",
+        "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+        "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings"
+      ],
+      "completed_at": "2026-10-26T02:02:18Z",
+      "conclusion": "success",
+      "job_id": 121360470909,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40256859116/job/121360470909",
+      "jobs_metadata_sha256": "88aca4014bc916d88e45d76f268f6fcbae4f118ed35ba0401610cc744f795c7f",
+      "other_jobs": [],
+      "raw_log_sha256": "64385dec43052448541a283b2e66488616554e42abbdcd3c25ebff6d0956fd9e",
+      "run_id": 40256859116,
+      "run_metadata_sha256": "1a8d4fe04cdcb392f2e89e05d904388d8a94694b013ccdf5c08cabe6b7063cae",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40256859116",
+      "started_at": "2026-10-26T01:59:24Z",
+      "watcher": {
+        "deadline_seconds": 3600,
+        "elapsed_seconds": 1.042,
+        "exit_code": 0,
+        "interval_seconds": 300,
+        "receipt_sha256": "f6d2e4846038e1d6c74e2ac12000a330ff8857f456883c812e65e362d1915ef4"
+      }
+    }
+  },
+  "schema": 1,
+  "separate_workspace_checks": {
+    "doctests": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4,
+      "summary_count": 46
+    },
+    "process_harness": {
+      "cases": [
+        "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2012 ms)",
+        "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+        "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+        "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+        "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+        "test missing_executable_fails_at_once ... ok (2 ms)",
+        "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+        "test startup_failures_are_final ... ok (411 ms)",
+        "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+        "test protocol_violations_are_replaced ... ok (177 ms)",
+        "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+        "test close_during_inference_never_waits ... ok (233 ms)",
+        "test sustained_requests_stay_bounded ... ok (690 ms)"
+      ],
+      "failed": 0,
+      "passed": 13
+    },
+    "relay_signals": "ok",
+    "scope": "Custom harnesses and doctests are separate from the nextest census."
+  }
+}
