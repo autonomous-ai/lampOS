@@ -1,0 +1,74 @@
+{
+  "head": "7182777eadc3d8968cea32d643a74e7c86442223",
+  "base": "c121bc16eb9e6a7142bbc1110d4ed692481f1a82",
+  "runtime_source": "830c384ae4050d895cfd5f764f9a00f9989b8388 plus exact committed call_wait diagnostic patch",
+  "runtime_source_file_sha256": "539fc0976f79a512a7f84d60416ec0e54363e3843b42cfe22a6de4978a4c43aa",
+  "runtime_result": [
+    1,
+    0,
+    0
+  ],
+  "runtime_repeated": false,
+  "runtime_log_sha256": "287cb2f63c3605ef6b7fec2183b20739231641d10a4d91571bc2ed91f598e5e7",
+  "runtime_terminal": {
+    "head": "830c384ae4050d895cfd5f764f9a00f9989b8388",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 120,
+    "timed_out": false,
+    "elapsed_seconds": 2.3826439999975264,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "pid": 39719,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "287cb2f63c3605ef6b7fec2183b20739231641d10a4d91571bc2ed91f598e5e7"
+  },
+  "all_six_preserved_executables_equal": {
+    "it-46363ab9699809b5": true,
+    "requested_audio-019db324b83a9807": true,
+    "lamp_skills-a718b2a0214b6903": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-c6f44302f3b2c78f": true,
+    "lamp-skills": true
+  },
+  "source_delta": [
+    "crates/body/src/bin/lamp-body.rs",
+    "crates/body/src/body.rs",
+    "crates/body/src/body/tests.rs",
+    "crates/body/src/poses.rs",
+    "docs/body.md",
+    "docs/switches.md"
+  ],
+  "runtime_input_audit": "Focused test creates four synthetic skills and uses only its private temp directory plus the unchanged Skills child. It does not scan repository Body sources or docs. Only integration driver and Skills child execute; four other copied drivers are not claimed as executed.",
+  "observations": {
+    "catalog_observed_ms": 787.72001,
+    "first_call_us": 256.614,
+    "median_us": 256.614,
+    "calls": 10,
+    "complete_noninterleaved_rows": true
+  },
+  "fresh_compiler_gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "limits": "Test-only observations. The original784/aa9 aggregate538/4/9 remains failed and unpublished; no root cause or production latency fix is claimed. Initial diagnostic run passed but had interleaved stderr; that run is retained separately. No device result."
+}

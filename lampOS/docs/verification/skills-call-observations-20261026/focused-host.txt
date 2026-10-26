@@ -1,0 +1,42 @@
+    Finished `test` profile [unoptimized] target(s) in 0.25s
+     Running tests/it/main.rs (./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-46363ab9699809b5)
+
+running 1 test
+test call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics ... lamp-skills: skills from /tmp/cwjfKtlk/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["air", "faces", "rests", "wave"]
+spawn to tools.json observed: 787.72001ms
+lamp-skills: wave Triggered: the model called wave with {}
+call 1/10 elapsed=256.614µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 2/10 elapsed=266.158µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 3/10 elapsed=254.818µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 4/10 elapsed=193.209µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 5/10 elapsed=158.425µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 6/10 elapsed=256.464µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 7/10 elapsed=159.038µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 8/10 elapsed=435.382µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 9/10 elapsed=382.486µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+call 10/10 elapsed=301.17µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+tool calls, fastest to slowest: [158.425µs, 159.038µs, 193.209µs, 254.818µs, 256.464µs, 256.614µs, 266.158µs, 301.17µs, 382.486µs, 435.382µs]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 312 filtered out; finished in 1.14s
+
