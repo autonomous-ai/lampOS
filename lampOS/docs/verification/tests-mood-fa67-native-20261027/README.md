@@ -1,0 +1,18 @@
+# Mood fa67 original native checks
+
+The original pull-request runs for [#3623](https://github.com/autonomous-ai/lampOS/pull/3623), authored head `fa67e6889e350d3f67165ef85f7319439a9b196a`, both completed successfully on attempt 1:
+
+- [Linux ARM64 build and tests, 40404562154](https://github.com/autonomous-ai/lampOS/actions/runs/40404562154): **7,541 unique PASS; 0 FAIL, LEAK or TIMEOUT**, 53 aggregate skipped tests and 114 skipped binaries. The selected ordinary runtime covers 12 packages and 70 binaries; it is not full-workspace runtime qualification.
+- [Linux formatting and strict Clippy, 40404562142](https://github.com/autonomous-ai/lampOS/actions/runs/40404562142): workspace/all-targets checks and separate promoter checks passed.
+
+Both jobs actually checked out preview `aa84af13291e2766505fb5603240226c79e12a2c`, ordered parents `a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33` then `fa67e6889e350d3f67165ef85f7319439a9b196a`. Its tree `9a9766c55c2a944d325c9657aa70a6b8f48db0bc` equals the authored head's tracked tree. Workflow, nextest configuration, Mood fixture and Reader fixture bytes were bound to immutable Git blobs. Tree equality is not a claim of binary equality.
+
+The execution window begins at ARM64 log line 824 and ends with the summary at line 8367: 7,541 distinct `(binary, test)` identities and distinct ordinals 1–7,541, without execution duplicates or retry/flaky records. The 34 later PASS rows are configured `success-output = "final"` reprints: 22 realtime and 12 privacy-worker rows. Each matches its original identity, status, duration and ordinal and its configuration filter; they are not additional executions. The 53 skips are an aggregate report; their individual identities were not emitted.
+
+The affected `lamp-expression::runtime` case `sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus` passed exactly once (ordinal 1,187; 0.198 s). All **340 ordinary Expression cases** passed (27 library, 4 binary, 281 integration and 28 runtime). All **14 ordinary Reader controls** also passed once. This run uses Main's Reader source and does not qualify another PR's Reader patch. The isolated Linux root/setpriv DAC case remained ignored; the non-Linux ACL fallback case was not compiled.
+
+Separate successful steps are promoter **25/0/0**, workspace doctests **4/0/0**, relay-signals **ok once**, and process **13/0**. These counts are not added to nextest. The run reported export of 47 current workspace binaries, two examples and `SHA256SUMS` (50 uploaded files). Artifact ID `12691481316`, size 116,059,812 bytes, has API/upload digest `sha256:febbbbe0c140130f32652cd56d5db40bdd661a79e00124dd3c0d7a4203435170`. Only metadata/logs were read: no archive or ARM64 binary was downloaded or executed locally, and individual payload hashes were not independently verified.
+
+The old `09c9c7726a90a774355033d595acc229cb330a1d` original runs [40402150533](https://github.com/autonomous-ai/lampOS/actions/runs/40402150533) and [40402150548](https://github.com/autonomous-ai/lampOS/actions/runs/40402150548) remain separately recorded as successful old-head attempts. Their results are not current-head checks. Historical Mac failures and the distinct 2bf controller failure/read-only alias disposition retain their original scopes; this audit establishes no historical cause or waiver.
+
+[audit.json](audit.json) records package/binary counts, every required Mood/Reader identity, exclusions, preview/source bindings, auxiliary results, original run metadata and retained-receipt SHA-256 bindings. This is an exported API/log receipt, without a CI write or rerun.

@@ -1,0 +1,3074 @@
+{
+  "schema": 1,
+  "subject": "Skills current a3b full Mac package qualification",
+  "pull_request": 3545,
+  "head": "b634b554475316ed02fe8b646edac9099dbbe986",
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "status": "PASS",
+  "platform": "Mac",
+  "runtime_scope": "Full lamp-skills package, all five actual test drivers; no ordinary filter. Full reverse-dependent runtime and current-head native/device qualification are separate.",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "runtime_attempts": 1,
+  "test_threads": 1,
+  "no_fail_fast": true,
+  "runtime_reuse": false,
+  "counts": {
+    "passed": 525,
+    "failed": 0,
+    "ignored": 9
+  },
+  "ordinary_target_case_pairs": 534,
+  "elapsed_s": 236.674202,
+  "doc_groups_separate": [
+    {
+      "target": "lamp_skills",
+      "status": "ok",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    }
+  ],
+  "target_inventory_count": 5,
+  "targets": [
+    {
+      "target": "lamp_skills-c6f44302f3b2c78f",
+      "counts": {
+        "passed": 158,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "addon::tests::a_drop_holds_that_add_ons_next_proposal_five_minutes",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::tests::a_proposal_that_fails_its_check_is_not_sent_or_counted",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::tests::a_say_the_judge_dropped_does_not_spend_the_hours_four",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::tests::an_add_on_has_twenty_an_hour_and_all_have_four_says",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::tests::proposals_are_numbered_in_order_and_spaced_per_add_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "clock::tests::a_skip_past_the_most_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "clock::tests::without_a_test_driving_it_a_wait_takes_its_whole_time",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::a_second_owner_is_refused_until_the_first_is_dropped",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::a_window_remainder_uses_the_trusted_sample_without_forecasting_dst",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::added_fields_keep_known_days_and_maximum_length_keys_survive_a_save",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::current_bitmap_values_and_duplicate_keys_are_refused_without_repair",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::failed_directory_sync_never_grants_a_claim_or_rolls_back_installed_evidence",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::forward_claim_and_date_correction_preserve_exact_days_across_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::key_and_file_bounds_never_evict_existing_days",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::legacy_high_water_migrates_conservatively_only_after_a_new_claim",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::malformed_newer_or_duplicate_state_is_never_replaced",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::moment_rejects_unset_clock_and_observes_the_local_midnight",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::new_york_dst_gap_does_not_invent_a_window_and_repeated_hour_claims_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::pre_rename_failures_preserve_bytes_and_poison_the_owner_without_consuming_a_day",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::synchronization_is_required_even_for_a_plausible_wall_clock",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::the_full_supported_calendar_and_all_maximum_keys_fit_without_eviction",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::unique_temporaries_do_not_overwrite_or_remove_other_files",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::unsafe_files_and_replacement_outside_the_owner_are_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::window_remainders_keep_milliseconds_and_cross_midnight_exactly",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::windows_have_exact_half_open_and_overnight_boundaries",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily::tests::windows_refuse_ambiguous_or_malformed_times",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_cool_brighter_light_is_asked_one_step_warmer_and_one_dimmer",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_light_is_asked_from_the_skill_asked_again_while_kept_and_given_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_light_off_or_not_known_asks_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_light_outranked_is_said_at_the_give_back_by_what",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_long_name_is_cut_to_a_source_the_ring_takes",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_pattern_is_asked_with_the_light_and_a_second_pulse_is_said_not_played",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_ring_that_starts_during_a_run_is_asked_from_the_next_step",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::a_step_asks_for_its_colour_at_its_level_or_the_lights_and_a_dim_steps_down",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::at_the_dimmest_level_the_evening_asks_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::every_evening_ask_is_at_least_one_level_under_the_persons_light",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::nothing_is_asked_without_a_taker_or_a_light_to_dim_and_nothing_given_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "glow::tests::over_a_warm_three_the_evening_breathes_a_level_down_in_the_persons_colour",
+          "outcome": "ok"
+        },
+        {
+          "name": "known::tests::the_known_file_gives_the_name_only_while_fresh_and_plain",
+          "outcome": "ok"
+        },
+        {
+          "name": "known::tests::the_tellable_file_gives_the_names_who_said_yes",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::end_is_exclusive_and_unknown_time_creates_no_cap",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::rejected_batches_preserve_the_accepted_definitions_and_generation",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::reload_while_caps_get_is_held_fences_both_put_and_remove",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::restart_recovers_the_exact_token_and_unknown_or_older_time_keeps_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::spring_and_autumn_windows_end_in_local_time",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::the_final_cap_boundary_refuses_a_revoked_put_but_keeps_exact_token_cleanup",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::unsynchronized_plausible_time_cannot_create_or_expire_a_window_cap",
+          "outcome": "ok"
+        },
+        {
+          "name": "limits::tests::window_end_removes_only_its_owned_token_and_entry_uses_private_put",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::tests::a_file_swapped_after_its_folder_was_listed_is_not_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::tests::a_store_package_is_never_older_than_what_it_replaces",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::tests::only_a_runs_own_folder_names_are_taken_for_what_it_left",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::tests::only_lamp_cloud_and_the_voice_may_ask_the_manage_helper",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::tests::the_askers_cgroups_are_their_product_units_slices",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::a_replaced_parent_is_refused_even_when_the_leaf_inode_is_the_same",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::a_replaced_path_cannot_supply_the_stamp_for_already_opened_bytes",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::each_stamp_change_is_refused_and_identifies_its_observation_side",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::equal_stamps_cannot_hide_changed_audio_or_permission_bytes",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::maximum_width_numeric_refusal_stays_within_1536_bytes",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::non_regular_observations_keep_their_refusal_and_fixed_type_details",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::sha256_keeps_the_existing_lowercase_and_length_prefix_encoding",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio::file_checks::stability_refusals_identify_role_and_phase_without_disclosing_input",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_completion_keeps_its_captured_definition_generation",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_foreign_completion_neither_confirms_nor_renews_a_pending_wake",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_lamp_asleep_by_hand_or_private_is_not_stretched_the_morning_after",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_late_sample_keeps_only_the_existing_lease_and_recovers_the_same_episode",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_queued_completion_cannot_extend_the_original_deadline",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_rest_a_sound_ended_settles_again_at_most_three_times_a_night",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_rest_a_stir_ended_at_0530_is_greeted_at_0710_with_a_stretch",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_rest_ended_for_anything_but_a_sound_does_not_settle_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_rest_ended_in_a_turn_does_not_settle_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_skill_cannot_rest_with_no_receipt_or_a_refusal_that_repeats",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_sound_with_a_face_in_view_does_not_settle_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_sound_with_no_turn_and_no_face_settles_again_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_terminal_receipt_before_the_last_renewal_still_ends_the_episode",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_thread_captured_before_reload_cannot_start_old_work",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_trusted_correction_shortens_the_published_lease_only_with_fresh_evidence",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_trusted_outside_window_sample_cancels_rest_immediately",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::a_turn_ends_the_nights_rest_and_quiet_after_it_does_not_settle_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::an_ask_issued_after_the_tick_sample_waits_so_its_request_is_not_stamped_earlier",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::an_edited_disabled_or_removed_owner_cannot_keep_its_rest",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::an_unchanged_definition_cannot_retain_pending_admission_or_wake",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::an_untrusted_clock_cannot_start_rest_or_wake_an_admitted_rest",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::changed_expression_does_not_rebind_rest_during_clock_loss",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::clock_loss_cancels_pending_admission_and_wake_even_with_a_fresh_ack",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::clock_loss_does_not_renew_without_fresh_matching_expression_evidence",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::clock_loss_keeps_admitted_rest_only_until_the_last_trusted_window_end",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::completion_cannot_cross_an_owner_window_or_clock_change",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::leaving_the_night_window_ends_the_resettling",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::missing_receipts_cannot_extend_an_issued_rest_lease",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::no_rest_tonight_no_greeting",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::only_a_completed_wake_allows_its_following_sound",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::publication_stops_at_the_episode_cap_but_cancel_remains_deliverable",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::published_rest_and_wake_leases_end_at_the_window_if_skills_stalls",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::reload_cancels_pending_admission_and_a_late_ack_cannot_restore_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::stale_or_missing_faces_do_not_settle_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::the_longest_window_carries_a_held_rest_into_the_next_night",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::the_night_rested_is_kept_across_a_restart_until_the_next_night",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::unrelated_reload_retains_admitted_rest_but_invalidates_old_run_authority",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine::tests::wake_uses_the_admitted_episode_and_cancellation_stops_renewal",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_body_ask_says_who_asks_only_with_the_switch",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_dotted_field_reads_inside_an_object",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_rise_is_over_the_lowest_reading_of_its_while_before",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_say_from_names_where_the_voice_keeps_the_words",
+          "outcome": "ok"
+        },
+        {
+          "name": "unplug::tests::a_cancel_needs_the_bodys_fresh_matching_folding_or_ready",
+          "outcome": "ok"
+        },
+        {
+          "name": "unplug::tests::failure_wins_over_still_live_asleep_receipts",
+          "outcome": "ok"
+        },
+        {
+          "name": "unplug::tests::never_mind_is_refused_unless_a_latch_is_in_force",
+          "outcome": "ok"
+        },
+        {
+          "name": "unplug::tests::ordinary_skill_or_tool_cannot_publish_or_borrow_an_unplug_request",
+          "outcome": "ok"
+        },
+        {
+          "name": "unplug::tests::readiness_requires_all_three_matching_fresh_receipts",
+          "outcome": "ok"
+        },
+        {
+          "name": "unplug::tests::repeated_calls_keep_the_original_latch",
+          "outcome": "ok"
+        },
+        {
+          "name": "unplug::tests::stay_minutes_default_to_ten",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::a_length_is_said_as_a_person_says_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::a_spell_is_named_only_for_who_said_yes_and_let_go_on_a_no",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::a_spell_only_a_voice_showed_is_told_as_heard_not_seen",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::a_spell_the_eyes_knew_is_someone_the_lamp_knows_and_never_who",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::a_stretch_unseen_is_said_and_nobody_else_is_said_when_nobody_came",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::a_visit_while_someone_was_out_is_kept_as_a_spell_with_its_length",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::spells_older_than_the_window_are_not_told_nor_older_than_a_day_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::who_was_heres_words_are_what_the_lamp_said_before_byte_for_byte",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::who_was_heres_words_have_only_their_own_slots",
+          "outcome": "ok"
+        },
+        {
+          "name": "visits::tests::with_no_value_there_is_no_record_and_with_values_stopped_it_says_since_when",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_door_then_a_face_gives_one_arrival",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_door_with_no_face_within_thirty_seconds_texts_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_pause_lasts_until_asked_or_its_most",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_reload_never_turns_a_watch_on_and_a_changed_or_removed_one_is_off",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_second_arrival_within_two_minutes_does_not_turn_the_head",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_second_visit_within_ten_minutes_is_not_texted",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_text_says_known_or_not_and_never_a_name",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_visit_gives_one_text_with_its_time_and_length",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_voice_alone_never_names",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_watch_without_known_faces_names_nobody",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_watchs_words_have_only_their_own_slots",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::a_yes_taken_back_before_the_text_goes_names_nobody",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::guard_from_the_app_is_on_without_a_voice_and_counts_only_once_its_mark_shows",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::it_ends_by_itself_at_its_most",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::it_is_never_on_by_itself",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::more_than_one_person_at_the_desk_were_one_was",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::names_too_long_for_one_line_send_the_unnamed_text_not_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::nothing_is_taken_until_the_ring_first_shows_its_mark",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::off_when_asked_gives_the_mark_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::once_the_switch_has_ended_it_nothing_about_the_desk_is_taken",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::only_lamp_clouds_unit_is_the_app",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::sounds_are_taken_only_with_the_switch_and_the_lamps_voice_clear",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_apps_op_past_its_deadline_or_with_none_is_let_go",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_face_of_the_person_who_asked_ends_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_local_minute_is_the_wall_clock_east_of_utc",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_named_lines_have_only_their_own_slots",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_persons_light_pauses_it_until_they_ask_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_privacy_switch_closed_ends_it_with_one_text",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_topics_are_the_messages_own",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::the_watch_words_are_guard_modes_and_what_the_lamp_said_before",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::two_known_one_tellable_names_one_and_says_someone_the_lamp_knows_for_the_other",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::while_its_mark_is_not_shown_nothing_about_the_desk_is_taken",
+          "outcome": "ok"
+        },
+        {
+          "name": "watch::tests::with_names_off_nobody_is_ever_named",
+          "outcome": "ok"
+        }
+      ],
+      "ignored_declared": [],
+      "all_case_count": 158,
+      "ordinary_filter_count": 0,
+      "executable": {
+        "target": "lamp_skills-c6f44302f3b2c78f",
+        "cargo_target": "lamp_skills",
+        "kind": [
+          "lib"
+        ],
+        "source": "lampOS/crates/skills/src/lib.rs",
+        "test_profile": true,
+        "compiler_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "0ea27cd984cd1e3f4b76f16adea3bb7f853b32b40fbf642bdf4667ff424b1a6c",
+        "bytes": 13966988,
+        "mode": "0o755",
+        "independent_frozen_copy": true,
+        "actual_inode_policy": "strict",
+        "frozen_inode_policy": "strict"
+      }
+    },
+    {
+      "target": "lamp_skills-a718b2a0214b6903",
+      "counts": {
+        "passed": 20,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "tests::a_failure_after_ready_says_it_needs_checking_and_never_stands",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_failure_after_the_cancel_says_it_needs_checking",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_forged_rest_plan_is_refused_before_any_rest_or_say_request",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_line_never_begun_cancels_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_path_comes_by_its_flag_or_else_the_environment",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_runs_sockets_carry_its_skills_permissions_and_nothing_for_another",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_say_the_skill_may_not_make_is_never_asked_and_nothing_comes_with_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::a_step_the_skill_may_not_make_is_not_sent_nor_counted",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::an_already_awake_morning_stretches_then_hums",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::clock_warning_tracks_enabled_schedules_without_repeating_each_tick",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::live_scheduled_time_requires_kernel_trust_or_an_explicit_override",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::never_mind_says_its_line_before_the_cancel_that_moves_the_body",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::only_a_skill_given_who_has_its_note_told_who_is_at_the_lamp",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::ordinary_and_disabled_skills_do_not_query_kernel_clock_trust",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::the_actions_part_is_called_only_for_what_the_skill_may_call",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::the_timeout_fires_once_and_never_from_failed",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::the_timer_counts_unbroken_minutes_ready",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::the_unplug_words_are_the_skills_and_what_the_lamp_said_before",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::unplug_denied_at_dispatch_neither_latches_nor_sends_delayed_speech",
+          "outcome": "ok"
+        },
+        {
+          "name": "tests::unplug_reload_changes_new_admissions_not_captured_run_grants",
+          "outcome": "ok"
+        }
+      ],
+      "ignored_declared": [],
+      "all_case_count": 20,
+      "ordinary_filter_count": 0,
+      "executable": {
+        "target": "lamp_skills-a718b2a0214b6903",
+        "cargo_target": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "source": "lampOS/crates/skills/src/main.rs",
+        "test_profile": true,
+        "compiler_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "ea1ed13b54e0fca31885a1b54a233384c43974d0c7122ee67737e96cfebc9171",
+        "bytes": 13299132,
+        "mode": "0o755",
+        "independent_frozen_copy": true,
+        "actual_inode_policy": "strict",
+        "frozen_inode_policy": "strict"
+      }
+    },
+    {
+      "target": "it-46363ab9699809b5",
+      "counts": {
+        "passed": 314,
+        "failed": 0,
+        "ignored": 1
+      },
+      "cases": [
+        {
+          "name": "addon::a_quoted_line_left_unsaid_is_journaled_as_said_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::a_say_needs_the_quoted_grant_and_only_an_add_on_has_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::only_a_say_kept_by_the_policy_is_asked_of_the_voice_quoted",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::only_an_add_on_proposes",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::the_documents_examples_load_as_add_ons_that_propose",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::the_loader_refuses_an_add_on_anything_but_proposing",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::with_the_switch_the_program_writes_one_proposal_stamped_with_the_add_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "addon::without_the_switch_no_add_on_is_loaded_and_nothing_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_claimed_day_and_a_spoken_window_say_why_not_run",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_daily_chance_requires_both_a_sane_clock_and_a_durable_journal",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_daily_watch_leaving_its_window_says_so_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_daily_watch_losing_the_trusted_moment_says_so_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_daily_watch_reset_by_a_face_says_so_once_with_its_held_time",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_daily_watch_reset_by_a_silent_camera_says_so_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_dropped_morning_lets_welcome_back_greet_after_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_face_the_morning_never_holds_for_is_greeted_by_welcome_back_at_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_gap_in_the_empty_face_stream_restarts_the_absence_duration",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_missing_camera_is_not_absence_and_time_outside_the_window_does_not_count",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_missing_journal_reports_once_across_ticks_and_reload_until_one_is_installed",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_pending_daily_ask_cannot_be_rebound_to_a_reordered_trigger",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_restart_after_the_morning_greets_nobody_twice",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_restart_before_the_morning_still_greets_with_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_rested_night_and_a_first_face_greet_once_with_the_morning",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_storage_fault_withholds_pending_daily_output_and_is_not_retried",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::a_watch_that_never_held_or_is_not_daily_says_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::an_ordinary_pending_policy_run_revalidates_across_an_unrelated_reload",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::an_unsynchronized_clock_neither_spends_a_day_nor_approves_pending_output",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::bedtime_keeps_a_chance_that_matured_while_the_voice_was_listening",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::clock_triggers_use_no_external_topic_and_an_expired_clock_cannot_start_them",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::core_bedtime_manifest_is_disabled_and_has_no_model_function",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::corrected_dates_run_once_after_a_future_claim_restart_and_reload",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::disabled_daily_skills_and_ordinary_quiet_hours_keep_their_existing_behavior",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::disabled_skills_are_validated_but_never_started_or_offered",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::disabled_tool_is_excluded_even_when_passed_directly_to_the_catalogue",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::generic_routines_subscribe_to_the_voice_their_final_gate_requires",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::relative_lights_and_resettles_are_checked_at_load",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::routine_quiet_time_restarts_after_a_stale_voice_heartbeat",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::spoken_to_at_0650_a_face_at_0710_is_not_greeted",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::the_daily_claim_precedes_a_policy_answer_and_is_not_replayed_after_refusal",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::two_faces_in_one_morning_greet_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::unknown_rest_values_and_unsafe_caps_are_refused_at_load",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::unless_heard_goes_with_during",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::welcome_back_counts_away_from_the_last_visit_not_a_glimpse",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::welcome_back_says_each_dropped_chance_once_with_its_gate",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::welcome_backs_hello_after_a_dropped_morning_claims_the_morning",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::windowed_and_routine_policy_runs_keep_their_definition_fence",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::without_a_rested_night_welcome_back_does_not_wait",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::without_bedtime_morning_welcome_back_does_not_wait",
+          "outcome": "ok"
+        },
+        {
+          "name": "daily_engine::yields_to_goes_with_an_appears_trigger",
+          "outcome": "ok"
+        },
+        {
+          "name": "journal_output::a_broken_journal_does_not_end_skills_or_lose_its_tool_replies",
+          "outcome": "ok"
+        },
+        {
+          "name": "journal_output::a_full_unread_journal_does_not_hold_startup_or_tool_replies",
+          "outcome": "ok"
+        },
+        {
+          "name": "journal_output::a_normal_cli_usage_error_reaches_stderr_before_skills_exits",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_made_skill_goes_on_by_its_sha256_and_only_by_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_made_skill_goes_on_only_within_its_ask_and_only_the_newest",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_made_skill_is_put_on_by_a_spoken_yes_through_the_helper",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_made_skill_never_takes_the_place_of_one_put_on_another_way",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_made_skill_past_the_cap_or_not_made_here_does_not_go_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_made_skill_whose_package_changed_does_not_go_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::a_skill_made_by_voice_is_checked_packed_and_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::at_most_five_made_skills_are_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "made::once_the_newest_is_on_an_older_ask_puts_nothing_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::a_claim_back_mid_sleep_keeps_the_fallbacks_sleep_to_the_morning",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::a_dead_claimer_passes_the_night_to_the_fallback_with_no_lift",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::a_lamp_nobody_saw_all_day_keeps_its_head_down_into_the_next_night",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::a_newer_episode_takes_the_night_over_with_no_lift",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::a_rest_always_refused_gives_the_night_to_the_fallback",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::a_skills_restart_mid_night_hands_the_sleep_over_with_the_head_down",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::night_sleep_turned_off_claims_the_night_and_nothing_sleeps",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::the_claim_names_night_sleep_on_or_off_and_nothing_without_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::the_skill_and_the_product_catalogue_name_the_same_night",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::the_skill_route_settles_with_the_built_in_sleep_and_wakes_on_the_same_reflexes",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::the_sleep_grant_is_core_rest_alone_and_asks_nobody",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_no_claim_the_fallback_sleeps_as_the_built_in_one",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_a_gap_in_the_voice_begins_the_fifteen_minutes_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_a_push_begins_the_fifteen_minutes_again_and_no_push_does_not",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_a_push_held_begins_the_fifteen_minutes_again_once_at_its_start",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_a_push_let_go_and_pushed_again_begins_it_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_a_sound_heard_as_no_words_is_slept_through",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_a_spell_of_thinking_alone_is_slept_through",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_a_touch_begins_the_fifteen_minutes_again_and_one_off_does_not",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_the_lamp_speaking_begins_the_fifteen_minutes_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_the_name_heard_with_no_words_begins_it_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_words_heard_after_the_voice_rests_begin_it_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::with_the_switch_words_heard_begin_the_fifteen_minutes_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "night_sleep::without_the_switch_each_sound_begins_the_fifteen_minutes_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_core_skill_is_never_installed_replaced_or_removed",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_core_skill_or_one_without_a_version_or_that_does_not_load_is_not_packed",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_disabled_installable_reserves_its_tool_but_adds_no_live_function",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_folder_with_a_link_or_nowhere_to_go_is_not_installed",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_list_says_each_skills_name_kind_version_and_what_it_may_use",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_package_changed_damaged_or_out_of_shape_installs_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_package_installs_whole_its_files_checked_and_open_to_the_parts",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_packages_signature_is_carried_and_not_checked",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_peer_refused_before_its_request_is_written_still_leaves_the_skill_in_place",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_peer_that_is_not_an_asker_is_refused_and_nothing_is_removed",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_skill_packs_to_a_versioned_tar_of_its_files_and_their_sha256_the_same_each_time",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_folder_none",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_skill_renamed_aside_but_not_deleted_is_answered_done_its_path_in_the_journal_only",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::a_skill_whose_tool_another_skill_has_is_not_installed",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::an_install_waits_while_another_run_holds_the_skills_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::an_installable_skill_is_replaced_by_its_next_version_and_removed_whole",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::the_daily_journal_opens_beside_the_apps_off_in_a_0700_state_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::the_manage_helper_refuses_core_skills_and_bad_names_on_its_own",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::the_manage_helper_waits_for_a_held_folder_only_so_long_then_does_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::the_off_file_is_never_written_or_read_through_a_link",
+          "outcome": "ok"
+        },
+        {
+          "name": "package::what_a_killed_install_or_remove_left_is_deleted_by_the_next_install",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine_service::cancellation_and_a_replaced_expression_owner_end_the_run_without_a_hum",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine_service::denied_body_or_speak_never_reaches_expression_or_say",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine_service::exact_words_after_wake_keep_their_priority_and_original_start_deadline",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine_service::reloading_an_unrelated_disabled_skill_keeps_the_same_admitted_rest",
+          "outcome": "ok"
+        },
+        {
+          "name": "routine_service::the_process_waits_for_its_completed_wake_before_sending_the_hum",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_baseline_coming_in_mid_run_is_no_noticing",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_breath_held_until_it_ends_is_given_back_when_its_skill_is_removed",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_breath_until_it_ends_is_asked_of_the_ring_and_given_back_when_the_trigger_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_breath_until_it_ends_without_the_ring_is_held_steady_and_given_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_case_calls_the_skills_tool_at_its_time_and_needs_no_recording_for_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_chance_held_back_by_a_talk_waits_for_its_end_within_the_wait",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_clip_ended_for_a_higher_ask_is_followed_by_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_clip_the_body_said_dropped_is_followed_by_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_colour_until_it_ends_is_loaded_and_refused_with_a_for_or_keep",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_condition_changed_by_a_reload_begins_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_dance_waits_for_the_line_plays_twice_and_gives_the_light_back_at_its_end",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_dim_at_the_lowest_level_changes_nothing_and_is_given_back_as_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_dim_held_until_it_ends_is_given_back_when_its_skill_is_removed",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_dim_until_it_ends_asked_of_the_ring_is_given_back_when_the_trigger_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_dim_until_it_ends_is_held_and_given_back_when_the_trigger_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_dim_until_it_ends_stays_past_the_says_outcome_until_the_trigger_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_dropped_chance_says_its_gate_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_field_above_a_line_for_a_while_once_a_spell_and_only_with_someone_there",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_folder_beginning_with_a_dot_is_passed_over",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_found_with_no_look_held_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_hand_on_the_body_ends_the_dance_and_the_clip_is_not_sent_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_held_run_ends_when_its_trigger_value_expires_or_its_topic_goes_silent",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_history_from_before_its_words_says_the_built_in_ones_for_one_release",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_history_is_told_to_the_call_from_room_presence_and_held_to_its_rules",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_last_clip_dropped_for_another_skill_is_said_at_the_runs_end",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_level_is_stepped_to_from_the_level_shown_and_given_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_light_changed_while_a_breath_was_held_is_left_as_it_is",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_light_files_pattern_is_loaded_and_held_to_its_bounds",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_light_show_plays_its_frames_in_turn_and_stops_when_someone_speaks",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_light_someone_changed_while_it_was_held_is_left_as_it_is",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_line_the_person_spoke_over_is_not_followed_by_the_dance",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_line_with_no_words_does_not_end_a_search",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_look_at_a_face_subscribes_to_the_faces_whatever_the_trigger",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_macs_appledouble_files_are_passed_over",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_not_equals_condition_holds_while_the_field_is_anything_else_for_its_time",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_pause_ends_a_search_its_pose_and_its_light",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_queued_run_whose_item_left_is_let_go_and_the_next_still_starts",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_rearm_line_waits_for_the_field_to_stay_past_it_for_a_while",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_recorded_case_fails_when_the_skill_no_longer_does_what_it_expects",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_reload_ends_a_held_run_whose_skill_or_trigger_is_gone",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_repeat_tool_call_holds_the_runs_pose_again_and_only_that",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_rise_after_a_gap_in_readings_or_a_dropout_is_not_one",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_rise_and_an_each_read_a_dotted_path_and_an_empty_step_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_rise_begins_again_at_a_reload_and_is_asked_again_as_it_was",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_rise_fires_on_a_sharp_climb_and_never_on_a_slow_one_or_noise",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_rise_rearms_only_after_its_line_and_its_cooldown",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_run_noticed_by_a_look_a_move_a_word_or_leaving_is_not_ignored",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_say_from_the_voices_own_asks_for_it_by_source_and_moves_with_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_say_never_begun_moves_nothing_and_changes_no_light",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_say_now_after_a_reload_moved_a_held_trigger_does_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_say_now_with_its_trigger_still_held_dims_until_it_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_say_of_the_persons_reminder_or_task_news_reads_its_topic",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_say_table_is_exact_words_or_a_note_at_its_priority",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_scene_after_the_run_ended_still_lets_a_pose_held_again_go",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_scene_keeps_the_persons_light_and_the_next_scene_lets_the_pose_go",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_search_is_held_to_its_rules_and_its_looks_are_counted",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_search_told_found_keeps_its_pose_and_takes_no_look",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_searchs_found_is_held_to_its_rules",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_searchs_note_and_walk_are_its_files_and_go_in_the_tools_file",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_searchs_pose_held_past_its_run_still_ends_when_someone_speaks",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_searchs_pose_held_past_its_run_still_ends_when_the_lamp_is_paused",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_shared_budget_gives_its_group_its_runs_an_hour_between_them",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_shared_stop_is_one_groups_only",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_short_sound_loads_and_a_long_loud_or_other_one_is_refused_with_why",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_skill_reads_and_does_only_what_its_permissions_declare",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_skill_rests_until_the_morning_after_runs_nobody_noticed",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_skill_runs_once_at_a_time_and_says_so_when_it_cannot",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_skills_kind_and_version_are_read_and_checked",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_skills_own_move_loads_as_the_body_takes_it_and_a_bad_one_is_refused_with_why",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_skills_stop_is_one_function_held_to_its_rules",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_skills_stop_snoozes_it_until_the_morning_or_turns_it_off_until_asked",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_sound_is_asked_of_the_voice_and_its_refusal_is_said_in_the_event",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_timed_condition_begins_again_after_its_value_expired",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_tool_is_one_skills_a_core_skills_first",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_tool_needs_no_trigger_and_a_look_needs_a_tool",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_tools_call_runs_only_while_its_conditions_hold_on_values_that_last",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_tools_choice_and_flag_are_told_to_the_model_and_checked_on_a_call",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_turned_pose_takes_the_place_of_the_one_held",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_watch_from_before_its_words_says_the_built_in_ones_for_one_release",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_active_window_starts_a_skill_only_between_its_hours",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_expired_face_is_not_looked_at_and_the_other_steps_still_run",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_expired_queued_call_is_never_committed",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_installable_or_addon_declaring_a_core_grant_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_items_run_asked_of_the_policy_goes_ahead_only_while_its_item_holds",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_items_tasks_ask_names_its_task_and_a_schedule_ask_does_not",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::another_skills_dropped_clip_is_not_the_runs_own",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::asking_the_policy_a_hello_made_and_not_noticed_rests",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::asking_the_policy_a_skill_acts_only_on_a_say_now_that_names_its_ask",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::asking_the_policy_a_skill_that_is_not_a_hello_asks_its_act",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::asking_the_policy_with_nobody_to_answer_is_no_at_once",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::daily_held_dim_keeps_clock_reload_and_restart_fences",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::daily_rise_revalidation_keeps_window_and_reload_fences",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::disabled_skills_enter_neither_tools_nor_body_metadata",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::each_item_of_a_list_comes_or_turns_and_a_restart_or_reload_is_not_news",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::each_item_of_a_list_on_its_own_and_steps_by_the_trigger_that_fired",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::each_kept_off_file_keeps_its_skills_off",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::every_skill_folder_passes_its_own_recorded_tests",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::every_skill_folder_says_its_kind_and_version",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::exact_say_and_routine_cue_share_one_speech_slot",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::exact_words_reach_the_voice_unchanged_at_their_priority",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::guard_mode_from_the_app_is_the_owners_alone_and_the_switch_closed_ends_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::guard_mode_pauses_under_the_persons_light_until_they_ask_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::guard_modes_new_words_come_only_with_their_switch",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::item_runs_go_by_the_items_number_across_triggers",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::most_a_day_lets_a_skill_start_itself_that_often_a_local_day",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::news_and_reminder_words_are_checked_as_the_voice_reads_them",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::no_skill_may_take_the_reserved_never_mind_tool",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::off_is_kept_as_one_line_a_skill_and_a_snooze_is_not",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::onboarding_consent_clauses_cannot_be_removed_when_loading_or_packaging",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::onboarding_data_is_required_and_checked_before_a_skill_loads",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::onboarding_pending_snapshot_is_asked_once_and_retry_is_an_explicit_edge",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::onboarding_refuses_wrong_kind_wrong_trigger_and_unbounded_pending_identity",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::onboarding_request_names_invitation_and_has_no_extra_tool_or_authority",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_resting",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::quiet_hours_keep_a_skill_still_and_so_does_a_time_of_day_not_known",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::quiet_hours_keep_their_clock_hours_across_summer_time_in_the_lamps_zone",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::resting_a_budget_queue_and_a_while_without_a_wait_say_why_not_run",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::routines_need_each_output_grant_and_their_implicit_voice_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::someone_speaking_ends_a_search_its_pose_and_its_light",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::task_news_the_policy_declines_does_nothing_and_asks_once_a_task",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_asking_lines_late_words_do_not_end_its_search",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_body_drops_a_clip_sent_at_the_first_ones_length_and_takes_one_sent_a_few_steps_later",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_light_going_out_is_asked_of_the_ring_with_its_fade_and_given_back_when_the_trigger_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_light_going_out_is_loaded_with_its_fade_and_refused_with_anything_else",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_loader_refuses_a_clip_it_does_not_have_and_arguments_it_cannot_use",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_loader_refuses_a_rearm_line_quiet_hours_or_an_end_it_cannot_use",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_loader_refuses_a_rise_it_cannot_judge",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_loader_refuses_an_again_it_cannot_use",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_loader_refuses_an_item_trigger_or_a_step_it_cannot_use",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_loader_refuses_what_it_cannot_do",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_nudge_limits_are_held_to_their_rules",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_one_action_reply_reports_an_ack_write_error",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_permissions_refuse_every_call_and_action_they_do_not_give",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_program_dances_again_on_dance_again_but_not_on_a_noise",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_program_does_nothing_without_the_skip",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_program_forgets_a_snooze_at_a_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_program_keeps_a_skill_off_across_a_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_program_looks_and_lights_with_the_words_and_gives_the_light_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_program_says_each_items_news_in_turn",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_startle_is_its_granted_skills_move_and_nothing_else",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::the_zone_flags_are_refused_before_the_start_when_they_cannot_stand",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::thinking_after_a_moment_of_speaking_is_still_the_line",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::through_and_broken_by_are_refused_where_they_mean_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::unplug_core_is_installed_but_hidden_and_uncallable_with_switch_off",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::unplug_is_only_an_explicit_single_step_and_admission_is_never_readiness",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::unplug_operation_is_the_core_grant_not_the_skill_name",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::unplug_requires_core_kind_and_each_declared_permission",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::unplug_words_are_the_granted_skills_own",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::watch_you_leave_asked_of_the_policy_goes_ahead_only_while_a_side_is_chosen",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::who_was_here_marks_someone_the_lamp_knows_only_with_known_faces_and_never_names_them",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::who_was_here_names_only_who_said_yes_and_only_to_a_skill_with_known_faces",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::with_body_requests_each_gesture_a_skill_sends_says_who_asks",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::with_no_over_from_the_body_the_second_clip_is_not_sent",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::with_the_policy_asked_only_a_run_made_can_be_ignored",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::with_the_switch_a_skills_light_is_asked_of_the_ring_and_the_persons_never_touched",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::with_the_switch_and_nothing_to_take_it_the_light_is_left_and_the_run_says_why",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::within_its_while_a_tool_runs_again_only_when_what_was_heard_asks_for_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::without_body_requests_a_last_clip_dropped_is_not_said",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::without_the_ring_the_light_is_never_put_out",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::without_the_skip_nothing_the_skill_starts_is_done",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::words_after_the_voice_starts_again_end_a_search",
+          "outcome": "ok"
+        },
+        {
+          "name": "skills::write_an_off_fixture",
+          "outcome": "ignored"
+        },
+        {
+          "name": "store::a_catalogue_entry_installs_only_the_package_it_names",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::a_package_signed_with_the_store_key_installs_and_is_listed",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::an_install_waits_for_a_held_folder_only_so_long_then_writes_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::an_older_version_is_refused_and_the_same_or_a_newer_one_taken",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::an_over_size_package_or_a_path_trick_link_or_core_name_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::an_unsigned_wrongly_signed_or_tampered_package_is_refused_before_anything_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::only_an_https_url_is_fetched_and_a_redirect_only_to_https",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::store_readiness_requires_its_own_key_and_an_explicit_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "store::the_real_helper_refuses_on_its_own",
+          "outcome": "ok"
+        },
+        {
+          "name": "welcome_stuck::a_chance_let_go_after_its_wait_says_so",
+          "outcome": "ok"
+        },
+        {
+          "name": "welcome_stuck::an_arrival_after_a_say_that_expired_is_greeted",
+          "outcome": "ok"
+        },
+        {
+          "name": "welcome_stuck::drop_mask_counts_faces_without_their_contents",
+          "outcome": "ok"
+        },
+        {
+          "name": "welcome_stuck::drop_mask_hides_arbitrary_text",
+          "outcome": "ok"
+        },
+        {
+          "name": "welcome_stuck::drop_mask_hides_list_contents",
+          "outcome": "ok"
+        },
+        {
+          "name": "welcome_stuck::drop_mask_hides_object_contents",
+          "outcome": "ok"
+        },
+        {
+          "name": "welcome_stuck::drop_mask_keeps_safe_scalar_descriptions",
+          "outcome": "ok"
+        }
+      ],
+      "ignored_declared": [
+        "skills::write_an_off_fixture"
+      ],
+      "all_case_count": 315,
+      "ordinary_filter_count": 0,
+      "executable": {
+        "target": "it-46363ab9699809b5",
+        "cargo_target": "it",
+        "kind": [
+          "test"
+        ],
+        "source": "lampOS/crates/skills/tests/it/main.rs",
+        "test_profile": true,
+        "compiler_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "b1584586cd71f08790e870f6cc7ba88d8bdc5de10c2a721b6635c21850fbda5f",
+        "bytes": 21338284,
+        "mode": "0o755",
+        "independent_frozen_copy": true,
+        "actual_inode_policy": "strict",
+        "frozen_inode_policy": "strict"
+      }
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 8
+      },
+      "cases": [
+        {
+          "name": "fixture::complete_reply_finishes_inside_absolute_deadline",
+          "outcome": "ok"
+        },
+        {
+          "name": "fixture::dribbling_reply_cannot_renew_absolute_deadline",
+          "outcome": "ok"
+        },
+        {
+          "name": "release_6408_installs_6498_packages_and_6498_loads_the_replacement",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6408_keeps_6498_daily_claims_and_6498_reads_them_back",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6408_reads_6498_on_off_and_6498_reads_the_changes_back",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6408_reads_6498_rested_night_and_6498_keeps_its_morning_spent",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6498_installs_6408_packages_and_6408_loads_the_replacement",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6498_keeps_6408_daily_claims_and_6408_reads_them_back",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6498_reads_6408_on_off_and_6408_reads_the_changes_back",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6498_reads_6408_rested_night_and_6408_keeps_its_morning_spent",
+          "outcome": "ignored"
+        }
+      ],
+      "ignored_declared": [
+        "release_6408_installs_6498_packages_and_6498_loads_the_replacement",
+        "release_6408_keeps_6498_daily_claims_and_6498_reads_them_back",
+        "release_6408_reads_6498_on_off_and_6498_reads_the_changes_back",
+        "release_6408_reads_6498_rested_night_and_6498_keeps_its_morning_spent",
+        "release_6498_installs_6408_packages_and_6408_loads_the_replacement",
+        "release_6498_keeps_6408_daily_claims_and_6408_reads_them_back",
+        "release_6498_reads_6408_on_off_and_6408_reads_the_changes_back",
+        "release_6498_reads_6408_rested_night_and_6408_keeps_its_morning_spent"
+      ],
+      "all_case_count": 10,
+      "ordinary_filter_count": 0,
+      "executable": {
+        "target": "release_pair-88349d4c2302e5ab",
+        "cargo_target": "release_pair",
+        "kind": [
+          "test"
+        ],
+        "source": "lampOS/crates/skills/tests/release_pair.rs",
+        "test_profile": true,
+        "compiler_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "451586536b7df523847145fdf43f01a02040107aab189cc91c782b6c148b27f8",
+        "bytes": 3694632,
+        "mode": "0o755",
+        "independent_frozen_copy": true,
+        "actual_inode_policy": "strict",
+        "frozen_inode_policy": "strict"
+      }
+    },
+    {
+      "target": "requested_audio-019db324b83a9807",
+      "counts": {
+        "passed": 31,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "a_second_start_and_finish_are_terminal",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_stale_successful_scan_cannot_restore_inventory_revoked_in_its_generation",
+          "outcome": "ok"
+        },
+        {
+          "name": "byte_identical_file_edits_remain_accepted_with_full_content_reads",
+          "outcome": "ok"
+        },
+        {
+          "name": "catalog_body_and_core_metadata_follow_filtered_duplicate_tool_winners",
+          "outcome": "ok"
+        },
+        {
+          "name": "disabled_media_reserves_its_tool_without_advertisement_or_authority",
+          "outcome": "ok"
+        },
+        {
+          "name": "every_asset_scan_reads_all_payloads_and_preserves_live_offers",
+          "outcome": "ok"
+        },
+        {
+          "name": "exact_context_offer_and_unknown_private_enums_are_checked",
+          "outcome": "ok"
+        },
+        {
+          "name": "in_place_permission_edit_and_asset_edit_revoke_existing_offers",
+          "outcome": "ok"
+        },
+        {
+          "name": "original_start_and_finish_boundaries_never_move",
+          "outcome": "ok"
+        },
+        {
+          "name": "paths_links_and_modified_assets_are_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "real_call_socket_keeps_legacy_tools_and_requires_private_spoken_context",
+          "outcome": "ok"
+        },
+        {
+          "name": "real_service_switch_off_hides_and_refuses_media_with_valid_context",
+          "outcome": "ok"
+        },
+        {
+          "name": "refused_cap_reload_keeps_audio_generation_but_asset_scan_still_revokes_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "refuses_every_ungranted_or_non_tool_shape_and_unknown_values",
+          "outcome": "ok"
+        },
+        {
+          "name": "renewal_never_revives_a_lease_and_terminal_call_cannot_be_reissued",
+          "outcome": "ok"
+        },
+        {
+          "name": "replacement_revocation_restart_and_stale_scans_fail_quiet",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_cannot_mix_with_proposals_or_unplug_words",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_permission_cannot_turn_search_found_into_a_run",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_a_granted_daily_clock_trigger",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_exact_and_ranked_confirmation_tables",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_fully_granted_limits_and_routine_steps",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_fully_granted_rise_triggers",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_fully_granted_shows_and_choice_steps",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_history_that_an_ordinary_tool_can_tell",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_valid_nudge_limits_and_stop_settings",
+          "outcome": "ok"
+        },
+        {
+          "name": "requested_audio_refuses_valid_search_and_watch_settings",
+          "outcome": "ok"
+        },
+        {
+          "name": "restored_size_and_modified_time_cannot_hide_audio_or_permission_edits",
+          "outcome": "ok"
+        },
+        {
+          "name": "sixteen_maximum_recordings_report_full_content_scan_costs",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_bounded_table_refuses_instead_of_evicting_replay_protection",
+          "outcome": "ok"
+        },
+        {
+          "name": "unchanged_file_metadata_cannot_validate_a_different_public_asset_digest",
+          "outcome": "ok"
+        },
+        {
+          "name": "validates_and_packs_while_off_but_never_advertises_or_runs_media",
+          "outcome": "ok"
+        }
+      ],
+      "ignored_declared": [],
+      "all_case_count": 31,
+      "ordinary_filter_count": 0,
+      "executable": {
+        "target": "requested_audio-019db324b83a9807",
+        "cargo_target": "requested_audio",
+        "kind": [
+          "test"
+        ],
+        "source": "lampOS/crates/skills/tests/requested_audio.rs",
+        "test_profile": true,
+        "compiler_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "fresh": false,
+        "sha256": "6c5c87fb01ba65a4dca01fc4fa9f203b1c32c7a428a7b997a081350dcd6885cd",
+        "bytes": 13169900,
+        "mode": "0o755",
+        "independent_frozen_copy": true,
+        "actual_inode_policy": "strict",
+        "frozen_inode_policy": "strict"
+      }
+    }
+  ],
+  "declared_ignored_identities": [
+    {
+      "target": "it-46363ab9699809b5",
+      "case": "skills::write_an_off_fixture"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6408_installs_6498_packages_and_6498_loads_the_replacement"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6408_keeps_6498_daily_claims_and_6498_reads_them_back"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6408_reads_6498_on_off_and_6498_reads_the_changes_back"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6408_reads_6498_rested_night_and_6498_keeps_its_morning_spent"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6498_installs_6408_packages_and_6408_loads_the_replacement"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6498_keeps_6408_daily_claims_and_6408_reads_them_back"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6498_reads_6408_on_off_and_6408_reads_the_changes_back"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "case": "release_6498_reads_6408_rested_night_and_6408_keeps_its_morning_spent"
+    }
+  ],
+  "actual_executable_count": 7,
+  "test_driver_count": 5,
+  "non_test_helper_count": 2,
+  "actual_executable_bindings": [
+    {
+      "target": "requested_audio-019db324b83a9807",
+      "cargo_target": "requested_audio",
+      "kind": [
+        "test"
+      ],
+      "source": "lampOS/crates/skills/tests/requested_audio.rs",
+      "test_profile": true,
+      "compiler_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "6c5c87fb01ba65a4dca01fc4fa9f203b1c32c7a428a7b997a081350dcd6885cd",
+      "bytes": 13169900,
+      "mode": "0o755",
+      "independent_frozen_copy": true,
+      "actual_inode_policy": "strict",
+      "frozen_inode_policy": "strict"
+    },
+    {
+      "target": "lamp-skills",
+      "cargo_target": "lamp-skills",
+      "kind": [
+        "bin"
+      ],
+      "source": "lampOS/crates/skills/src/main.rs",
+      "test_profile": false,
+      "compiler_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "d1bd7dcffbdcea260d076067fb4651d09ebfe38c1e622fbb7d8f38437b68e553",
+      "bytes": 20296020,
+      "mode": "0o755",
+      "independent_frozen_copy": true,
+      "actual_inode_policy": "only recorded inode replacement; every other field strict",
+      "frozen_inode_policy": "strict"
+    },
+    {
+      "target": "it-46363ab9699809b5",
+      "cargo_target": "it",
+      "kind": [
+        "test"
+      ],
+      "source": "lampOS/crates/skills/tests/it/main.rs",
+      "test_profile": true,
+      "compiler_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "b1584586cd71f08790e870f6cc7ba88d8bdc5de10c2a721b6635c21850fbda5f",
+      "bytes": 21338284,
+      "mode": "0o755",
+      "independent_frozen_copy": true,
+      "actual_inode_policy": "strict",
+      "frozen_inode_policy": "strict"
+    },
+    {
+      "target": "render_relaxing_music",
+      "cargo_target": "render_relaxing_music",
+      "kind": [
+        "example"
+      ],
+      "source": "lampOS/crates/skills/examples/render_relaxing_music.rs",
+      "test_profile": false,
+      "compiler_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "042f7fb125806ba19551b630ac8e11a055c02363e41abd546828f7ef563f1e8b",
+      "bytes": 548496,
+      "mode": "0o755",
+      "independent_frozen_copy": true,
+      "actual_inode_policy": "only recorded inode replacement; every other field strict",
+      "frozen_inode_policy": "strict"
+    },
+    {
+      "target": "release_pair-88349d4c2302e5ab",
+      "cargo_target": "release_pair",
+      "kind": [
+        "test"
+      ],
+      "source": "lampOS/crates/skills/tests/release_pair.rs",
+      "test_profile": true,
+      "compiler_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "451586536b7df523847145fdf43f01a02040107aab189cc91c782b6c148b27f8",
+      "bytes": 3694632,
+      "mode": "0o755",
+      "independent_frozen_copy": true,
+      "actual_inode_policy": "strict",
+      "frozen_inode_policy": "strict"
+    },
+    {
+      "target": "lamp_skills-a718b2a0214b6903",
+      "cargo_target": "lamp-skills",
+      "kind": [
+        "bin"
+      ],
+      "source": "lampOS/crates/skills/src/main.rs",
+      "test_profile": true,
+      "compiler_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "ea1ed13b54e0fca31885a1b54a233384c43974d0c7122ee67737e96cfebc9171",
+      "bytes": 13299132,
+      "mode": "0o755",
+      "independent_frozen_copy": true,
+      "actual_inode_policy": "strict",
+      "frozen_inode_policy": "strict"
+    },
+    {
+      "target": "lamp_skills-c6f44302f3b2c78f",
+      "cargo_target": "lamp_skills",
+      "kind": [
+        "lib"
+      ],
+      "source": "lampOS/crates/skills/src/lib.rs",
+      "test_profile": true,
+      "compiler_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "0ea27cd984cd1e3f4b76f16adea3bb7f853b32b40fbf642bdf4667ff424b1a6c",
+      "bytes": 13966988,
+      "mode": "0o755",
+      "independent_frozen_copy": true,
+      "actual_inode_policy": "strict",
+      "frozen_inode_policy": "strict"
+    }
+  ],
+  "required_addon_caller": {
+    "identity": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "target": "it-46363ab9699809b5",
+    "outcome": "ok",
+    "execution_occurrences": 1,
+    "Rust_test_count": 1,
+    "internal_helper_boolean_variants": [
+      true,
+      false
+    ],
+    "two_helper_variants_not_two_Rust_tests": true
+  },
+  "gates": {
+    "fmt": true,
+    "actual_reverse_closure": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "supported_clean_packages": [
+      "lamp-skills"
+    ],
+    "invalidated_Skills_strict_rows": 8,
+    "Skills_fresh_false_required_and_observed": true,
+    "blanket_transitive_freshness_claim": false,
+    "workspace_build_before_test_compile": true,
+    "jobs": 1,
+    "debug_info": 0,
+    "incremental": false,
+    "offline": true,
+    "locked": true
+  },
+  "source": {
+    "tracked_files": 10674,
+    "source_before_equals_after": true,
+    "clean_before_and_after": true,
+    "all_tracked_bytes_modes_index_unchanged": true,
+    "index_sha256": "aba91ff13d5fede21b5164d5b886275f5ae9b39808af65aa88b7d86a5fe74b35",
+    "official_snapshot_equals_canonical_except_branch": true,
+    "qualification_alias_pushed_claim": false,
+    "official_ref_publication_separate_from_proof": true,
+    "authored_paths": [
+      "lampOS/crates/skills/tests/it/addon.rs",
+      "lampOS/docs/skills.md"
+    ],
+    "two_authored_blobs_unchanged_during_source_carry": true
+  },
+  "witnesses": {
+    "inherited": 228,
+    "new_actual_compiled_copies": 7,
+    "final": 235,
+    "all_hash_bytes_mode_mtime_device_inode_exact": true,
+    "test_driver_actual_inodes_strict": true,
+    "all_frozen_inodes_strict": true,
+    "physical_manifest_audit_receipt_sha256": "6db5f95c154a8b85f6c188ec475d484297339abe7fc4463270ff430f3fd4ff1c"
+  },
+  "prospective_alias_policy": {
+    "policy_bound_to_launch_plan_before_runtime": true,
+    "only_metadata_derived_non_test_bin_example_paths": true,
+    "allowed_changes": [
+      "inode"
+    ],
+    "strict_other_fields": [
+      "sha256",
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device"
+    ],
+    "allowed_boundary": "Successful sole full Cargo command, no Compiling/Checking lines; earlier and final checks strict against recorded inode",
+    "events": [
+      {
+        "alias": "debug/lamp-skills",
+        "before_inode": 484062243,
+        "after_inode": 484063810,
+        "all_other_fields_exact": true
+      },
+      {
+        "alias": "debug/examples/render_relaxing_music",
+        "before_inode": 484062319,
+        "after_inode": 484063811,
+        "all_other_fields_exact": true
+      }
+    ],
+    "not_a_test_failure_waiver": true
+  },
+  "closure": {
+    "native_controller_exit": 0,
+    "owned_command_count": 17,
+    "all_direct_wait_status_and_exit_code": 0,
+    "all_owned_groups_closed": true,
+    "unresolved_owned_processes": 0,
+    "lease_released": true,
+    "timeouts": 0,
+    "disk_reserve_breaches": 0,
+    "detached_descendant_claim": false
+  },
+  "owned_command_receipts": {
+    "cmd-fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 12.143727,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.544058,
+      "stdout_sha256": "2a523fb3426bd4b0d5e15bde66a3ff74a4b79d082c1af04f52368202ea194365",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-clean-skills": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.410146,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "75fa5359864f58da358d2558b40a00ea191b72930d1d5d2cd12ab18b428f7ff9"
+    },
+    "cmd-strict": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--jobs",
+        "1",
+        "--message-format=json",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 160.898025,
+      "stdout_sha256": "2b34a4daa8c2acef2e97b71e5f4f2f7a249434b8a97bded71ef5dc9fb82e32b0",
+      "stderr_sha256": "21186a409830fceeaba4933a93d317f0c35b7fe08e063a95816896fc922a7bb1"
+    },
+    "cmd-workspace": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--jobs",
+        "1",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 85.609632,
+      "stdout_sha256": "caf1e8b8025aadb0ada72c34a04afb5f42353952c321a9b160324b1f4a58f504",
+      "stderr_sha256": "aa31f592638bb947c2e13e2a3e8c70fc717cc66720dd0d06145f95a70f88f2f6"
+    },
+    "cmd-test-compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-skills",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 126.179725,
+      "stdout_sha256": "0e083afe3ed11c2d6f1f20299a6b2042f386d98c07f428f0e1043ec2b5f90cbe",
+      "stderr_sha256": "0c913cfa282c9ddb8a5bc998012225fb29fcdf99247c210d86019e8e6e20d8f1"
+    },
+    "cmd-inventory-0-all": {
+      "command": [
+        "<target>/debug/deps/requested_audio-019db324b83a9807",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.866761,
+      "stdout_sha256": "776d471b3008d3d5429b0a7c738dfff7d036ab9972b872199d16b1c870f378fa",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-0-ignored": {
+      "command": [
+        "<target>/debug/deps/requested_audio-019db324b83a9807",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.122099,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-1-all": {
+      "command": [
+        "<target>/debug/deps/it-46363ab9699809b5",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.898049,
+      "stdout_sha256": "be48954b09f084df4033ce59f0ba9373c338f5d4439049c493fcafeda79cd65a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-1-ignored": {
+      "command": [
+        "<target>/debug/deps/it-46363ab9699809b5",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.120505,
+      "stdout_sha256": "163d33ee43b30a5a7645433ba3a13e9da5256f58bd03c729b798fc95ae23396c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-2-all": {
+      "command": [
+        "<target>/debug/deps/release_pair-88349d4c2302e5ab",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.651719,
+      "stdout_sha256": "61c3d9ddd3a71efbb2a3ac1831a13905723c29b458077ce217e3b9206ffccc53",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-2-ignored": {
+      "command": [
+        "<target>/debug/deps/release_pair-88349d4c2302e5ab",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.119892,
+      "stdout_sha256": "13cd79aa19072cb9a78263fd0a2faca4809b076cc9bb6f005b993d2f68320ebf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-3-all": {
+      "command": [
+        "<target>/debug/deps/lamp_skills-a718b2a0214b6903",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.797957,
+      "stdout_sha256": "068898e2448ab71f7375db9a79d2cffab7b5ea923d6b27776e4ffb5670d3f45b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-3-ignored": {
+      "command": [
+        "<target>/debug/deps/lamp_skills-a718b2a0214b6903",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.118138,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-4-all": {
+      "command": [
+        "<target>/debug/deps/lamp_skills-c6f44302f3b2c78f",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.815477,
+      "stdout_sha256": "6741255cb4c072d3b40ede7e73c3b212817fe08cb1f0ff84a1299f533878a78f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-inventory-4-ignored": {
+      "command": [
+        "<target>/debug/deps/lamp_skills-c6f44302f3b2c78f",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 0.12201,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cmd-full-skills": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-skills",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "group_closed": true,
+      "elapsed_s": 236.674202,
+      "stdout_sha256": "b1b442a63ad27a9d57e62fa46aa7dab494f0a4a655c36a52e4fbc0f86288ee4d",
+      "stderr_sha256": "574b4c76628bfc6c0c3436c6a798e9a7b5558983628ebe2261ef98d375a61bce"
+    }
+  },
+  "retained_original_failure": {
+    "head": "91ca92d058adae8ce8992065afadd5e5753c55c8",
+    "base": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+    "counts": {
+      "passed": 521,
+      "failed": 1,
+      "ignored": 9
+    },
+    "case": "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+    "status": "FAIL",
+    "command_exit": 101,
+    "cause_established": false,
+    "waived": false,
+    "receipt_sha256": {
+      "terminal.json": "390f1cf6877bd57926e1c0edefd14ad435686618ff0f58192f38eae41ddff08a",
+      "completed-failure-census.json": "36318b8829282969a2cbaf65344a73dd7915e9c11ea36ac61636f009679da92a"
+    }
+  },
+  "limits": {
+    "new_current_head_native_or_Linux_CI_claim": false,
+    "full_reverse_dependent_runtime_claim": false,
+    "device_or_physical_latency_claim": false,
+    "fresh_exact_head_CI_and_independent_read": "pending",
+    "earlier_results_relabelled": false,
+    "source_target_compiler_runtime_access_during_publication": false
+  },
+  "private_receipt_sha256": {
+    "authored-blob-comparisons.json": "11c7c69f1cf2893ea7fc27f76b1c4dfda26b7c498734593c5809f47c352d9773",
+    "bounded-alias-inode-policy.json": "4d33e76d8f609d598e73b805fd01bb5ddac1bdc9933ee6e3dfff73379482a715",
+    "cmd-clean-skills.json": "e0bf2c3d5093bc170a232c81bf99905e2f887fb8de0aa9a84d946afc6dd983d5",
+    "cmd-fmt.json": "e7b453ec8e635a0ab2e027deee675c780aa4645b21dbe41f10d79c6bf1093368",
+    "cmd-full-skills.json": "41725a038a0c99920b4848370290fb1cce9372cccbf3aabc7f52fa7ebf7f17d9",
+    "cmd-inventory-0-all.json": "6f225028b640900f6c3fccaf23f4787544b7aa8a03912304af866a12b92a2d30",
+    "cmd-inventory-0-ignored.json": "01c60355ec280f30e5484169977bddab000d97b8469e1994b482c395c2abe3fa",
+    "cmd-inventory-1-all.json": "f7d523f770a607ccc2f7cd6fa8c97fb9b7dc5b4f12a6e3e7e8462403464369b6",
+    "cmd-inventory-1-ignored.json": "54efd08e97e5a72ea67601d0c9b185ef74271d1cfe7a30e6b4aa529c1a766965",
+    "cmd-inventory-2-all.json": "1189a90666bde05cf40f62d221ecb56f4c4d84e2f0c96acb699a03771716ed3d",
+    "cmd-inventory-2-ignored.json": "8ab0f4165d4de15924098cca12f9408dc1482034c816e6829db5d38f54837d7b",
+    "cmd-inventory-3-all.json": "ae23cb2f9bcb767a96c1fae6e0bb36a71d7667905bc5ff004bd2541d2bdcc24f",
+    "cmd-inventory-3-ignored.json": "4c1e4f4b5ab3100752aabda66a99ade7757fab977922f691f855b94d6fe38d84",
+    "cmd-inventory-4-all.json": "e4480604a3e49b19857ae26bd3eb60c389fb03b43248c2cbbea27cf6d6817a27",
+    "cmd-inventory-4-ignored.json": "36fe763f80b650a50af720f57699c223f0b0bb674a2c3aa959c051e1bb81734c",
+    "cmd-metadata.json": "c38b343d85e414cc4b902484e51b7b41d174783556c437ed0265f360db040fd3",
+    "cmd-strict.json": "d5966321ef1545801e778a4dcebc177fd3d23d5cdb397670d97290373fec24aa",
+    "cmd-test-compile.json": "5419474eaeaa14932c2f975922b26a1ae52ba007f31bafa49cfe5f35495f30e6",
+    "cmd-workspace.json": "60c9437e04bebe488b9a1a5eb46f3c35fda4127df34850b0ec25794984413c91",
+    "launch.json": "fce859d22a7adec136b02b0e866c1ba6a50a582e789bf0d743617314320779c7",
+    "native-controller-result.json": "d706fcc3b26fb70bad40dc9934ec88fcb06504a93aba4df9fb1f3e13b71cb45a",
+    "plan.json": "c79c290686f80384297b57069a02916560240eec6c8d200e9ef26b8e52e35cb5",
+    "prepared-source-original-ownWT.json": "994e59960022b37b0b34aef9ccf454364bcbf82549a689c89338ceee8584fb18",
+    "prepared-source.json": "cc5f76cec2b3f0943239862ca197c6a00b0d221f2186011e65d5b722bdd86eff",
+    "range-diff.txt": "71d7217ed08339f0450fd33f9650e8abc67bffa8fce5b3db1b2bb24d9a252e63",
+    "run.py": "5c01296be5b0bba1161784fadd1b392760e21327fe7b17a4725645b935a9c0a7",
+    "semantic-actual-executables-after.json": "09a3bbebc09b4b84a7f93efa92130b1896bf52cafde235cb6d5a351c0115a4b3",
+    "semantic-actual-executables.json": "95f2c5076cdea33853fc8747826d5ebb7d081154e83da203291c7c8bd3f975e8",
+    "semantic-alias-policy.json": "880fd609da399236851b4305d2e0f1f5fa29b5c74e45f26bf37635f58a4228e7",
+    "semantic-alias-republish-audit.json": "281e41e7b1261dd1278e1588778b944e398eac8f916187500aa6bd5b9d3a064a",
+    "semantic-census.json": "240e66c07f69833e4702b6d0fe31ebc809fc8cf4873564b2ab6e7ebb4338af71",
+    "semantic-inventory.json": "8953b072699c277b5ff74b0d5297a69425dba0018c653f62d255929f90b57750",
+    "semantic-new-frozen.json": "0b8d0484ccca066df3016c3ec19683653c20d2976910f26ce674e9cbaf21a1c9",
+    "semantic-protected-after.json": "88476b2c9f9e746ed33976dc912e365d9821a5d322df03bedcf454a5db24d708",
+    "semantic-protected-before.json": "868de733e71b5e987f82a74b3266131a92b707797728cf4ec04dc3a8874009e1",
+    "semantic-required-caller.json": "9d0ee6f243d07e34269d49687fffbeb916ad0881b541f8ee2b93bd66dc980cd5",
+    "semantic-source-after.json": "cc5f76cec2b3f0943239862ca197c6a00b0d221f2186011e65d5b722bdd86eff",
+    "semantic-source-before.json": "cc5f76cec2b3f0943239862ca197c6a00b0d221f2186011e65d5b722bdd86eff",
+    "semantic-strict-artifacts.json": "6ad06880f7dc858ecae2211fe11002c2f5848fe267b07be69102257d7f4413f1",
+    "semantic-strict-local-bindings.json": "eb42b737c10e3fbcc75c9d5f0048b1032aa00366ac20098722898fac86782c15",
+    "semantic-test-compiler-artifacts.json": "43523839e552ab0a293986a4e920eec0d69d853bc930df1d8a882dd8f056852a",
+    "semantic-workspace-artifacts.json": "ed8514cb73ac571c01d1fb8e00c96000f9e3ef6320b5fe7856bea042b49901f5",
+    "sourcecarry-after.json": "95afea812e920d958096388be1ab48351acdc7eafd466aa45fdb63c40b2d8277",
+    "terminal.json": "009dfe0772295b8a235375337a6f88aca2c5a0d74fdf4c490df70f6cd6c986ce"
+  }
+}

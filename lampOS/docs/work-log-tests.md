@@ -1,5 +1,17 @@
 # Tests work log
 
+## 2026-10-27 05:04 — Fixture native gates and peer reads clear; carrier reserve abort retained
+
+Ready for lamp-voice: no (journal ready publication is next; other carries remain active)
+
+Current journal `c2ab4426a` and Mood `fa67e6889` on a3b have both current peer READ-OKs and fresh original ARM64/Linux success. [Journal native proof](verification/tests-journal-c2ab-native-20261027/) and [Mood native proof](verification/tests-mood-fa67-native-20261027/) each record **7,541 unique PASS / 0 FAIL / 0 LEAK / 0 TIMEOUT**, 53 aggregate skips, all 340 Expression cases and the affected case once, with preview trees equal to their offered heads. Auxiliary results stay separate. Journal is being offered first to unblock the independently observed old watchdog failure; Mood stays draft until its shared helper and docs compose onto journal before the second merge.
+
+Skills `b634b5544/a3b` completed the fresh full Mac package **525/0/9**, formatting, strict twelve-package Clippy, workspace, source and 235 guards; [proof](verification/tests-skills-b634-a3b-20261027/). Its current branch is pushed and fresh native checks follow. The one addon caller exercised both internal Boolean variants; these are not two Rust tests. Historical 521/1/9 is retained.
+
+[Carrier 3be/2bf](verification/tests-carrier-2bf-serial-20261027/) remains a completed **442/0/6** plus promoter **25/0/0** observation. The new 63a/a3b gate passed compiler stages but stopped mid-install when free disk dropped below the 2 GiB + 64 MiB reserve. Only 133 completed passes and two ignores from three drivers are credited; the whole command remains aborted/FAIL, promoter unrun, and all source/258 witnesses/groups closed. No assertion failure or full count is invented. Unused old Cargo cache ownership is being audited before scoped cleanup; current targets, sources, frozen evidence and archives remain untouched.
+
+Sentinel `5ac039201/a3b` is a clean equal-patch carry with actual Skills-parent handoff now bound, still disabled pending disk admission/review. Restart `f6ee7ecf8/a3b` is also source-only with future Reader handoff deferred. No device action.
+
 ## 2026-10-27 04:36 — Both fixture carries pass on a3b
 
 Ready for lamp-voice: no (fresh native checks and current reads pending)
