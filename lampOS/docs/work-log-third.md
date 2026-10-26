@@ -13,6 +13,22 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:56 — Provisional current-base Expression fixture review
+
+Ready for lamp-voice: no (review overlay for #3548)
+
+Applied exactly the published **5713bece4** two-file patch to **9e5d3b9c6**
+in an isolated review checkout. Formatting, strict Expression all-target
+Clippy and five unplug runtime unit controls pass, changed case once.
+Source/base/patch hashes and actual unit driver are sealed.
+[Receipt](verification/ready-speaking-reader-20261026/provisional-9e5.json).
+The author has not published its current carry; no exact-head READ-OK yet.
+No full suite, private 1,100 ms intervention, product binary or device test.
+Will compare offered bytes before binding this provisional execution.
+
+Factory 3c54671c0 is green and in train 162 (#3552); Reviewer-three carries
+READ-OK to the exact head. Reminder latest native audit continues.
+
 ## 2026-10-26 13:50 — Latest factory native gates green
 
 Ready for lamp-voice: no (#3546, final carry reads pending)

@@ -1,0 +1,52 @@
+{
+  "base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+  "authored_patch_head": "5713bece435526832373cc9de38db99a39fc706f",
+  "patch_sha256": "4e2d66c0b348ebb0e954ec4e8af3aad023ec94c29fbae35e13485ef067dfd881",
+  "source_count": 7236,
+  "all_source_unchanged": true,
+  "source_manifest_sha256": "f2ddbdb0d437be2666256d1350f96f7157d4a648be143c0a6079f1825a9be6e7",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T06:54:34Z",
+      "finished": "2026-10-26T06:54:46Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --offline --locked -p lamp-expression --all-targets -- -D warnings",
+      "started": "2026-10-26T06:54:46Z",
+      "finished": "2026-10-26T06:55:00Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-unplug": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-expression --lib runtime::unplug_tests:: -- --test-threads=1",
+      "started": "2026-10-26T06:55:00Z",
+      "finished": "2026-10-26T06:55:16Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "executable_sha256": {
+    "lamp_expression-97b0d6d78b5cc498": "9bf7510341de3586472bdde3dff804d98647f0d55022f43d33cca2a0166eaf84"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-unplug": "abbbfd8c929e72a3e50febc390f80c3a7a3dba9f5caa17d5be9c2f79e749a5e8"
+  },
+  "limits": "Provisional review overlay of published5713 patch on9e5; author current carry unpublished at execution. Five unplug unit controls only, no full Expression/reverse-dependency runtime suite, no private1100ms intervention, no device or productbinary execution."
+}
