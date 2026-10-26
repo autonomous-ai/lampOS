@@ -428,7 +428,10 @@ workflow change.
    written), every unit it names that differs from how it was is written
    back, and those recorded as running are restarted in the saved old
    units' startup order. Already-restored units and units that were inactive
-   gain no restart. The graph is checked before any restoration write: a
+   gain no restart. Completed product Setup is also left alone when its
+   restored unit passes the lifecycle check in step 8; the journal still
+   truthfully records whether it was active before the switch. The graph is
+   checked before any restoration write: a
    cycle or unsupported ordering syntax leaves the journal and the existing
    recovery prefix in place for another attempt. A completed put-back
    refuses the build.
@@ -558,7 +561,32 @@ workflow change.
    lamp may have changed a file while the round waited; each file's bytes
    before are in the journal, written with it). Each changed unit that was
    running is then restarted in the candidate graph's startup order. A unit
-   that was not running is switched without being started. At the voice's
+   that was not running is switched without being started.
+
+   **Completed product Setup:** `lamp-setup.service` may still be serving
+   the phone for its ten-minute grace period, or may have ended while the
+   update fetched its files. Restarting it after `/var/lib/lampos-setup/done`
+   exists stops that process, but the unit's condition prevents a new start.
+   Leave it alone: its files and link update for the next setup, without a
+   restart or a new watch. This exception requires the exact product unit
+   declarations both before and after, the normal installed unit directory,
+   a regular completion marker and no unknown unit fragment or drop-in.
+   Only install's exact unit-local exit-note hook is allowed. A fresh bounded
+   `systemctl show` query must also report the loaded canonical identity,
+   exactly that one name, the canonical installed fragment and no drop-ins
+   except that hook. Aliases (including loaded aliases no longer on disk),
+   custom search paths, failed queries and incomplete metadata retain normal
+   restart/watch. The manager is queried only after filesystem recognition,
+   after reload, independently on both forward and recovery paths. Reads are
+   nonblocking, refuse nonregular or symlink override inputs, and cap each
+   file at 16 KiB and each drop-in directory at 128 entries. The ordinary
+   merged-`/usr` library alias is checked through its destination. Missing
+   completion, a custom unit, a condition reset or uncertain overrides
+   retain the normal restart and watch. Completion is checked again after
+   inspecting overrides and querying the manager, at selection time; this does not lock out a
+   simultaneous reset. The earlier activity snapshot remains unchanged.
+
+   At the voice's
    own restart boundary, queued speech is read and the 45 s quiet gate is
    checked again: a prerequisite's restart may have taken time. If no quiet
    moment arrives within `--quiet-wait-s`, the changes are put back,
@@ -581,6 +609,10 @@ workflow change.
     folder made for it if still empty; a file the lamp changed since it was
     written is left, and said), and those restarted are restarted again in
     that saved order. Already-restored and inactive members gain no restart.
+    After successful file/link restoration, the same completed-product-Setup
+    check avoids a spurious restart, including recovery from an older
+    interrupted-switch journal. A reset that removes completion restores
+    the ordinary restart rule.
     The saved order must name all journal units exactly once, before any
     already-restored prefix is excluded. A present malformed order keeps
     the journal and every restoration prefix intact and starts no new round.

@@ -16,6 +16,11 @@ use std::{
 pub trait Systemd {
     /// Each unit's state, as `systemctl show` gives it.
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String>;
+    /// Fresh effective product Setup identity after reload, including loaded
+    /// aliases and drop-ins. Unknown managers retain normal restart/watch.
+    fn setup_unit_properties(&mut self) -> Option<String> {
+        None
+    }
     /// The installed fallback can run, and its deadline timer is armed now
     /// and enabled persistently. Reads systemd's state; changes nothing.
     fn self_recovery_ready(&mut self) -> Result<(), String>;
@@ -83,6 +88,19 @@ impl Systemd for Systemctl {
             return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
         }
         Ok(parse_show(&String::from_utf8_lossy(&output.stdout)))
+    }
+
+    fn setup_unit_properties(&mut self) -> Option<String> {
+        output_within(
+            Command::new("systemctl").args([
+                "show",
+                "--no-pager",
+                "--property=Id,Names,LoadState,FragmentPath,DropInPaths",
+                "--",
+                "lamp-setup.service",
+            ]),
+            JOURNAL_WITHIN,
+        )
     }
 
     fn self_recovery_ready(&mut self) -> Result<(), String> {
