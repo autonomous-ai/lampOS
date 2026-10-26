@@ -243,6 +243,8 @@ fi
 systemctl enable avahi-daemon 2>/dev/null || true
 systemctl restart avahi-daemon 2>/dev/null || true
 
+# Only a 5 GHz image carries country_code; on 2.4 GHz this asks for US, which this board's kernel
+# leaves pending (it refuses every regulatory.db), so the country stays 00 and nothing waits on it.
 REG=\$(grep "^country_code=" /etc/hostapd/hostapd.conf 2>/dev/null | cut -d= -f2)
 [ -z "\$REG" ] && REG=US
 iw reg set "\$REG" 2>/dev/null || true
