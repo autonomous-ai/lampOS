@@ -13751,3 +13751,151 @@ fn the_ranges_waited_for_are_the_starts_own_bounds() {
         .is_none()
     );
 }
+
+/// lamp-52e6's own stored limits, read without moving (body.md's 52e6
+/// table), by `Joint::index`: yaw, shoulder, elbow, roll, pitch.
+const LAMP_52E6_RANGES: [(u16, u16); 5] = [
+    (809, 3_239),
+    (2_047, 3_799),
+    (0, 4_095),
+    (1_065, 2_413),
+    (1_451, 3_067),
+];
+
+fn own() -> Limits {
+    Limits {
+        own_ranges: true,
+        ..Limits::FOLDED
+    }
+}
+
+fn ranged(ranges: [(u16, u16); 5], cancel_at: Duration) -> (Lamp, Clock) {
+    let (mut lamp, clock) = folded(cancel_at);
+    for (servo, range) in lamp.servos.iter_mut().zip(ranges) {
+        servo.range = range;
+    }
+    (lamp, clock)
+}
+
+/// #3558: off, the servos' own limits are not read, so a lamp whose servos
+/// store anything at all runs exactly as before.
+#[test]
+fn without_own_ranges_the_servos_limits_change_nothing() {
+    let writes = |ranges: [(u16, u16); 5]| {
+        let (mut lamp, mut clock) = ranged(ranges, Duration::from_secs(8));
+        let news = script(&clock.time);
+        let report = run(
+            &mut lamp,
+            &mut clock,
+            Limits::FOLDED,
+            Some(HOME),
+            news,
+            |_| {},
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert_eq!(report.own_ranges, None);
+        (lamp.goals, lamp.registers)
+    };
+    assert_eq!(writes([(2_000, 2_001); 5]), writes([(0, 4_095); 5]));
+}
+
+/// #3558: on, all five are read at start and a lamp whose poses fit them,
+/// as lamp-52e6's do, runs as it would without them.
+#[test]
+fn with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before() {
+    let writes = |limits: Limits| {
+        let (mut lamp, mut clock) = ranged(LAMP_52E6_RANGES, Duration::from_secs(8));
+        let news = script(&clock.time);
+        let report = run(&mut lamp, &mut clock, limits, Some(HOME), news, |_| {});
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        (report.own_ranges, lamp.goals)
+    };
+    let (read, goals) = writes(own());
+    assert_eq!(read, Some(LAMP_52E6_RANGES));
+    assert_eq!(goals, writes(Limits::FOLDED).1);
+}
+
+/// #3558: a home outside a joint's own limits (less the margin) does not
+/// start, writing nothing, and says which.
+#[test]
+fn with_own_ranges_a_home_outside_them_is_refused() {
+    let mut ranges = LAMP_52E6_RANGES;
+    // Home's yaw, 2015, is 10 inside this low end: inside the servo, not
+    // inside its margin.
+    ranges[Joint::BaseYaw.index()] = (2_005, 3_239);
+    let (mut lamp, mut clock) = ranged(ranges, Duration::from_secs(2));
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, own(), Some(HOME), news, |_| {});
+    match &report.stop {
+        Stop::Refused { why } => assert!(why.contains("home base_yaw 2015"), "{why}"),
+        stop => panic!("{stop:?}"),
+    }
+    assert!(lamp.nothing_was_written());
+}
+
+/// #3558: a head or base goal outside its joint's own limits (less the
+/// margin) ends the run on `Stop::Window`, as an arm goal does.
+#[test]
+fn with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let mut bus = Bus::new(&mut lamp, &mut clock, None);
+    // Without the bound, any goal in 0..=4095 is the guard's to take.
+    for goal in [0, 828, 3_220, 4_095] {
+        assert_eq!(bus.goal_refused(Joint::BaseYaw, goal), None, "{goal}");
+    }
+    bus.windows = LAMP_52E6_RANGES.map(own_window);
+    let (low, high) = (829, 3_219);
+    for goal in [low, 2_015, high] {
+        assert_eq!(bus.goal_refused(Joint::BaseYaw, goal), None, "{goal}");
+    }
+    for goal in [low - 1, high + 1] {
+        assert_eq!(
+            bus.goal_refused(Joint::BaseYaw, goal),
+            Some(Stop::Window {
+                joint: Joint::BaseYaw.id(),
+                goal,
+                window: (low, high),
+                from: goal,
+            })
+        );
+    }
+    // lamp-52e6's elbow stores the full turn: its goals keep its arm window.
+    assert_eq!(bus.window(Joint::ElbowPitch), (0, 4_095));
+}
+
+/// #3558: the folded arm, the stand and the pitch window are each checked
+/// against their joints' own limits; a joint storing 0..=4095 (lamp-52e6's
+/// elbow) is never checked, and its goals keep 0..=4095.
+#[test]
+fn own_ranges_check_every_pose_and_leave_a_full_turn_alone() {
+    assert_eq!(own_window((0, 4_095)), (0, 4_095));
+    assert_eq!(own_window((809, 3_239)), (829, 3_219));
+    let up = standing(1, 10);
+    let window = Limits::FOLDED.pitch_window;
+    assert_eq!(
+        outside_own_ranges(&LAMP_52E6_RANGES, Some(HOME), window, Some(up)),
+        None
+    );
+    let mut ranges = LAMP_52E6_RANGES;
+    ranges[Joint::BasePitch.index()] = (2_100, 3_799);
+    let why = outside_own_ranges(&ranges, Some(HOME), window, Some(up)).unwrap();
+    assert!(why.starts_with("folded arm base_pitch 2050"), "{why}");
+    let mut ranges = LAMP_52E6_RANGES;
+    ranges[Joint::WristRoll.index()] = (1_065, 2_050);
+    let why = outside_own_ranges(&ranges, None, window, Some(up)).unwrap();
+    assert!(why.starts_with("stand wrist_roll 2044"), "{why}");
+    let mut ranges = LAMP_52E6_RANGES;
+    ranges[Joint::WristPitch.index()] = (1_451, 2_040);
+    let why = outside_own_ranges(&ranges, None, window, None).unwrap();
+    assert!(why.starts_with("pitch window wrist_pitch 2030"), "{why}");
+    // Any count at all of a joint storing the full turn.
+    let full = [(0, 4_095); 5];
+    let far = Standing {
+        folded: [0, 4_095],
+        ..up
+    };
+    assert_eq!(
+        outside_own_ranges(&full, Some([0, 4_095, 0]), (0, 4_095), Some(far)),
+        None
+    );
+}

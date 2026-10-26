@@ -313,6 +313,80 @@ pub fn gesture_pause_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// `LAMP_BODY_OWN_RANGES=on` (#3558): the body reads each joint's own
+/// stored limits at start and bounds the lamp by them (`Limits::own_ranges`).
+pub const OWN_RANGES: &str = "LAMP_BODY_OWN_RANGES";
+
+/// Whether a value of [`OWN_RANGES`] turns the bound on.
+pub fn own_ranges_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// How far inside a joint's own stored limits a head or base goal stays
+/// (#3558): under two degrees, so a goal is never one the servo would
+/// refuse and leave the joint short of.
+const OWN_RANGE_MARGIN: u16 = 20;
+
+/// The window a head or base goal must be inside for a joint whose servo
+/// stores `range` (registers 9 and 11): the range less `OWN_RANGE_MARGIN`
+/// either side. A servo storing the whole turn, 0..=4095, was never
+/// calibrated by V1 and keeps today's 0..=4095.
+fn own_window((min, max): (u16, u16)) -> (u16, u16) {
+    if (min, max) == (0, 4_095) {
+        (0, 4_095)
+    } else {
+        (
+            min.saturating_add(OWN_RANGE_MARGIN),
+            max.saturating_sub(OWN_RANGE_MARGIN),
+        )
+    }
+}
+
+/// Why the poses this body was given do not fit its joints' own stored
+/// limits (#3558), or `None` when they do. `ranges` are by
+/// [`Joint::index`]. What the head and the base are asked for (`home`,
+/// the pitch window, the stand's pitch, roll and yaw) must be inside the
+/// window their goals are held to ([`own_window`]); the arm's folded and
+/// standing counts inside the servo's own limits themselves, since its
+/// goals keep their own window and a folded arm may rest on its stop
+/// (lamp-52e6's shoulder folds at 2050, its limit 2047).
+fn outside_own_ranges(
+    ranges: &[(u16, u16); 5],
+    home: Option<[u16; 3]>,
+    pitch_window: (u16, u16),
+    standing: Option<Standing>,
+) -> Option<String> {
+    let mut asked: Vec<(&str, Joint, u16)> = vec![
+        ("pitch window", Joint::WristPitch, pitch_window.0),
+        ("pitch window", Joint::WristPitch, pitch_window.1),
+    ];
+    for (index, joint) in COMMANDED.into_iter().enumerate() {
+        asked.extend(home.map(|home| ("home", joint, home[index])));
+    }
+    if let Some(up) = standing {
+        for (index, joint) in ARM.into_iter().enumerate() {
+            asked.push(("folded arm", joint, up.folded[index]));
+        }
+        for (index, joint) in COMMANDED.into_iter().chain(ARM).enumerate() {
+            asked.push(("stand", joint, up.pose[index]));
+        }
+    }
+    asked.into_iter().find_map(|(pose, joint, count)| {
+        let range = ranges[joint.index()];
+        let (low, high) = if ARM.contains(&joint) {
+            range
+        } else {
+            own_window(range)
+        };
+        (!(low..=high).contains(&count)).then(|| {
+            let (min, max) = range;
+            format!(
+                "{pose} {joint} {count} is outside {low}..={high}, its servo's own {min}..={max}"
+            )
+        })
+    })
+}
+
 /// A gesture paused at offsets `from`, moving `speed` a step, `held` into
 /// its pause (#2602): where it is, eased as the ease out does but to a
 /// stop a third of the way it would carry on, so it neither snaps still
@@ -719,6 +793,15 @@ pub struct Limits {
     /// conversation begins (#2668).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub gesture_pause: bool,
+    /// `LAMP_BODY_OWN_RANGES=on` (#3558): each joint's own stored limits
+    /// are read at start; a home, folded arm, stand or pitch window outside
+    /// them is refused, and a head or base goal outside them (less
+    /// `OWN_RANGE_MARGIN`) ends the run on `Stop::Window`, as an arm goal
+    /// outside its window does. A joint storing 0..=4095 keeps today's
+    /// guard. A bound, never a remap: poses and clips stay shared. Off: the
+    /// limits are not read, as before.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub own_ranges: bool,
     /// A load above this on `load_steps` steps in a row makes the joint give
     /// way, and ends the run if it stays or comes back too often.
     pub load: [u16; 3],
@@ -849,6 +932,7 @@ impl Limits {
         look_at_name: false,
         arbitration: false,
         gesture_pause: false,
+        own_ranges: false,
     };
 }
 
@@ -1168,6 +1252,10 @@ pub struct BodyReport {
     pub standing: Option<Standing>,
     /// Why it would not stand, though it ran as a folded lamp.
     pub standing_refused: Option<String>,
+    /// With `Limits::own_ranges`, each joint's own stored limits as read at
+    /// start, by `Joint::index` (#3558).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub own_ranges: Option<[(u16, u16); 5]>,
     /// Writes of torque enable: to clear a latched overload on the shoulder
     /// or the elbow before standing, and, told to take hold, to each joint
     /// found without torque.
@@ -1479,6 +1567,9 @@ struct Bus<'a, P, R> {
     runtime: &'a mut R,
     /// Each arm joint's window (`arm_windows`).
     arm_windows: [(u16, u16); 2],
+    /// Each head and base joint's window, by `Joint::index`: 0..=4095, or
+    /// with `Limits::own_ranges` its own (`own_window`).
+    windows: [(u16, u16); 5],
     /// An arm goal refused before it was written: the run ends on it.
     refused: Option<Stop>,
     /// When positions were last read, each joint's last good position,
@@ -1536,6 +1627,7 @@ impl<'a, P: PortIo, R: Runtime> Bus<'a, P, R> {
             io,
             runtime,
             arm_windows: arm_windows(standing),
+            windows: [(0, 4_095); 5],
             refused: None,
             read_at: None,
             good: [None; 5],
@@ -2015,10 +2107,7 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     /// of a folded arm at rest (`resting`): it has no hold to let go, and
     /// its way back from a hand is already ramped.
     fn eased(&self, joint: Joint, from: u16, goal: u16, resting: bool) -> u16 {
-        let (low, high) = ARM
-            .iter()
-            .position(|arm| *arm == joint)
-            .map_or((0, 4_095), |index| self.arm_windows[index]);
+        let (low, high) = self.window(joint);
         if self.goal_refused(joint, goal).is_none()
             || !(low..=high).contains(&goal)
             || goal.abs_diff(from) > ARM_EASE_REACH
@@ -2030,6 +2119,14 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         } else {
             from.saturating_sub(ARM_GOAL_STEP).max(goal)
         }
+    }
+
+    /// The window a goal for `joint` must be inside: an arm joint's
+    /// (`arm_windows`), or a head or base joint's (`windows`).
+    fn window(&self, joint: Joint) -> (u16, u16) {
+        ARM.iter()
+            .position(|arm| *arm == joint)
+            .map_or(self.windows[joint.index()], |index| self.arm_windows[index])
     }
 
     /// A goal refused before it was written: the run ends on the first.
@@ -2060,7 +2157,7 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     /// pushing, never asks it past either. If not, the stop the run ends on.
     fn goal_refused(&self, joint: Joint, goal: u16) -> Option<Stop> {
         let arm = ARM.iter().position(|arm| *arm == joint);
-        let (low, high) = arm.map_or((0, 4_095), |index| self.arm_windows[index]);
+        let (low, high) = self.window(joint);
         let read = self.good[joint.index()];
         let from = self.goals[joint.index()].or(read);
         let allowed = (low..=high).contains(&goal)
@@ -3522,6 +3619,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         last: None,
         standing: None,
         standing_refused: None,
+        own_ranges: None,
         torque_writes: 0,
         torque_given: Vec::new(),
         woke: None,
@@ -3680,6 +3778,26 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 return report;
             }
         }
+    }
+    // #3558: each joint's own stored limits, read-only, bound the poses
+    // given and every head and base goal, as V1's calibration does.
+    if limits.own_ranges {
+        let mut ranges = [(0, 4_095); 5];
+        for joint in Joint::ALL {
+            match bus.position_limits(joint) {
+                Ok(range) => ranges[joint.index()] = range,
+                Err(detail) => {
+                    report.stop = refused(format!("first read: {detail}"));
+                    return report;
+                }
+            }
+        }
+        report.own_ranges = Some(ranges);
+        if let Some(why) = outside_own_ranges(&ranges, home, limits.pitch_window, standing) {
+            report.stop = refused(why);
+            return report;
+        }
+        bus.windows = ranges.map(own_window);
     }
     if standing.is_some() && home.is_none() {
         standing = None;
