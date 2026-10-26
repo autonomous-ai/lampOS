@@ -1,3 +1,9 @@
+## 2026-10-26 23:15 — Routine carry integration qualifies on delivered observations
+
+Ready for lamp-voice: no (#3598)
+
+Pushed 50fdff861/521 after current compiler gates and one whole changed integration run 312/0/1. Other five binaries match earlier actual dd8e execution 211/0/8; four Routine cases remain in that unchanged library. Source and six saved/actual hashes stayed stable, group absent without cleanup. [Current host](verification/routine-request-expiry-20261026/current-521d-host.json). Same unrelated passing-case BrokenPipe is preserved, with a separate claimed worker repair. Original current native/read carries pending; author HOLD stays. No historical cause or device claim.
+
 ## 2026-10-26 23:04 — observations delivered; Routine native green on prior base
 
 Ready for lamp-voice: yes (#3591 delivered as 521dcb006)

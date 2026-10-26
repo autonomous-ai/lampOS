@@ -1,0 +1,86 @@
+{
+  "head": "50fdff861018eb82e4c2145d958dc139cd7dedbc",
+  "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "actual_current_integration": [
+    312,
+    0,
+    1
+  ],
+  "terminal": {
+    "head": "50fdff861018eb82e4c2145d958dc139cd7dedbc",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 1200,
+    "timed_out": false,
+    "elapsed_seconds": 215.713907458,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "process_group_absent_before_cleanup": true,
+    "forced_cleanup": false,
+    "pid": 54627,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "b4015b71cbb493164e953abd125de91d004755d224fd87a3841386b1bcead678"
+  },
+  "artifact_byte_comparison_to_cbde": {
+    "requested_audio-019db324b83a9807": true,
+    "lamp_skills-a718b2a0214b6903": true,
+    "it-46363ab9699809b5": false,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-c6f44302f3b2c78f": true,
+    "lamp-skills": true
+  },
+  "retained_other_drivers": {
+    "actual_head": "dd8e46d7000ba3f35c0129f1a8a5876b938e0068",
+    "actual_base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+    "library": [
+      158,
+      0,
+      0
+    ],
+    "binary": [
+      20,
+      0,
+      0
+    ],
+    "release_pair": [
+      2,
+      0,
+      8
+    ],
+    "requested_audio": [
+      31,
+      0,
+      0
+    ],
+    "docs": [
+      0,
+      0,
+      0
+    ],
+    "reason": "Five actual binaries unchanged; only inherited call_wait source changed, so entire changed integration driver was executed anew."
+  },
+  "case_observation_rows": 10,
+  "preserved_background_panic": "Same unjoined mock actions worker in passing repeat-call case, skills.rs3035 BrokenPipe; separately claimed3bc8repair, not inthisPR.",
+  "limits": "Current integration is actual50f/521, not an automatic older-driver reuse. Other drivers stay at actualdd8e. Priorhistorical538/4/9 and521/1/9 remainfailed withunproven cause. Native currenthead/readcarries pending."
+}

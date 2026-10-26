@@ -1,0 +1,12 @@
+tool calls, fastest to slowest: [205.635µs, 216.46µs, 237.796µs, 270.149µs, 347.112µs, 351.52µs, 355.032µs, 403.266µs, 409.853µs, 440.863µs]
+spawn to tools.json observed: 55.751228ms
+call 1/10 elapsed=409.853µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 2/10 elapsed=270.149µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 3/10 elapsed=347.112µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 4/10 elapsed=351.52µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 5/10 elapsed=205.635µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 6/10 elapsed=216.46µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 7/10 elapsed=440.863µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 8/10 elapsed=237.796µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 9/10 elapsed=355.032µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 10/10 elapsed=403.266µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
