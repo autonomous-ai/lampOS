@@ -697,7 +697,11 @@ mod sleep_name {
         }
 
         fn step(&mut self) -> Output {
-            self.now_us += TICK_US;
+            self.step_by(TICK_US)
+        }
+
+        fn step_by(&mut self, step_us: u64) -> Output {
+            self.now_us += step_us;
             let mut timing = voice(self.now_us);
             timing.stamp.sequence = self.now_us + 1;
             timing.state = self.state;
@@ -763,7 +767,7 @@ mod sleep_name {
             // A host stall of more than a tick while publishing would place
             // this step's room before the last one's, refused as out of
             // order (#1196). Like a lamp's, this clock then keeps up with the wall.
-            self.now_us += (wall.saturating_sub(publishing) * 1_000).saturating_sub(TICK_US);
+            self.now_us += (wall.saturating_sub(publishing) * 1_000).saturating_sub(step_us);
             let output = self.service.step(|| self.now_us, wall);
             assert_eq!(self.service.counts.refused, 0);
             assert_eq!(self.service.counts.input_errors, 0);
@@ -785,6 +789,23 @@ mod sleep_name {
                 }
             }
             panic!("service never reached sleep within 70 logical seconds");
+        }
+
+        fn sleep_after_absence(&mut self) {
+            // The first fresh empty look establishes nobody_since. Only then
+            // cross the catalogue's minute of absence, publishing fresh bus
+            // inputs again rather than ageing the retained first look.
+            assert!(!has(&self.step(), "asleep"));
+            let mut output = self.step_by(60 * SECOND_US);
+            for _ in 0..50 {
+                if has(&output, "asleep") {
+                    self.state = Voice::Listening;
+                    assert!(has(&self.step(), "asleep"));
+                    return;
+                }
+                output = self.step();
+            }
+            panic!("service never reported sleep after the absence threshold");
         }
 
         fn name(&mut self) {
@@ -1000,7 +1021,7 @@ mod sleep_name {
         const CHILD: &str = "LAMP_EXPRESSION_SLEEP_NAME_JOURNAL_CHILD";
         if std::env::var_os(CHILD).is_some() {
             let mut lamp = SleepingService::new();
-            lamp.sleep();
+            lamp.sleep_after_absence();
             lamp.name();
             // Beyond the two-second source window and 300 ms delivery grace,
             // then several further ticks: one rejection must not repeat.
