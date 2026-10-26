@@ -676,8 +676,14 @@ on a lamp not set up the body never starts, and every part would be
 `not_checked`, exit 3, which counts as done: a pass that checked nothing
 (lamp-52e6 with the V2 image on 2026-10-26: step 4 timed out on lamp-body's
 mood socket). The factory therefore runs steps 1 to 3 on the unset lamp, sets
-it up from the app on the factory's Wi-Fi, runs step 4 (`--from 4`), and
-holds the button 5 s, the reset, before packing. The product reset plan
+it up from the app on the factory's Wi-Fi, and runs step 4 (`--from 4`).
+A passed step 4 then asks for the reset and runs it as the button does
+(setup's `reset-now` on the lamp's plan, in the unit `lamp-setup-wipe`): the
+lamp reboots into setup, unset. The lamp is then removed from the factory
+account in the app, and packed. A reset declined leaves step 4 failed, "NOT
+READY TO PACK", so a lamp set up at the bench is never called done; the
+keeper's pause, where the image has a keeper (the product image has none),
+keeps it at rest meanwhile. The product reset plan
 keeps what steps 1 to 3 wrote (`/etc/lampOS/body/lamp.env`, the pins file,
 `/etc/lampOS/update`) and the self-test's record in `/var/lib/lamp-selftest`;
 it wipes the person's data, the Wi-Fi, the credentials and the marker. A
