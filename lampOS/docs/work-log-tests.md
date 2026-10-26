@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-26 12:51 — Sentinel ready; Skills pushed; Ready control started
+
+Ready for lamp-voice: yes (#3543)
+
+[Sentinel proof](verification/tests-sentinel-ready-20261026/) records native
+7,492/0/53, no leaks/timeouts, all fourteen Reader cases once, exact-tree match
+and three current reads. Privileged DAC and historical causation are not claimed.
+
+Ready for lamp-voice: no (#3545 native; #3466 installed rehearsal)
+
+[Skills current proof](verification/tests-skills-cced-20261026/) records one full
+522/0/9 package run plus strict/build gates. The branch is pushed as #3545;
+Linux Clippy passes, ARM64 and reads continue. [Ready-speaking matched control](verification/tests-ready-speaking-control-20261026/)
+completed original 0/1 and candidate 1/0 once each, under the same 1,100 ms
+setup intervention. Exact phase/cleanup and source restoration passed; canonical
+qualification is next. This is not a historical-cause or full-suite claim.
+
+Reviewer-two's receipt correction is recorded with the carrier proof: workspace
+docs have 46 summaries, plus one separate zero-case promotion summary. Docs stay
+4/0 and process stays separate at 13/0. The original audit hash and all raw logs
+are retained; no tests were rerun for this correction. No device action occurred.
+
 ## 2026-10-26 12:35 — Carrier native green; sentinel published
 
 Ready for lamp-voice: no (#3466 installed rehearsal; #3543 native/review)

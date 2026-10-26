@@ -1,0 +1,26 @@
+{
+  "status": "PASS",
+  "head": "942123c90d360bfb23a2c2739c229509691f3788",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "scope": "fmt, strict reverse-closure12 Clippy, workspace build, full Skills package",
+  "full_12_mac_runtime_complete": false,
+  "ready_for_push": false,
+  "remaining_scope": "Joining gate requires tests for touched crates and reverse dependents. This package gate does not complete all12 Mac runtime tests. Current exact-head Linux affected closure/ARM64 qualification is separate and still required; prior interrupted c5 full12 remains failed/incomplete. Root decides remaining Mac execution scope; no automatic ready-to-push claim.",
+  "fmt": true,
+  "strict_12_clippy": true,
+  "workspace_build": true,
+  "full_skills_package": true,
+  "skills_counts": {
+    "passed": 522,
+    "failed": 0,
+    "ignored": 9
+  },
+  "affected_case_outcomes": [
+    "ok"
+  ],
+  "executable_hashes_unchanged": true,
+  "source_unchanged": true,
+  "old_frozen_99_unchanged": true,
+  "producer_frozen_10_unchanged": true,
+  "skills_runtime_observations": 1
+}

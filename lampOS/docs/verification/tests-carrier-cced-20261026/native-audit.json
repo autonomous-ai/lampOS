@@ -95,7 +95,7 @@
   ],
   "doc_tests_passed": 4,
   "doc_tests_failed": 0,
-  "doc_test_summaries": 47,
+  "doc_test_summaries": 46,
   "raw_sha256": {
     "arm64": "406ed5d7e98574d6b8f8adeb8c378d4fb04bdb7f25dd335dda5f7e54b4c23c13",
     "clippy": "94193711b534f5839985c48f53c35e97ad82a1e1e6926e20d5ca2fe7ab263157"
@@ -104,5 +104,7 @@
     "Native CI on Linux ARM64; no local ARM64 build and no device trial.",
     "Nextest census is workflow-selected scope; separate custom process, docs and promotion counts are not added to it.",
     "Product-installed GOOD/BAD acceptance rehearsal remains pending."
-  ]
+  ],
+  "standalone_promotion_doc_summaries": 1,
+  "doc_census_correction": "Original47 included the standalone promotion zero-case doctest; workspace documentation-only step has46 summaries, still4/0."
 }

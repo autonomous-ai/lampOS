@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "head": "077734181546b581d00ecb2bc507f57ff72f6460",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "runtime_scope": "Mac session_reader only; Linux-only sentinel and full reverse-dependent runtime UNRUN",
+  "ready_for_push": false,
+  "fmt": true,
+  "strict_clippy_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_build": true,
+  "mac_focused_passed": 4,
+  "source_unchanged": true,
+  "old_frozen_99_unchanged": true,
+  "producer_frozen_9_unchanged": true
+}

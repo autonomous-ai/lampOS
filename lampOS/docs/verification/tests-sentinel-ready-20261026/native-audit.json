@@ -1,0 +1,130 @@
+{
+  "run_id": 40274519868,
+  "attempt": 1,
+  "conclusion": "success",
+  "head": "077734181546b581d00ecb2bc507f57ff72f6460",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "preview": "243f8fe2e9d239876bdb1a3f5055fc2491c829cc",
+  "preview_parents": [
+    "cced429433211e06790f23ed8f51e07be613972d",
+    "077734181546b581d00ecb2bc507f57ff72f6460"
+  ],
+  "equal_tree": "e7c4db8ab5e395fbaa84a0e25c498c522b2b0773",
+  "scope": "affected nextest selection; not a whole-workspace test census",
+  "selected": 7492,
+  "unique_pass": 7492,
+  "unique_fail": 0,
+  "unique_leak": 0,
+  "unique_timeout": 0,
+  "skipped": 53,
+  "executed_binaries": 70,
+  "skipped_binaries": 114,
+  "elapsed_seconds": 154.167,
+  "nextest_summary": "7492 tests run: 7492 passed, 53 skipped",
+  "duplicate_terminal_output_lines": 34,
+  "reader_passes": [
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6177,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6178,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6179,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6180,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "index": 6181,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6182,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "index": 6183,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6184,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6185,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "index": 6186,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6187,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "index": 6188,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6189,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6190,
+      "total": 7492,
+      "name": "lamp-voice session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    }
+  ],
+  "privileged_dac": "Ignored existing privileged test unrun; aggregate skip count only",
+  "source_limit": "Sentinel scoped fixture current run only; no historical failure cause established",
+  "log_sha256": "c62308deb12f2d642c3490863de63da573a70ae6abd4ea5ae366ecfd553d8ab8",
+  "log_bytes": 1871193,
+  "publication": "Raw log private; minimal metadata audit only"
+}

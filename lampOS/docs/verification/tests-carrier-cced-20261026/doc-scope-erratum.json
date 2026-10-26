@@ -1,0 +1,10 @@
+{
+  "original_audit_sha256": "3e2a91bb439a97d4c31b0b09f6cb9a6b33bfe414e68b3cb157e1da96dd87b005",
+  "old_doc_test_summaries": 47,
+  "correct_workspace_doc_summaries": 46,
+  "standalone_promotion_doc_summaries": 1,
+  "workspace_doc_passed": 4,
+  "workspace_doc_failed": 0,
+  "separate_process_harness_passed": 13,
+  "reason": "Old field included the standalone lampos_promote zero-case doctest summary alongside46 workspace doctest summaries; process harness remains separate. No test rerun."
+}

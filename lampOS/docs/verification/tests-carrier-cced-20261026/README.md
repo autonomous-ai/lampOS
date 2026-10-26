@@ -28,3 +28,8 @@ manifest and AArch64 `lamp-update` were extracted privately. The updater is
 `49286ba0b831c373a8a1240fe589b0578817fd55ac12b2c0006e673db4f4bc31`,
 matching the artifact manifest. It was not executed. `artifact-audit.json`
 records the source/run identity; no binary artifact is committed.
+
+Receipt correction: the workspace documentation-only step has **46** summaries,
+not the original packet's 47. The extra zero-case summary belonged to standalone
+`lampos_promote`. Workspace docs remain 4/0; the process harness remains separate
+at 13/0. `doc-scope-erratum.json` retains the original audit hash and correction.
