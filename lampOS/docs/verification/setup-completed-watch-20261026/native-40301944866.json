@@ -1,0 +1,114 @@
+{
+  "pr": 3570,
+  "offered_head": "9531e2289fab2226fe932503ba5f924019a853d3",
+  "offered_base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+  "arm64_run": 40301944866,
+  "linux_clippy_run": 40301944848,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "aa2d7cf7f784118ef469852948daab97061dbd88",
+      "preview_parents": [
+        "690dff041e331b5c89160901b4f38f3a9915e60b",
+        "9531e2289fab2226fe932503ba5f924019a853d3"
+      ],
+      "preview_tree": "0f6f405f0a6f9cb38a43862c3857329609ef2a4f",
+      "offered_tree": "0f6f405f0a6f9cb38a43862c3857329609ef2a4f",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "aa2d7cf7f784118ef469852948daab97061dbd88",
+      "preview_parents": [
+        "690dff041e331b5c89160901b4f38f3a9915e60b",
+        "9531e2289fab2226fe932503ba5f924019a853d3"
+      ],
+      "preview_tree": "0f6f405f0a6f9cb38a43862c3857329609ef2a4f",
+      "offered_tree": "0f6f405f0a6f9cb38a43862c3857329609ef2a4f",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 7514,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 53,
+  "unique_terminal_cases": 7514,
+  "repeated_equal_rows": 34,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    7514
+  ],
+  "own_control_pass_counts": {
+    "lamp-update setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins": 1,
+    "lamp-update setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown": 1,
+    "lamp-update::round setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback": 1,
+    "lamp-update::round setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched": 1,
+    "lamp-update::round setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception": 1,
+    "lamp-update::round setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules": 1,
+    "lamp-update::round setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules": 1,
+    "lamp-update::round setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception": 1,
+    "lamp-update::round setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup": 1,
+    "lamp-update::round setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup": 1,
+    "lamp-update::round setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart": 1,
+    "lamp-update::round setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch": 1,
+    "lamp-update::round setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup": 1,
+    "lamp-update::round setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check": 1,
+    "lamp-update::round setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files": 1,
+    "lamp-update::round setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch": 1,
+    "lamp-update::round setup_lifecycle::completion_removed_during_the_manager_query_is_not_used": 1,
+    "lamp-update::round setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T09:59:42.2792857Z      Summary [ 174.238s] 7514 tests run: 7514 passed, 53 skipped",
+  "all_pass_audit": true,
+  "qualified": true,
+  "limits": "Original Setup lifecycle head9531e2289 on690dff041 only; local425/0/6 remains actual1aa runtime with current690 compiler/executable equivalence. No retries, local ARM linking, device or physical-latency claims. Native runtime selected12 of46 crates and70 binaries;114 binaries excluded. Workspace release build and all-target Clippy are separate.",
+  "turn_wire_custom_harness": {
+    "passed": 13,
+    "failed": 0,
+    "control_pass_counts": {
+      "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+      "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+      "verdict_carries_identity_and_one_request_at_a_time": 1,
+      "missing_model_is_final_and_never_restarted": 1,
+      "missing_executable_fails_at_once": 1,
+      "spawn_returns_while_worker_startup_is_held": 1,
+      "startup_failures_are_final": 1,
+      "serving_failures_are_replaced_within_budget": 1,
+      "protocol_violations_are_replaced": 1,
+      "cancelled_answers_are_never_delivered": 1,
+      "close_during_inference_never_waits": 1,
+      "sustained_requests_stay_bounded": 1
+    },
+    "summary": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T09:59:56.5979125Z test result: 13 passed; 0 failed"
+    ],
+    "counts_separate_from_nextest": true,
+    "qualified": true
+  },
+  "selection": {
+    "scope": "PR affected crates and dependents, not full workspace runtime",
+    "crates": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "selected_binaries": 70,
+    "skipped_binaries": 114,
+    "workspace_crates": 46
+  },
+  "private_receipt_sha256": "f52e3584b77a27e10c4f39d1b95ebdf37152a1f318d2dbd8036bb4ac20034b4b"
+}

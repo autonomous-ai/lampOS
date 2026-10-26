@@ -1,0 +1,91 @@
+{
+  "head": "ef08682c45dded9faba3ee52a5bf8e11681f3154",
+  "base": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "previous_runtime_base": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "gates": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "start": "2026-10-26T09:53:24Z",
+      "finish": "2026-10-26T09:53:36Z",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "start": "2026-10-26T09:53:36Z",
+      "finish": "2026-10-26T09:54:44Z",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "start": "2026-10-26T09:54:44Z",
+      "finish": "2026-10-26T09:56:25Z",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "test-compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--no-run"
+      ],
+      "start": "2026-10-26T09:56:25Z",
+      "finish": "2026-10-26T09:57:02Z",
+      "exit": 0,
+      "log_sha256": "92722f7e179dd0754ca755f412edac6cf5165c41826280ad81c5b27cf7b527ab"
+    }
+  },
+  "source_changed_from_previous": [],
+  "source_unchanged_during_gate": true,
+  "source_sha256": "4179016975c373832eed5a4fb32860fbd82a8f420adbc000941af81e69d8b145",
+  "actual_executables_compared": 10,
+  "different_executables": [],
+  "all_executables_identical": true,
+  "runtime_carried_as_prior_execution": {
+    "passed": 425,
+    "failed": 0,
+    "ignored": 6
+  },
+  "limits": "Fresh current-base compiler gates only; no runtime tests executed in this carry. Actual425/0/6 remains source-bound1aa execution. Entire lampOS tree equals original9531e2289; upstream change is outside lampOS in imager shell; no current native/device qualification inferred."
+}

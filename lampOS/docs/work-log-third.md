@@ -13,6 +13,36 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 17:08 — Native qualification and image-only carries
+
+Ready for lamp-voice: no (new carries require their current gates)
+
+Reminder **28510e559/690dff041** passed original ARM64 **40301124162**
+and Linux **40301124252**: **11,381/0/106**, all 21 controls once, exact
+preview parents/tree. Separate docs 4/0, Turn-wire 13/0, promoter 25/0
+and relay passed. Both member reads are posted.
+[Native receipt](verification/reminder-pending-present-20261026/native-40301124162.json).
+Local **b9de89470/aa7cf9029** has the identical whole lampOS tree and fresh
+compiler gates. Its executables differ after rebuilding in the other target
+directory; the reason is not established. The failed equality check is not
+runtime qualification. A fresh full Skills serial run is now in progress,
+with original binaries/results preserved rather than reused as current.
+
+Setup **9531e2289/690dff041** passed original ARM64 **40301944866** and
+Linux **40301944848**: **7,514/0/53**, all 18 controls once. This is the
+selected 12-crate/70-binary scope, not the entire workspace; separate
+Turn-wire is 13/0. Exact preview parents/tree verified.
+[Native receipt](verification/setup-completed-watch-20261026/native-40301944866.json).
+Pushed current **ef08682c4/aa7cf9029**, identical whole lampOS tree and fresh
+compiler gates; all ten artifacts match the prior 425/0/6 execution.
+[Carry receipt](verification/setup-completed-watch-20261026/carry-aa7.json).
+New native qualification is running; source readers found no P1/P2.
+No device acceptance is claimed.
+
+The fixture scope repair keeps all assertions/fresh installs and all four
+refusal watchdogs. Its formatting, strict Clippy and workspace build pass;
+full parallel install execution is running under the suite bound.
+
 ## 2026-10-26 16:50 — Install fixture boundary reproduced
 
 Ready for lamp-voice: no (diagnosis only)
