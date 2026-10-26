@@ -1853,7 +1853,7 @@ then use that person's scope:
   pins the bytes).
 
 - **A forget misheard asks** (`LAMP_MEMORY_FORGET_ASKS=on`, with the Days
-  client only; off unless set; both voice routes). `forget`'s description
+  client only; on in the product since 26 Oct; both voice routes). `forget`'s description
   gains one sentence (`remember::FORGET_ASKS_DESCRIBED`): when nothing was
   forgotten and the words may have been misheard, a word close to something
   the lamp was shown as kept, it says nothing matched and asks whether they
