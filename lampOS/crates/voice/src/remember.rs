@@ -9749,7 +9749,9 @@ mod tests {
     /// was, with each forget switch off or on.
     #[test]
     fn asking_about_a_misheard_forget_adds_to_forget_alone() {
-        for (forget_all, forget_about) in [(false, false), (true, false), (true, true)] {
+        for (forget_all, forget_about) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
             let before = tools_for(true, forget_all, forget_about);
             let after = forget_asks_described(before.clone());
             assert_eq!(before.len(), after.len());
