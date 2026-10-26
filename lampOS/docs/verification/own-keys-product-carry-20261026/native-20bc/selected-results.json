@@ -1,0 +1,142 @@
+[
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_directory",
+    "ordinal": 6243,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_fifo",
+    "ordinal": 6244,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again",
+    "ordinal": 6332,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_off_drop_in_without_reloading",
+    "ordinal": 6377,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+    "ordinal": 6378,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_symlink_to_the_exact_template",
+    "ordinal": 6381,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_preflight_refuses_a_directory_at_the_retired_own_keys_path",
+    "ordinal": 6382,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest",
+    "ordinal": 6391,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "the_product_takes_a_persons_own_keys",
+    "ordinal": 6413,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time",
+    "ordinal": 10346,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance",
+    "ordinal": 10348,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup",
+    "ordinal": 10349,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input",
+    "ordinal": 10352,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped",
+    "ordinal": 10715,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up",
+    "ordinal": 10716,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker",
+    "ordinal": 10717,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going",
+    "ordinal": 10718,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation",
+    "ordinal": 10719,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice-eval::it",
+    "name": "switches::every_switch_says_how_it_is_counted",
+    "ordinal": 11354,
+    "status": "PASS",
+    "total": 11376
+  },
+  {
+    "binary": "lamp-voice-eval::it",
+    "name": "switches::the_counts_by_table_and_in_all",
+    "ordinal": 11355,
+    "status": "PASS",
+    "total": 11376
+  }
+]

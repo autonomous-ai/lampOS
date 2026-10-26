@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 software qualified on current base; activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 18:34 +07, current original native gates green
+
+[Original 20bc native evidence](verification/own-keys-product-carry-20261026/native-20bc/README.md): ARM64 **40313521881** and Linux Clippy **40313521925**, both attempt 1, pass. Actual checkouts use preview a5e7bc214 with exact ba950/20bc parents and authored-tree equality. Workspace PR-profile census: **11,376 unique passes / zero failures, leaks, timeouts or selected unrun / 106 skipped**, all 20 startup/own-keys controls once; 35 echoes excluded. Separate process 13, relay 1, docs 4 across 46 summaries and helper 25 remain separate. General CI has no same-head run; exact workflow path exclusions explain the absence, which is not a passing result.
+
+Local exclusive Voice and current Update gates remain separately source-bound below. #3510 remains draft because #2094 and explicit current-lamp acceptance still hold activation. No device, provider, signing or release action. Next: independent source and focused diagnostics review of #3577, excluding its parent privacy/HOLD disposition; current source read finds the intended acknowledgement strengthening, and isolated tests are being prepared.
+
+---
+
 Ready for lamp-voice: own-keys current CI pending; reset support read handed to its owner.
 
 ## Current checkpoint: 2026-10-26 18:19 +07, reset barrier source support
