@@ -1,0 +1,241 @@
+{
+  "artifacts": [
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "5d3818fa0db1825b01a32df4879f48673fafb2c95fd6b9260622534771a9abf7",
+      "target": "probe",
+      "test_profile": true
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "40070bbb6686e92fad2ebbd0cb1ab35bc88fedfd10054bf80448f4e5ec96c58a",
+      "target": "relay_signals",
+      "test_profile": true
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "bin"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "ebfaf00875ac855a372d2c7e46a82c4ac9dd970f40519d60fff5deed802f2fe9",
+      "target": "lamp-ipc-probe",
+      "test_profile": false
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "88890f45d607af8d4fd5eb60fa8895263b7e937dd436d85e7d1436f5a213b18d",
+      "target": "sockets",
+      "test_profile": true
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "5cee78eab3c040cbb8046784fdd33caffbb259cac8b659e4d25f54e42446d616",
+      "target": "relay_exit",
+      "test_profile": true
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "bin"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "e796bbb35dfdd57a8937fe3ed410503e448722c213e4669fe49663697769cfc8",
+      "target": "lamp-ipc-probe",
+      "test_profile": true
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "49859607ff921cddc97d31abcd2d73a7c80c77757a1ec6d9ed9cc67e17aaecc5",
+      "target": "relay_shared",
+      "test_profile": true
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "aaebadc42c77b6a3fd92d01afd24f733d379bac37f5a89045c74c5d58ff71c82",
+      "target": "lamp_ipc",
+      "test_profile": true
+    }
+  ],
+  "artifacts_receipt_sha256": "e41e7c78a4b26bff6fdf1ec2b93fc1a4fcf6cf3f248c57193193dcb7983c18d4",
+  "counts": {
+    "doctest_passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "ordinary_passed": 26,
+    "ordinary_target_pass_counts": [
+      8,
+      0,
+      3,
+      1,
+      1,
+      13
+    ],
+    "relay_signals": "ok"
+  },
+  "full_log_sha256": "908df66d242cc6320fe356e6ac3dbf086a595b0d93726a2d8e31b444cd84600a",
+  "head": "7f7dfe42759a7d637e708804e13b78bee7e3c10e",
+  "platform": "macOS",
+  "schema": 1,
+  "scope": "Original retained command output audited without executing a test or build during packaging.",
+  "stages": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 0.966,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "a66f88cf76369d6bea0778baf81500173f439b7ef62c6df575653ccdf94528d4",
+      "source_entries": 7168,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 2.151,
+      "exit_code": 0,
+      "log_sha256": "71599a9ea46baccde9087625eb4175d7ef236f04aa23829293b78cca474c9901",
+      "receipt_sha256": "c71f07a5fc3ea20a17bcf44ab2da32d570293d609a25291a4498bd02a241802e",
+      "source_entries": 7168,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.068,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "978859f59dc1ac5f9ccde1b093621735be30e332139454775d77078f910ed477",
+      "source_entries": 7168,
+      "source_unchanged": true
+    },
+    "full": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 8.533,
+      "exit_code": 0,
+      "log_sha256": "908df66d242cc6320fe356e6ac3dbf086a595b0d93726a2d8e31b444cd84600a",
+      "receipt_sha256": "be976db0a12c1d994d663b9015e7112b3b712d0b92d9f9b4f74c115538a551e3",
+      "source_entries": 7168,
+      "source_unchanged": true
+    }
+  }
+}

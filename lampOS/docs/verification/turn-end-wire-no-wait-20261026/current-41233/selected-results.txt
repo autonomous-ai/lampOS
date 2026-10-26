@@ -1,0 +1,16 @@
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2028 ms)
+test a_worker_reporting_another_model_is_refused_before_any_request ... ok (11 ms)
+test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (13 ms)
+test verdict_carries_identity_and_one_request_at_a_time ... ok (92 ms)
+test missing_model_is_final_and_never_restarted ... ok (174 ms)
+test missing_executable_fails_at_once ... ok (3 ms)
+test spawn_returns_while_worker_startup_is_held ... ok (37 ms)
+test startup_failures_are_final ... ok (458 ms)
+test serving_failures_are_replaced_within_budget ... ok (554 ms)
+test protocol_violations_are_replaced ... ok (245 ms)
+test cancelled_answers_are_never_delivered ... ok (168 ms)
+test close_during_inference_never_waits ... ok (254 ms)
+test sustained_requests_stay_bounded ... ok (2646 ms)
+test result: 13 passed; 0 failed
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

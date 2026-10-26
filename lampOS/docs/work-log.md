@@ -1,3 +1,17 @@
+Ready for lamp-voice: no; current-base qualifications replace the earlier ready state.
+
+## Current checkpoint: 2026-10-26 09:04 +07, all pieces carried onto the memory landing
+
+Train152 advanced lamp-voice to `41233c1b6`. [#3524](https://github.com/autonomous-ai/lampOS/pull/3524) is pushed as `ca7096534`; [current Mac continuation](verification/turn-end-wire-no-wait-20261026/current-41233/README.md) passes fmt, strict Turn-end-wire Clippy, compilation and full **18/0/0** (five library plus thirteen separate process cases). [#3528](https://github.com/autonomous-ai/lampOS/pull/3528) is pushed as `7f7dfe427`; [current Mac continuation](verification/ipc-log-no-wait-20261026/current-41233/README.md) passes fmt, strict IPC Clippy, compilation, **26 ordinary tests + one doctest**, and the relay signal harness. Both preserve one equal patch and all seven authored blobs. Current original native checks and carry reads are pending; no older native result is relabelled current.
+
+Music #3515 carries four equal patches as local `e6fa2a668`, unpushed. Own-keys #3510 carries seven equal patches as local `453f8607a`, unpushed. The eight upstream paths change Voice memory behavior, Memory integration tests, the product Voice unit, Update functions and switch docs. Music current fmt/strict Voice/Voice-eval Clippy and two compiled census tests pass; its full Voice run is active. Own-keys current qualification is queued behind it: strict selected nine-crate Clippy, full Voice and the affected Memory/product/census readers. Both old public heads retain their original c5 evidence. Own-keys activation HOLD remains for #2094 and explicit current-lamp acceptance.
+
+The new real-worker model-open fixture remains uncommitted, frozen and source-read clear on 41233. The explicit Rustix filesystem feature is test-only. Its parent requires return while the FIFO model is held, then actual reader rendezvous, expected rejection, worker reaping, completion witnesses and native exit zero. The five-second diagnostic precedes the unchanged ten-second startup deadline. No compiler/test result is claimed yet; it follows the current PR carries in the single compiler queue.
+
+The log rebase preserves **14,091** prior proof blobs and modes. No local full-workspace/ARM64 gate, model download, provider, device, key or release action ran.
+
+---
+
 Ready for lamp-voice: yes (#3515 and #3524); #3528 waits on native checks/readers; #3510 activation HOLD.
 
 ## Current checkpoint: 2026-10-26 08:48 +07, IPC fixture published and real model-open row taken

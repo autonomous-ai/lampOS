@@ -1,0 +1,71 @@
+{
+  "authored_blobs": [
+    {
+      "git_blob": "2de12edfe9933a99d10980e63dc92c7ef31cb173",
+      "mode": "100644",
+      "path": "lampOS/crates/turn-end-wire/tests/process.rs",
+      "sha256": "24d9fb0977dfcf68311a690a856eba179e011a9b3294c28d5b0abb10d1eafa44"
+    },
+    {
+      "git_blob": "71d5e6d753d3d5f468e0ed6405e07dcd33d5c7ca",
+      "mode": "100644",
+      "path": "lampOS/docs/endpoint-detection.md",
+      "sha256": "2ca42748a5111df710d7fa7eacdf4db7e30b248e35e6baea55c6a26714980588"
+    },
+    {
+      "git_blob": "921e2ed39c2fba7d7a597256b77e887f318c4bf5",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/turn-end-wire-no-wait-20261026/README.md",
+      "sha256": "37d61949e36f82670c66d26dc6b84753fb773a4a288102c26b0b283ab9ed0c27"
+    },
+    {
+      "git_blob": "b32933405292cdf063c58d805ecdc556ec10696c",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/turn-end-wire-no-wait-20261026/SHA256SUMS",
+      "sha256": "9ff165690914de4ae4544d3bb1d4d3cd5ad63e2201c03a8c618bacc6f2689d25"
+    },
+    {
+      "git_blob": "8a3b4de1ecf451471542af3acc8071b1f81b2153",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/turn-end-wire-no-wait-20261026/inputs.sha256",
+      "sha256": "57ecde6a5ae48917d24091858e344e12517f5c8d39f3d873c4351583eca7efb2"
+    },
+    {
+      "git_blob": "ac585f6cf3560b12cfce98c174717478bbe20aa8",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/turn-end-wire-no-wait-20261026/results.json",
+      "sha256": "418965c05551cc870fcc1e12f59049a6e65caec47e848ae2592c732e0cbff9c7"
+    },
+    {
+      "git_blob": "7bd9eace4df9d72f7081f8631aa25268a9822032",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/turn-end-wire-no-wait-20261026/selected-results.txt",
+      "sha256": "133cc32a5de1280527de13bc5da360a576d1de4a29d95beef39b57451b1af390"
+    }
+  ],
+  "authored_blobs_identical": true,
+  "authored_tree": "142244e86997e692b7fe250b837947d3538bf8cc",
+  "base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "base_changed_paths": [
+    "lampOS/crates/memory/tests/voice_observe_forget.rs",
+    "lampOS/crates/memory/tests/voice_observe_named_forget.rs",
+    "lampOS/crates/memory/tests/voice_observe_room.rs",
+    "lampOS/crates/update/tests/functions.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/remember/needs_face.rs",
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/switches.md"
+  ],
+  "complete_receipt_sha256": "20e02cafb5792d53ad6e40d8c67138bf401ebf67a0dbe7fc31d82433670db692",
+  "head": "ca70965343208bf64f8be03d53eb5705b811ec72",
+  "native_scope": "This packet contains fresh Mac continuation checks only. Earlier native results remain bound to their earlier heads; new-head native checks are not established here.",
+  "old_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "old_head": "ecaed2484b2df1b1723e222d90647825f3e65764",
+  "pr": 3524,
+  "range_diff": "1:  ecaed2484b = 1:  ca70965343 lampOS: test endpoint spawn without a host stopwatch",
+  "source_inventory": {
+    "all_current_bytes_and_modes_verified": true,
+    "entries": 7168,
+    "sha256": "faeb87e9285d5fabedf7264464e366827ce11fa34f6303245045beae5ad9e717"
+  }
+}

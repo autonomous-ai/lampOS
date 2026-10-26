@@ -1,0 +1,71 @@
+{
+  "authored_blobs": [
+    {
+      "git_blob": "7ddb3205706cafc65f3aeeaad601d467d06b5135",
+      "mode": "100644",
+      "path": "lampOS/crates/ipc/src/log_relay.rs",
+      "sha256": "45e32867938eb0c93cab3a8444451d70fe0ec1831b130f1d830922958d2ab44f"
+    },
+    {
+      "git_blob": "389bf4e64b1b8716fd8eba46dcf0eea628de7b8a",
+      "mode": "100644",
+      "path": "lampOS/docs/logging.md",
+      "sha256": "69e92873cb28698813a09310a255ba714d25a078e37060cf09864a0a6953840a"
+    },
+    {
+      "git_blob": "2ed91f288886a4a082eaf9f64b03639971d0476c",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/ipc-log-no-wait-20261026/README.md",
+      "sha256": "ca122b5b206e2d5b07e121c263c8220d55291eb669580b29c1d5bd0e36d3866c"
+    },
+    {
+      "git_blob": "a343072021eebe0b7c882d9d66ab6930e1e2e561",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/ipc-log-no-wait-20261026/SHA256SUMS",
+      "sha256": "de260396bd1aaf26c91b9a752e9d9ee4cc640e9374f61608bf3ebf39e01d3e96"
+    },
+    {
+      "git_blob": "0faa132ef0fff98ea50ccbd93fc825db8ad68a10",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/ipc-log-no-wait-20261026/inputs.sha256",
+      "sha256": "c382342422e1fbb789959a53e5a19aea84a90f76d2cb777b33557c330014e871"
+    },
+    {
+      "git_blob": "6a20f6210b0542723db25f5938595a90ced970c4",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/ipc-log-no-wait-20261026/results.json",
+      "sha256": "a0b7f3122f7de0a0950ea039afb3e4a9f298c4f4b428c152c41a192683f4cd42"
+    },
+    {
+      "git_blob": "e0121b8e51438ba0221ada9a54ebece3d0daf64c",
+      "mode": "100644",
+      "path": "lampOS/docs/verification/ipc-log-no-wait-20261026/selected-results.txt",
+      "sha256": "fa74e730b4c11b8191d15d039de885dd74893c8e7e46cb7d4eb9bcf05ffcf279"
+    }
+  ],
+  "authored_blobs_identical": true,
+  "authored_tree": "96b9eb9c699d044c297d8644e394e0cd74253500",
+  "base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "base_changed_paths": [
+    "lampOS/crates/memory/tests/voice_observe_forget.rs",
+    "lampOS/crates/memory/tests/voice_observe_named_forget.rs",
+    "lampOS/crates/memory/tests/voice_observe_room.rs",
+    "lampOS/crates/update/tests/functions.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/remember/needs_face.rs",
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/switches.md"
+  ],
+  "complete_receipt_sha256": "20e02cafb5792d53ad6e40d8c67138bf401ebf67a0dbe7fc31d82433670db692",
+  "head": "7f7dfe42759a7d637e708804e13b78bee7e3c10e",
+  "native_scope": "This packet contains fresh Mac continuation checks only. Earlier native results remain bound to their earlier heads; new-head native checks are not established here.",
+  "old_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "old_head": "f0c7072be3582eda1d1ca6bf7464031b3e2b0434",
+  "pr": 3528,
+  "range_diff": "1:  f0c7072be3 = 1:  7f7dfe4275 lampOS: observe full journal writes without a stopwatch",
+  "source_inventory": {
+    "all_current_bytes_and_modes_verified": true,
+    "entries": 7168,
+    "sha256": "5df7a9dcaab9964fde8121909674e01caa6703c0f2afc37998ed905118e99f9a"
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "artifacts": [
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "e5c260b7566f9d06a117ab578e1f5ff7738772722467aa62fe5e577021d8625f",
+      "target": "process",
+      "test_profile": true
+    },
+    {
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "3ce827a037c88c4484057179ed4dd92344d9abbff5b526f6f5f4d138455bbc41",
+      "target": "lamp_turn_end_wire",
+      "test_profile": true
+    }
+  ],
+  "artifacts_receipt_sha256": "539da00a37c4008e9afa1db9566478f7571de1d99fca7525f4001b675ccfdd28",
+  "counts": {
+    "doctest_passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "ordinary_passed": 5,
+    "process_case_names": [
+      "an_idle_worker_stays_ready_across_a_long_quiet",
+      "a_worker_reporting_another_model_is_refused_before_any_request",
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way",
+      "verdict_carries_identity_and_one_request_at_a_time",
+      "missing_model_is_final_and_never_restarted",
+      "missing_executable_fails_at_once",
+      "spawn_returns_while_worker_startup_is_held",
+      "startup_failures_are_final",
+      "serving_failures_are_replaced_within_budget",
+      "protocol_violations_are_replaced",
+      "cancelled_answers_are_never_delivered",
+      "close_during_inference_never_waits",
+      "sustained_requests_stay_bounded"
+    ],
+    "process_passed": 13,
+    "total_defined_passed": 18
+  },
+  "full_log_sha256": "b42d4edfd5af7935cefcd4aa090d35be7d29c821e2c6f90d33c4091c70d4746c",
+  "head": "ca70965343208bf64f8be03d53eb5705b811ec72",
+  "platform": "macOS",
+  "schema": 1,
+  "scope": "Original retained command output audited without executing a test or build during packaging.",
+  "stages": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end-wire",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 0.613,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "fb0eaf619b335d17be67358f97c52d6327735346564aaef56ecc2720c0ead047",
+      "source_entries": 7168,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end-wire",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 1.007,
+      "exit_code": 0,
+      "log_sha256": "74d545b140a0f62d72475fc7a36d049991aa8266d76efbdf488f1a9f4050be36",
+      "receipt_sha256": "709119185bf723478d65a4b4d522b47babcb523842c3045052af3a012d08769a",
+      "source_entries": 7168,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.984,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "6cf8adf55df6b0fc0f1febbb4d3bb527f17993e6c943c9e4717d6ca989e74e34",
+      "source_entries": 7168,
+      "source_unchanged": true
+    },
+    "full": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end-wire",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 8.284,
+      "exit_code": 0,
+      "log_sha256": "b42d4edfd5af7935cefcd4aa090d35be7d29c821e2c6f90d33c4091c70d4746c",
+      "receipt_sha256": "00648dbdd818bcac1b4a2cd0415e39b0b312b3745e0a8e01b4bd1b42677ed9a8",
+      "source_entries": 7168,
+      "source_unchanged": true
+    }
+  }
+}
