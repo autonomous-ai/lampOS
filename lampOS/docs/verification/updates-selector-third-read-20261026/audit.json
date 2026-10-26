@@ -1,0 +1,21 @@
+{
+  "pr": 3590,
+  "head": "65b5170412880bb862beb336d93b526a8be3c3ab",
+  "base": "c121bc16eb9e6a7142bbc1110d4ed692481f1a82",
+  "disposition": "READ-OK source only; no P1/P2",
+  "files": [
+    "lampOS/docs/updates.md"
+  ],
+  "checks": [
+    "main.rs defaults --lamp to ROOT/etc/hostname",
+    "round.rs::carried_units matches named units against selectedlamp and installedparts",
+    "round.rs::plan fallsback toinstalled unit text when no namedmatch",
+    "linked-product guard emits reportedrefusal forhash-pinneddevunit",
+    "--lamp lamp-0000 is selector override, not hostname mutation",
+    "Currentwording keeps installedproductunits; newtemplates through install separatefrom3466",
+    "Public7071 operatorreport useddev-name override and succeeded"
+  ],
+  "diff_check_exit": 0,
+  "patch_sha256": "9accf5d04bffb7a488fd695732355fe5d5f8c2ec8f201b1f7c58efdb0f0bf7c1",
+  "limits": "No runtime, installer, device or new product-template carriage claimed. Documents currently implemented selector behavior."
+}
