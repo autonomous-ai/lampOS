@@ -16,8 +16,12 @@ use lamp_msgs::{
 };
 use std::{
     io::{BufRead, BufReader, Read, Write},
-    os::unix::net::{UnixListener, UnixStream},
+    os::unix::{
+        fs::PermissionsExt,
+        net::{UnixListener, UnixStream},
+    },
     path::{Path, PathBuf},
+    process::{Child, Command, Stdio},
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -236,9 +240,22 @@ struct Test {
 
 impl Test {
     fn new(route: Route, lease_us: u64, hold_start: bool) -> Self {
+        Self::in_directory(
+            route,
+            lease_us,
+            hold_start,
+            SessionDirectory::create().unwrap(),
+        )
+    }
+
+    fn in_directory(
+        route: Route,
+        lease_us: u64,
+        hold_start: bool,
+        directory: SessionDirectory,
+    ) -> Self {
         assert!(crate::scenario_clock::is_active());
         let clock = Arc::new(AtomicU64::new(monotonic_us()));
-        let directory = SessionDirectory::create().unwrap();
         let skills = Skills::new(&directory.path, lease_us, hold_start, clock.clone());
         let bus = Bus::new(directory.path.join("bus")).unwrap();
         let mut publisher = bus
@@ -1240,6 +1257,236 @@ fn requested_audio_boundary_records_unavailable_and_stale_envelope_refusals() {
                 None,
                 "envelope refusal must not consume the current turn's offer: {case}"
             );
+        }
+    }
+}
+
+#[test]
+fn requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let occupied = test.offer(2);
+    let ticket = test.service.offer(occupied.clone()).unwrap();
+    test.skills.started(&occupied);
+    assert!(
+        ticket.wait_ready(WAIT),
+        "the independent ticket holds capacity"
+    );
+    let offer = private_boundary_offer(&test);
+    let turn = (offer.context.request, offer.context.provider_session);
+    assert_eq!(
+        test.reply
+            .as_ref()
+            .unwrap()
+            .requested_audio_refusal(test.worker, test.snapshot, &offer),
+        None,
+        "the reply itself has not tried an offer"
+    );
+    for refused in [
+        "its recording could not be prepared",
+        "this turn already had its one offer",
+    ] {
+        let from = test.trace.len();
+        let at_us = monotonic_us();
+        handle_requested_audio(
+            &mut test.reply,
+            Some(&test.service),
+            test.worker,
+            test.snapshot,
+            turn,
+            offer.clone(),
+            &mut test.trace,
+        )
+        .unwrap();
+        assert_offer_boundary(&test.trace, from, turn, Some(refused), at_us, &offer);
+        let current = test.reply.as_ref().unwrap();
+        assert!(!current.requested_audio_bound(), "no ticket was granted");
+        assert!(!current.requested_audio_waiting());
+        assert_eq!(
+            current.requested_audio_refusal(test.worker, test.snapshot, &offer),
+            Some("this turn already had its one offer")
+        );
+        assert!(test.pending.is_none(), "no recording was dispatched");
+        assert!(test.skills.operations.try_recv().is_err());
+    }
+    assert!(
+        ticket.live(monotonic_us()),
+        "the occupied ticket was untouched"
+    );
+    drop(ticket);
+    test.skills
+        .finished(&occupied, RequestedAudioOutcome::Cancelled);
+    assert!(test.service.wait_idle(WAIT));
+}
+
+const JOURNAL_CHILD_MODE: &str = "LAMP_REQUESTED_AUDIO_JOURNAL_TEST_MODE";
+const JOURNAL_CHILD_ROOT: &str = "LAMP_REQUESTED_AUDIO_JOURNAL_TEST_ROOT";
+const JOURNAL_CHILD_TEST: &str = "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance";
+const JOURNAL_CAPTURE_LIMIT: u64 = 65_536;
+
+// The child has no child processes. Its threads, socket and audio fixtures all
+// belong to this private root; reap it before removing any of those files.
+struct JournalChild {
+    child: Option<Child>,
+    directory: SessionDirectory,
+}
+
+impl Drop for JournalChild {
+    fn drop(&mut self) {
+        if let Some(child) = &mut self.child {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        let _ = fs::remove_dir_all(&self.directory.path);
+    }
+}
+
+fn journal_child_case(mode: &str, root: &Path) {
+    let _clock = fixture_clock();
+    let fixture = root.join("fixture");
+    assert!(
+        fixture.is_dir(),
+        "the parent owns the child fixture directory"
+    );
+    let mut test = Test::in_directory(
+        Route::Spoken,
+        REQUESTED_AUDIO_LEASE_US,
+        false,
+        SessionDirectory { path: fixture },
+    );
+    let mut offer = private_boundary_offer(&test);
+    let refused = match mode {
+        "refused" => {
+            offer.asset = "/unopened/private-audio-marker.wav".into();
+            offer.sha256 = "private-invalid-digest-marker".into();
+            Some("the offer does not check")
+        }
+        "accepted" => None,
+        _ => panic!("unexpected journal child mode"),
+    };
+    let turn = (offer.context.request, offer.context.provider_session);
+    assert_eq!(turn.0, 1, "the parent checks this request's exact line");
+    let from = test.trace.len();
+    let at_us = monotonic_us();
+    handle_requested_audio(
+        &mut test.reply,
+        Some(&test.service),
+        test.worker,
+        test.snapshot,
+        turn,
+        offer.clone(),
+        &mut test.trace,
+    )
+    .unwrap();
+    assert_offer_boundary(&test.trace, from, turn, refused, at_us, &offer);
+    if refused.is_none() {
+        assert!(test.reply.as_ref().unwrap().requested_audio_bound());
+        test.skills.started(&offer);
+        assert!(
+            test.reply
+                .as_ref()
+                .unwrap()
+                .wait_requested_audio_ready(WAIT)
+        );
+        test.cancel("hand_stop");
+        test.skills
+            .finished(&offer, RequestedAudioOutcome::Cancelled);
+        assert!(test.service.wait_idle(WAIT));
+    } else {
+        assert!(!test.reply.as_ref().unwrap().requested_audio_bound());
+        assert!(test.skills.operations.try_recv().is_err());
+    }
+}
+
+fn captured_journal_mode(mode: &str) -> String {
+    let directory = SessionDirectory::create().unwrap();
+    let mut child = JournalChild {
+        child: None,
+        directory,
+    };
+    let root = &child.directory.path;
+    fs::create_dir(root.join("fixture")).unwrap();
+    fs::set_permissions(root.join("fixture"), fs::Permissions::from_mode(0o700)).unwrap();
+    let stderr = root.join("stderr");
+    let stdout = root.join("stdout");
+    child.child = Some(
+        Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                JOURNAL_CHILD_TEST,
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(JOURNAL_CHILD_MODE, mode)
+            .env(JOURNAL_CHILD_ROOT, root)
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(fs::File::create(&stdout).unwrap()))
+            .stderr(Stdio::from(fs::File::create(&stderr).unwrap()))
+            .spawn()
+            .unwrap(),
+    );
+    // These are parent watchdog/storage limits, not a measured runtime or
+    // physical-latency promise. A failed/oversized child is killed and reaped.
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let status = loop {
+        for path in [&stdout, &stderr] {
+            assert!(
+                fs::metadata(path).unwrap().len() <= JOURNAL_CAPTURE_LIMIT,
+                "journal child exceeded its capture limit"
+            );
+        }
+        if let Some(status) = child.child.as_mut().unwrap().try_wait().unwrap() {
+            break status;
+        }
+        assert!(Instant::now() < deadline, "journal child did not finish");
+        thread::sleep(Duration::from_millis(5));
+    };
+    let mut journal = String::new();
+    fs::File::open(stderr)
+        .unwrap()
+        .take(JOURNAL_CAPTURE_LIMIT + 1)
+        .read_to_string(&mut journal)
+        .unwrap();
+    assert!(journal.len() as u64 <= JOURNAL_CAPTURE_LIMIT);
+    assert!(
+        status.success(),
+        "journal child assertions failed: {status}; {journal}"
+    );
+    assert_eq!(fs::read_to_string(root.join("finished")).unwrap(), mode);
+    journal
+}
+
+#[test]
+fn requested_audio_boundary_journals_one_refusal_and_no_acceptance() {
+    if let Some(mode) = std::env::var_os(JOURNAL_CHILD_MODE) {
+        let mode = mode.to_str().unwrap();
+        let root = PathBuf::from(std::env::var_os(JOURNAL_CHILD_ROOT).unwrap());
+        journal_child_case(mode, &root);
+        // The fixture, ticket, service and fake daemon have all dropped before
+        // the parent accepts this completion witness and the successful exit.
+        fs::write(root.join("finished"), mode).unwrap();
+        return;
+    }
+    for mode in ["refused", "accepted"] {
+        let journal = captured_journal_mode(mode);
+        let lines: Vec<_> = journal
+            .lines()
+            .filter(|line| line.contains("requested audio refused"))
+            .collect();
+        let expected = if mode == "refused" {
+            vec!["lamp-voice: request 1: requested audio refused: the offer does not check"]
+        } else {
+            Vec::new()
+        };
+        assert_eq!(lines, expected, "exact refusal text and count for {mode}");
+        for private in [
+            "private-audio-marker",
+            "private-invalid-digest-marker",
+            "private-skills-boot-marker",
+            "private-recording-marker",
+            "private-call-marker",
+        ] {
+            assert!(!journal.contains(private), "offer data entered stderr");
         }
     }
 }

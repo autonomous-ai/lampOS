@@ -1,0 +1,545 @@
+{
+  "base_commit": "d21a854b6a46209c8a76a70d8a8b3f3e286f0ff3",
+  "baseline_artifact": {
+    "compiler_fresh": true,
+    "kind": [
+      "lib"
+    ],
+    "sha256": "6bfa89a78eda84947feaa2df6dcbf3209af8f9d2521867fd34ee8046d833e128",
+    "source_sha256": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+    "target": "lamp_voice"
+  },
+  "baseline_cases": [
+    {
+      "case": "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+      "census": {
+        "failed": 0,
+        "filtered": 3801,
+        "ignored": 0,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.04s",
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      "command": [
+        "<preserved Voice library test executable>",
+        "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "executable_sha256": "6bfa89a78eda84947feaa2df6dcbf3209af8f9d2521867fd34ee8046d833e128",
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 1.863,
+      "label": "negative-baseline-prepare-failure",
+      "log_sha256": "ab818042ebfa306e4ccd6e0da600dd37d4d42d0d3fed87ab08d275045523f51c",
+      "preexec_sha256": "aed146e30cf57700b17161a260344e36cb4cfcecf524b7824f025b80a39e149a",
+      "receipt_written_at": "2026-10-26T07:27:08+07:00",
+      "source_entries": 7163,
+      "source_sha256": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+      "source_unchanged": true
+    },
+    {
+      "case": "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+      "census": {
+        "failed": 0,
+        "filtered": 3801,
+        "ignored": 0,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.07s",
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      "command": [
+        "<preserved Voice library test executable>",
+        "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "executable_sha256": "6bfa89a78eda84947feaa2df6dcbf3209af8f9d2521867fd34ee8046d833e128",
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 0.525,
+      "label": "negative-baseline-journal-line",
+      "log_sha256": "c4c4f1e745e270419723f39a2ad777e29dba11633bf19b416183e168ac723c9a",
+      "preexec_sha256": "bead33b03a10f2a02cb5cb8374e8a60e8e437667ce91901e0671052027a8c4d6",
+      "receipt_written_at": "2026-10-26T07:27:09+07:00",
+      "source_entries": 7163,
+      "source_sha256": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+      "source_unchanged": true
+    }
+  ],
+  "candidate_is_uncommitted_patch_at_gate": true,
+  "candidate_patch_sha256": "9f2f376c33ecff302131940a295c35799a800db3ce6f6ce05f2e756073d61c19",
+  "committed_head_at_gate": "beba7179b5c0293f6fb07fb132885ae41566a8dc",
+  "compiled_artifacts": [
+    {
+      "sha256": "a1d1ad65d035a577e1da3bbab998e61d4c872f0c46eddd82fd492a708131aa91",
+      "target": "release_pair"
+    },
+    {
+      "sha256": "6bfa89a78eda84947feaa2df6dcbf3209af8f9d2521867fd34ee8046d833e128",
+      "target": "lamp_voice"
+    },
+    {
+      "sha256": "4b1f02b89bab08f25e24d466e99f5133f052a38b779ad8df070b652360d32200",
+      "target": "it"
+    },
+    {
+      "sha256": "d7b824471fc1d00b24e727559ad64de20bf85fad91d5204846cf9a8bab196e5d",
+      "target": "stop_words_stt_replay"
+    },
+    {
+      "sha256": "c4546f49a73315d309e6149957d2c059cd4b62355bad19f5b996285127666439",
+      "target": "render_line_second"
+    },
+    {
+      "sha256": "90e04b538a765e6bcf494b9c33fec0f20212c068aa782eba4cb3504658d034ad",
+      "target": "lamp-voice"
+    }
+  ],
+  "controller_sha256": {
+    "gate": "d0f6dfa03c3f328028299e73f4ea2308dfc6165287142c212038e79eca4c13ef",
+    "negative_controls": "2b2add0d5cdf2cd3b383c4ee155f3d6d262c58e172d29d777b73e5afdb9d2907",
+    "proof_preparation": "46ec30df8c119a2b20d6b84eaf88108612bcc1a27701c42060ddf9eb037e355d",
+    "runner": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "gate": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 6.155,
+      "label": "fmt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_written_at": "2026-10-26T07:14:32+07:00",
+      "source_entries": 7163,
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::requested_audio::requested_audio_boundary_",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 80.169,
+      "label": "focused",
+      "log_sha256": "574e43885556a4d3d2dfffc62333fc74bc263cede7191f39f1fa94b40b9f0110",
+      "receipt_written_at": "2026-10-26T07:15:52+07:00",
+      "source_entries": 7163,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3797,
+          "ignored": 0,
+          "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3797 filtered out; finished in 0.30s",
+          "measured": 0,
+          "passed": 5,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "filtered": 3797,
+        "ignored": 0,
+        "measured": 0,
+        "passed": 5
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 44.179,
+      "label": "clippy",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_written_at": "2026-10-26T07:16:37+07:00",
+      "source_entries": 7163,
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 40.164,
+      "label": "compile",
+      "log_sha256": "406eedc888c54573c8c2b89254a73e75225f0b64d6054af1bd81f0b1c388f442",
+      "receipt_written_at": "2026-10-26T07:17:17+07:00",
+      "source_entries": 7163,
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 575.119,
+      "label": "full",
+      "log_sha256": "b4f8099f2099978ae5c2c625e5f25c4cdbd6f150d635590d310864a2c7329375",
+      "receipt_written_at": "2026-10-26T07:26:53+07:00",
+      "source_entries": 7163,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 15,
+          "literal": "test result: ok. 3787 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 545.70s",
+          "measured": 0,
+          "passed": 3787,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.82s",
+          "measured": 0,
+          "passed": 275,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 6,
+          "literal": "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+          "measured": 0,
+          "passed": 6,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "filtered": 0,
+        "ignored": 21,
+        "measured": 0,
+        "passed": 4073
+      }
+    }
+  ],
+  "mutations": [
+    {
+      "artifact": {
+        "compiler_fresh": false,
+        "kind": [
+          "lib"
+        ],
+        "sha256": "7eb5881ff598986fc5e1e46e09cf9dd495f48bbeb0db36cb52e676b4fa657073",
+        "source_sha256": "429693dca67524aea6a51b6f578623f894a1062ccf3b035f818a5b53e010ee04",
+        "target": "lamp_voice"
+      },
+      "case": "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+      "census": {
+        "failed": 1,
+        "filtered": 3801,
+        "ignored": 0,
+        "literal": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.05s",
+        "measured": 0,
+        "passed": 0,
+        "status": "FAILED"
+      },
+      "command": [
+        "<preserved Voice library test executable>",
+        "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "host_command_elapsed_seconds": 82.065,
+        "label": "negative-preparation-reason-compile",
+        "log_sha256": "373f80b1334f0189befd87e87eaf47de34454d2d3dea234a89bd1c8fbd3e692e",
+        "receipt_written_at": "2026-10-26T07:28:33+07:00",
+        "source_entries": 7163,
+        "source_unchanged": true
+      },
+      "executable_sha256": "7eb5881ff598986fc5e1e46e09cf9dd495f48bbeb0db36cb52e676b4fa657073",
+      "exit_code": 101,
+      "host_command_elapsed_seconds": 2.097,
+      "intended_assertion": {
+        "line": 1103,
+        "message": "assertion `left == right` failed",
+        "path": "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs"
+      },
+      "label": "negative-preparation-reason-case",
+      "log_sha256": "ab26976ce24b9c468ff089c00c7929d28069c4c561963b072d542390d2a2d24b",
+      "mutation": "Change the fixed preparation-failure refusal reason",
+      "name": "preparation-reason",
+      "preexec_sha256": "0f72049f7d38c8eaf06f64d546c5f1d7ccd70d80cbb6f5037304b3fa32fdd9f3",
+      "receipt_written_at": "2026-10-26T07:28:35+07:00",
+      "source_entries": 7163,
+      "source_sha256": "429693dca67524aea6a51b6f578623f894a1062ccf3b035f818a5b53e010ee04",
+      "source_unchanged": true
+    },
+    {
+      "artifact": {
+        "compiler_fresh": false,
+        "kind": [
+          "lib"
+        ],
+        "sha256": "026ecb12bbe825fac971f1b9e09ac5125a5a536d5509740c7c3a549f8c75f111",
+        "source_sha256": "47015f7c05cee83fbba16f2762a0c9bfb78372be9e85780216fb8db37dd5e3ba",
+        "target": "lamp_voice"
+      },
+      "case": "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+      "census": {
+        "failed": 1,
+        "filtered": 3801,
+        "ignored": 0,
+        "literal": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.05s",
+        "measured": 0,
+        "passed": 0,
+        "status": "FAILED"
+      },
+      "command": [
+        "<preserved Voice library test executable>",
+        "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "host_command_elapsed_seconds": 86.437,
+        "label": "negative-journal-wording-compile",
+        "log_sha256": "9054c46b2b3bd108299b4e244f9338bd42e5e63755bb016e0ca5c8f51612913e",
+        "receipt_written_at": "2026-10-26T07:30:03+07:00",
+        "source_entries": 7163,
+        "source_unchanged": true
+      },
+      "executable_sha256": "026ecb12bbe825fac971f1b9e09ac5125a5a536d5509740c7c3a549f8c75f111",
+      "exit_code": 101,
+      "host_command_elapsed_seconds": 2.131,
+      "intended_assertion": {
+        "line": 1481,
+        "message": "assertion `left == right` failed",
+        "path": "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs"
+      },
+      "label": "negative-journal-wording-case",
+      "log_sha256": "500086c479adcc3d0764ee9c04e7e7d5e6bb23693b68da20ca8ab0175a1fc19b",
+      "mutation": "Change the fixed refusal stderr line",
+      "name": "journal-wording",
+      "preexec_sha256": "20fa0bf5f43bbca68128e1d8f21c5f2b4bdd411d4bcfe1684a7b5784ea3b0d9b",
+      "receipt_written_at": "2026-10-26T07:30:06+07:00",
+      "source_entries": 7163,
+      "source_sha256": "47015f7c05cee83fbba16f2762a0c9bfb78372be9e85780216fb8db37dd5e3ba",
+      "source_unchanged": true
+    }
+  ],
+  "negative_campaign_receipt_sha256": "08f3814ec2c8ec7c6d64e57f807a54a0e7eb7aa1aa9dd37063ff55016ce64770",
+  "rebase": {
+    "base": "d21a854b6a46209c8a76a70d8a8b3f3e286f0ff3",
+    "head": "beba7179b5c0293f6fb07fb132885ae41566a8dc",
+    "old_head": "788faaedaf223b495a69bca2433d980ea0bcc086",
+    "review_test_sha256": "5ae99f09a6e20756671608093eaedcd8dcb49bb82dabb38724977272fa63c460"
+  },
+  "rebase_receipt_sha256": "10f13084f17a6e6ce6983caa4df388d91b60c5a0b35f77c9270afc22af49ef67",
+  "restoration": {
+    "all_source_restored": true,
+    "baseline_copy_preserved": true,
+    "source_restored": true
+  },
+  "restored_artifact": {
+    "compiler_fresh": false,
+    "kind": [
+      "lib"
+    ],
+    "sha256": "6bfa89a78eda84947feaa2df6dcbf3209af8f9d2521867fd34ee8046d833e128",
+    "source_sha256": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+    "target": "lamp_voice"
+  },
+  "restored_cases": [
+    {
+      "case": "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+      "census": {
+        "failed": 0,
+        "filtered": 3801,
+        "ignored": 0,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.05s",
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      "command": [
+        "<preserved Voice library test executable>",
+        "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "executable_sha256": "6bfa89a78eda84947feaa2df6dcbf3209af8f9d2521867fd34ee8046d833e128",
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 1.907,
+      "label": "negative-restored-prepare-failure",
+      "log_sha256": "1b8f48607bb8916aa8bcad5db53d8cd3a18d15a7ac23db8f8691f635fa002765",
+      "preexec_sha256": "608d6f253b4516501fd08ae58a8f86cf5ab12ce8f356424f3e139610f667af2a",
+      "receipt_written_at": "2026-10-26T07:31:34+07:00",
+      "source_entries": 7163,
+      "source_sha256": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+      "source_unchanged": true
+    },
+    {
+      "case": "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+      "census": {
+        "failed": 0,
+        "filtered": 3801,
+        "ignored": 0,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.08s",
+        "measured": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      "command": [
+        "<preserved Voice library test executable>",
+        "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "executable_sha256": "6bfa89a78eda84947feaa2df6dcbf3209af8f9d2521867fd34ee8046d833e128",
+      "exit_code": 0,
+      "host_command_elapsed_seconds": 0.543,
+      "label": "negative-restored-journal-line",
+      "log_sha256": "f1db6384955a8fc0d8580f25b3a33bb997dae98b7da655efc6d3a0fb5ae8031e",
+      "preexec_sha256": "05398d19b559decb221c2d4208b20567594149eb1dd58b51f02944de247f3049",
+      "receipt_written_at": "2026-10-26T07:31:35+07:00",
+      "source_entries": 7163,
+      "source_sha256": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+      "source_unchanged": true
+    }
+  ],
+  "restored_compile": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "host_command_elapsed_seconds": 83.274,
+    "label": "negative-restored-compile",
+    "log_sha256": "4174313869861177c6513c090fe61102e02992050c7cdef6ed41950fed415364",
+    "receipt_written_at": "2026-10-26T07:31:31+07:00",
+    "source_entries": 7163,
+    "source_unchanged": true
+  },
+  "scope": "Mac host coordinator trace plus actual controlled-child stderr; native PR CI is separate.",
+  "source_entries": 7163,
+  "source_manifest_sha256": "56f10eb06d1e401e40260296e95994bc9c2f949130a0fa19d53c0ede8fad5bb9",
+  "source_sha256": {
+    "lampOS/crates/voice/src/coordinator.rs": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "5ae99f09a6e20756671608093eaedcd8dcb49bb82dabb38724977272fa63c460"
+  },
+  "uncommitted_patch_paths": [
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs"
+  ]
+}

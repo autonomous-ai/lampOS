@@ -1,0 +1,37 @@
+[focused]
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 3797 filtered out; finished in 0.30s
+
+[full]
+test result: ok. 3787 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 545.70s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.82s
+test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[baseline-prepare-failure]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.04s
+
+[baseline-journal-line]
+test coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.07s
+
+[restored-prepare-failure]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.05s
+
+[restored-journal-line]
+test coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.08s
+
+[preparation-reason]
+test coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.05s
+assertion `left == right` failed
+
+[journal-wording]
+test coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3801 filtered out; finished in 0.05s
+assertion `left == right` failed
