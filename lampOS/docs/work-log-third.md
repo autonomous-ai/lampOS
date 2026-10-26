@@ -13,6 +13,20 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 14:49 — Latest reminder native event qualified
+
+Ready for lamp-voice: no (#3525, final reader disposition requested)
+
+**aad5a4fe3** still includes latest **1ec33957c**. Original ARM64
+**40286216508** and Linux **40286216536** pass: 11,381 unique cases,
+zero failures/leaks/timeouts, 106 skipped, all 21 controls once. Exact
+preview **3fc004c96** has ordered base/head parents and offered tree
+**c780ea948**. Turn-wire 13/0 is separate.
+[Receipt](verification/reminder-pending-present-20261026/native-40286216508.json).
+This is current-head native execution; local 542/0/9 remains fe488/883.
+Reviewer-three READ-OK and Reviewer-two source clearance are exact-current;
+final disposition requested before train delivery. No physical acceptance.
+
 ## 2026-10-26 14:30 — Documentation-only reminder carry
 
 Ready for lamp-voice: no (#3525)
