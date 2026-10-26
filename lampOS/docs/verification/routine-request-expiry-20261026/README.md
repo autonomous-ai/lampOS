@@ -15,3 +15,7 @@ Controlled expiry can establish a mechanism for recv(None). It cannot retrospect
 Observed result: the exact pair passed 1/0 at 1adcbe08c/7d0017f08. Both publications were delivered; the 500 ms event was discarded with expired 0→1, while the 5 s event delivered its exact queued payload with expired unchanged. Both Manager times and deadlines were preserved. Five unexecuted saved drivers get no runtime credit. This is host evidence, not an old-failure causal clearance or device result.
 
 Provenance correction: the first packet used the older scratch folder’s 2d18 label as the base. Direct Git parent inspection proves the actual runtime parent is 7d0017f08; the complete lampOS subtrees at both bases are identical. Outcome, source head and artifact hashes are unchanged.
+
+## Final fixture isolation
+
+The final test-only change uses the bounded five-second header constructor in exactly the three synthetic-clock policy fixtures and the positive control. The stock constructor and 500 ms negative control remain unchanged. Actual full host execution at dd8e46d70/7d passed 523 tests with zero case failures and nine declared ignores; its separate detached mock-worker BrokenPipe output is retained and reported on #1806 at 6420349822. The docs-only cbde1ee4a wording follow-up has current compiler checks and identical six executable hashes, so that run remains at dd8e without rerunning it. PR #3598 is draft pending current original native gates and independent reads.

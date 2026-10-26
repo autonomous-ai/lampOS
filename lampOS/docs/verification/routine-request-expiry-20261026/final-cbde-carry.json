@@ -1,0 +1,33 @@
+{
+  "head": "cbde1ee4aed240b6342db0e61f1e94b6661976d2",
+  "base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "all_six_artifacts_same_as_actual_dd8e_runtime": {
+    "it-46363ab9699809b5": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-a718b2a0214b6903": true,
+    "requested_audio-019db324b83a9807": true,
+    "lamp_skills-c6f44302f3b2c78f": true,
+    "lamp-skills": true
+  },
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "delta_after_runtime": [
+    "docs/voice-test-fixtures.md: precise description of header-age/elapsed controlled-window checks"
+  ],
+  "retained_actual_full_runtime": {
+    "head": "dd8e46d7000ba3f35c0129f1a8a5876b938e0068",
+    "base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+    "result": [
+      523,
+      0,
+      9
+    ],
+    "rerun_on_docs_head": false,
+    "background_panic": "Unrelated detached mock worker BrokenPipe retained, case passed, reported #1806 comment6420349822."
+  },
+  "limits": "Current original native qualification and peer reads pending. No new product behavior, historical-failure cause or device-latency claim."
+}
