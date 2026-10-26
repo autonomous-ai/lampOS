@@ -1,0 +1,165 @@
+{
+  "status": "UNCHANGED_BASE_CONTROL_FAILED_SAME_THREE_PREDICATES",
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "baseline_source_clean": true,
+  "candidate_source_delta": [
+    "lampOS/crates/voice/src/session_reader.rs",
+    "lampOS/crates/voice/src/session_reader/tests.rs",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "tracked_source_count": 10564,
+  "source_guards_unchanged": {
+    "baseline": true,
+    "candidate": true
+  },
+  "source_index_equal": true,
+  "module": {
+    "package": "lamp-voice-eval",
+    "target": "it",
+    "filter": "relay_hardening::",
+    "test_threads": 1,
+    "observations": 1,
+    "passed": 4,
+    "failed": 3,
+    "ignored": 0,
+    "filtered_out": 231,
+    "exit": 101,
+    "outcomes": [
+      {
+        "name": "relay_hardening::a_clean_session_reports_no_relay_failure",
+        "status": "ok"
+      },
+      {
+        "name": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+        "status": "FAILED"
+      },
+      {
+        "name": "relay_hardening::a_cut_off_final_trace_record_is_reported_and_the_digest_covers_the_whole_file",
+        "status": "ok"
+      },
+      {
+        "name": "relay_hardening::an_early_relay_error_after_the_runtime_exited_still_stops_its_workers",
+        "status": "FAILED"
+      },
+      {
+        "name": "relay_hardening::oversized_and_non_utf8_stdout_lines_are_explicit_failures",
+        "status": "ok"
+      },
+      {
+        "name": "relay_hardening::oversized_or_non_utf8_trace_records_stop_the_trace_explicitly",
+        "status": "ok"
+      },
+      {
+        "name": "relay_hardening::workers_left_after_a_normal_exit_are_stopped_and_reported",
+        "status": "FAILED"
+      }
+    ]
+  },
+  "same_failure_predicates": [
+    {
+      "test": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+      "file": "lampOS/crates/voice-eval/tests/it/relay_hardening.rs",
+      "line": 228,
+      "message": "worker survived the stop",
+      "predicate": "process_gone(read_pid(&pid_file)); test_kill_process polling bounded at3s"
+    },
+    {
+      "test": "relay_hardening::an_early_relay_error_after_the_runtime_exited_still_stops_its_workers",
+      "file": "lampOS/crates/voice-eval/tests/it/relay_hardening.rs",
+      "line": 326,
+      "message": "a worker survived the relay's early return",
+      "predicate": "process_gone(read_pid(&pid_file)); test_kill_process polling bounded at3s"
+    },
+    {
+      "test": "relay_hardening::workers_left_after_a_normal_exit_are_stopped_and_reported",
+      "file": "lampOS/crates/voice-eval/tests/it/relay_hardening.rs",
+      "line": 248,
+      "message": "worker survived the relay",
+      "predicate": "process_gone(read_pid(&pid_file)); test_kill_process polling bounded at3s"
+    }
+  ],
+  "artifact": {
+    "sha256": "4750b34999755b985db25b1dbcaf0200781b35a719141c967b22b4b3935a344b",
+    "baseline_and_original_candidate_saved_binaries_independently_rehashed_equal": true,
+    "before_after_hash_stable": true,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": []
+  },
+  "environment": {
+    "platform": "linux/amd64",
+    "uid_gid": "1000:1000",
+    "init": false,
+    "pid1": "tail",
+    "extra_capabilities": [],
+    "network": "none",
+    "image_sha256": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c"
+  },
+  "control_specific_proc_observation": {
+    "timing": "one post-module snapshot",
+    "zombie_entries": [
+      {
+        "command": "sh",
+        "state": "Z",
+        "parent_pid": 1
+      },
+      {
+        "command": "sleep",
+        "state": "Z",
+        "parent_pid": 1
+      },
+      {
+        "command": "sleep",
+        "state": "Z",
+        "parent_pid": 1
+      }
+    ],
+    "scope_limit": "Snapshot was not tied to each asserted PID/starttime. It is consistent with an unreaped-child hypothesis in this control; it does not prove historical original-run cause."
+  },
+  "original_full_run": {
+    "status": "FAILED",
+    "passed": 7454,
+    "failed": 3,
+    "ignored": 53,
+    "summaries": 79,
+    "exit": 101
+  },
+  "conclusion": "These same three PID-existence assertion failures reproduce on unchanged3d in this lane, with a byte-identical Voice-eval integration executable. They do not require the three-file Reader patch. Historical original-run cause remains unproven.",
+  "limits": [
+    "This is one focused unchanged-base module control, not a clean full-suite control.",
+    "Original full failed gate remains FAILED; this classification is not a waiver.",
+    "No current-c5, ARM64 or device qualification is established.",
+    "Independent audit only; no rerun, compiler, source edits or GitHub posts."
+  ],
+  "evidence_sha256": {
+    "baseline": {
+      "terminal.json": "d725ed81419a6226752f38c1f6153484817411a80f97e51197f6d73220c4e820",
+      "module.stdout": "7528f9b9dafb8db8c18f6f25cf6be807ef6da93f5bf5108f9f11da2d66950368",
+      "module.stderr": "d996bc6f47d3c7c6a82cac1e05a432c2a0e80c50eaffca353cb3fd37367b645d",
+      "module-result.json": "2f0b33a862c19287bcf95d0293726061e7880a352a010a0c7576dd0f68b1c903",
+      "source-before.json": "828761fd8b9a721cd93c877f1e476213a134ecf362076a8dad9867db531ce6e7",
+      "source-after.json": "828761fd8b9a721cd93c877f1e476213a134ecf362076a8dad9867db531ce6e7",
+      "executable-before.stdout": "a684683192ea0fd7bd5438f0b048250ae73b6ac126247cbd13fc0531cbc0db67",
+      "executable-after.stdout": "a684683192ea0fd7bd5438f0b048250ae73b6ac126247cbd13fc0531cbc0db67",
+      "post-module-proc.stdout": "7760198dfd1536a067b7e68ba1246565a74944d87f89f1af347edb08aacc7500",
+      "container-inspect.json": "0225a5ac6ef898fdc0f79bc482b90d76f16ddc000b9fa39ed0446ec20f481750",
+      "selected-artifact.json": "261f2b79b1f934bb4084026068b51c25a5f98d9e733dd9c4ed6292e2be0d5196",
+      "compile-result.json": "2bc0bacb2e8c00ba7ef3345db52d82a0ec6e9c06096be0bcea4cc9391e8e7f78"
+    },
+    "candidate": {
+      "full-tests.stdout": "dc0b33223e49e0abcd9c47d49c8822d7965eefaa0627e9827dda96f4fb316542",
+      "full-tests.stderr": "e10034c3a6909b0e29ff117ff76c8fffda409f3883f0cadbb0c856acb492de4a",
+      "full-tests-result.json": "bcf18db78266d406991f39b8ace05db0bb1bddc1422cdad46b309f8e908876d5",
+      "source-before.json": "d5fa2dac0be291ae4b2eab5065a46224e13097dcb3a291b8bd9a152b2d0dfe19",
+      "source-after.json": "d5fa2dac0be291ae4b2eab5065a46224e13097dcb3a291b8bd9a152b2d0dfe19",
+      "executable-hashes-before.stdout": "d14ad5d6d4b8baea18747658bf58b70f4d3a9d278d9a344434d14e2d6671cf00",
+      "executable-hashes-after.stdout": "d14ad5d6d4b8baea18747658bf58b70f4d3a9d278d9a344434d14e2d6671cf00",
+      "frozen-executables.json": "37fbd56d62007b52ee51e68fbfc4609a6039d49909607ea0833f216d98dc8935"
+    }
+  }
+}

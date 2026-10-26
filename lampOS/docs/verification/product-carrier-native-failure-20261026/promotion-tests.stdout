@@ -1,0 +1,50 @@
+
+running 2 tests
+test github::tests::stream_hash_is_bounded_and_matches_bytes ... ok
+test github::tests::unrelated_release_notes_may_be_null_but_selected_notes_still_refuse ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 22 tests
+test bootstrap_copies_only_envelope ... ok
+test bootstrap_lost_rename_response_removes_canonical_and_keeps_stage ... ok
+test changed_downloaded_payload_refuses_before_writes ... ok
+test context_requires_exact_switch_and_trusted_public_key ... ok
+test equal_identical_is_noop_and_older_is_refused ... ok
+test equal_sequence_different_valid_envelope_refuses ... ok
+test external_models_are_explicitly_unsupported ... ok
+test failures_before_and_after_each_rename_restore_exact_old_bytes ... ok
+test final_verification_failure_restores_old_bytes ... ok
+test foreign_canonical_during_recovery_is_untouched ... ok
+test missing_canonical_or_orphan_tag_never_bootstraps_over_existing_state ... ok
+test promotion_preserves_signed_bytes_and_old_backup ... ok
+test restoration_failure_reports_retained_asset_ids ... ok
+test signature_valid_future_updater_requirement_refuses_before_writes ... ok
+test signed_identity_must_match_source_and_fixed_url ... ok
+test source_provenance_must_match_original_successful_attempt ... ok
+test stable_changed_while_staging_is_not_overwritten ... ok
+test staged_corruption_leaves_old_canonical_intact ... ok
+test staging_and_backup_names_are_never_overwritten ... ok
+test uncertain_or_duplicate_inventories_refuse ... ok
+test upload_failure_before_or_after_remote_write_preserves_old_canonical ... ok
+test wrong_trusted_key_refuses_before_writes ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+
+running 1 test
+test promotion_is_manual_separate_and_branch_protected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-26 08:16 — Promotion repair pushed; reader failures reproduced unchanged
+
+Ready for lamp-voice: no (#3466; reader fixture)
+
+Carrier repair `2d9194565` on current `c5c7603a7` is pushed. The standalone
+promotion suite passes25/0/0, with fmt, strict all-target Clippy and build.
+Only its fixture minimum changed; all assertions remain. Fresh native
+ARM6440253271430 and Linux Clippy40253271444 are active. The old failure
+stays3/21/0 before workspace tests. Real installed GOOD/BAD remains pending.
+
+[Unchanged-base control](verification/tests-reader-baseline-20261026/) ran once:
+4 passed /3 failed, the exact same relay assertions as the candidate full
+7454/3/53. Both saved executables hash identically; source guards remained
+unchanged. These failures reproduce without the reader patch in this lane.
+The original full remains failed, and historical cause remains unproven.
+Current-c5 reader fmt/metadata pass; strict twelve-crate Clippy and workspace
+build are active before commit, push and native qualification.
+
 ## 2026-10-26 08:12 — Carrier integration failure identified; reader baseline active
 
 Ready for lamp-voice: no (#3466; reader fixture)
