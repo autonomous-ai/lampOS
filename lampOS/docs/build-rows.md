@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-26 11:49 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-26 14:48 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 93.8% over 70 rows. Quality 67.5% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 93.8% over 70 rows. Quality 68.2% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -94,10 +94,10 @@ Written by the first builder from the team's review page at 2026-10-26 11:49 (+0
 | Cutting in | 0.55 | 0.75 | 25 Oct 19:0x, up from 0.5: on lamp-52e6 with the ship candidate’s own product switches (Seventh, played ElevenLabs lines, an empty room), every real cut-in stopped the story, 4 of 4, with no false stop; |
 | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
-| Not spoken to | 0.60 | 0.90 | 25 Oct 14:4x, unchanged: in a busy played round on lamp-4ace 4 of 6 desk lines were left alone; |
+| Not spoken to | 0.70 | 0.90 | 26 Oct 14:5x, up from 0.6: on 6999 (lamp-voice d5dc2e87f, #3517’s LAMP_NAME_STAYS_IN_ITS_LINE on) the busy scene’s desk talk was left alone 6 of 6, against 4 of 6 on 6919 and 6963: a name misheard in one colleague’s line… |
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
-| Speaking up on its own | 0.80 | 0.85 | 25 Oct 21:3x, unchanged: two reminder rounds on lamp-4ace (the ship build 6819 and #3477’s build, product unit, played lines, a conversation over the due minutes): each one set was said 6 to 13 s after it was due, at a p… |
+| Speaking up on its own | 0.82 | 0.85 | 26 Oct 14:5x, up from 0.8: on 6999 every reminder set was said: one cut off by people talking is offered again and said (#3523, Third), and the next one triggers the reminders skill again, so no 10 s wait. |
 | Remembers you: your name and what you told it | 0.55 | 0.90 | 26 Oct 09:5x, up from 0.5: on 6963 (the memory switches on in the product) a person nobody knows asking “how do I take my coffee?” got “I don’t actually know that one — you’ve never told me”, not the room’s latte (6919 a… |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
