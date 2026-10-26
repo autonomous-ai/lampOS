@@ -8,6 +8,24 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+
+## 2026-10-26 12:04 — Interruption correction delivered and published
+
+Ready for lamp-voice: delivered (#3523, train 155)
+
+Train **c48af4dc1** and landing **706d9bb4d** have identical trees; all
+nineteen authored file blobs and the stable patch match member **4b45bbf06**.
+Original train ARM64 **40263572545** passed **11,354 unique PASS**, zero
+FAIL/LEAK/TIMEOUT, 106 skipped, all nine controls once. Linux Clippy
+**40263572487** passed; Turn-wire **13/0** remains separate.
+[Native receipt](verification/train155-third-20261026/native-40263572545.json),
+[landing and publication](verification/train155-third-20261026/landing.json).
+
+Post-merge run **40264783972** attempt 1 passed build/test but refused
+publication for a duplicate release tag. Attempt 2 now succeeds, including
+publication. Both original attempts are preserved separately. Publication is
+not proof of deployment, acoustic behavior or First's physical replay.
+
 ## 2026-10-26 12:01 — Reminder trigger native result and current carry
 
 Ready for lamp-voice: no (#3525)

@@ -1,0 +1,147 @@
+{
+  "pr": 3534,
+  "train": 155,
+  "member_pr": 3523,
+  "member_head": "4b45bbf0606c5d94213438cab3afb201a6a2fd92",
+  "train_head": "c48af4dc1196fe8ac98424529841635e44303f16",
+  "landing": "706d9bb4de4b5dc735ca70ea76cb14ee47998a4a",
+  "train_tree": "f81f20c40b903fc5543ae907b3fef457c0996b6f",
+  "landing_tree": "f81f20c40b903fc5543ae907b3fef457c0996b6f",
+  "tree_equal": true,
+  "authored_blob_equality": {
+    "lampOS/crates/voice/src/coordinator.rs": {
+      "member": "a19d3441d7e315d14a5352cb10190f49335eb8ae",
+      "landing": "a19d3441d7e315d14a5352cb10190f49335eb8ae"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs": {
+      "member": "fb3fde96334330fc8148b254a8dfd3b453fe747a",
+      "landing": "fb3fde96334330fc8148b254a8dfd3b453fe747a"
+    },
+    "lampOS/crates/voice/src/reminders.rs": {
+      "member": "0091d3a2a0e2686dc0c36185e7a1998a486d312a",
+      "landing": "0091d3a2a0e2686dc0c36185e7a1998a486d312a"
+    },
+    "lampOS/crates/voice/src/reminders/consumer.rs": {
+      "member": "a14ddc30080383832ac897214c0796c7288c8aac",
+      "landing": "a14ddc30080383832ac897214c0796c7288c8aac"
+    },
+    "lampOS/crates/voice/src/reminders/consumer/tests.rs": {
+      "member": "1f64678cf58958ba0b8ad037e1ee0b4f1dfae070",
+      "landing": "1f64678cf58958ba0b8ad037e1ee0b4f1dfae070"
+    },
+    "lampOS/crates/voice/src/reminders/tests.rs": {
+      "member": "c0cbc45817fc3dce2ec38fd76928b1b8e30c6f42",
+      "landing": "c0cbc45817fc3dce2ec38fd76928b1b8e30c6f42"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "member": "80ca14ed75a60e917387ff24570bd4049a5e012e",
+      "landing": "80ca14ed75a60e917387ff24570bd4049a5e012e"
+    },
+    "lampOS/docs/schedule.md": {
+      "member": "79b0b6ac6acad09c61ebd7ee807600888e85369d",
+      "landing": "79b0b6ac6acad09c61ebd7ee807600888e85369d"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/README.md": {
+      "member": "98d967196da473a235f909452403d0cf086f08c0",
+      "landing": "98d967196da473a235f909452403d0cf086f08c0"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/carry-0c1.json": {
+      "member": "7afe2075ed5d5bb805e162f97e194f3037d32aba",
+      "landing": "7afe2075ed5d5bb805e162f97e194f3037d32aba"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/current-0c1.json": {
+      "member": "8fc91515d2a63d456b3e074aa2b8a6108ff92c23",
+      "landing": "8fc91515d2a63d456b3e074aa2b8a6108ff92c23"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/current-c5-carry.json": {
+      "member": "12e8721fd6471a3fa00569b2d716745e5df16b2c",
+      "landing": "12e8721fd6471a3fa00569b2d716745e5df16b2c"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/earlier-failed-full.json": {
+      "member": "3e8a64b0523751125aa857397bf8b70f657f6298",
+      "landing": "3e8a64b0523751125aa857397bf8b70f657f6298"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/fixed.json": {
+      "member": "47828b1fc0901ae71564baf1494b99894b27cb7e",
+      "landing": "47828b1fc0901ae71564baf1494b99894b27cb7e"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/negative.json": {
+      "member": "21e1cc9e9aac16e97de31efb24b3f423c58d002f",
+      "landing": "21e1cc9e9aac16e97de31efb24b3f423c58d002f"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/negative.patch": {
+      "member": "3d2dece758d85a823c29d321c6ff54cc31dea519",
+      "landing": "3d2dece758d85a823c29d321c6ff54cc31dea519"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/review-fixed.json": {
+      "member": "3099c06fa3c29519f5a13c70d2614d4015684ada",
+      "landing": "3099c06fa3c29519f5a13c70d2614d4015684ada"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/review-negative.json": {
+      "member": "cbc0db6cd6d69402f72f71fd2d5f5d7ada2539cb",
+      "landing": "cbc0db6cd6d69402f72f71fd2d5f5d7ada2539cb"
+    },
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/review-negative.patch": {
+      "member": "7ddac3b4d29872ed4b18f550539a1e32a7deaaef",
+      "landing": "7ddac3b4d29872ed4b18f550539a1e32a7deaaef"
+    }
+  },
+  "member_patch_id": "41d3e556e963267e23517c63b3352f86902e034a",
+  "landing_patch_id": "41d3e556e963267e23517c63b3352f86902e034a",
+  "authored_patch_equal": true,
+  "merged_at": "2026-10-26T03:34:59Z",
+  "post_merge_run": {
+    "id": 40264783972,
+    "attempt": 2,
+    "head": "706d9bb4de4b5dc735ca70ea76cb14ee47998a4a",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "conclusion": "success"
+      },
+      {
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "conclusion": "success"
+      },
+      {
+        "name": "report-full-run-failure",
+        "conclusion": "skipped"
+      }
+    ],
+    "duplicate_tag_errors": [],
+    "raw_log_sha256": "1a580ee0a59b30c1401a7fc459e7ad994fa8b083c2f3ccf7e3a2fe49d676f4d8"
+  },
+  "limits": "Train CI qualifies its tree, equal to landing; no invented native execution at member or current head. Post-merge build/test and publication outcomes are separate. No device or acoustic acceptance.",
+  "post_merge_original_attempt": {
+    "id": 40264783972,
+    "attempt": 1,
+    "conclusion": "failure",
+    "jobs": [
+      {
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "conclusion": "success"
+      },
+      {
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "conclusion": "failure"
+      },
+      {
+        "name": "report-full-run-failure",
+        "conclusion": "skipped"
+      }
+    ],
+    "duplicate_tag_errors": [
+      "lampOS \u2014 sign and publish the tested lamp-voice artifact\tverify, sign, upload, then promote the channel\t2026-10-26T03:57:56.8152478Z lampOS publication refused: duplicate release tag"
+    ],
+    "raw_log_sha256": "ea23e94fbd743724c4477e87bf3476bac157d50a6f8cfc5cfc00301736e7aa34"
+  }
+}
