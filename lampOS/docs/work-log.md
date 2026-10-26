@@ -1,3 +1,13 @@
+Ready for lamp-voice: yes (#3553, documentation-only); #3510 activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 14:20 +07, add-on error-code correction offered
+
+[#3553](https://github.com/autonomous-ai/lampOS/pull/3553) `cc7aa7d07` on current 88335bfbe addresses the unclaimed P3 from #3550. The single addons.md paragraph now distinguishes per-minute `RATE_LIMITED` from four-undecided-per-device `BACKPRESSURE`. Verified against public openharness commit `3f49f426833aacb712f20c3b4c04df8a2e51ec25`, `cli/src/lib/autonomous-device/addons.ts` constants and proposal checks (retrieved SHA-256 `b6243bf3d7c9695c7f96b5c3e7e73d3ed32ff3d4bee6fe2c6453504c45171e72`), and its add-on contract. No external code was changed.
+
+Open and merged PR searches plus the original review replies found no duplicate correction. Exact diff: one file, four added/three removed lines; `git diff --check` exits zero. No Rust or runtime gate was run for this wording correction; both native workflow path filters exclude this Markdown file, and absence of a check is not reported as success. Independent reads are requested. Own-keys 46b5 current native qualification continues with activation HOLD unchanged.
+
+---
+
 Ready for lamp-voice: #3542 and #3528 delivered; #3510 current native pending and activation HOLD.
 
 ## Current checkpoint: 2026-10-26 14:15 +07, own-keys factory-base carry pushed
