@@ -588,9 +588,11 @@ const STAND_INS: &[&str] = &[
 /// "Hey Lamp". 15 of them were held, 11 as said to someone it calls by
 /// name ("Louvre, what did I just ask you?" five times of five). Nobody's
 /// name, and lamp-name heard none of those five, so the near rule
-/// (`LAMP_NAME_NEAR`) could not take it.
+/// (`LAMP_NAME_NEAR`) could not take it. "Lampy" too: on lamp-4ace on 26 Oct
+/// (6999, 14:1x) "Lamp, what did I just ask you?" came back as "Lampy, …"
+/// and was held as said to someone it calls by name.
 const STAND_ALONE_INS: &[&str] = &[
-    "lynn", "len", "lin", "lump", "land", "line", "palin", "palan", "louvre",
+    "lynn", "len", "lin", "lump", "land", "line", "palin", "palan", "louvre", "lampy",
 ];
 
 /// [`STAND_ALONE_INS`] when they count, else none.
@@ -3937,6 +3939,7 @@ mod tests {
             "Lin, what time is it?",
             "Louvre, what did I just ask you?",
             "Hey, Louvre. What time is it in London right now?",
+            "Lampy, what did I just ask you?",
         ] {
             assert!(!addresses_someone_else_on(heard, true), "{heard}");
             assert!(called_by_name_on(heard, true), "{heard}");
@@ -4015,6 +4018,14 @@ mod tests {
                     Some(Verdict::Play(_))
                 ),
                 "Louvre on the second route, {room:?}"
+            );
+            // 26 Oct: held on 6999 as said to someone it calls by name.
+            assert!(
+                matches!(
+                    judged("Lampy, what did I just ask you?", true, room),
+                    Some(Verdict::Play(_))
+                ),
+                "Lampy on the second route, {room:?}"
             );
         }
     }
