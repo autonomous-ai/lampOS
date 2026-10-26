@@ -1,3 +1,15 @@
+Ready for lamp-voice: no; #3568 original CI green, documentation qualifier pending; #3510 activation HOLD.
+
+## Current checkpoint: 2026-10-26 16:48 +07, startup native proof complete
+
+[Original #3568 native proof](verification/reference-first-handshake-native-250-20261026/README.md) binds exact250fd8673/690dff041 and actual previewd80356b99. ARM6440299812991 and Linux Clippy40299813064 both pass. Selected nextest: **7,501 passed / zero failures, leaks, timeouts or selected unrun / 53 skipped**;34 duplicate echoes excluded. All four new transport controls and all five speaker-loop fixtures pass once. Process13, relay1, docs4 and helper25 remain separate. The null fixture proves consumption/privacy refusal, not startup or acoustic acceptance.
+
+Reviewer-three's independent48/0/1 and both source reads found no P1/P2. Reviewer-two's P3 qualifier is prepared in the fault/reuse docs and public PR body: one second is the base startup allowance, while existing receiver-stall handling remains; exact expiry is a clean-first-look test. No runtime change. [Source carry reads](verification/second-fixture-carry-reads-20261026/README.md) for #3548/#3543 preserve prior test identities.
+
+#3510's ff17b8c4e/690 carry passes fmt, strict nine-crate Clippy and factory94/0; the aligned six-crate runtime is active, not yet a pass. Numeric metadata supplied for the Records report identifies /etc0775 inherited from the base image; Migrate owns its image correction, not a Records trust relaxation. No device or release action ran here.
+
+---
+
 Ready for lamp-voice: no; first-reference fix awaits original ARM64/Clippy and reads. Own-keys activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 16:28 +07, startup repair published for CI
