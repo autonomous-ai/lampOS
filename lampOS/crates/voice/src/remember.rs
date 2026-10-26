@@ -7191,7 +7191,8 @@ fn days_answer(
         let ago = |at: u64| when(local_day(now, zone) - local_day(at, zone));
         let at = entry.get("at_unix_ms")?.as_u64()?;
         let when = ago(at);
-        let item = match entry.get("kind")?.as_str()? {
+        let kind = entry.get("kind")?.as_str()?;
+        let mut item = match kind {
             "kept" if dated.is_some() => {
                 let mut item = json!({"source_id":id,"when":when,"asked_to_remember":entry.get("text")?.as_str()?,"since":format!("since {when}")});
                 if let Some(until) = entry.get("until_unix_ms").and_then(Value::as_u64) {
@@ -7216,6 +7217,25 @@ fn days_answer(
             }
             _ => return None,
         };
+        // The day a kept thing or observation is about, from the store's
+        // `on`, with today and whether it is still to come (lamp-06c1, 26
+        // Oct: a graduation on 31 October was told as past). Its `since`
+        // and `at_unix_ms` stay when it was kept.
+        if matches!(kind, "kept" | "observation")
+            && let Some(day) = entry["on"].as_str().and_then(crate::local_time::day_of)
+        {
+            let today = local_day(now, zone);
+            let status = if day > today {
+                "upcoming"
+            } else if day == today {
+                "today"
+            } else {
+                "past"
+            };
+            item["event_on"] = json!(day_name(day));
+            item["event_status"] = json!(status);
+            item["today"] = json!(day_name(today));
+        }
         found.push(item);
     }
     let mut told = json!({"found":found,"untrusted":true,"scope":ROOM_SCOPE});
@@ -11846,6 +11866,27 @@ mod tests {
                 .0["found"],
             json!([])
         );
+    }
+
+    /// lamp-06c1, 26 Oct (P06): a found event day says whether it is
+    /// still to come, today or past, by the lamp's local day.
+    #[test]
+    fn a_dated_search_result_says_whether_its_event_is_still_coming() {
+        let dated = |on| {
+            days_answer(
+                &json!({"ok":true,"entries":[{"id":1,"kind":"kept","at_unix_ms":NOW,"text":"Sister's wedding","on":on}]}),
+                NOW,
+                Some(&EAST),
+                None,
+            )
+            .unwrap()
+            .0["found"][0]
+                .clone()
+        };
+        assert_eq!(dated("2026-10-17")["event_status"], "upcoming");
+        assert_eq!(dated("2026-10-13")["event_status"], "today");
+        assert_eq!(dated("2026-10-12")["event_status"], "past");
+        assert_eq!(dated("2026-10-17")["event_on"], "2026-10-17");
     }
 
     #[test]
