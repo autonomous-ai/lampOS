@@ -1,0 +1,78 @@
+{
+  "pr": 3520,
+  "offered_head": "1fa9ae1b9288b9d4080fbef79723aa4ad6970486",
+  "offered_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "arm64_run": 40253030459,
+  "linux_clippy_run": 40253030332,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "a339bdc8c57548ac1cf2f7e72f4297f1d1161d71",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "1fa9ae1b9288b9d4080fbef79723aa4ad6970486"
+      ],
+      "preview_tree": "e6376efdb7331103d05656edc522ec60cda4060c",
+      "offered_tree": "e6376efdb7331103d05656edc522ec60cda4060c",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "a339bdc8c57548ac1cf2f7e72f4297f1d1161d71",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "1fa9ae1b9288b9d4080fbef79723aa4ad6970486"
+      ],
+      "preview_tree": "e6376efdb7331103d05656edc522ec60cda4060c",
+      "offered_tree": "e6376efdb7331103d05656edc522ec60cda4060c",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11325,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11325,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11325
+  ],
+  "own_control_pass_counts": {
+    "lamp-voice coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture": 1,
+    "lamp-voice coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer": 1,
+    "lamp-voice search_pushed::tests::a_push_mid_search_holds_its_looks_in_the_lamps_turns_for_thirty_seconds": 1,
+    "lamp-voice search_pushed::tests::the_next_request_is_told_once_and_its_words_may_look_again": 1,
+    "lamp-voice search_pushed::tests::a_push_with_no_search_going_on_changes_nothing": 1,
+    "lamp-voice search_pushed::tests::a_walked_search_goes_on_with_its_turns_past_two_minutes": 1,
+    "lamp-voice search_pushed::tests::use_skill_holds_only_the_searchs_own_skill": 1,
+    "lamp-voice search_pushed::tests::each_fresh_push_is_taken_once": 1,
+    "lamp-voice search_pushed::tests::the_reader_takes_a_push_from_the_bus": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T01:22:56.2452537Z      Summary [ 212.244s] 11325 tests run: 11325 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "linux-clippy-40253030332.log",
+      "bytes": 85630,
+      "sha256": "34eef9f55790401a534a39a6871a242192911795e9b2e1d476fcc71584447030"
+    },
+    "arm64": {
+      "path": "arm64-40253030459.log",
+      "bytes": 2718632,
+      "sha256": "4d13130daeae5ec5bb635ea337293ce78b27501ab173e28375e7ce293e4e0f5c"
+    }
+  },
+  "old_756_run": {
+    "id": 40251330020,
+    "head": "2a353bfdb05f42548a82ec5374485f463d88ebac",
+    "conclusion": "success",
+    "metadata_receipt": "old-756-run-40251330020.json"
+  },
+  "limits": "Exact offered c5 head native gates only. Earlier 756 success/cancellation preserved separately. No local tests, workflow retries, device, provider, physical latency or future-base qualification.",
+  "qualified": true
+}

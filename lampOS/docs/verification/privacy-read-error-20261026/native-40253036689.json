@@ -1,0 +1,71 @@
+{
+  "pr": 3512,
+  "offered_head": "3bccb4a5f544d70ecaa2000c61089ff3c064bf5e",
+  "offered_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "arm64_run": 40253036689,
+  "linux_clippy_run": 40253036672,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "6ecdd717f641700ed85764f6d8a68eb7c3eb84fb",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "3bccb4a5f544d70ecaa2000c61089ff3c064bf5e"
+      ],
+      "preview_tree": "2cbbc330b6974437816de1cf715028f4aa851f64",
+      "offered_tree": "2cbbc330b6974437816de1cf715028f4aa851f64",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "6ecdd717f641700ed85764f6d8a68eb7c3eb84fb",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "3bccb4a5f544d70ecaa2000c61089ff3c064bf5e"
+      ],
+      "preview_tree": "2cbbc330b6974437816de1cf715028f4aa851f64",
+      "offered_tree": "2cbbc330b6974437816de1cf715028f4aa851f64",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11327,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11327,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11327
+  ],
+  "own_control_pass_counts": {
+    "lamp-expression::runtime sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease": 1,
+    "lamp-expression::it rest_requests::live_privacy_read_error_refuses_rest_until_a_valid_open_lease": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T01:23:32.6754123Z      Summary [ 207.128s] 11327 tests run: 11327 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "linux-clippy-40253036672.log",
+      "bytes": 88030,
+      "sha256": "f24b4982c5803a3262264b75c0d3d98f3c6f3a5d5d048727d94aa978656d5f24"
+    },
+    "arm64": {
+      "path": "arm64-40253036689.log",
+      "bytes": 2720641,
+      "sha256": "09257b3ef70c735f96061c7a624bea1dd82807f45d5fd83203361096c8921253"
+    }
+  },
+  "old_756_run": {
+    "id": 40251609106,
+    "head": "b34e40ba7a16f7098278b94c7fe768d9b2462d21",
+    "conclusion": "success",
+    "metadata_receipt": "old-756-run-40251609106.json"
+  },
+  "limits": "Exact offered c5 head native gates only. Earlier 756 success/cancellation preserved separately. No local tests, workflow retries, device, provider, physical latency or future-base qualification.",
+  "qualified": true
+}

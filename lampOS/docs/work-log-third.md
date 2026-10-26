@@ -7,6 +7,21 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:27 — Current fixture and privacy native gates green
+
+Ready for lamp-voice: no; second current reads are pending.
+
+#3520 **1fa9ae1b9**: original ARM64 **40253030459**, **11,325 unique
+PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped; its nine controls each pass once.
+Linux Clippy **40253030332** succeeds. #3512 **3bccb4a5f**: original
+ARM64 **40253036689**, **11,327 unique PASS**, zero FAIL/LEAK/TIMEOUT,
+106 skipped; both new controls pass once. Linux Clippy **40253036672**
+succeeds. Each run is attempt one, with exact c5/offered-head preview
+parents and tree equality. Their native receipts are beside the carry
+receipts. Both have a current reviewer-three READ-OK; the second read is
+requested. The preflight 756 event **40252014652** was cancelled by its
+c5 push, not failed or passed; its current native gate is separate.
+
 ## 2026-10-26 08:22 — Interruption repair pushed; persistent-pending fault reproduced
 
 Ready for lamp-voice: no; fresh native gates and reads are pending.
