@@ -1,0 +1,225 @@
+{
+  "artifact_manifest_sha256": "133c7ae857b07b3487e38bf35839ad52d14c109d9d80bd4f7fbbd86fc217c9c0",
+  "artifact_scope": "Actual compiler-emitted executable hashes rechecked unchanged; preserved copies also rechecked.",
+  "complete_marker_sha256": "ebdcbce259861cc8afa5d361cb650913d71a275c2d63bdab64171c8415d1300a",
+  "controller_sha256": "a5cad648c5bfffdf818c2a56a6542a7625d5e921f47d7347d97e25b0e5d4079f",
+  "count_scope": "Sum of the listed full-run libtest summaries only. Focused reruns and relay are separate. This is not a native nextest unique-case census; interleaved summaries are not assigned to crate headers.",
+  "full_literal_summary_totals": {
+    "failed": 0,
+    "ignored": 21,
+    "passed": 4085
+  },
+  "full_scope_packages": [
+    "lamp-voice"
+  ],
+  "identity": {
+    "base": "cced429433211e06790f23ed8f51e07be613972d",
+    "branch": "second/voice-memory-no-wait",
+    "head": "cced429433211e06790f23ed8f51e07be613972d",
+    "scope": "Uncommitted held-ack test changes and test-only process helper; no product source, Group B deadline, model/provider/device or local ARM64 change."
+  },
+  "kind": "voice-memory",
+  "limits": "Mac host gate only. No ARM64, device, provider, activation, release or physical latency acceptance. This packet does not waive or rewrite any earlier failed gate or artifact guard.",
+  "packet_generator_sha256": "31479b475043649bb56286412dd77a86cad5f6c6d180696c1f688f83188310d7",
+  "schema": 1,
+  "source_inventory": {
+    "bytes_modes_and_file_set_rechecked": true,
+    "entry_count": 7221,
+    "sha256": "34bcc4a424ea12e43a40d6020339e40a1ca18e1e0364aafd64cb4e1c5dc6754d"
+  },
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.304,
+      "exit_code": 0,
+      "label": "fmt",
+      "literal_summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "d71fcee61c2c35f5ed61197725363e9c37f77c526da312e3fa9c5ce81912f9b3",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 43.365,
+      "exit_code": 0,
+      "label": "clippy",
+      "literal_summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "62859ab41af5020a0d73aeff951d7aba3a6bd7fed79c80d6b0536193a3011dd5",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 117.399,
+      "exit_code": 0,
+      "label": "compile",
+      "literal_summaries": [],
+      "log_sha256": "744926aba9b94de7f49efc4a9554f16321ed91521afff1d51f0a2fc84299f8b4",
+      "receipt_sha256": "354677a4b5cc916ec214b4bb3882b6e6cbc98d497d9e76021e8c60302d56d7c3",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "<target>/debug/deps/lamp_voice-d0423b4e04fbfa63",
+        "remember::tests::the_days_writer_submits_after_idle_without_waiting_for_a_model",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 2.305,
+      "exit_code": 0,
+      "label": "focused-1",
+      "literal_summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 3813,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3813 filtered out; finished in 0.07s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "log_sha256": "393237b6593a084e7088e04dc1d3a63b6d1ad8767e5c3120642581d5d06d713e",
+      "receipt_sha256": "8cf5186d61def8b1def5d6ec8612fa10b68aa23268a5d4b9ac59eb115c4bb0f7",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "<target>/debug/deps/lamp_voice-d0423b4e04fbfa63",
+        "remember::tests::a_held_background_write_cannot_block_or_grow_the_foreground_queue",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.412,
+      "exit_code": 0,
+      "label": "focused-2",
+      "literal_summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 3813,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3813 filtered out; finished in 0.02s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "log_sha256": "9e2204e32603d14d954b175fe8f078429efbf20e037616c2ddbd8f77191adc26",
+      "receipt_sha256": "0d349363ce17800635cc577d37c969fbaf9e379ebb809b8b8bb9b07f08ff8ce4",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 575.975,
+      "exit_code": 0,
+      "label": "full",
+      "literal_summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 15,
+          "literal": "test result: ok. 3799 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 546.56s",
+          "measured": 0,
+          "passed": 3799
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 1
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.84s",
+          "measured": 0,
+          "passed": 275
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 6,
+          "literal": "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 4
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+          "measured": 0,
+          "passed": 6
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "log_sha256": "30444b0ecca53b1e39c6948619b409c239d90a35f21cbb24fbe0696bbef1bce0",
+      "receipt_sha256": "81b14776725f4eebb4dd1a1fbbf161a9a5dae40273e0de15a1a964370c207300",
+      "relay_lines": [],
+      "source_unchanged": true
+    }
+  ]
+}

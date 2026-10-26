@@ -1,0 +1,31 @@
+{
+  "limits": "The actual admission failure is qualifying evidence for this mutant, not evidence that its originally anticipated watchdog failure occurred. The restored 2/0 and byte-identical preserved library remain distinct from the failed original controller.",
+  "method": "Read-only source and retained log reconciliation; no test rerun or receipt overwrite.",
+  "mutation": {
+    "baseline_sha256": "3a262a4d63d4fae50241db8c553181ec7c9fb45363a2017afc898697f7197664",
+    "mutant_sha256": "673a2b846e8389fdbfa48695908765b3cbfacc9e1a26e7cbe3016ee9d316b662",
+    "only_change": ".try_send(DaysJob::Exchange { becomes .send(DaysJob::Exchange {",
+    "path": "lampOS/crates/voice/src/remember.rs"
+  },
+  "observed_failure": {
+    "child_assertion": "assertion failed: !client.finished_exchange(NOW, \"overflow\", \"answer\")",
+    "child_failed": 1,
+    "child_location": "crates/voice/src/remember.rs:13247:17",
+    "child_passed": 0,
+    "counts_are_not_added": true,
+    "interpretation": "The blocking send admits the overflow after the existing writer timeout frees queue capacity. The overflow-refusal assertion detects that admission regression. This is not a parent-watchdog detection.",
+    "native_outer_exit": 101,
+    "outer_failed": 1,
+    "outer_passed": 0,
+    "parent_location": "crates/voice/src/remember_no_wait.rs:112:5",
+    "parent_reason": "Child exited 101; its captured stdout/stderr were included in the assertion diagnostic.",
+    "peer_secondary_failure": "The release sender drops during the child assertion unwind; the waiting peer then reports RecvError.",
+    "raw_child_stderr_sha256": "6d6cb786a8c3a84a18fe15226720588c8fdb2b76f2269edf54e1dba749075f4f",
+    "raw_child_stdout_sha256": "69aa1734a34f843c7290036f4f458d10a94a43fdbe8e1dc71e93efcb9b79f229",
+    "raw_outer_log_sha256": "0bb55dafc5363010c03f34257bd3cbe25e825a3ea3fdf92b879ceb8ea2890e14"
+  },
+  "original_procedure_still_failed": true,
+  "parser_failure": "The controller expected one terminal summary in the combined outer log. The parent diagnostic embeds the child summary, so two 0/1 summaries appear. The original controller stopped before the queued-wait variant and retained complete=false.",
+  "schema": 1,
+  "source_audit": "After removing only the two named test bodies and the cfg(test) no_wait module declaration, retained baseline candidate and original-head remember.rs are identical. Production and Group B assertions/timeouts are unchanged."
+}
