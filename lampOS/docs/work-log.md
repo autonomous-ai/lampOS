@@ -1,3 +1,15 @@
+Ready for lamp-voice: startup delivered; #3510 activation HOLD and next-base qualification active.
+
+## Current checkpoint: 2026-10-26 17:30 +07, own-keys original native qualified
+
+[Own-keys f378 native evidence](verification/own-keys-product-carry-20261026/native-f378/README.md) verifies original ARM64 `40304968180`, Linux Clippy `40304968147` and general CI `40304958474` success. Workspace PR-profile nextest: **11,371 unique passes / zero failures, leaks, timeouts or selected unrun / 106 skipped**, all eleven own-keys/census controls once; 35 echoes excluded. Exact preview parents and both actual native checkouts equal the authored tree. General CI's four jobs check out f378 directly. Separate process 13, relay 1, docs 4 and helper 25 are not summed into nextest.
+
+The executed ff17/690 host gate remains **6,175/0/48** plus factory **94/0**. Current private `d378a1850` carries the seven unchanged own-keys patches onto startup landing `6663ca655`. Symbol readers for that inherited change stay inside Voice, so its focused full Voice gate follows fresh fmt/strict nine-crate Clippy. Old 66-artifact actual checks precede that rebuild; only fresh Voice bindings will be claimed afterward. No earlier runtime is relabeled.
+
+The log rebase preserves every earlier verification entry. #2094 and explicit current-lamp acceptance still hold activation; software success does not clear them. No device, provider, signing or release action ran.
+
+---
+
 Ready for lamp-voice: #3568 delivered; #3510 activation HOLD and new startup-base carry underway.
 
 ## Current checkpoint: 2026-10-26 17:28 +07, startup landed and installer review passed

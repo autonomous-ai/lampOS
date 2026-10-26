@@ -1,0 +1,287 @@
+{
+  "run": {
+    "id": 40304958474,
+    "run_attempt": 1,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "f378095a90aa5b4183bb90e499c6cc7853fd546e",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40304958474"
+  },
+  "jobs": [
+    {
+      "id": 121511682984,
+      "name": "Go (system) \u2014 build \u00b7 vet \u00b7 test",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T10:07:52Z",
+      "completed_at": "2026-10-26T10:09:15Z",
+      "actual_checkout": "f378095a90aa5b4183bb90e499c6cc7853fd546e",
+      "raw_log_sha256": "d6564c9e88d58b604aed1d5133a16b3702351dffeeb7c6d06052e6f7a71c6162",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "vet",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-go@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 121511683347,
+      "name": "Image builder \u2014 signatures \u00b7 bootstrap \u00b7 output",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T10:07:52Z",
+      "completed_at": "2026-10-26T10:08:14Z",
+      "actual_checkout": "f378095a90aa5b4183bb90e499c6cc7853fd546e",
+      "raw_log_sha256": "bbd37238d620a0c88bbe9b68282bc0a6616fd817a52748f2bf1ab93ab3fe0fa0",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "image test tools (same Ubuntu release as the builder)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "image shell syntax",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "signed bootstrap and output contracts (no image or device)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "existing image integrity and resize tests (disposable files only)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 121511683391,
+      "name": "Web (system/web) \u2014 typecheck \u00b7 build \u00b7 lint",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T10:07:52Z",
+      "completed_at": "2026-10-26T10:08:32Z",
+      "actual_checkout": "f378095a90aa5b4183bb90e499c6cc7853fd546e",
+      "raw_log_sha256": "faaa6217d0a0367fd43e9367eca382d9193853a8df7da51df21d2141ca56c9b5",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "install",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "typecheck + build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "lint",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 121511683877,
+      "name": "Python (hal) \u2014 unit tests \u00b7 syntax",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T10:07:52Z",
+      "completed_at": "2026-10-26T10:08:14Z",
+      "actual_checkout": "f378095a90aa5b4183bb90e499c6cc7853fd546e",
+      "raw_log_sha256": "d1b8f719442df4e6db350604e96ecc61978630dd30119be3717eba72922443e1",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "syntax check every tracked Python source (including routes)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Python syntax gate regression tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "hal lint (broken / moved-away local imports)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "unit tests (board + device \u2014 no hardware deps)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "HAL route contracts (no hardware deps)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hermes Jev plugin tests (mock proxy, no credentials)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Hermes runtime patch contracts (generated Python + idempotence)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Buddy helper tests (mock transport, no desktop actions)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "conformance suite (CTS \u2014 devices vs COMPATIBILITY.md)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "skill catalog matches the skills/ tree",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "scope": "General CI checks out the authored head directly; it does not use the lampOS merge preview. Counts are not added to ARM64 nextest.",
+  "raw_metadata_sha256": {
+    "general-run-final.json": "62fa7080e58fd730272f0038a7e8daa1d8d10883d9f772a1044b6b50002dde76",
+    "general-jobs-final.json": "d9e5e4ee94420096044114d1b9848cb965dc04aed89667f4190910863fdfc2cc"
+  },
+  "python_scope_note": "The syntax checker deliberately prints two one-failure summaries inside its passing negative-control unit tests; these are not job failures. CTS has 14 skipped of 16 tests."
+}
