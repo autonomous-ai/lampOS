@@ -1,0 +1,401 @@
+{
+  "schema": 1,
+  "train": 173,
+  "pr": 3585,
+  "head": "9f05448330d2e009e6c6207f99db6b8dee12b7e0",
+  "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+  "disposition": "READ-OK for train composition, original native binding and execution; delivery gate belongs to First",
+  "composition": {
+    "train": 173,
+    "pr": 3585,
+    "member_prs": [
+      3579
+    ],
+    "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+    "candidate": "9f05448330d2e009e6c6207f99db6b8dee12b7e0",
+    "reviewed_head": "cbc89589b1c76e6f2050e4a1ec54b11fe69071fc",
+    "base_is_ancestor": true,
+    "candidate_tree": "1d0b50352bc83a5ba73c56d7d5852ca93d40ee58",
+    "reviewed_tree": "1d0b50352bc83a5ba73c56d7d5852ca93d40ee58",
+    "full_tree_identical": true,
+    "range_diff_equal_commits": 8,
+    "range_diff": [
+      "1:  64b90c24b6 = 1:  16b95a9528 lampOS: the reset stops each part of lampos.target by name and waits for it before wiping, so nothing writes back after the wipe",
+      "2:  9bfcdfec62 = 2:  c899cb0244 lampOS: the reset checks every part of the lamp stopped, and none joined, before it wipes, recursing into a part that is a target",
+      "3:  7d8baa481f = 3:  1aa65ab366 lampOS: the reset also stops setup, its helpers, the skills' manager, records and the updater, after what starts them, and reads them stopped before it wipes",
+      "4:  b35928b76e = 4:  edf2615d2d lampOS: the reset wipes Wi-Fi's rollback and staging copies with its file, and Wi-Fi puts no old network back while a reset is journalled",
+      "5:  2370a28c3e = 5:  796fba8ef5 lampOS: setup.md says the reset wipes Wi-Fi's copies and Wi-Fi puts nothing back during a reset",
+      "6:  d839c04e61 = 6:  254e070934 lampOS: the reset stops the updater's way back and the keeper's restart socket first, the boot Wi-Fi restore too, names only loaded units, and wipes setup's staging copies",
+      "7:  afa25fc401 = 7:  d424a3c98a lampOS: setup.md lists the updater's way back, the keeper's restart socket and the staging copies in the reset",
+      "8:  cbc89589b1 = 8:  9f05448330 lampOS: a test where the updater's way back, a self-switch pending, would restart the updater past the reset's final check"
+    ],
+    "changed_paths_vs_reviewed": []
+  },
+  "runs": {
+    "arm64": {
+      "id": 40324039184,
+      "name": "lampOS on ARM64",
+      "head_sha": "9f05448330d2e009e6c6207f99db6b8dee12b7e0",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40324039184"
+    },
+    "linux-clippy": {
+      "id": 40324039222,
+      "name": "lampOS clippy",
+      "head_sha": "9f05448330d2e009e6c6207f99db6b8dee12b7e0",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40324039222"
+    }
+  },
+  "previews": {
+    "arm64": {
+      "executed_preview": "658e2d954de5b858b16108bf9b89ad478a43fde1",
+      "preview_parents": [
+        "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+        "9f05448330d2e009e6c6207f99db6b8dee12b7e0"
+      ],
+      "preview_tree": "1d0b50352bc83a5ba73c56d7d5852ca93d40ee58",
+      "offered_tree": "1d0b50352bc83a5ba73c56d7d5852ca93d40ee58",
+      "verified": true
+    },
+    "linux-clippy": {
+      "executed_preview": "658e2d954de5b858b16108bf9b89ad478a43fde1",
+      "preview_parents": [
+        "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+        "9f05448330d2e009e6c6207f99db6b8dee12b7e0"
+      ],
+      "preview_tree": "1d0b50352bc83a5ba73c56d7d5852ca93d40ee58",
+      "offered_tree": "1d0b50352bc83a5ba73c56d7d5852ca93d40ee58",
+      "verified": true
+    }
+  },
+  "nextest": {
+    "passed": 1413,
+    "failed": 0,
+    "leaks": 0,
+    "timeouts": 0,
+    "skipped": 9,
+    "unique_terminal_cases": 1413,
+    "repeated_equal_rows": 0,
+    "all_selected_ordinals_present": true,
+    "reported_selected_totals": [
+      1413
+    ],
+    "package_census": {
+      "lamp-cloud": 196,
+      "lamp-setup": 185,
+      "lamp-update": 409,
+      "lamp-voice-eval": 623
+    },
+    "binary_census": {
+      "lamp-cloud": 166,
+      "lamp-cloud::it": 30,
+      "lamp-setup": 16,
+      "lamp-setup::it": 163,
+      "lamp-setup::wake": 6,
+      "lamp-update": 121,
+      "lamp-update::functions": 5,
+      "lamp-update::install": 101,
+      "lamp-update::it": 13,
+      "lamp-update::round": 167,
+      "lamp-update::self-cli-exec": 1,
+      "lamp-update::self-process-cuts": 1,
+      "lamp-voice-eval": 378,
+      "lamp-voice-eval::bin/lamp-voice-eval": 7,
+      "lamp-voice-eval::it": 238
+    },
+    "selection": [
+      "2026-10-26T12:41:05.6495167Z Changed: lamp-setup. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 4 of 46 crates.",
+      "2026-10-26T12:41:05.6600088Z   PICKED: package(=lamp-cloud) | package(=lamp-setup) | package(=lamp-update) | package(=lamp-voice-eval)"
+    ],
+    "nextest_start_rows": [
+      "2026-10-26T12:41:32.2907164Z     Starting 1413 tests across 20 binaries (9 tests and 164 binaries skipped)"
+    ],
+    "skip_rows_logged": 0,
+    "skip_count_basis": "9 tests and 164 binaries skipped in nextest start/summary; no individual skip rows emitted"
+  },
+  "changed_control_pass_counts": {
+    "lamp-setup::it reset::a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order": 1,
+    "lamp-setup::it reset::a_reset_waits_for_every_part_of_the_target_before_wiping": 1,
+    "lamp-setup::it reset::a_reset_stops_the_writers_outside_the_target_after_what_starts_them": 1,
+    "lamp-setup::it reset::the_updaters_way_back_restarts_nothing_after_the_barrier": 1,
+    "lamp-setup::it reset::a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile": 1,
+    "lamp-setup::it reset::parts_that_cannot_be_read_reboot_without_wiping": 1,
+    "lamp-setup::it reset::a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup": 1,
+    "lamp-setup::it reset::only_a_systemctl_stop_of_a_target_names_its_parts": 1,
+    "lamp-setup::it reset::a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe": 1
+  },
+  "all_reset_module_controls": {
+    "count": 32,
+    "all_once": true
+  },
+  "original_review_comparison": {
+    "head": "cbc89589b1c76e6f2050e4a1ec54b11fe69071fc",
+    "all_1413_names_and_terminal_states_identical": true,
+    "setup_cases": 185,
+    "reset_cases": 32
+  },
+  "separate_harnesses": {
+    "doctests": {
+      "harnesses": 46,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0,
+      "all_13_once": true
+    },
+    "relay_signals": {
+      "ok_witnesses": 1
+    },
+    "promoter": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "all_expected_present": true
+    },
+    "offline_publication": {
+      "lampos-publish-test.py": {
+        "passed": 35,
+        "elapsed_seconds": 0.244,
+        "ok": true,
+        "separate_from_nextest": true
+      },
+      "lampos-publish-artifact-test.py": {
+        "passed": 12,
+        "elapsed_seconds": 0.696,
+        "ok": true,
+        "separate_from_nextest": true
+      },
+      "lampos-publish-cli-test.py": {
+        "passed": 7,
+        "elapsed_seconds": 0.39,
+        "ok": true,
+        "separate_from_nextest": true
+      }
+    }
+  },
+  "job_step_outcomes": {
+    "arm64": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "system packages",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "publication failure tests (offline, no signing secret)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Rust 1.96.0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "stable promotion tests (offline, disposable test key)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "restore the cache",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "unchanged source files get the cached build's times back",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "record fresh source times for a cold publication build",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Run taiki-e/install-action@v2",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "build (release, the lamps' binaries)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "every built lamp-* binary is classified for the lamp-os package",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "build the two selected artifact examples without filename collisions",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "which crates a pull request tests",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "doc tests and the own-harness tests (nextest runs neither)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "export only current Cargo targets and their SHA-256",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "discard the isolated example target before saving the cache",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "save the cache",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "linux-clippy": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "system packages",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Rust 1.96.0",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "stable promotion formatting and strict Clippy",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "formatting (whole workspace, pinned Rust)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "restore the cache",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "unchanged source files get the cached build's times back",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "clippy (every crate and target, warnings as errors)",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "save the cache",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "logs": {
+    "arm64": {
+      "path": "arm64-40324039184.log",
+      "bytes": 469544,
+      "sha256": "a2652b58ac0bdc24dabc1fb8ff0c4983b1625d789117132a67ec55931f7dbe70"
+    },
+    "linux-clippy": {
+      "path": "linux-clippy-40324039222.log",
+      "bytes": 94431,
+      "sha256": "42d918b4249227ef6aebb3723e370d26aaadf82b1b4cbd225108e9daee84e4ce"
+    }
+  },
+  "artifacts": {
+    "total_count": 1,
+    "artifacts": [
+      {
+        "id": 12650557522,
+        "name": "lampos-arm64-9f05448330d2e009e6c6207f99db6b8dee12b7e0",
+        "size_in_bytes": 116060575,
+        "digest": "sha256:71abbf7b1f12e8fb0afc30bc455654bb047dae0b01f9b547f133fa8867e6d6ba",
+        "expired": false,
+        "created_at": "2026-10-26T12:42:31Z",
+        "expires_at": "2026-11-02T12:42:24Z"
+      }
+    ]
+  },
+  "artifact_limit": "Inventory only; binaries were not downloaded or executed in this audit.",
+  "limits": "Original attempt-1 native CI only; no retries, local builds, device access or source changes. Four selected packages, not the whole workspace runtime suite. Skip names are unavailable in these logs and are not inferred. A passed model test does not prove actual systemd shutdown or customer reset on a lamp.",
+  "qualified": true
+}

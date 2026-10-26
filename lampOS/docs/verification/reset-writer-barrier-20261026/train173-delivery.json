@@ -1,0 +1,20 @@
+{
+  "pr": 3579,
+  "member": "cbc89589b1c76e6f2050e4a1ec54b11fe69071fc",
+  "train_pr": 3585,
+  "candidate": "9f05448330d2e009e6c6207f99db6b8dee12b7e0",
+  "landing": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+  "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+  "full_tree": "1d0b50352bc83a5ba73c56d7d5852ca93d40ee58",
+  "member_landing_diff_empty": true,
+  "range_diff": "1:  64b90c24b6 = 1:  af43a8f69e lampOS: the reset stops each part of lampos.target by name and waits for it before wiping, so nothing writes back after the wipe\n2:  9bfcdfec62 = 2:  2622d32062 lampOS: the reset checks every part of the lamp stopped, and none joined, before it wipes, recursing into a part that is a target\n3:  7d8baa481f = 3:  f4bf8e42c3 lampOS: the reset also stops setup, its helpers, the skills' manager, records and the updater, after what starts them, and reads them stopped before it wipes\n4:  b35928b76e = 4:  3ef3563358 lampOS: the reset wipes Wi-Fi's rollback and staging copies with its file, and Wi-Fi puts no old network back while a reset is journalled\n5:  2370a28c3e = 5:  3379f7457d lampOS: setup.md says the reset wipes Wi-Fi's copies and Wi-Fi puts nothing back during a reset\n6:  d839c04e61 = 6:  2af73442af lampOS: the reset stops the updater's way back and the keeper's restart socket first, the boot Wi-Fi restore too, names only loaded units, and wipes setup's staging copies\n7:  afa25fc401 = 7:  0076d399db lampOS: setup.md lists the updater's way back, the keeper's restart socket and the staging copies in the reset\n8:  cbc89589b1 = 8:  aa9ec9e27a lampOS: a test where the updater's way back, a self-switch pending, would restart the updater past the reset's final check\n",
+  "native_arm": 40324039184,
+  "native_linux": 40324039222,
+  "native_selected": [
+    1413,
+    0,
+    9
+  ],
+  "status": "Delivered by train173; original member PR closed, train PR merged as eight preserved commits.",
+  "limits": "Repository delivery only. First owns publication and installed factory/reset/empty stores/customer-onboarding acceptance; no device changes by Third."
+}
