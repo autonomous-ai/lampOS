@@ -1,0 +1,9 @@
+# Shell launch diagnostic
+
+One predeclared host diagnostic ran thirty rotating triplets: direct script pathname, `/bin/sh script`, and `/bin/sh -c` literal. Each mode used fifteen OLD and fifteen NEW builtin-only updater scripts, with exact expected output, zero exit and EOF required. All **90 launches passed**. Each actual launcher used observed `posix_spawn`; the startup/finish bounds remained five/two seconds. No observation reached the two-second sampling trigger.
+
+Maximum first-byte observations were **846.64 ms** for direct scripts, **13.10 ms** for interpreter-file launches, and **13.26 ms** for literal commands. These are observations of this auxiliary CPython probe, with its exact scripts and host conditions; they are not measurements of the Rust fixture or updater. The probe did not reproduce the five-second stall, did not reproduce the full fixture/FORKS coordination or historical load, and establishes no failure cause. All owned literal children were reaped, and helper source hashes remained unchanged.
+
+The [candidate full run](https://github.com/autonomous-ai/lampOS/tree/839863049/lampOS/docs/verification/tests-carrier-2d-parallel-failure-20261026) remains failed at **439/3/6**. The [unmodified Main Round control](https://github.com/autonomous-ai/lampOS/tree/0d2b1537a/lampOS/docs/verification/tests-carrier-unmodified-round-control-20261026) and [isolated candidate observation](https://github.com/autonomous-ai/lampOS/tree/f7f01e798/lampOS/docs/verification/tests-carrier-candidate-three-control-20261026) keep their separate **183/0/0** and **3/0/0** identities. This diagnostic grants no waiver or readiness clearance.
+
+`audit.json` retains all ninety sanitized case observations, receipt hashes, timings, script hashes and limitations. No product code, fixture deadline, test assertion or branch source was changed. No ARM64 or device action ran.
