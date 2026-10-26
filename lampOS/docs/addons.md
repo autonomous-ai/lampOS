@@ -723,9 +723,15 @@ tier's whole say is longer:
   second `id` while one is open is dropped as `busy`.
 - **One decision, on a reference.** The service keeps the complete say's
   words itself. It writes one `AddonProposal` from `own-<computer>` with no
-  `note`, so `AddonProposal::check` and `ADDON_NOTE_BYTES` stay as they
-  are, and `params.long = {id, bytes, parts}`, a reference the judge reads
-  as metadata only. The judge decides once for all of it. `holdsMs` is
+  `note` and a new part, `long = {id, bytes, parts}`, a reference the judge
+  reads as metadata only. `AddonProposal::check`'s rule for `say` changes
+  with it (`crates/msgs/src/addon.rs`, the parts tuple): a `say` carries
+  exactly one of a `note` of at most `ADDON_NOTE_BYTES` or a `long` with
+  `bytes` 1 to 4,096 and `parts` 1 to 14, never both or neither. A `long`
+  is taken only from the trusted service's own bus source, checked where
+  the runtime reads the source (`crates/addons/src/runtime.rs`), and
+  dropped from any other writer. Partners' says keep the 300-byte `note`
+  exactly as today. The judge decides once for all of it. `holdsMs` is
   counted from the last part. It counts as one say in the trusted tier's
   rates, whatever its length, and the decision goes back once, with the
   `id`. Only on `kept` does the service hand the words, by the reference,
@@ -747,8 +753,9 @@ tier's whole say is longer:
   most 300 bytes. The service drops a `params.part` from any other
   computer as `not_for_partner`.
 - **Code.** The constants above stay as they are for proposals, partners'
-  included. The new pieces are `params.part` and `params.long` in
-  `crates/msgs` (a schema change, landed with its readers), the service's
+  included. The new pieces are `params.part` and the `long` part in
+  `crates/msgs` (a schema change, landed with its readers), the `say`
+  rule in `AddonProposal::check` (one of `note` or `long`), the service's
   gathering and held words, the judge accepting the trusted service's
   source (`crates/addons/src/runtime.rs` takes `skills` only today), and a
   say-service request for a trusted say of up to 4,096 bytes, by reference,
