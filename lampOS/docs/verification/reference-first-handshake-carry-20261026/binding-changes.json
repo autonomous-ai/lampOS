@@ -1,0 +1,20 @@
+[
+  {
+    "expected_changed_reader": true,
+    "kind": [
+      "lib"
+    ],
+    "new_sha256": "31261d908d3415dd870562fad341e049ad5178318f6074240a2a02932dec7149",
+    "old_sha256": "3b8456759b2c8ee183defc27966618f9869de50ec9ed659d1cf78a9c57fbd154",
+    "target": "lamp_update"
+  },
+  {
+    "expected_changed_reader": true,
+    "kind": [
+      "test"
+    ],
+    "new_sha256": "19b70db144bea5c55abe6764f93c7c2310fe2c9e701a1b8b97d4f57585db6700",
+    "old_sha256": "543b00181b2d7f58a927134801729d567ed71942d259725f21cdb3bddeb599f9",
+    "target": "install"
+  }
+]

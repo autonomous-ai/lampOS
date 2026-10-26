@@ -1,0 +1,84 @@
+{
+  "identity.json": {
+    "base": "1ec33957c78e6dc39bd7ca0b3b8f7c74543f6b35",
+    "purpose": "Disable only the new first CapturePrepared allowance, expect the reported-age regression to fail; restore and run transport tests. No device or Linux test."
+  },
+  "fmt.json": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "disk_free_before": 111907786752,
+    "elapsed_seconds": 5.98,
+    "error": null,
+    "exit_code": 0,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_entries": 7236,
+    "source_unchanged": true
+  },
+  "disabled-allowance.json": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "disk_free_before": 111906525184,
+    "elapsed_seconds": 108.572,
+    "error": null,
+    "exit_code": 101,
+    "log_sha256": "daf28c6e676c35e382b0438e343f840ef318b42ed4cea12a9e770a0a8159de2e",
+    "source_entries": 7236,
+    "source_unchanged": true
+  },
+  "disabled-allowance-expected-failure.json": {
+    "exit_code": 101,
+    "expected_failure_observed": true,
+    "production_allowance_disabled_only": true,
+    "reported_age_us": 143402
+  },
+  "restored-transport.json": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "transport::tests::",
+      "--",
+      "--test-threads=1"
+    ],
+    "disk_free_before": 111857496064,
+    "elapsed_seconds": 80.153,
+    "error": null,
+    "exit_code": 0,
+    "log_sha256": "2ec5c0c1585f3fcea1906e489b41267efdbdbb732605898867e7157d3ad59312",
+    "source_entries": 7236,
+    "source_unchanged": true
+  },
+  "complete.json": {
+    "disabled_allowance_failed_as_expected": true,
+    "exit_code": 0,
+    "literal_summaries": [
+      "test result: ok. 34 passed; 0 failed; 1 ignored; 0 measured; 3787 filtered out; finished in 0.11s"
+    ],
+    "source_restored": true
+  },
+  "limits": "Control and transport execution on original1ec candidate; not added to7427 and not relabeled onto the current carry."
+}

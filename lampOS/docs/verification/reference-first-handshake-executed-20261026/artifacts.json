@@ -1,0 +1,1844 @@
+[
+  {
+    "package": "lamp-peek@0.1.0",
+    "target": "lamp-peek",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-peek",
+    "sha256": "2cea874ea27da8258b734f1aecef2c2609a34a946f62100f4fd2628bb21e1c95",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-peek@0.1.0",
+    "target": "lamp-peek",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_peek-d6933b14265fa15d",
+    "sha256": "b5093a8b2ece100278475c3103bec221ddcddd32605159c94d83b8a61d675915",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-peek@0.1.0",
+    "target": "peek",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "peek-9f30a3a22d150551",
+    "sha256": "3ce08bf743998ebe9b0e470e91e4a48c72dcd19eb4098dd7c952a4c23f194204",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-cloud@0.1.0",
+    "target": "release_pair",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "release_pair-f1640921eeefd6e0",
+    "sha256": "8d06521cef5c1b9276ed762096fcb56e4f30a6564f8ce0906ed7a87c90cd970f",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-cloud@0.1.0",
+    "target": "lamp-cloud",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-cloud",
+    "sha256": "e284df50b7430cf18b55f725258963e67a5f6524c243255389da86913552ac38",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-cloud@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-3e0d523900dc9b16",
+    "sha256": "eea75ca93829a8d2fb1abef72f925cca6634fe18306a2189ad845f0f90e29b7d",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-cloud@0.1.0",
+    "target": "lamp-cloud",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_cloud-98575ddcd1dfb4a4",
+    "sha256": "000ce071d762d5c12c2b7f40567231dfab89f81238b01610e0607eea8952e023",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice-eval@0.1.0",
+    "target": "turn_end_replay",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "turn_end_replay",
+    "sha256": "9edc31139aeee42c704babf37320f55e24fd1b1d0f20814dc404e699f77b0f3f",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice-eval@0.1.0",
+    "target": "same_voice_pairs",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "same_voice_pairs",
+    "sha256": "4c4f95eff0f3ae55a94a26084653a9213243026233d8be4126f57b4ba92874aa",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice-eval@0.1.0",
+    "target": "lamp_voice_eval",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_voice_eval-8963e8cb131a4790",
+    "sha256": "7084f650dbd5a78aabe2f51a2f9d0d765306c83ec953e71738b038be37e017d6",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice-eval@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-71cdc8e9a66bee71",
+    "sha256": "1dbbf9ce3f5dde340ec81a67ed3d957d5c42ecec018f0c7d9509c152daccbc77",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice-eval@0.1.0",
+    "target": "lamp-voice-eval",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_voice_eval-fadbda892ed95aa9",
+    "sha256": "eb82563aeeeeaf1e5adf47f7e0a7efd1c67d989e44928b492687bb26f231069f",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice-eval@0.1.0",
+    "target": "lamp-voice-eval",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-voice-eval",
+    "sha256": "c268a333f9c35113a54c35e07e2285e2ecea620beaa62b6cc641ceb93c9173f0",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-cloud@0.1.0",
+    "target": "lamp_cloud",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_cloud-2d85590c5b488b1f",
+    "sha256": "35aa9b0ba606a63927f48a98e8a6f411d905bf2667c8f34fc5d9b2e069d0deff",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-setup@0.1.0",
+    "target": "wake",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "wake-d308af7a0a70e612",
+    "sha256": "cf1450e83e265523a1810964285259df8d27be13ca83627fdb22128d565719ca",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-setup@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-29160a7d1fe7e363",
+    "sha256": "1f8b86dd1bf5422b963edd095c2b9eb5c311c2176a39ed9f6ac46e330c996346",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-setup@0.1.0",
+    "target": "lamp-setup",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_setup-9c702477f431b4a8",
+    "sha256": "b2d8aaea5d638af02f5018d6fa44e4dfa0bb68d81cb6773f1a0dbc3dfd512e03",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-setup@0.1.0",
+    "target": "lamp-setup",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-setup",
+    "sha256": "ac5076184ea274cf9cf356c7cd17f4cebd2a8ad651bf09e5c98b4ae952907fb3",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "release_pair",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "release_pair-421d899db2f1ea43",
+    "sha256": "5a5dfecf8b2c28508f18744bfb8554aa67fa2105170329d0777bc7861eaccdbf",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "admission_latency",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "admission_latency",
+    "sha256": "e19fc553745ed2848323252ee1686d132993ea95de836f6fd31abf9b897f80c1",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "stop_words_stt_replay",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "stop_words_stt_replay-00c3d5ade90339de",
+    "sha256": "72ea1b50d86234b375c2aa152d78d4941475c5634a145fea5ec5d2b47108495e",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "render_line_second",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "render_line_second-0bd40a322a0ccf32",
+    "sha256": "fbaf08c12dfc82db54350de2a96aa4b7aa81ceb6115c24645c839a3169c8b07c",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "reference_pace",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "reference_pace",
+    "sha256": "c30f7cca912417f46b4170f3098e1693d7b163d2723f3f28c31cc28575c85e42",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "hearing_replay",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "hearing_replay",
+    "sha256": "f357a5ce54c3644286707617ccc92ab2180dbef7df457f636f4706b7f138ba37",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "lamp-voice",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_voice-c2104e0b231de0af",
+    "sha256": "390148899e74846b8bdb3cb07bb1b71cab31c4cdd33c8fbaaab79061078761fe",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "ring_process_probe",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "ring_process_probe",
+    "sha256": "3307c2c4fd75092f245b0034237b23e489a1c95b6fc6627202d2984c4022bf79",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "head_qualification_operator",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "head_qualification_operator",
+    "sha256": "5ac8d99baeb610ddb231fbd61f8a9fed795fb1496eba89ae71131e75bffe8f07",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "duplex_lab",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "duplex_lab",
+    "sha256": "f1a999248bae8ed66504b683f17c176ffef3da7d60db265224af8acb6accee56",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-ff8814137b406f09",
+    "sha256": "6bb2062ba6be36fb4c6a1b672f11546be129d4b04626024992bccc2f5edd79a5",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "probe_handover",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "probe_handover",
+    "sha256": "530745996582ea550e67471cfb652db15d1a6dbe01b42167c9938a7c3ac3266f",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "lamp_voice",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_voice-9cb3bb6d29219bbc",
+    "sha256": "901c292fb643fc96ce4cffaab25a6d14b46b73dcbc294525948c64f6ac570b91",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-skills@0.1.0",
+    "target": "render_relaxing_music",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "render_relaxing_music",
+    "sha256": "8a071965c92020a584b0db21cabe70aaa9b8c7cb4bbf327f0600c8efbd1a2164",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-skills@0.1.0",
+    "target": "release_pair",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "release_pair-fe88cce8c241f77a",
+    "sha256": "ab8e7b35344f88367a510ddc148614860b190b22d8d0b74161faa5e023c42ffb",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "functions",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "functions-a79539d1b683d78e",
+    "sha256": "493b10b7de5fe8b31539e488b1cec273dd372944111b5a40cf59cd3d7242094c",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "lamp_update",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_update-bf1ff12e0c522c55",
+    "sha256": "3b8456759b2c8ee183defc27966618f9869de50ec9ed659d1cf78a9c57fbd154",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "lamp-update",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_update-21a27aecedff36b1",
+    "sha256": "ea19f4a23e82d5bee435cb149ea7964be99245be3d86c43b2ea2691722d55a04",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "round",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "round-7e901bc5f5991b1d",
+    "sha256": "3cc49e2899971003639761a26d6820d1b23bc3233a60b0eccadd5830337279cb",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-skills@0.1.0",
+    "target": "requested_audio",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "requested_audio-dc0356d0f2a100c3",
+    "sha256": "4efb3870d9ae5333ea2d6c67601ef5a82f2c693d9863eff646970e0387de9338",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "install",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "install-9191cffef374a606",
+    "sha256": "543b00181b2d7f58a927134801729d567ed71942d259725f21cdb3bddeb599f9",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-b4c361f80933d986",
+    "sha256": "7d010412ba6ad8252b929d4fe565678b10a274d80c3c1c7c7304d390aeccf633",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "self-cli-exec",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "self_cli_exec-8281cc7af00bd2ca",
+    "sha256": "9086083c17b19c112e9ef2af98cd9cb4481d14acc29c13b476c0abfcd0468069",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-skills@0.1.0",
+    "target": "lamp_skills",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_skills-a033a3b884bf3ee4",
+    "sha256": "db793164f48776e50b5b64b22867802c3c3bd82da0a12bd570617f179a9cee98",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-skills@0.1.0",
+    "target": "lamp-skills",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_skills-a4fb845bf2fc4439",
+    "sha256": "5ccd8d8c1696f269c43acdc4d922698fad965e6f7bcaffe58051d3deafe15862",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-skills@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-cb0bbc97d2930593",
+    "sha256": "e327eb30cd3eddc63b0187e232a88f70a512757e9fbd7c2c6c68f9942da6b92e",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "release_pair",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "release_pair-256f992c10791363",
+    "sha256": "c5ba50854049fd0bd11d45e5add9c1f0d246b2b87422d1fa8c505b9755065768",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "self-process-cuts",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "self_process_cuts-d5ced55ee0a7935e",
+    "sha256": "c20f89382d2d8b06192f71222a16708750e48d074c23bcf1cfd955979358d25e",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-peek@0.1.0",
+    "target": "lamp_peek",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_peek-c04cb8464eabb3bc",
+    "sha256": "cfc8740f06c61e6d6399ccc52eace8b7478485a9cc27a7c51b5a51d154ae0ca3",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-setup@0.1.0",
+    "target": "lamp_setup",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_setup-5f9e487dc0ded486",
+    "sha256": "e8a92f59766a6ced09d5bd27d1243eaf480be3ff933cf6d4f14db1f931dee6d7",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-skills@0.1.0",
+    "target": "lamp-skills",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-skills",
+    "sha256": "8c81fbb66b806df80ff9dcf069e1fd728a224ed448cd2aaa2c69ccc85ece77e2",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_forget_named",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_forget_named-43b7cb065fd6de5b",
+    "sha256": "0b20a33fe9a5ca14eb3070267ba3369c2a26573fac3ee8d6635a7f3e349cf5be",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_forget",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_forget-74f427745157799f",
+    "sha256": "4f512259a75fb16d7a17a07b4a343143fcc7bd995f4b46514cc511f8a4ddba82",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "lamp-memory",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-memory",
+    "sha256": "933c7aa4520e875ca2106d1992c0a6ecfebca089b3c3dc35bd47402a0751e494",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "forget_person",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "forget_person-092c1b2075247468",
+    "sha256": "ff572f50d61ce37df7a424c5d67a8d21824e8474e25273464d364a3d4b54494a",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "forgot",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "forgot-9dff199d99645d9b",
+    "sha256": "f6f1a420dc117f7316a32a5870181726493d5d01d9922b448504c8856b10caa8",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "lamp-memory",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_memory-8940c2cb57c255d2",
+    "sha256": "cc19a594beacf15b7ad170c2add35f48a3dc099ac7ea51c446e5ea4569d57e74",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_observe_named_forget",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_observe_named_forget-f088b42f8cd2f168",
+    "sha256": "7135535f28b992d000858d5bae9c256963b4e96d81fe1ced1f36e06ef84acc56",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "release_pair",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "release_pair-fa4de417e90a8d58",
+    "sha256": "cd9ed064cac3cd3e518ce60d66ffa57c017b7d2ea3b1489405c1de1972a4d219",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_observe_room",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_observe_room-0e4584cbc9f45624",
+    "sha256": "3ae1098e62f2e83740ab72a8290795792b132bd83e514f8b4f9b78b33d437361",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_since_until",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_since_until-2e64893599bca735",
+    "sha256": "cf4eeace01275342c0a42627c141da1b1a014a017e7169933aca1f7f32307cd7",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "health_control",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "health_control-ccd689d59e5927d6",
+    "sha256": "d284eb29e82f2a71097fb45e3791bdb8149bc1588b0b3cb1958073483177b781",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "lamp-memory-eval",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-memory-eval",
+    "sha256": "00ad480a72f1a1305f7bdd3cac4063da9f2b3b590ffeeb39141a3607abeb498f",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "lamp-memory-fixture",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-memory-fixture",
+    "sha256": "147254fbd27b35b152f814eab481b1cd75446a9ea3dd423227f2ef49e932a1af",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "forget_shared_exchange",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "forget_shared_exchange-586236edd058f9ac",
+    "sha256": "70b3b4ffa94269caa1c6b8c782db31554038edf7492b48b593cdb3a560987125",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "lamp-memory-eval",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_memory_eval-c414b615715b1cc2",
+    "sha256": "7d5d9328e6b86b9be6bfbf462aac74926a26e7848e43eeea009f1d41cf571e85",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_link_used",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_link_used-c269c1ba120b091d",
+    "sha256": "336a549dba64e37aadaac292a66f2cbdb01024055fddf9d50f1c3f3ca9f332f0",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_follows_face",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_follows_face-ea24c872fe1a290c",
+    "sha256": "58435ece85d10e1814180d3a5f43689038bd206d77f2131da1138d5e505fc2b1",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_observe_forget",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_observe_forget-b217185ee2135986",
+    "sha256": "50f06463753191b5da6e3230501263d36ea0471e63f9090a0bdb3e832308b861",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_early_words",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_early_words-7924e5efe3312d9c",
+    "sha256": "906082cf9b590104d24f84a70a071d7beb47b439e4a93e987366d082c798c486",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_observe",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_observe-51b27f0351572930",
+    "sha256": "e33923c7d1cdc6a232994678d9bce4a3216f4e50563974c0e3c7bbcdb5af274c",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "voice_forget_about",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "voice_forget_about-44e5dd563903ff9e",
+    "sha256": "bc547243ec956d68024f01d4ba9293d1a5f329f4c828545dfdab6252e311d427",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "paraphrase_fixture",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "paraphrase_fixture-14b6ad392f07c11d",
+    "sha256": "9ec4b5a64e553a507799b4c8d41b8dda45089062e065b9f58a3efc22948c15aa",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-ea9b06d0f8d5f4c2",
+    "sha256": "82a835bc9d9c5ab8451b8d2bac6008663f54a14b66ab902551a97e2eeba727a0",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "lamp-expression",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_expression-2fdf40af67fe27b3",
+    "sha256": "18cd3bf573faf49cc57e2551075b8a5213145bb84266b08cf4eb1a3aa1ced81a",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "recent_playout_cost",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "recent_playout_cost",
+    "sha256": "a239880b5a95b7e4b37298648305c0d4ea95d787f40583d1fd96ab69722a8ed3",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-7ec422dbd000fd43",
+    "sha256": "b491b609c13307d7fb1854b3f62226d5aa9a27bd99bc142b6859dfd3f3c05e3d",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-lean@0.1.0",
+    "target": "lamp_lean",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_lean-fea1f88300821b40",
+    "sha256": "a9814457ae2bd8645c38ab1478e5c6ae080f8a51ee2d25da3313f719d68ccb59",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-lean@0.1.0",
+    "target": "check",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "check",
+    "sha256": "c37fb737ab158dd8d6ca4a73651c059df185904100354ac36408dfb26d28060d",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "replay_cost",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "replay_cost",
+    "sha256": "e6a27ca8c5aeb5ffdcab5dc5b4c9a27fe8f7432b113f06f386dfc6e8e6ac7473",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-lean@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-cee9cb6322910cf1",
+    "sha256": "56b387f0f1c2a49ee5f05f1bd26ddaded8a0cb7f6e7fd1679b54580bc3bf0f1e",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "rest_cost",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "rest_cost",
+    "sha256": "c90c3d21c642d2ec19df1cb595eb5303b2d6fca76d4a63158e90fa514f5b210b",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "runtime",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "runtime-ef42b38ccead2078",
+    "sha256": "aa46affe59ea2ae70eb203986eff23470ea2c97ea3e036b89e97a329cc900f5f",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "lamp-expression",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-expression",
+    "sha256": "5eebdad85d803360b452703d66841796ac7ccdce0e8a791c81e0048c98e92c20",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-voice@0.1.0",
+    "target": "lamp-voice",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-voice",
+    "sha256": "46855a4a1cf1a79c8c069e185828b1d08c148df414cd17a002695610ee5c2fab",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-memory@0.1.0",
+    "target": "lamp_memory",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_memory-4217c9b549931686",
+    "sha256": "fb2d138101c52361809f7d7d75432cc673eda13c52e5f75153ee7acb70503b4a",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-expression@0.1.0",
+    "target": "lamp_expression",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_expression-4d1f4bcd6ed14bdb",
+    "sha256": "7fb3d7ee87d9465f4c88e854f0c5efe80844341661317eea4ff870fcee78764c",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-worker",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_body_worker-f05fb009c6a8e5b2",
+    "sha256": "a884128dfcc8178d65cf7016e61f9a3fdda660b90ab8376f3784f576d5a1c629",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-body",
+    "sha256": "d42b32e7d50450f8ebdf1e33f408b933f83a9fccf9dc9a05600b6ec5d33c905c",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-mood",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_body_mood-dee3aeb305b9b03d",
+    "sha256": "e3d1ed9e8d154b9107a0387bfb19a4bf2e4734db2a1b5686a1963d3926fc8e7a",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "expression_ask",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "expression_ask",
+    "sha256": "ebca0bf4611b27d469a3ab51040de73e5a884126b5a853f7ed2bd5edd4657267",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-inspect",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_body_inspect-c4e685f3e3bbd1fd",
+    "sha256": "eec2dd7e510a13e0687f70262a030f22881959e022ccbb45386e5dfe353c1fd7",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-worker",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-body-worker",
+    "sha256": "8b95679a08ed8b46b9179e3f1566ad23099c4cc8e1f9ac020278ccccb1362110",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-measure",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_body_measure-d67bc25feec15034",
+    "sha256": "038f679a804348fdc123748b9ac059916edf38a798d400dad5b3b4580585c51a",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "head_plan",
+    "kind": [
+      "example"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "head_plan",
+    "sha256": "c23f463dd25fa364662688105d9aabacae0d18d504a17e40927178f261cc1874",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-inspect",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-body-inspect",
+    "sha256": "e63dcaf26e4ad024f609891ad380839301f0d0d6b1ebe9eae9bb2a6af7a756c8",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-mood",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-body-mood",
+    "sha256": "b3d77193a3cd0c7773ef32cb23b5e171d0fe7d180ce2e14fd04174cba0623d16",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body-measure",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-body-measure",
+    "sha256": "3235946c076ef7ed787fd97f4ced083f6fdced0c648509a5aa185decd26ed00e",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp-body",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_body-4525c7991b7ac4de",
+    "sha256": "3afab10dcd2708260f899462bf062ea3431ad35b8092997d2320c7466805a0ef",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "it",
+    "kind": [
+      "test"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "it-c680473205e5e63d",
+    "sha256": "cf94fd19701e7e1ea9b29499bb86d50ed1657f29952787bf211e5f18bd850f73",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-body@0.1.0",
+    "target": "lamp_body",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "executable_name": "lamp_body-1634a7d723f25bdc",
+    "sha256": "f4bffd7edc062c3b34742d928a10e9e5dadedf412d2b180e022b65d3e4ec4b53",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-keeper@0.1.0",
+    "target": "lamp-keeper",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [
+      "default",
+      "prepare"
+    ],
+    "executable_name": "lamp_keeper-8ed1b9236c2a3758",
+    "sha256": "c8a648b4f16849ea655101772ca6c9ed4f21773cd89cd5f28205774981be50df",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-keeper@0.1.0",
+    "target": "lamp_keeper",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [
+      "default",
+      "prepare"
+    ],
+    "executable_name": "lamp_keeper-f2f4afc165f8f1e8",
+    "sha256": "59bbad597441ab98a213ab3aa307dc57aa0eb5450bafb047105ee7517ab58471",
+    "actual_and_preserved_match": true
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "lamp-update",
+    "kind": [
+      "bin"
+    ],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "executable_name": "lamp-update",
+    "sha256": "4a3c85ad377a323ba5f221c03eb55d4d9acc15c105ea883ae48fc63d5df75fe5",
+    "actual_and_preserved_match": true
+  }
+]

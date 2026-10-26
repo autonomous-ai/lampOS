@@ -1,3 +1,13 @@
+Ready for lamp-voice: no; first-reference fix awaits original ARM64/Clippy and reads. Own-keys activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 16:28 +07, startup repair published for CI
+
+The #3530 initial CapturePrepared repair is `250fd8673` on latest `690dff041`. [Full executed gate](verification/reference-first-handshake-executed-20261026/README.md) is **7,427 passed / 0 failed / 52 ignored** on exact `7c483e0f9`/1cad, plus the separate disabled-allowance failure and restored transport **34/0/1**. [Carry proof](verification/reference-first-handshake-carry-20261026/README.md) retains **222/0/2 Update and 94/0 factory** on ea5/1aa. Final carry changes only the scorecard; fmt and strict twelve-crate Clippy pass, source and targeted artifact guards pass. Counts stay attached to their actual executions. Interrupted gates and the corrected compile/runtime selection remain recorded.
+
+Only the first in-order speaker-side readiness message gets the existing startup allowance; boot, sequence, future stamp, authority, privacy and prime checks stay mandatory. Linux real-worker consumption/privacy fixture awaits PR CI. No lamp, setup repeat, latency or acoustic acceptance is claimed. The log rebase preserves all previous verification entries. Next: own-keys current-base qualification while the startup PR runs CI.
+
+---
+
 Ready for lamp-voice: #1812 host proof audited; startup repair in current gate; #3510 activation HOLD.
 
 ## Current checkpoint: 2026-10-26 15:45 +07, separate signature implementation agrees

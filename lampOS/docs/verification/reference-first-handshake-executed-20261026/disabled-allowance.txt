@@ -1,0 +1,19 @@
+
+running 1 test
+transport::tests::initial_capture_prepared_survives_bounded_speaker_startup --- FAILED
+
+failures:
+
+---- transport::tests::initial_capture_prepared_survives_bounded_speaker_startup stdout ----
+
+thread 'transport::tests::initial_capture_prepared_survives_bounded_speaker_startup' (5066245) panicked at crates/voice/src/transport.rs:685:59:
+called `Result::unwrap()` on an `Err` value: Custom { kind: InvalidData, error: "ref.c.speaker: stale, reordered or wrong-boot runtime message (sequence 1 after 0, sent 143402 us before now, bound 100000 us, same boot true)" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    transport::tests::initial_capture_prepared_survives_bounded_speaker_startup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3821 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

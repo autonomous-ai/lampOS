@@ -1,0 +1,50 @@
+[
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "install",
+    "kind": [
+      "test"
+    ],
+    "features": [],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "5c9ec8398f7d4710794fd0b43ab0e7a9505c242d0deab2c9f7cf4acb15fca231"
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "lamp_update",
+    "kind": [
+      "lib"
+    ],
+    "features": [],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "be2364c1cf0ab808febe9ca5c3d0de25b73dd17c6d6dfa28b77cd5adefca5426"
+  },
+  {
+    "package": "lamp-update@0.1.0",
+    "target": "lamp-update",
+    "kind": [
+      "bin"
+    ],
+    "features": [],
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "sha256": "a65a84fb418af7a05687b719e94ec7ddd3397ffde99a47f01f2beb4c67fe959b"
+  }
+]

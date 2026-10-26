@@ -1,0 +1,9 @@
+{
+  "reason": "Public base advanced to 330995f68 with a Voice parser change; stop superseded compilation before full runtime tests and qualify current composition instead.",
+  "at": "2026-10-26T08:22:58.784211+00:00",
+  "controller_exit": 241,
+  "compile_exit": -15,
+  "child_cleanup": "g.stop sent TERM to owned compiler process group and waited for it",
+  "full_runtime_started": false,
+  "fmt_and_clippy": "Completed on original1ec source; retained, not relabeled."
+}
