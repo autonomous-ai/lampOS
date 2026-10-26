@@ -1,5 +1,28 @@
 # Tests work log
 
+## 2026-10-26 08:12 — Carrier integration failure identified; reader baseline active
+
+Ready for lamp-voice: no (#3466; reader fixture)
+
+Carrier `0dbf2a81f` on756 is pushed. Current Mac fmt, strict twelve-package
+Clippy, updater build, ten carrier tests and workspace build passed; Linux
+Clippy40251915583 passed. [ARM64 failure](verification/product-carrier-native-failure-20261026/)
+40251915590 stops before workspace tests: the new promotion tool's common
+product-unit fixture still declares level3. Its Rust targets report3/21/0.
+The one-line level6 fixture repair is taken, with assertions unchanged; its
+standalone gates are next after the sole compiler finishes the reader control.
+All four carrier patches carry equally onto c5's build-row-only base update.
+
+Reader unchanged3d Linux x86 seven-case control is active, once, using the
+original environment and frozen candidate receipts. The failed full7454/3/53
+remains failed. Current-c5 reader source is separately prepared: both Rust
+files are identical to the qualified3d proposal and inherited NoPause docs
+remain. No current-source qualification or full-pass claim is made yet.
+
+The source/proof read of #3520 current2a353bfdb found no P1/P2 and was posted;
+it makes no independent test or native count claim. Tests still owns no lamp,
+and #3466's real installed GOOD/BAD round remains pending. No device action ran.
+
 ## 2026-10-26 07:22 — Reader full failure retained; carrier follows train149
 
 Ready for lamp-voice: no (#3466; reader fixture)

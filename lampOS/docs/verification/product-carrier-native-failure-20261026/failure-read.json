@@ -1,0 +1,58 @@
+{
+  "run": 40251915590,
+  "job": 121345479131,
+  "status": "FAILED",
+  "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+  "command_exit": 101,
+  "head": "0dbf2a81febd671f2a7e4390b22c5044cff98486",
+  "base": "756be347e13d2e52e7268414295dda8fc554c267",
+  "actual_merge_checkout": "42baa0cc0ab317f1bb7b58e42adea4437a39988b",
+  "rust_summaries": [
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: FAILED. 1 passed; 21 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+  ],
+  "prior_python_summaries": [
+    "Ran 35 tests in 0.231s",
+    "Ran 12 tests in 0.704s"
+  ],
+  "rust_total": {
+    "passed": 3,
+    "failed": 21,
+    "ignored": 0
+  },
+  "failed_cases": [
+    "bootstrap_copies_only_envelope",
+    "bootstrap_lost_rename_response_removes_canonical_and_keeps_stage",
+    "changed_downloaded_payload_refuses_before_writes",
+    "equal_identical_is_noop_and_older_is_refused",
+    "equal_sequence_different_valid_envelope_refuses",
+    "external_models_are_explicitly_unsupported",
+    "failures_before_and_after_each_rename_restore_exact_old_bytes",
+    "missing_canonical_or_orphan_tag_never_bootstraps_over_existing_state",
+    "final_verification_failure_restores_old_bytes",
+    "foreign_canonical_during_recovery_is_untouched",
+    "promotion_preserves_signed_bytes_and_old_backup",
+    "restoration_failure_reports_retained_asset_ids",
+    "signature_valid_future_updater_requirement_refuses_before_writes",
+    "stable_changed_while_staging_is_not_overwritten",
+    "source_provenance_must_match_original_successful_attempt",
+    "signed_identity_must_match_source_and_fixed_url",
+    "staged_corruption_leaves_old_canonical_intact",
+    "uncertain_or_duplicate_inventories_refuse",
+    "staging_and_backup_names_are_never_overwritten",
+    "wrong_trusted_key_refuses_before_writes",
+    "upload_failure_before_or_after_remote_write_preserves_old_canonical"
+  ],
+  "common_panic": "tests/promotion.rs:30:65; Result::unwrap Err Refused(\"a build with product units needs min_updater 6 or more\")",
+  "cause_evidence": "Shared payload includes product unit and min_updater literal 3. lamp-update manifest.rs:771 rejects product units below PRODUCT_UNITS_UPDATER=6; envelope() unwraps seal() at line30. All21 fail there before their promotion assertions. Standalone crate path-depends on current lamp-update.",
+  "source_review": "Observed one-line fixture correction to manifest::PRODUCT_UNITS_UPDATER. Future refusal test still uses manifest::UPDATER + 1 and asserts valid signed bytes, promote refusal, writes==0. No additional source concern found in this scoped read.",
+  "not_reached": "lampOS workspace build/test gate; no full workspace/native passing census from this run",
+  "download": {
+    "bytes": 96797,
+    "sha256": "03e0111f7f429046a3a7efd1545fbcaab22c837ccdea3af47619377b7f84622b",
+    "stderr_bytes": 0,
+    "receipt_limit": "Native download session was no longer present after context compaction; its exit code was not captured. Saved original log includes failure and final cleanup, empty download stderr."
+  },
+  "limits": "Read-only diagnosis. No rerun, compiler, tests, source edits, posts, device actions. Correction not independently executed."
+}
