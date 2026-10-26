@@ -1,0 +1,62 @@
+{
+  "member_pr": 3512,
+  "train_pr": 3531,
+  "train": 154,
+  "merged_at": "2026-10-26T02:44:23Z",
+  "member_disposition": "closed by train bot, not a direct GitHub PR merge",
+  "commits": {
+    "offered_member": "1c0f99559b5fb3a757413ad3eda5add251539ccc",
+    "qualified_train": "df14d165bf5ee72a141c63525df15282044e7997",
+    "landing": "1c884f16cf4de53a700bba7512c129c3ee01d72d"
+  },
+  "direct_parents": {
+    "offered_member": [
+      "0c1f6437ee57eae3416e3281d91b813d1c3bec1d"
+    ],
+    "qualified_train": [
+      "0c1f6437ee57eae3416e3281d91b813d1c3bec1d"
+    ],
+    "landing": [
+      "0c1f6437ee57eae3416e3281d91b813d1c3bec1d"
+    ]
+  },
+  "trees": {
+    "offered_member": "3852c68f19c8d15ae624caba96e7e018a5b30ea2",
+    "qualified_train": "3852c68f19c8d15ae624caba96e7e018a5b30ea2",
+    "landing": "3852c68f19c8d15ae624caba96e7e018a5b30ea2"
+  },
+  "landing_equals_offered_and_qualified_train": true,
+  "authored_paths": [
+    "lampOS/crates/expression/src/runtime.rs",
+    "lampOS/crates/expression/tests/it/rest_requests.rs",
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/expression.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/verification/privacy-read-error-20261026/README.md",
+    "lampOS/docs/verification/privacy-read-error-20261026/current-3d972.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/focused-fixed.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/full-409.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-rest.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-tap.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-tests.json"
+  ],
+  "authored_blobs_and_modes_equal": true,
+  "patch_sha256": {
+    "offered_member": "d99d74abd79aacca98ecb0ffc2de39d5a23361e4e154e2babe416fbae940b3e9",
+    "qualified_train": "d99d74abd79aacca98ecb0ffc2de39d5a23361e4e154e2babe416fbae940b3e9",
+    "landing": "d99d74abd79aacca98ecb0ffc2de39d5a23361e4e154e2babe416fbae940b3e9"
+  },
+  "authored_metadata_equal": true,
+  "authored_metadata_sha256": "525e6f40d18fdff20ccfe9eb834eff027d87c027eb14f34c344fa120d75bad31",
+  "message_equal": true,
+  "member_native_receipt": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-privacy-read-evidence/native-40259060397/native-40259060397.json",
+    "sha256": "cd050b909d21826320c99a6b6a4b8ea1e6aa524513dc3cedc7ccfbc9e27051f0"
+  },
+  "train_native_receipt": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-privacy-read-evidence/train154/native-40259401324.json",
+    "sha256": "44d1c407a6a80995cb2ae5fda2eb81e82aa9247fcfff0c2d13e41bfc8610ff1e"
+  },
+  "lamp_voice_at_audit": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "limits": "Tree equivalence to exact original member and train native events; no CI execution at rebased landing SHA, local Cargo, manual merge, device or physical acceptance claim."
+}

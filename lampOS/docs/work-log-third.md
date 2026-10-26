@@ -7,6 +7,25 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 09:58 — Privacy correction delivered in train 154
+
+#3512 is closed as carried by **train 154 (#3531)** at **1c884f16c**.
+Offered **1c0f99559**, qualified train **df14d165b**, and the landing have
+the same whole tree, authored blobs and patch. The train's own original
+ARM64 **40259401324** and Linux Clippy **40259401261** pass: **11,345
+unique PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped; both privacy controls
+once. Turn-wire **13/0** is separate. This is tree equivalence to the tested
+train, not an invented CI execution at the landing SHA.
+[Landing](verification/train154-third-20261026/landing.json) and
+[train receipt](verification/train154-third-20261026/native-40259401324.json).
+
+Both reminder branches are carried locally onto this landed base. #3523's
+current carry is gating before push; its prior head's P2 is closed by both
+readers, with reviewer-two's independent full run still separate. #3525's
+corrected frozen0c1 source passes full Skills **539/0/9**, all eighteen
+controls once. Its current-base gate and three actual-parser simulated-host
+Update controls follow. No lamp actions or physical acceptance claimed.
+
 ## 2026-10-26 09:43 — Current native gates and independent IPC read
 
 #3523 **04253d6df** on **0c1f6437e** passes original ARM64 **40258980142**:

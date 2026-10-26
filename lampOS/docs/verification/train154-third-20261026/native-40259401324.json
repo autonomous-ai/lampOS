@@ -1,0 +1,98 @@
+{
+  "pr": 3531,
+  "offered_head": "df14d165bf5ee72a141c63525df15282044e7997",
+  "offered_base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "arm64_run": 40259401324,
+  "linux_clippy_run": 40259401261,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "7b3ec14cd8878af9ce1c065cbcbb42146d243eac",
+      "preview_parents": [
+        "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+        "df14d165bf5ee72a141c63525df15282044e7997"
+      ],
+      "preview_tree": "3852c68f19c8d15ae624caba96e7e018a5b30ea2",
+      "offered_tree": "3852c68f19c8d15ae624caba96e7e018a5b30ea2",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "7b3ec14cd8878af9ce1c065cbcbb42146d243eac",
+      "preview_parents": [
+        "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+        "df14d165bf5ee72a141c63525df15282044e7997"
+      ],
+      "preview_tree": "3852c68f19c8d15ae624caba96e7e018a5b30ea2",
+      "offered_tree": "3852c68f19c8d15ae624caba96e7e018a5b30ea2",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11345,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11345,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11345
+  ],
+  "own_control_pass_counts": {
+    "lamp-expression::runtime sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease": 1,
+    "lamp-expression::it rest_requests::live_privacy_read_error_refuses_rest_until_a_valid_open_lease": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T02:43:45.4617281Z      Summary [ 233.984s] 11345 tests run: 11345 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-privacy-read-evidence/train154/linux-clippy-40259401261.log",
+      "bytes": 89364,
+      "sha256": "c88cfe25a855c80e4ede0eddf346c75e48a38301a989e61574bbe2d06c6d797a"
+    },
+    "arm64": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-privacy-read-evidence/train154/arm64-40259401324.log",
+      "bytes": 2724715,
+      "sha256": "a9dcc449fe5d8944d90b614620910ff8b8664eb973b9501f23997461868ed9db"
+    }
+  },
+  "controls_source": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-privacy-read-evidence/current-0c1/sealed.json",
+    "sha256": "36dc62c19206ec3d9f74b0fce9dc7eb3130811faf5c47279dab4fa0a4ff096ff"
+  },
+  "turn_wire_custom_harness": {
+    "passed": 13,
+    "failed": 0,
+    "control_pass_counts": {
+      "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+      "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+      "verdict_carries_identity_and_one_request_at_a_time": 1,
+      "missing_model_is_final_and_never_restarted": 1,
+      "missing_executable_fails_at_once": 1,
+      "spawn_returns_while_worker_startup_is_held": 1,
+      "startup_failures_are_final": 1,
+      "serving_failures_are_replaced_within_budget": 1,
+      "protocol_violations_are_replaced": 1,
+      "cancelled_answers_are_never_delivered": 1,
+      "close_during_inference_never_waits": 1,
+      "sustained_requests_stay_bounded": 1
+    },
+    "summary": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T02:43:59.9976422Z test result: 13 passed; 0 failed"
+    ],
+    "counts_separate_from_nextest": true,
+    "qualified": true
+  },
+  "member_event": {
+    "head": "1c0f99559b5fb3a757413ad3eda5add251539ccc",
+    "arm64_run": 40259060397,
+    "scope": "separate current member event"
+  },
+  "qualified": true,
+  "limits": "Original train154 df14d165b event on 0c1, separate from offered member1c0 and historical3bcc. Custom Turn-wire13 is outside nextest totals. Landing-tree equality is recorded separately; no execution at the landing SHA, local tests, retries, device or physical-latency claim."
+}
