@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 HOLD includes accepted keys-helper reset quiescence.
+
+## Current checkpoint: 2026-10-26 18:41 +07, own-keys reset dependency made explicit
+
+[Accepted-helper source finding](verification/reset-stop-order-source-20261026/README.md#accepted-keys-helper-separate-activation-prerequisite): a provider check may finish in a keys helper outside target membership, followed by credential storage before its reply. Reset must establish helper quiescence before wipe; closing Cloud's socket is not a storage barrier. No affected-lamp reproduction is claimed. Third owns the common-helper follow-up, and #3510 remains draft until that regression and #2094/current-lamp acceptance close. Current software CI remains green but does not cover this interleaving.
+
+The independent #3577 diagnostics review continues in its isolated target; fmt/strict Voice Clippy passed and compilation is active. Parent privacy/HOLD stays separate. No device or real-key operation ran.
+
+---
+
 Ready for lamp-voice: #3510 software qualified on current base; activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 18:34 +07, current original native gates green

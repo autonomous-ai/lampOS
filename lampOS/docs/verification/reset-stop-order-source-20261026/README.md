@@ -16,3 +16,9 @@ These sources support the candidate that `systemctl stop lampos.target` can fini
 The repair needs an explicit completion barrier for the relevant writers and a delayed-stop regression; reset must retain its failure/recovery journal behavior. The effective lamp units, plan and reset invocation must still be bound to incident evidence. Other lamp-specific maintained plans may separately omit onboarding; do not conflate that drift with this ordering candidate.
 
 The primary-source finding was posted on Queue comment 6414697205. No source fix, runtime test or acceptance result is claimed by this record.
+
+## Accepted keys helper: separate activation prerequisite
+
+Third's common-helper coverage audit also applies to own-keys activation #3510. On ba950 and the 20bc carry, `lamp-setup-keys.socket` has `PartOf=lampos.target`, but `lamp-setup-keys@.service` has no target membership. In setup `main.rs::own_keys`, peer authentication precedes the request. `keys::check_and_keep` waits for the provider verdict before `Store::keep`, which can recreate the directory and write credentials. That write precedes the helper's reply to Cloud; a broken reply socket does not undo it. There is no reset-generation check between the provider result and storage.
+
+This exposes a source-level post-wipe write opportunity if an accepted helper survives reset; no device reproduction or actual credential was used. #3510 remains draft until accepted-helper quiescence and a delayed-provider regression cover this interleaving, in addition to #2094 and current-lamp acceptance. Third owns that separate helper repair; the onboarding-only barrier must not be described as fixing it. Source finding: PR comment 6415101391 and Queue comment 6415101850.
