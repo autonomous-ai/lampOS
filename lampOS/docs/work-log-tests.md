@@ -1,5 +1,21 @@
 # Tests work log
 
+## 2026-10-26 — Installed carrier GOOD/BAD passed and original lamp restored
+
+Ready for lamp-voice: no (First's decision and current-base delivery remain separate)
+
+[Installed carrier proof](verification/product-carrier-lamp-52e6-20261026/)
+records one meaningful GOOD 900011 and one BAD 900012 with automatic exact-GOOD
+fallback/refusal and 900011 retained. The original 6963 units, builds, records,
+trust/feed and services were restored; the pruned original updater came from
+the verified on-lamp archive. Trial releases/tags/key were deleted and the
+lease released. Normal quiet/watch bounds were unchanged. The first bounded
+GOOD observer needed one continuation of the same run; precise dry-phase
+sequence boundaries remain fixture-only, and the first no-state log does
+not prove persistent absence. The private archive stayed on-lamp after its
+export was rejected; no export retry occurred. Candidate c700's native
+9980/ba950 preview remains distinct from its authored 1aa base.
+
 ## 2026-10-26 17:21 — Pinned gates retained; installed OTA access pending
 
 Ready for lamp-voice: no (current-base delivery and remaining gates)

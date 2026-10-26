@@ -1,0 +1,122 @@
+{
+  "lamp": "lamp-52e6",
+  "candidate_head": "c7006af27eef606e811be4ccf0b91e1f72f3aca2",
+  "actual_native_preview": "9980ef50672813b389c34e27326f44ddbe552783",
+  "arm64_run": 40309937640,
+  "linux_clippy_run": 40309937656,
+  "good_attempts": 1,
+  "bad_attempts": 1,
+  "good": {
+    "good_sequence": 900011,
+    "unit_sha256": "0438362a71da5d482404b2326da14f3c550c46059e6aeafda5343f152daf9b0d",
+    "unit_real_environment_change": true,
+    "exec_start_preserved": true,
+    "voice_binary_target_sidecars_unchanged": true,
+    "updater_terminal": "inactive",
+    "voice_active": true,
+    "normal_health_watch_finished": true,
+    "acceptance": "GOOD_APPLIED"
+  },
+  "bad": {
+    "bad_sequence": 900012,
+    "installed_sequence_retained": 900011,
+    "automatic_good_unit_restored": true,
+    "good_unit_sha256": "0438362a71da5d482404b2326da14f3c550c46059e6aeafda5343f152daf9b0d",
+    "voice_binary_target_sidecars_unchanged": true,
+    "voice_active": true,
+    "bad_refused": true,
+    "refusal_reason": "lamp-voice.service ended and systemd is starting it again",
+    "acceptance": "BAD_AUTOMATIC_FALLBACK"
+  },
+  "restoration": {
+    "restored": true,
+    "installed": {
+      "sequence": 6963,
+      "commit": "41233c1b6954abc812186d7014a7adb19422e29e"
+    },
+    "updater_sha256": "6d22838aa93a8b0cd5ff229bb08c7b30b824c751d17a3f5056d91c9388075fa0",
+    "voice_sha256": "7e17711d38060336204031413e2730549158aa548fd037cf2b9a6d56e1a69533",
+    "voice_unit_sha256": "f646f08633b4a5cb5a2e388cbdefbffddb26d987eef9324377803de51839a644",
+    "sidecars_match": true,
+    "real_key_fingerprint": "54213f8d3aa2f241",
+    "feed": "lampos-stable",
+    "signed_channel": "lamp-voice",
+    "active_services": {
+      "lamp-voice.service": "active",
+      "lamp-update.service": "active",
+      "lamp-update-back.timer": "active"
+    },
+    "trial_runtime_override_removed": true,
+    "trial_trust_removed": true,
+    "trial_updater_build_removed": true,
+    "trial_record_residue_absent": true,
+    "ssh_key_added": false,
+    "sudoers_added": false,
+    "lock_inode_preserved": true,
+    "voice_state": {
+      "value": "resting",
+      "age_ms": 235
+    }
+  },
+  "observation_summary": {
+    "good-observations.json": {
+      "observations": 559,
+      "ended_on_service_terminal": false,
+      "source_sha256": "fd87a177baaef0e95d47e7486c154066164088259c1fda673f641a9bcaa1d557",
+      "sequences_observed": [
+        6963
+      ],
+      "unit_hashes_observed": [
+        "0438362a71da5d482404b2326da14f3c550c46059e6aeafda5343f152daf9b0d",
+        "f646f08633b4a5cb5a2e388cbdefbffddb26d987eef9324377803de51839a644"
+      ],
+      "states": {
+        "resting": 392,
+        "listening": 159,
+        "thinking": 8
+      }
+    },
+    "good-watch-continuation.json": {
+      "observations": 1,
+      "ended_on_service_terminal": true,
+      "source_sha256": "b2432126429d3d50711c2c01dd87823cf6f59d41c97588c4872f713b51bcbe24",
+      "sequences_observed": [
+        900011
+      ],
+      "unit_hashes_observed": [
+        "0438362a71da5d482404b2326da14f3c550c46059e6aeafda5343f152daf9b0d"
+      ],
+      "states": {
+        "listening": 1
+      }
+    },
+    "bad-observations.json": {
+      "observations": 475,
+      "ended_on_service_terminal": true,
+      "source_sha256": "ee45636ffe17b6d4f313024591de88cc99f1440d934d8f3dc0cfd3a9978122aa",
+      "sequences_observed": [
+        900011
+      ],
+      "unit_hashes_observed": [
+        "0438362a71da5d482404b2326da14f3c550c46059e6aeafda5343f152daf9b0d",
+        "8fd0e175d73718c85b9ffb77975bd87722f82c96b1bb63f70cb3a46db46a8458"
+      ],
+      "states": {
+        "listening": 80,
+        "resting": 391,
+        "thinking": 4
+      }
+    }
+  },
+  "normal_quiet_watch_recovery_unchanged": true,
+  "manual_voice_restart_before_acceptance": false,
+  "teardown_voice_restart": true,
+  "on_lamp_backup_sha256": "0bd9cc1ba177a4f7db68e7dbc30f63bfbc2762db0364a0142a23f43cae3726ad",
+  "off_lamp_backup_export": "blocked by automatic approval review; not performed or retried",
+  "limits": [
+    "Precise climb/dry-confirmation sequence boundaries were covered by fixture tests; the device observer began after confirmation.",
+    "The initial no-state wait log prints only once and does not prove continuing absence or its cause.",
+    "GOOD first 300-second observation ended during the watch; one continuation observed the same run complete.",
+    "Raw private startup/records/observation receipts and original snapshot stay on the lamp; published observations are derived summaries."
+  ]
+}
