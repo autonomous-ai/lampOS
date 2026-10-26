@@ -1,0 +1,110 @@
+{
+  "head": "9d52154fa9f157d5763f3acfe4589901e80d1f35",
+  "base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+  "compiler_gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "capture": {
+    "at": "2026-10-26T19:57:25.057369+00:00",
+    "bank_validation": "bank-validation.json",
+    "base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+    "compiled_test_drivers": 70,
+    "compiler_bank": "cached same physical target; no clean stage or cold-build claim",
+    "declared_workspace_product_children": 47,
+    "executable_paths": 133,
+    "head": "9d52154fa9f157d5763f3acfe4589901e80d1f35",
+    "inputs": {
+      "actual-artifacts.json": "e45485db7e4e1f36db2ec5732367224af032e3f58bc5fba6ee7608f78e86207b",
+      "bank-provenance.json": "5e026d4d68cd0bb8d149c3aeb4fda85a6bc6dc722de7b836983a1f4234c66f4e",
+      "bank-validation.json": "ae18ee8eb7cb47872b277a534bdb1d15bc777038bea79accb0dc0adc789ef46c",
+      "base.txt": "090f1717e7cad7063441c81b08aac51bb01dbc5f25926b9ef756e03557cc72ac",
+      "build.log": "bf13baf7549a8fc1d869d3010f84905353db2c7fb2bf90c31e6630baf9ea246c",
+      "capture.py": "12497a874c99cf5ff38a9037fb504efd7c3e15dde1a160dd56506b98bfbde9d4",
+      "gate.sh": "2b595f5b69efdd02d7e4acb211ec14e025ea48d1bf9eddcc06821cde258f27ee",
+      "head.txt": "af31b6ea04af323a7f21db30c38b635b0439563b412dcfa9dad7bbf9f5574319",
+      "inputs-after-capture.json": "c45a01e94583f0b3a76b00d1b7459c69bb9c66b2a4a4eeda9e59783ef3cf95df",
+      "inputs-before-capture.json": "4de88ef0faf55667d299eba4b5a0af7bbe10d1ab860fd037472c12a0100fff5d",
+      "inputs.py": "16bf31c5bb10701c0715acc18cac0717b63ec1c0788b585c0ef86ff4e4061445",
+      "metadata-before.json": "b57ab76c55882f73652bb8c088b299cb047d4eb8579d2591685901232dcf7b72",
+      "source-before.json": "cf99ba73fbd93ca21ebf7025fa6c1463badf8c532eef56d81a41d5cab6bf36a4",
+      "test-compile.log": "327eb718e0718b364b79e9ae5a7301b18327cd9c76d4b214797d797f0c00cd90"
+    },
+    "limits": [
+      "Compiler fresh flags are recorded by stage, not inferred from timestamps.",
+      "No clean stage exists for this cached carry; actual true and false fresh records are retained.",
+      "Current raw input snapshots are not historical preimages or a current runtime result.",
+      "Captured product children are not thereby claimed to have executed.",
+      "Ephemeral rustdoc executables are not emitted by cargo test --no-run."
+    ],
+    "normal_local_fresh_false": false,
+    "normal_local_fresh_records": {
+      "false": 24,
+      "true": 72
+    },
+    "normal_local_packages": 48,
+    "normal_skills_consumers": [
+      "lamp-skills",
+      "lamp-cloud"
+    ],
+    "parents": [
+      "2bf5122dc76999f970556bb7c78840ab6e107ce0"
+    ],
+    "preimages": "independent APFS clones or copies; never hard links; captured after compile, before runtime",
+    "raw_input_content_inventory_sha256": "4098e12dfa9bf931895dd36c9795fb9a58595df3dbf2406cf29bc5ad88f59b3f",
+    "raw_input_observed_stat_sha256": "0b07d07e1f2ef4b23e7aeb803cb8ef2efeac1922a444815caf00fb01a2e8a1a5",
+    "required_feature_children_not_emitted": [],
+    "runtime_controller_binding": "not required for compilation capture; a later composed runtime must bind its own exact controller and selection",
+    "runtime_scope": "captures the full 12-package dev/test closure; composed execution selection is a separate later receipt",
+    "selected_packages": [
+      "lamp-skills",
+      "lamp-cloud",
+      "lamp-body",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "source_files": 7259,
+    "status": "complete",
+    "target": "./.claude/worktrees/third-reminder-dedicated-target",
+    "tree": "410eefb17c4aa62202468db8a69858c1093b40ca",
+    "workspace_product_children": 47,
+    "worktree": "./.claude/worktrees/third-reminder-pending/lampOS"
+  },
+  "artifact_comparison": {
+    "changed": [
+      {
+        "key": "9e470c682aaaa66ca79ea544",
+        "roles": [
+          "compiled_test_driver"
+        ],
+        "target": "it",
+        "package": "lamp-skills",
+        "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-d234ff01061c9264"
+      }
+    ],
+    "same": 132,
+    "total": 133
+  },
+  "raw_input_summary": {
+    "entries": 8719,
+    "bytes_hashed": 209093970,
+    "holds": [],
+    "content_inventory_sha256": "4098e12dfa9bf931895dd36c9795fb9a58595df3dbf2406cf29bc5ad88f59b3f",
+    "observed_stat_sha256": "0b07d07e1f2ef4b23e7aeb803cb8ef2efeac1922a444815caf00fb01a2e8a1a5"
+  },
+  "runtime_state": "UNRUN: selected current validation being prepared; no current full12 command claimed",
+  "limits": [
+    "Actual cached compiler flags retained, no cold-clean claim.",
+    "Raw inventories are private producer evidence; only aggregate digests/counts published.",
+    "Prior094 full result is historical source-specific coverage, not relabeled as this head."
+  ]
+}
