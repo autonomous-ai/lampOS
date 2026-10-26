@@ -1,0 +1,9 @@
+# Independent hand-pump fixture review
+
+READ-OK `55eb90cf4859845c9daaa73a2e1949d4776b2957` on `cced429433211e06790f23ed8f51e07be613972d`, no P1/P2 found. Exact-head Mac fmt, strict all-target Voice Clippy, library compilation and both changed fixtures pass **2/0/0**, each in an owned thirty-second process watchdog. [results.json](results.json) retains exact selectors, outcomes and hashes. Source and actual/preserved library executable hashes stayed unchanged.
+
+The ordinary off-mode wait still receives `PUMP_TICK`; readiness and wait observers compile only for tests. Readiness is published only after subscriptions and a completed drain. The held-start case cannot become ready before release and joins before checking its results. The off-mode progress predicate is read before stop, so stop's unpark cannot create a passing observation. Duration min/max are read after join and cover the arguments passed to completed park calls. They do not measure elapsed park time or establish a minimum host throughput. The removal of the old throughput floor is explicit, with its failures retained.
+
+Readiness and wake failures reach stop/join before assertions. Join itself is not internally timed out: its two-second bound is asserted only after return; a stuck join requires the caller's outer watchdog. This review used that bounded caller. Existing waiting ceiling and wake bounds, ordinary waits and the documented late-wake false-positive remain unchanged. No new production switch or routing/privacy path is introduced.
+
+This is independent execution of two positive Mac fixtures. No full Voice suite, private author fault mutant, Linux path, hardware heat or physical latency acceptance was run or inferred. The author's original full gate, fault receipts and native event keep their separate identities.

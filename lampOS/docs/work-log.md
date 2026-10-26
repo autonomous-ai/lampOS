@@ -1,3 +1,15 @@
+Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 12:57 +07, independent hand-pump review complete
+
+[Independent #3544 review](verification/hand-pump-second-review-20261026/README.md) at `55eb90cf4` finds no P1/P2. Exact-head Mac fmt, strict all-target Voice Clippy, compilation and the two changed fixtures pass **2/0/0** under owned thirty-second process watchdogs. All source and actual/preserved library executable hashes remain unchanged. This is not the author's full Voice or private fault-control execution.
+
+Readiness follows the subscribed drain; held startup cannot pass it. Off-mode progress is sampled before stop and duration arguments read after join, so stop's unpark cannot create progress. The new observer checks requested park arguments, not elapsed park duration or a host throughput guarantee. Existing wake/wait/stop limits and the late-wake false-positive stay explicit; a stuck join still requires the outer watchdog. No physical latency or heat result follows.
+
+Latest fetch still shows cced, with Second's fixture heads current and ready. Own-keys original current native proof is published, with activation HOLD unchanged. Queue/review monitoring continues; no release or lamp action.
+
+---
+
 Ready for lamp-voice: yes (#3542 and #3528); #3510 remains activation HOLD despite qualified current gates.
 
 ## Current checkpoint: 2026-10-26 12:49 +07, own-keys current native qualification complete

@@ -1,0 +1,112 @@
+{
+  "actual_and_preserved_copy_unchanged": true,
+  "artifact_receipt_sha256": "391f60b47a4f07899a6fc5fee25240354fa4e27205ccbaca044ec11c219b2af8",
+  "completion_sha256": "77c8070927bd1e1c17080600ceff72c70d1d65e7e6c17747ede3ee45c64322f1",
+  "identity": {
+    "base": "cced429433211e06790f23ed8f51e07be613972d",
+    "head": "55eb90cf4859845c9daaa73a2e1949d4776b2957",
+    "scope": "Independent Mac source review and two changed hand-pump fixtures under an owned 30-second process watchdog. No full Voice, private fault mutant or device run."
+  },
+  "library_executable_sha256": "8c07d71e3198c329293ed680382f67f18c088a14754f19ad4c35f0d57fcdda8c",
+  "limits": "Two changed Mac fixtures only; no full Voice, author fault mutants, Linux, physical heat, throughput or latency acceptance.",
+  "schema": 1,
+  "source_inventory_sha256": "042aefe96fcfc5f33426a8a6793ecc7dce8fb7921f17bccaa10d863f35668f23",
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.914,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "5c2e6dc26b1e2b0675740a256adf2fc226df01b62e7f352883f44f07d18c6337",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "fmt"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 53.073,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "c8fb0f2416ca325baa0868ab3f6b17d6384836ea86e1961c03d5fe3ed2057018",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "clippy"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 104.976,
+      "exit_code": 0,
+      "log_sha256": "366b91391f314e88fb9b48ebbffd821726073c9d4f3f6f6f2d9530a85ff0ee52",
+      "receipt_sha256": "19276f4a89d2e388139acfd63352cdc25225f477766fe12042210f8b920608a6",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "compile"
+    },
+    {
+      "command": [
+        "<target>/debug/deps/lamp_voice-d0423b4e04fbfa63",
+        "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 2.07,
+      "exit_code": 0,
+      "log_sha256": "385b49910bc1cc727a5aacaab3823af303163448ec51b84c6433acba9a8780d0",
+      "receipt_sha256": "4f5353c2608b8ad32cc45033f3e84064195ab631549609b26ffe7ee845dade1c",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "focused-1"
+    },
+    {
+      "command": [
+        "<target>/debug/deps/lamp_voice-d0423b4e04fbfa63",
+        "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 2.681,
+      "exit_code": 0,
+      "log_sha256": "53968e634feb5fe4ccefb0b75b5fb77da1c4918fc6cd4f66dc120d188637185b",
+      "receipt_sha256": "490e4a1638e7b33a4846f4e50a3061774a1dc14396df359ce05c99d9a087f742",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "focused-2"
+    }
+  ],
+  "test_output": [
+    "\nrunning 1 test\ntest hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3814 filtered out; finished in 0.03s\n\n",
+    "\nrunning 1 test\ntest hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3814 filtered out; finished in 2.25s\n\n"
+  ],
+  "watchdog": "Each selected driver ran under a 30-second external process-group watchdog; neither timed out. Cleanup would send TERM, wait five seconds, then KILL and wait up to ten more seconds. Not a hard operating-system teardown guarantee."
+}
