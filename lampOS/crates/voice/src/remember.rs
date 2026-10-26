@@ -9250,8 +9250,11 @@ mod tests {
     /// request not marked as asking for everything, as Live and texts never
     /// mark one, has its memory emptied and its face kept: the eyes are asked
     /// nothing. The same call on a request marked as the second route's guard
-    /// marks it forgets the face too. The Days client and its switch are the
-    /// process's, so it runs in a child, its consent file in its own folder.
+    /// marks it forgets the face too. A text (`tools::answer_typed`), with
+    /// the eyes' socket set too, is the room's and never reaches the eyes or
+    /// the memory's `forget_all` (the reviewer-lead's step 2: a composed
+    /// negative per route). The Days client and its switch are the process's,
+    /// so it runs in a child, its consent file in its own folder.
     #[test]
     fn forget_everything_through_the_tools_takes_the_face_only_when_marked() {
         const NAME: &str =
@@ -9341,6 +9344,20 @@ mod tests {
         assert!(
             eyes_listener.accept().is_err(),
             "a forget of everything not marked reached the eyes"
+        );
+        // A text, with the eyes set: the room's, so nothing of anyone's is
+        // forgotten and the eyes are asked nothing.
+        let texts = crate::tools::Settings {
+            memory: Some(memory.clone()),
+            who: Some(eyes.clone()),
+            ..Default::default()
+        };
+        let told = crate::tools::answer_typed(&texts, &forget, 3_564_103);
+        assert_eq!(told["forgotten"], false, "{told}");
+        assert!(told.get("face").is_none(), "{told}");
+        assert!(
+            eyes_listener.accept().is_err(),
+            "a text's forget of everything reached the eyes"
         );
         // Marked: the same call, the same settings, and the face goes too.
         eyes_listener.set_nonblocking(false).unwrap();
