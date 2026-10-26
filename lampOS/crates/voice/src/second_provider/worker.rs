@@ -4815,6 +4815,15 @@ type Looked = Arc<Mutex<crate::addressed::Looks>>;
 /// route's model reads one line of words, and on lamp-4ace on 19 Oct it
 /// answered colleagues' talk after a named request six times ("Sounds like
 /// a big saving."), where Live answered it once (#1712).
+/// Told beside the lamp's name when it is answered in the place of the line
+/// after it, held because nothing showed the one who said the name said it
+/// (`LAMP_SECOND_NAME_CARRIES`, `one_speaker`): that line's words are never
+/// told, as they may be someone else's, only that words came. On lamp-4ace on
+/// 26 Oct, the first line after a start, "Lamp." and then "Remember that the
+/// plant by the window needs water on Fridays." in a room not yet known to be
+/// quiet, got "Mm? I'm here.", and the request was lost with nothing asked.
+pub(crate) const NAME_THEN_HELD: &str = "(For you to know, not to answer: right after your name someone went on talking, but you could not tell it was the one who called you, so you did not take in what they said. Ask them, briefly, what they wanted.)";
+
 pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
 
 /// How the rule saw a line when it judged it, kept for a verdict given
