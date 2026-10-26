@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-26 12:35 — Carrier native green; sentinel published
+
+Ready for lamp-voice: no (#3466 installed rehearsal; #3543 native/review)
+
+[Current carrier proof](verification/tests-carrier-cced-20261026/) binds
+b635671c2/cced to first-attempt ARM64 11,372 unique passes, zero failures,
+leaks or timeouts, 106 skips and an equal authored/preview tree. Linux Clippy
+passes. The current native updater is checksum-verified and preserved for an
+assigned lamp owner; no device action or physical acceptance occurred.
+
+Sentinel #3543 at 0777341815/cced is pushed as a draft. Mac formatting,
+strict twelve-package Clippy, workspace build and four supported Reader cases
+pass; current Linux Clippy passes. Linux runtime remains pending. The exact
+historical failure cause remains unproved. Reviewer-three's nonblocking P3
+for the specific record-path refusal is retained as a separate strengthening
+follow-up; the original assertions are unchanged in this repair.
+
+Skills 942123c90/cced now owns the compiler. Formatting, metadata and strict
+checks pass; workspace build and full Skills runtime are pending. Ready and
+restart repairs stay prepared behind it. No earlier failed gate is waived.
+
 ## 2026-10-26 12:13 — Current carrier runtime; restart leak claimed
 
 Ready for lamp-voice: no (#3466; test follow-ups)

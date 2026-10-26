@@ -1,0 +1,24 @@
+{
+  "run_id": 40273208241,
+  "head": "b635671c2de69714def6907c3dabd2ef4f9e30a5",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "artifact_id": 12629627510,
+  "zip_bytes": 116068197,
+  "zip_sha256": "52524095e8dd23e5a0ae10f83d00ba7cd15c28ae3372a337094e98317175cc9a",
+  "github_artifact_digest_matches": true,
+  "updater_bytes": 4816120,
+  "updater_sha256": "49286ba0b831c373a8a1240fe589b0578817fd55ac12b2c0006e673db4f4bc31",
+  "sha256_manifest_match": true,
+  "manifest_sha256": "bca642cb13e23b3f21981cd714a0a043ca263de4c8f72cc2132f493c24e2e6c9",
+  "elf_class": "64-bit",
+  "elf_endianness": "little",
+  "elf_machine": 183,
+  "architecture": "AArch64",
+  "extracted_members": [
+    "SHA256SUMS",
+    "lamp-update"
+  ],
+  "executed": false,
+  "local_arm64_build": false,
+  "device_action": false
+}

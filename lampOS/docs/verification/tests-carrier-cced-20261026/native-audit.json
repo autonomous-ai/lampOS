@@ -1,0 +1,108 @@
+{
+  "head": "b635671c2de69714def6907c3dabd2ef4f9e30a5",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "actual_preview": "ddda3905535e765fd6555820d800ba0e475ee545",
+  "preview_parents": [
+    "cced429433211e06790f23ed8f51e07be613972d",
+    "b635671c2de69714def6907c3dabd2ef4f9e30a5"
+  ],
+  "authored_and_preview_tree": "0708eba851bca08bc90d876d0f37ec21c2d88339",
+  "arm64_run": 40273208241,
+  "arm64_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_run": 40273208181,
+  "linux_clippy_attempt": 1,
+  "linux_clippy_conclusion": "success",
+  "nextest_unique_pass": 11372,
+  "nextest_unique_fail": 0,
+  "nextest_unique_leak": 0,
+  "nextest_unique_timeout": 0,
+  "nextest_selected": 11372,
+  "nextest_skipped": 106,
+  "nextest_executed_binaries": 182,
+  "nextest_skipped_binaries": 2,
+  "nextest_duration_s": 208.945,
+  "duplicate_terminal_display_lines": 35,
+  "product_carrier_cases": [
+    {
+      "status": "PASS",
+      "duration_s": 0.012,
+      "name": "lamp-update::round product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+      "line": 7391
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.027,
+      "name": "lamp-update::round product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+      "line": 7393
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.007,
+      "name": "lamp-update::round product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+      "line": 7394
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.014,
+      "name": "lamp-update::round product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+      "line": 7395
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.02,
+      "name": "lamp-update::round product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+      "line": 7396
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.022,
+      "name": "lamp-update::round product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+      "line": 7397
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.012,
+      "name": "lamp-update::round product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+      "line": 7398
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.063,
+      "name": "lamp-update::round product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+      "line": 7399
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.027,
+      "name": "lamp-update::round product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+      "line": 7400
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.017,
+      "name": "lamp-update::round product_carrier::the_lamps_specific_unit_wins_over_the_product_unit",
+      "line": 7401
+    }
+  ],
+  "promotion_passed": 25,
+  "promotion_failed": 0,
+  "custom_process": [
+    {
+      "passed": 13,
+      "failed": 0
+    }
+  ],
+  "doc_tests_passed": 4,
+  "doc_tests_failed": 0,
+  "doc_test_summaries": 47,
+  "raw_sha256": {
+    "arm64": "406ed5d7e98574d6b8f8adeb8c378d4fb04bdb7f25dd335dda5f7e54b4c23c13",
+    "clippy": "94193711b534f5839985c48f53c35e97ad82a1e1e6926e20d5ca2fe7ab263157"
+  },
+  "limitations": [
+    "Native CI on Linux ARM64; no local ARM64 build and no device trial.",
+    "Nextest census is workflow-selected scope; separate custom process, docs and promotion counts are not added to it.",
+    "Product-installed GOOD/BAD acceptance rehearsal remains pending."
+  ]
+}

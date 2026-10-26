@@ -1,0 +1,78 @@
+{
+  "head": "b635671c2de69714def6907c3dabd2ef4f9e30a5",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "terminal": {
+    "status": "PASS",
+    "head": "b635671c2de69714def6907c3dabd2ef4f9e30a5",
+    "base": "cced429433211e06790f23ed8f51e07be613972d",
+    "scope": "Mac carrier unit/focused round and complete standalone promotion; not full update or full workspace runtime",
+    "fmt": true,
+    "strict_affected_clippy": true,
+    "updater_build": true,
+    "workspace_build": true,
+    "promotion_fmt": true,
+    "promotion_strict": true,
+    "promotion_build": true,
+    "carrier_counts": {
+      "updater-unit-tests": {
+        "passed": 126,
+        "failed": 0,
+        "ignored": 2,
+        "summaries": 2
+      },
+      "product-carrier-tests": {
+        "passed": 10,
+        "failed": 0,
+        "ignored": 0,
+        "summaries": 1
+      },
+      "head-touch-tests": {
+        "passed": 34,
+        "failed": 0,
+        "ignored": 0,
+        "summaries": 1
+      }
+    },
+    "promotion_counts": {
+      "promotion-full-tests": {
+        "passed": 25,
+        "failed": 0,
+        "ignored": 0,
+        "summaries": 5
+      }
+    },
+    "source_unchanged": true,
+    "old_frozen_99_unchanged": true
+  },
+  "completed_stages": 17,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-turn-end",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "head_touch_elapsed_s": 675.33462362102,
+  "receipts": {
+    "terminal.json": "c512cca5139144d85eba81bff07324842e9146a343811dd0bb25c0017480f896",
+    "source-after.json": "c3989fa4af26c9b94907f5838ee358aaeef88014cfbda70222f6b1fa339e5dcd",
+    "metadata.stdout": "bdd84e3d30fdf25a8590de4714ad374ce3444df679a9deb05a10aa0f91dea111",
+    "run.py": "0cecb991b70c14ccbff08650e03b14c9da6af766dd978cbac973308439f01d58",
+    "carrier-frozen-executables.json": "a19b7f08440aad1708596574873c2a22c34e7f208f9cd45693d914274b27d2ed",
+    "promotion-frozen-executables.json": "47292a1214411a157eef027a386919c6a4d126404d54fdd3866687b6fbe332c9"
+  },
+  "limitations": [
+    "Mac x86 only; current ARM64/Linux CI not run",
+    "Full Update and full workspace runtime not run",
+    "Physical GOOD/BAD product trial remains pending"
+  ]
+}
