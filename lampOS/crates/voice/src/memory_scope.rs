@@ -462,6 +462,9 @@ struct RequestContext {
     /// The face cache a line with the camera allowed was admitted from, told
     /// when a face is remembered in it ([`ScopeLease::face_remembered`]).
     cache: Option<Arc<FaceCache>>,
+    /// This request's own ask for everything was shown for its
+    /// `forget_everything` ([`ScopeLease::mark_everything_asked`]).
+    everything: AtomicBool,
 }
 
 /// A keep's late look (#2807): the face cache and its generation when the
@@ -518,6 +521,7 @@ impl RequestScope {
                 key,
                 scope,
                 narrowed: AtomicBool::new(false),
+                everything: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late: None,
@@ -560,6 +564,7 @@ impl RequestScope {
                 key,
                 scope,
                 narrowed: AtomicBool::new(false),
+                everything: AtomicBool::new(false),
                 room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
                 late,
@@ -619,6 +624,22 @@ impl ScopeLease {
     /// send rechecks [`Self::scope`].
     pub fn admitted_person(&self) -> Option<&str> {
         self.context.scope.person()
+    }
+
+    /// This request's own ask for everything was shown for the
+    /// `forget_everything` it runs: its words ask for everything, the same
+    /// person asked just before, or they said yes to it held (the second
+    /// route's guard, #3608). Only the second route's dispatcher marks it,
+    /// as only it can make an [`EverythingShown`]; Live and texts never do,
+    /// so there a forget of everything keeps the face (#3564, Reviewer-two's
+    /// P2s). It lives with the request and goes with it.
+    pub(crate) fn mark_everything_asked(&self, _shown: &crate::second_provider::EverythingShown) {
+        self.context.everything.store(true, Ordering::Release);
+    }
+
+    /// Whether [`Self::mark_everything_asked`] was marked for this request.
+    pub(crate) fn everything_marked(&self) -> bool {
+        self.context.everything.load(Ordering::Acquire)
     }
 
     /// A face was remembered in this line: the face cache it was admitted
