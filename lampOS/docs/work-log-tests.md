@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-26 17:21 — Pinned gates retained; installed OTA access pending
+
+Ready for lamp-voice: no (current-base delivery and remaining gates)
+
+[Shared proof](verification/tests-shared-1aa-gates-20261026/) records Ready
+340/0/0, Reader 4/0/0 and restart 21/0/0 on their pinned 1aa commits. Ready and
+Reader's separate native previews on 690dff pass 7,496/0/53. Skills completed
+521/1/9, with its changed add-on passing and the unchanged routine receive
+helper failing; that local carry remains unpublished. [Earlier Sentinel
+overlay proof](verification/tests-sentinel-native-overlay-20261026/) keeps its
+authored 1ec and tested 1cad trees distinct.
+
+The owner directly requested the #3466 installed rerun. Taken/start posted;
+the verified host key is pinned, but no key is authorized for this client.
+No remote command or lamp change has run. The lead permits password access;
+the repository's key-only exception is pending from the owner. Host work
+continues: actual updater comparator code proves a meaningful unit delta
+versus comment-only no-op, disposable signing material and an input generator
+are prepared, and the corrected carrier regression gate is active. The old
+comment-only round remains HOLD; quiet is not bypassed.
+
 ## 2026-10-26 14:50 — Skills permissions result retained; current carry gate active
 
 Ready for lamp-voice: no (latest-base gates and native pending)

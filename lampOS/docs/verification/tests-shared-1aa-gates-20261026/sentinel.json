@@ -1,0 +1,43 @@
+{
+  "terminal": {
+    "status": "PASS",
+    "commit": "6588c7098298a277829deb52475e302a6e2a1649",
+    "runtime_attempts": 1,
+    "counts": {
+      "passed": 4,
+      "ignored": 0
+    },
+    "affected_outcomes": [
+      "ok"
+    ],
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "source_unchanged": true,
+    "witnesses_unchanged": true,
+    "executable_hashes_unchanged": true
+  },
+  "parent": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "private_receipt_sha256": {
+    "terminal.json": "bc52758bed65779513c50fab6f4e4bfd5c70d47deca2085fa8db92d0e448a69c",
+    "source-before.json": "ad78b58f05300394bd2e3e86c05c5bc3e09a605c403af156d5c65cc6b2985926",
+    "source-after.json": "ad78b58f05300394bd2e3e86c05c5bc3e09a605c403af156d5c65cc6b2985926",
+    "artifacts.json": "afecd1cb43738accc02c55d8d60da68a66ef5a55c8dcf34ecb77b002d9960694",
+    "frozen.json": "d062b52c1d7aadf7f387a14a5ef679f12fcab86f0857fa90ed83b295222795a9",
+    "inventory.json": "d39fe2edf59a0ea79a51fca52adca28e97d144eb95f715f7908ca47f7643f701"
+  },
+  "scope": "Full actual Mac Reader module; Linux-only assertions unrun locally",
+  "native_pending_when_mac_receipt_prepared": true,
+  "later_main_690dff_not_locally_executed": true
+}

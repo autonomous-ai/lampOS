@@ -1,0 +1,29 @@
+{
+  "run_id": 40299562588,
+  "run_head": "517e3fe24512c7ed23ea7cff23b57ccaff44063d",
+  "checkout": [
+    "cbffa92 Merge 517e3fe24512c7ed23ea7cff23b57ccaff44063d into 690dff041e331b5c89160901b4f38f3a9915e60b"
+  ],
+  "unique_counts": {
+    "PASS": 7496
+  },
+  "identical_repeats_verified": 34,
+  "skips": 53,
+  "summary": [
+    "Summary [ 170.559s] 7496 tests run: 7496 passed, 53 skipped"
+  ],
+  "affected_case": [
+    [
+      [
+        "lamp-expression",
+        "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges"
+      ],
+      [
+        "PASS",
+        "0.006"
+      ]
+    ]
+  ],
+  "raw_sha256": "7b1dba189f36e89a582f5607381169f2c4ff51361222ac14f045e676a552ccf9",
+  "scope": "actual ARM affected selection; checkout merge preview on690dff distinct from authored517e parent1aa; no authored/preview tree equality claimed"
+}

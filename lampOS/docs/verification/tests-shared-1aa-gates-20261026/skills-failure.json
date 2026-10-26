@@ -1,0 +1,38 @@
+{
+  "head": "91ca92d058adae8ce8992065afadd5e5753c55c8",
+  "parent": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "runtime_attempts": 1,
+  "counts": {
+    "passed": 521,
+    "failed": 1,
+    "ignored": 9
+  },
+  "failures": [
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline"
+  ],
+  "exact_inventory_match": true,
+  "doc_counts": {
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0
+  },
+  "command_exit": 101,
+  "controller_exit": 1,
+  "wall_seconds": 681.441967,
+  "timed_out": false,
+  "owned_group_absent": true,
+  "source_unchanged": true,
+  "witnesses_unchanged": true,
+  "executable_hashes_unchanged": true,
+  "changed_case_outcomes": [
+    "ok"
+  ],
+  "raw_sha256": {
+    "tests.stdout.txt": "2817e59a0f2239ce1f6b6d181f3f6be64f78fba4c3dfea44d146c0cbc4e1e934",
+    "tests.stderr.txt": "73be2b54b4961034a9961de247df67753911b7b2f8465003fecf289e751f3a19",
+    "terminal.json": "390f1cf6877bd57926e1c0edefd14ad435686618ff0f58192f38eae41ddff08a",
+    "inventory.json": "7308f8739b9f9644c05db8d75fad57d32537cb59f9a00187be653eb587b80107"
+  },
+  "failure_boundary": "routine.rs1381: next_request recv(50ms) returned no Request; iteration unknown, cause not established",
+  "unpublished_local_carry": true
+}

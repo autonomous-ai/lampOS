@@ -1,0 +1,140 @@
+{
+  "head": "96e3986a23259e4ee281c3be1b1959403dafd46d",
+  "authored_base": "1ec33957c78e6dc39bd7ca0b3b8f7c74543f6b35",
+  "actual_tested_base": "1cad670df4fdc3995974d0c15a75fc25bbe8e73d",
+  "actual_preview": "307b99005fd96c5d2bc37213880a6119ff8741ce",
+  "preview_parents": [
+    "1cad670df4fdc3995974d0c15a75fc25bbe8e73d",
+    "96e3986a23259e4ee281c3be1b1959403dafd46d"
+  ],
+  "authored_tree": "8fa17ac419bd5e637f8fa66aad8e860f43f282ba",
+  "tested_preview_tree": "dd67d0b0333d411494c3b585d32f78355b6f286f",
+  "preview_equals_original_authored_tree": false,
+  "tested_overlay_proof": {
+    "own_reflog_carry": "e9bc02f3acff4b439180d28911f1eecdf008eb60",
+    "carry_parent": "1cad670df4fdc3995974d0c15a75fc25bbe8e73d",
+    "carry_tree": "dd67d0b0333d411494c3b585d32f78355b6f286f",
+    "carry_tree_equals_tested_preview": true,
+    "range_diff_equal_patches": 1,
+    "range_diff_sha256": "f3702e0287855fac317b4d260b147e2761c89748f32c6da26f5c7719f04fa436"
+  },
+  "arm64_run": 40294010686,
+  "arm64_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_run": 40294010677,
+  "linux_clippy_attempt": 1,
+  "linux_clippy_conclusion": "success",
+  "nextest_unique_pass": 7496,
+  "nextest_unique_fail": 0,
+  "nextest_unique_leak": 0,
+  "nextest_unique_timeout": 0,
+  "nextest_selected": 7496,
+  "nextest_skipped": 53,
+  "nextest_executed_binaries": 70,
+  "nextest_skipped_binaries": 114,
+  "nextest_duration_s": 169.962,
+  "duplicate_terminal_display_lines": 34,
+  "linux_reader_module_passed": 14,
+  "reader_cases": [
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.009,
+      "name": "lamp-voice session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.009,
+      "name": "lamp-voice session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.009,
+      "name": "lamp-voice session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.011,
+      "name": "lamp-voice session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.01,
+      "name": "lamp-voice session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.007,
+      "name": "lamp-voice session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.011,
+      "name": "lamp-voice session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    },
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    }
+  ],
+  "changed_sentinel_cases": [
+    {
+      "status": "PASS",
+      "duration_s": 0.006,
+      "name": "lamp-voice session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    }
+  ],
+  "privileged_reader_dac": "Source-marked ignored; not executed or qualified by this run",
+  "promotion_passed": 25,
+  "promotion_failed": 0,
+  "custom_process": [
+    {
+      "passed": 13,
+      "failed": 0
+    }
+  ],
+  "doc_tests_passed": 4,
+  "doc_tests_failed": 0,
+  "relay_signals": "ok exactly once",
+  "raw_sha256": {
+    "arm64": "d5defc429a4dc8228bef5ec3fdac792eec619c0f85622363deb7b7ebdc36bc3c",
+    "clippy": "5a1243a2b383719856bd128cd0ea0ca72499a6b35c67ad185a0572e17e09d77d",
+    "tested_reader_source": "5f47477a111d7f82da5fdeb3b3893718099eb67a0fe93b76b4f24ddc32adce73"
+  },
+  "limitations": [
+    "Actual CI composition is 1cad + 96e; it does not qualify the original 1ec authored tree or current 6588/1aa carry",
+    "Nextest scope is workflow-selected; separate docs/process/promotion/relay counts are not added to it",
+    "No rerun, local compiler, source branch mutation, device action or push performed"
+  ],
+  "all_ordinary_reader_cases_executed_once": true
+}

@@ -1,0 +1,43 @@
+{
+  "terminal": {
+    "status": "PASS",
+    "commit": "517e3fe24512c7ed23ea7cff23b57ccaff44063d",
+    "runtime_attempts": 1,
+    "counts": {
+      "passed": 340,
+      "ignored": 0
+    },
+    "affected_outcomes": [
+      "ok"
+    ],
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "source_unchanged": true,
+    "witnesses_unchanged": true,
+    "executable_hashes_unchanged": true
+  },
+  "parent": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "private_receipt_sha256": {
+    "terminal.json": "a995bd06b5698cf46b127b5e458f993dec92496162d06365982089434e303cc1",
+    "source-before.json": "bafb6b823c21f3fac5a65f0848e7aaf0f17f2e38709d3b25e18e327b38dff438",
+    "source-after.json": "bafb6b823c21f3fac5a65f0848e7aaf0f17f2e38709d3b25e18e327b38dff438",
+    "artifacts.json": "7d7b80236c15e6e8d4849c7042c3f0c166fae62fecf84070ed0e869113ed6a3d",
+    "frozen.json": "941ce811498f5397297a1753fc38aafc37e903d8db593563f47fbd0b98176864",
+    "inventory.json": "539476f8998e846b30277c93ec69709cfa28e3a0800564092dab4f8876510e38"
+  },
+  "scope": "Full Expression package",
+  "native_pending_when_mac_receipt_prepared": true,
+  "later_main_690dff_not_locally_executed": true
+}
