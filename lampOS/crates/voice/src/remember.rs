@@ -375,6 +375,94 @@ pub fn asks_to_forget_everything(said: &str) -> bool {
     everything_asked(said) == Some(true)
 }
 
+/// What the model is told of a reply that said it kept something with no
+/// `remember` call ([`claims_a_keep`], finding K on #3504). Its words
+/// were not said.
+pub const KEEP_CLAIMED_UNKEPT: &str = "(For you to know: you were about to say you kept something, but nothing was kept: you did not call remember, and those words were not said. If they asked you to remember something, call remember now; otherwise answer without saying you kept anything.)";
+
+/// What the lamp says when, asked again, the model still says it kept
+/// something with no `remember` call.
+pub const NOT_KEPT_LINE: &str = "I didn't keep that. Tell me again and I'll remember it.";
+
+/// Whether a reply's opening says the lamp kept something, after up to
+/// three opening words such as "okay", "sure", "got it" or "done": only a
+/// keep that takes what was kept ("Kept: …", "Kept.", "kept that",
+/// "I'll remember that", "I've saved it", "Đã ghi nhớ"). "I'll keep it
+/// short", "I'll keep the light on", "I'll remember to remind you at five"
+/// and "Saved your playlist" claim nothing (the reviewer-lead's P2 on
+/// #3628), nor do "Got it, lights off." and "Noted.". `None` while the
+/// words so far could still begin a claim (unless `whole`, the reply is
+/// all there is); decided at the first that cannot.
+pub fn claims_a_keep(reply: &str, whole: bool) -> Option<bool> {
+    const OPENING: &[&str] = &[
+        "okay", "ok", "sure", "alright", "done", "yes", "yep", "great", "got it", "right",
+    ];
+    // Each claim, then what must follow it: a word from `objects`, or,
+    // when `bare`, also the reply's end or a mark (`.`, `!`, `:`, `,`); or,
+    // when `any`, anything after a word's end (the Vietnamese ones: "đã ghi
+    // nhớ rồi", "mình sẽ nhớ điều đó").
+    const CLAIMS: &[(&str, bool, bool)] = &[
+        ("kept", true, false),
+        ("i've kept", true, false),
+        ("i have kept", true, false),
+        ("i'll remember", false, false),
+        ("i will remember", false, false),
+        ("i've remembered", false, false),
+        ("i've saved", true, false),
+        ("saved", false, false),
+        ("\u{111}\u{e3} ghi nh\u{1edb}", true, true),
+        ("m\u{ec}nh s\u{1ebd} nh\u{1edb}", true, true),
+        ("\u{111}\u{e3} l\u{1b0}u", true, true),
+    ];
+    const OBJECTS: &[&str] = &["that", "this", "it", "those", "them"];
+    let mut rest = reply.trim_start().to_lowercase().replace('\u{2019}', "'");
+    // Up to three opening words, each with what ends it.
+    for _ in 0..3 {
+        let Some(opening) = OPENING.iter().find(|opening| {
+            rest.strip_prefix(**opening)
+                .is_some_and(|after| after.starts_with(|c: char| !c.is_alphanumeric() && c != '\''))
+        }) else {
+            break;
+        };
+        rest = rest[opening.len()..]
+            .trim_start_matches(|c: char| !c.is_alphanumeric())
+            .to_owned();
+    }
+    let mut maybe = rest.is_empty() || OPENING.iter().any(|opening| opening.starts_with(&rest));
+    for (claim, bare, any) in CLAIMS {
+        if let Some(after) = rest.strip_prefix(claim) {
+            if *any
+                && (after.starts_with(|c: char| !c.is_alphanumeric())
+                    || (whole && after.is_empty()))
+            {
+                return Some(true);
+            }
+            let marked = after.starts_with(['.', '!', ':', ',']);
+            let word = after
+                .trim_start()
+                .split(|c: char| !c.is_alphanumeric() && c != '\'')
+                .next()
+                .unwrap_or_default();
+            let object = after.starts_with(' ') && OBJECTS.contains(&word);
+            if (*bare && (marked || (whole && after.trim().is_empty()))) || object {
+                return Some(true);
+            }
+            // Still coming: the end, or a word that may yet be an object.
+            if after.is_empty()
+                || (after.starts_with(' ') && after.trim().is_empty())
+                || (after.starts_with(' ')
+                    && !after.trim_start().contains(|c: char| !c.is_alphanumeric())
+                    && OBJECTS.iter().any(|object| object.starts_with(word)))
+            {
+                maybe = true;
+            }
+        } else if claim.starts_with(rest.as_str()) {
+            maybe = true;
+        }
+    }
+    if maybe && !whole { None } else { Some(false) }
+}
+
 /// Whether `said` asks to forget, by its words: the English ones folded as
 /// names are matched, and the Vietnamese ones with their accents kept,
 /// written as one letter or as a letter and its mark, since without them
@@ -9423,6 +9511,51 @@ mod tests {
         assert_eq!(told["everything"], true);
         let told = memory_and_face(memory, &json!({"ok": true}), false);
         assert!(told.get("setup_name").is_none());
+    }
+
+    /// Finding K on #3504: which openings say something was kept.
+    #[test]
+    fn a_reply_that_says_it_kept_something_is_known_by_its_opening() {
+        for reply in [
+            "Kept: the meeting room is called Orange.",
+            "Kept.",
+            "Got it, kept that.",
+            "Okay, I'll remember that the key is in the blue box.",
+            "I've saved it.",
+            "Đã ghi nhớ: phòng họp tên là Orange.",
+            "Đã ghi nhớ rồi.",
+            "Mình sẽ nhớ điều đó.",
+        ] {
+            assert_eq!(claims_a_keep(reply, false), Some(true), "{reply}");
+        }
+        // The reviewer-lead's P2 on #3628: ordinary replies.
+        for reply in [
+            "Sure, I'll keep it short.",
+            "Okay, I'll keep the light on.",
+            "I'll remember to remind you at five.",
+            "Saved your playlist.",
+            "Got it, lights off.",
+            "Sure, here's a joke.",
+            "The red box.",
+            "I don't remember that.",
+            "Noted.",
+            "Not sure, maybe ask the office.",
+            "Kept items are in the box.",
+            "Remembered! You asked me this yesterday too.",
+            "Saved to your shopping list.",
+        ] {
+            assert_eq!(claims_a_keep(reply, true), Some(false), "{reply}");
+        }
+        assert_eq!(claims_a_keep("Got it,", false), None);
+        assert_eq!(claims_a_keep("Got it,", true), Some(false));
+        assert_eq!(claims_a_keep("Ke", false), None);
+        assert_eq!(claims_a_keep("I'll remember", false), None);
+        assert_eq!(claims_a_keep("I'll remember t", false), None);
+        assert_eq!(claims_a_keep("I'll remember to", false), Some(false));
+        assert_eq!(claims_a_keep("Kept", true), Some(true));
+        // Decided at the first word that begins no claim.
+        assert_eq!(claims_a_keep("Not", false), Some(false));
+        assert_eq!(claims_a_keep("The red", false), Some(false));
     }
 
     /// #2850: "forget my face" with its person's memory emptied says so;
