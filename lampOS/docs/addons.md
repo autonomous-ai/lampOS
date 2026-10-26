@@ -769,9 +769,10 @@ tier's whole say is longer:
   say-service request for a trusted say of up to 4,096 bytes, by reference,
   from that service only.
 - **Harness's rates (asked on openharness#1654).** Harness takes six
-  proposals a minute per add-on and device, twelve a minute per device,
-  and four undecided at once (`RATE_LIMITED`, openharness
-  `docs/autonomous-device-addons.md`). So a say of more than a few parts
+  proposals a minute per add-on and device and twelve a minute per device
+  (`RATE_LIMITED`), plus four undecided proposals per device
+  (`BACKPRESSURE`; openharness `docs/autonomous-device-addons.md`). So a
+  say of more than a few parts
   can't cross today. The parts need Harness either to count a say's parts
   as one proposal (same `id`, within 10 s), or to take one note of up to
   4,096 bytes from the trusted tier. Until it does, a trusted say is one
