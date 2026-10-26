@@ -1,0 +1,21 @@
+{
+  "pr": 3552,
+  "train": 162,
+  "member_pr": 3546,
+  "member": "3c54671c011ab5f49855fd0cfd719a99c6e80184",
+  "base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+  "candidate": "be046be4ca452d6549cfe426a65f957977c6412e",
+  "landing": "88335bfbef7a964ff5918b0dec06892dc9a4ea4d",
+  "merged_at": "2026-10-26T06:58:36Z",
+  "member_tree": "814c86dd47cbb63fbd6ae896d2f207019af296a2",
+  "candidate_tree": "814c86dd47cbb63fbd6ae896d2f207019af296a2",
+  "landing_tree": "814c86dd47cbb63fbd6ae896d2f207019af296a2",
+  "all_trees_equal": true,
+  "candidate_and_landing_parents_equal_base": true,
+  "authored_blobs": {
+    "lampOS/deploy/factory/steps-test.sh": "661938c275bcea068e60f56f60c649d98a8388f2",
+    "lampOS/deploy/factory/steps.sh": "db5e34995108ffc5d8d9e0b45eb4daa9dedd3c8b",
+    "lampOS/docs/install.md": "9932830edb61eaa78ff58c47fe8f12757a67d6a0"
+  },
+  "limits": "Identical full trees and same one-parent base establish exact one-member patch equality. Native qualification is in separate original train receipt; local shell86 and physical acceptance remain separate. No publication or device qualification inferred."
+}

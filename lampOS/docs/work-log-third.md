@@ -13,6 +13,21 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 14:03 — Factory refusal follow-up delivered
+
+Ready for lamp-voice: delivered (#3546, train 162)
+
+Member **3c54671c0**, train candidate **be046be4c** and landing
+**88335bfbe** have identical full tree **814c86dd4**, base **9e5d3b9c6**
+and one-member patch. Original train ARM64 **40282298355** passes
+11,361 unique tests, zero failures/leaks/timeouts, 106 skipped; Linux
+**40282298313** passes. Turn-wire 13/0 is separate.
+[Landing](verification/factory-resume-refusal-20261026/train162-landing.json),
+[train native](verification/factory-resume-refusal-20261026/train162-native.json).
+This delivers the unchecked-resume follow-up left by #2818. No publication,
+installation, actual systemd, motor or physical acceptance is claimed.
+The remaining reminder carry gate continues; next fixture read is queued.
+
 ## 2026-10-26 14:02 — Reminder native green; factory landed
 
 Ready for lamp-voice: no (#3525, new-base carry gate running)
