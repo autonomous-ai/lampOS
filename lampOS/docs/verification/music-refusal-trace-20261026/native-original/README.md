@@ -1,0 +1,11 @@
+# Music offer trace: original PR native qualification
+
+PR #3515 authored head `788faaedaf223b495a69bca2433d980ea0bcc086` is based on `3d9722f38817a4dd1601fac051d36ac9f2292969`. Both original jobs checked out merge preview `e429466078848de22b7d72bc9f39f61e239409fc`. Its complete tree `fa55d292a64c61066848da159ab5ed71a273e592` equals the authored head tree, with the exact base/head as its parents. [identities.json](identities.json) records the original run, job and artifact metadata.
+
+[ARM64 run 40246476225, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40246476225/attempts/1) succeeds: **11,322 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**. All ordinals 1–11,322 reconcile exactly once; 35 identical report echoes are excluded. All three new requested-audio boundary controls pass once. [selected-results.json](selected-results.json) gives their exact case names and ordinals, and [census.json](census.json) retains the literal summary and log hashes.
+
+The two excluded own-harness binaries run separately: relay signals succeeds and 12 process tests pass. Workspace doctests contribute four passes across 46 summaries. The separate stable-promotion tool workspace reports 22 passes. These scopes are not added to the nextest count.
+
+[Linux Clippy run 40246476212, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40246476212/attempts/1) succeeds, including pinned workspace formatting and strict workspace/all-target Clippy, plus the separate stable-promotion tool formatting and Clippy. Neither original job was rerun for this audit. Promotion, signing and failure-report jobs were skipped, not passed.
+
+Raw logs and API receipts remain retained privately. The published artifact metadata is bound to this authored head; its archive was not downloaded or executed by this audit. This is evidence for the original head only; later amendments require their own qualification. The new tests exercise the coordinator's shared admission-and-recording handler with finite in-memory metadata. They do not count journal writes or prove persisted trace I/O, actual provider transport, playback, device latency or #2793's physical acceptance.

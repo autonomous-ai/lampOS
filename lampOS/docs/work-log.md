@@ -1,4 +1,16 @@
-Music published; own-keys review docs fixed; two requested peer reads complete.
+Original music and amended own-keys native evidence retained; current-base qualification active.
+
+## Current checkpoint: 2026-10-26 07:09 +07, two native gates complete before d21 carries
+
+[#3515](https://github.com/autonomous-ai/lampOS/pull/3515)'s original `788faaeda` is qualified by [original native evidence](verification/music-refusal-trace-20261026/native-original/README.md): ARM64 **40246476225**, attempt 1, **11,322 unique PASS / zero failures, leaks or timeouts / 106 skipped**, all three boundary cases once. Linux Clippy **40246476212** passes. Actual preview `e42946607` and authored head share the same complete tree. This does not qualify the later d21 carry or the two review tests prepared afterward.
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510)'s review amendment `98f60cf40` is qualified by [amended native evidence](verification/own-keys-product-carry-20261026/native-amended/README.md): ARM64 **40246637499**, attempt 1, **11,329 unique PASS / zero failures, leaks or timeouts / 106 skipped**; all nine own-keys controls and both compiled switch readers pass once. Linux Clippy **40246637457** passes. Actual preview `3b197d408` equals the authored tree. Reviewers confirm the two documentation findings are fixed; activation HOLD remains for explicit #2094/current-lamp acceptance.
+
+The current base is `d21a854b6`, from train148. Own-keys carries four equal patches as `4fb4c1c04`; music's existing patch carries equal as `beba7179b`, with its new test-only file unchanged through autostash/rebase. The new TWO_FACES_HELD switch rows remain verbatim. Own-keys current-base formatting and strict selected Clippy pass; full Voice is active because the base changes Voice runtime. Music's five-boundary-test gate and two additional fault controls are prepared for the next single compiler slot. Original runtime/journal evidence is not promoted to those new heads.
+
+The log rebase preserved **14,023** earlier verification blobs and modes. Every native packet excludes duplicate report echoes and records separate doctest/custom-harness counts. No local ARM64, device, provider, real-key or release action ran.
+
+---
 
 ## Current checkpoint: 2026-10-26 06:56 +07, music #3515 and requested release reads
 

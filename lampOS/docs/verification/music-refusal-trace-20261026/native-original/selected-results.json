@@ -1,0 +1,23 @@
+[
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_a_safe_fixed_refusal_without_offer_data",
+    "ordinal": 7455,
+    "status": "PASS",
+    "total": 11322
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_acceptance_with_explicit_null_and_one_repeat_refusal",
+    "ordinal": 7456,
+    "status": "PASS",
+    "total": 11322
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_unavailable_and_stale_envelope_refusals",
+    "ordinal": 7466,
+    "status": "PASS",
+    "total": 11322
+  }
+]
