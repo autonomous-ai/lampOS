@@ -1,3 +1,11 @@
+## 2026-10-26 22:05 — Common full correction gate completed
+
+Ready for lamp-voice: no
+
+[Common frozen d9/2a827 qualification](verification/common-full-d9-20261026/receipt.json) completed **8,440/0/58 declared ignored**, including four direct hand cases and a disjoint 8,436-case nextest remainder. All 33 required privacy boundaries passed once; zero leaks/timeouts/retries. Separate process 13/0, two Mac-unsupported custom ignores and 14 zero-case doctest targets passed their commands. Formatting, strict workspace/all-target Clippy, workspace build and test compilation passed with all 48 local packages rebuilt. Source, 22 witnesses, 7,492 debug inputs, four passed clones and every owned process closure were verified; actual runtime controller exited 0.
+
+The compiler controller's 125 remains: five Cargo top-level/deps filename aliases were hash-identical to the freshly compiled identity. The separate continuation ran only unrun stages. Earlier compiler failures and all historical runtime failures stay intact. Latest Main is e672 after Setup, Body and Update changes; the source carry and affected current gates precede the folded #3064 push. Explicit-close, parent/privacy, matching-pin and physical HOLDs remain. No device or activation claim.
+
 ## 2026-10-26 19:33 — Current Common gate resumed after compiler corrections
 
 Ready for lamp-voice: no

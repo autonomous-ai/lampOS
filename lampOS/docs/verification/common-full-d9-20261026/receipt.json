@@ -1,0 +1,122 @@
+{
+  "source": {
+    "head": "0e5c49ca01b34521e2990a4dd717c26426387271",
+    "tree": "d9f10adf38fb5be2b34c9d61485f17044e52a92c",
+    "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac"
+  },
+  "runtime": {
+    "passed": 8440,
+    "failed": 0,
+    "declared_ignored": 58,
+    "direct_hand_cases": 4,
+    "nextest_remainder_passed": 8436,
+    "synthetic_direct_filter_skips": 4,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "required_controls_passed": 33,
+    "process_cases_separate": 13,
+    "custom_update_mac_ignored_separate": 2,
+    "doc_targets": 14,
+    "doc_cases": 0
+  },
+  "packages": {
+    "lamp-body": {
+      "passed": 609,
+      "failed": 0,
+      "declared_ignored": 0
+    },
+    "lamp-cloud": {
+      "passed": 196,
+      "failed": 0,
+      "declared_ignored": 4
+    },
+    "lamp-controls": {
+      "passed": 516,
+      "failed": 0,
+      "declared_ignored": 3
+    },
+    "lamp-expression": {
+      "passed": 340,
+      "failed": 0,
+      "declared_ignored": 0
+    },
+    "lamp-eyes": {
+      "passed": 370,
+      "failed": 0,
+      "declared_ignored": 5
+    },
+    "lamp-keeper": {
+      "passed": 41,
+      "failed": 0,
+      "declared_ignored": 1
+    },
+    "lamp-lean": {
+      "passed": 61,
+      "failed": 0,
+      "declared_ignored": 2
+    },
+    "lamp-memory": {
+      "passed": 330,
+      "failed": 0,
+      "declared_ignored": 8
+    },
+    "lamp-peek": {
+      "passed": 26,
+      "failed": 0,
+      "declared_ignored": 0
+    },
+    "lamp-setup": {
+      "passed": 178,
+      "failed": 0,
+      "declared_ignored": 1
+    },
+    "lamp-skills": {
+      "passed": 522,
+      "failed": 0,
+      "declared_ignored": 9
+    },
+    "lamp-update": {
+      "passed": 408,
+      "failed": 0,
+      "declared_ignored": 4
+    },
+    "lamp-voice": {
+      "passed": 4220,
+      "failed": 0,
+      "declared_ignored": 21
+    },
+    "lamp-voice-eval": {
+      "passed": 623,
+      "failed": 0,
+      "declared_ignored": 0
+    }
+  },
+  "compiler": {
+    "format_exit": 0,
+    "strict_workspace_all_target_clippy_exit": 0,
+    "workspace_build_exit": 0,
+    "test_compilation_exit": 0,
+    "fresh_local_packages": 48,
+    "default_profiles": true,
+    "incremental": "0"
+  },
+  "controllers": {
+    "original_compiler_provenance_exit": 125,
+    "only_unrun_runtime_exit": 0,
+    "alias_limit": "Five Cargo top-level versus deps aliases verified by exact package/target/profile/features and artifact hashes; no compiler replay"
+  },
+  "closure": {
+    "source_stable": true,
+    "owned_sessions_closed": true,
+    "witnesses": 22,
+    "debug_inputs": 7492,
+    "passed_driver_clones": 4
+  },
+  "release_sha256": "7fd90070098b02f9f0e417cce433d1a039ed1c052080ee0b87dfe7c3d8f26835",
+  "limits": [
+    "This is frozen d9/2a827 qualification, not current e672 runtime.",
+    "Explicit-close, independent privacy, matching pins and physical acceptance remain HOLD.",
+    "Two custom Mac unsupported targets are ignored, not passes; 14 doc targets have zero cases.",
+    "Historical failures remain at their original sources."
+  ]
+}
