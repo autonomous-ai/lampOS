@@ -22,6 +22,8 @@ use std::{
     process::Command,
 };
 
+mod systemd;
+
 /// What is never wiped, whatever a plan says: the software, its update trust,
 /// and the system itself.
 const PROTECTED: [&str; 12] = [
@@ -250,8 +252,16 @@ pub struct System;
 
 impl Effects for System {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
+        if systemd_stop(argv) {
+            return systemd::stop();
+        }
         let status = Command::new(&argv[0]).args(&argv[1..]).status()?;
         if status.success() {
+            // The keeper preserves its pause/rest protocol, but its target
+            // job alone does not wait for the propagated service stop jobs.
+            if keeper_stop(argv) {
+                return systemd::stop();
+            }
             Ok(())
         } else {
             Err(io::Error::other(format!("{} ended with {status}", argv[0])))
@@ -265,6 +275,17 @@ impl Effects for System {
         #[cfg(target_os = "linux")]
         let _ = rustix::system::reboot(rustix::system::RebootCommand::Restart);
     }
+}
+
+fn systemd_stop(argv: &[String]) -> bool {
+    matches!(argv, [program, verb, target]
+        if matches!(program.as_str(), "/usr/bin/systemctl" | "/bin/systemctl")
+            && verb == "stop" && target == "lampos.target")
+}
+
+fn keeper_stop(argv: &[String]) -> bool {
+    matches!(argv, [program, verb, target]
+        if program == "/usr/local/bin/lamp-keeper" && verb == "stop" && target == "lamp")
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

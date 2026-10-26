@@ -174,8 +174,13 @@ lamp-setup reset-now`). That unit, in this order:
 1. it writes a journal, durably (temporary file, sync, rename, directory sync);
 2. it removes the setup marker, so that from here any restart comes back into
    setup, never into the lamp with half its data;
-3. it runs the plan's stop command, the keeper's `lamp-keeper stop lamp`
-   (#767): the voice pauses, `lampos.target` stops, the body folds the lamp;
+3. it stops the lamp and waits for its writers. For the installed product
+   command (`/usr/bin/systemctl stop lampos.target`, also `/bin/systemctl`),
+   reset discovers the target's recursive `ConsistsOf` members and names
+   each in the stop command. For the stock keeper command
+   (`/usr/local/bin/lamp-keeper stop lamp`), it preserves the keeper's
+   pause/rest protocol first, then applies the same barrier. It verifies
+   that membership is unchanged and every member is inactive before wiping;
 4. it wipes each path in the plan: a file is removed, a directory keeps itself
    (systemd units name some of them and would not start without them) and
    loses everything in it. It walks by handle, one component at a time from
@@ -184,6 +189,20 @@ lamp-setup reset-now`). That unit, in this order:
 5. it removes the journal, syncs, and reboots. If the wipe fails it still
    reboots, and if the reboot command fails it forces one: a lamp left dark
    with no marker would wait for a hand.
+
+The target's stop job alone is not that barrier: systemd's default target
+ordering permits it to finish before its parts finish stopping. Voice can
+still flush its cached onboarding outcomes during that interval. Since a
+wipe retains the directory, that late write could restore the factory's
+progress before reboot. The barrier fixes already-installed stock plans;
+it needs no new plan field, switch, or migration. Discovery, explicit stop,
+and verification share a 60 s bound, at most 256 units and 64 KiB per query.
+An error, unknown state, changed membership or timeout takes the existing
+stop-failure path: no wipe, journal retained, reboot into reset recovery.
+Custom stop commands retain their contract to stop every writer before
+returning. This does not change the five-second button gesture or ordinary
+Voice startup. Installed reset timing and the customer's onboarding must
+still be checked on a lamp.
 
 With the keeper's `--setup-marker` (the fifth builder's, agreed on #702), a
 lamp with no marker starts only `lamp-setup.service`. So if the stop fails,

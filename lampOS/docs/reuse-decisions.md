@@ -1,5 +1,28 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Wait for reset's writers before wiping (2026-10-26)
+
+V1's `system/server/system/factoryreset.go` resets the active agent, wipes
+device and inactive-runtime data, then schedules a reboot after two seconds.
+That ordering is useful, but a delay is not proof that every writer stopped.
+Keep V2's durable reset journal, marker removal, handle-relative wipe,
+calibration/trust exclusions and recovery after interrupted reset.
+
+Systemd v252's `systemctl-start-unit.c` registers only each explicitly named
+unit's returned job with its waiter. Target default ordering puts its stop
+ahead of member service stops. Reuse systemd's explicit service stop jobs
+and manager-reported recursive `ConsistsOf` membership, then check inactivity,
+rather than adding a sleep or deleting onboarding's storage files differently.
+The existing stock product and keeper plans receive this barrier in Setup;
+custom commands still own their stop-completion contract. No Voice protocol,
+storage format, product switch or dependency changes.
+
+The reset latency target is bounded completion of the actual stop barrier:
+60 seconds across discovery, stop and verification, with failure retaining
+the journal and rebooting without wiping. The five-second gesture and normal
+interaction loops are unchanged. Source evidence and synthetic tests cannot
+establish the affected lamp's exact writer timing or customer onboarding.
+
 ## Bound the initial direct capture-ready handshake (2026-10-26)
 
 V1's `hal/drivers/voice/aec.py` `prepare_playback` retains the output rate
