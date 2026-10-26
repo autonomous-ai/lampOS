@@ -1,0 +1,12 @@
+{
+  "head": "0038db8cf1447ffa6e719ba701a53748e2113641",
+  "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+  "passed": 86,
+  "failed": 0,
+  "exit": 0,
+  "syntax_and_diff_check": true,
+  "authored_blobs_equal_prior_head": true,
+  "range_diff": "1:  e96296097 = 1:  0038db8cf lampOS: stop the factory head check when resume fails\n",
+  "log_sha256": "728190c9294561aaa040960f837c578c202d8b196b5c3eb85254fe5600b0fce9",
+  "limits": "Fresh native Mac stand-in gate only; no lamp, services or physical acceptance; prior negative remains on its original base."
+}

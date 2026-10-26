@@ -13,6 +13,20 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:17 — Current-base factory carry
+
+Ready for lamp-voice: no (#3546)
+
+Rebased onto train 159 landing **d5dc2e87f**, yielding **0038db8cf**.
+Range-diff is one equal commit and all three authored blobs match the old
+head. Fresh shell syntax, diff check and factory suite pass **86/0**.
+[Carry receipt](verification/factory-resume-refusal-20261026/current-d5dc.json).
+Pushed with an exact old-head lease. New native runs are ARM64
+**40278971251** and Linux Clippy **40278971282**, still running.
+Old reads stay on their old heads; current-head carry reads are requested.
+Reminder carry **b40c866ef** is also one equal commit, with its local gate
+running before push. Both PRs temporarily draft. Next read is #3548.
+
 ## 2026-10-26 13:08 — Factory guard has both independent reads
 
 Ready for lamp-voice: yes (#3546)
