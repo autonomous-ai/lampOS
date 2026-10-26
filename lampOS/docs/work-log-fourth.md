@@ -6,6 +6,14 @@ Main advanced to d5dc2e87f with actual Voice attention/worker changes. #3544 ret
 
 The diagnostic fixture completed combined Voice 4,086/0/21 with no leaks/timeouts; its changed case passed once in 0.690 s, docs had zero cases, and source/witness/process closure verified. The earlier capacity stop and exact incremental recovery remain recorded. Its two-file task was committed independently, then carried equally as 9b758a4a7 on a08abe33e. It is not yet published or current-source qualified. Common composition against the newly landed name handling is under source review while the compiler remains with the parent carry. No lamp or activation occurred.
 
+## 2026-10-26 14:23 — Independent documentation read and factory inputs
+
+Ready for lamp-voice: no
+
+Posted the second independent READ-OK on #3553 at cc7aa7d07. The one-file wording correction matches pinned Harness commit 3f49f4268: rates 6/12 use RATE_LIMITED, four undecided proposals per device use BACKPRESSURE, and the window is 60 seconds. Diff check and seven static source assertions passed; no runtime or Rust gate is claimed. The offered head was rechecked before posting.
+
+Main advanced to 88335bfbe. Its factory script and install document are compiled inputs to two Update tests, so workspace compiler equivalence does not hold. Both reader cases passed once in train 162 ARM64 40282298355, whose actual preview tree matches current Main. Independent exported factory stand-ins passed 86/0 in 126.7 seconds with syntax clean and closed processes, no device access. The subsequent parent carry will run fresh workspace gates and both Update test targets; unchanged Voice results require actual executable and runtime-input equivalence. The current full Voice run continues on frozen a08abe33e with no restart. Its result and final process closure are still pending.
+
 ## 2026-10-26 13:51 — Current carries and retained partial gate
 
 Ready for lamp-voice: no
