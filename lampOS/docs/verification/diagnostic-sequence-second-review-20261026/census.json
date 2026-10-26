@@ -1,0 +1,59 @@
+{
+  "cases": [
+    "diagnostics::accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm",
+    "diagnostics::audio_fault_end_is_incomplete_even_with_good_written_pcm",
+    "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+    "diagnostics::capture_processing_cannot_be_mislabelled_as_render_processing",
+    "diagnostics::capture_sequence_gap_and_unannounced_epoch_change_fail",
+    "diagnostics::closed_privacy_cannot_be_overridden_by_pcm_metadata",
+    "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+    "diagnostics::duration_and_frame_shape_limits_disable_evidence_without_blocking",
+    "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+    "diagnostics::no_overwrite_private_parent_and_symlink_rejection",
+    "diagnostics::omitted_open_privacy_and_missing_opening_frames_are_invalid",
+    "diagnostics::playback_reset_requires_matching_old_discard_and_advancing_epoch",
+    "diagnostics::processing_provenance_matches_pending_result_and_acknowledged_summary",
+    "diagnostics::render_cursor_gap_does_not_insert_silence",
+    "diagnostics::render_records_only_accepted_prefix_and_typed_priming_silence",
+    "diagnostics::repeated_privacy_observation_does_not_reset_the_render_cursor",
+    "diagnostics::replaced_artifact_never_receives_original_pcm_or_valid_marker",
+    "diagnostics::replacement_directory_and_existing_final_marker_cannot_be_certified"
+  ],
+  "expected_diagnostic_controls": [
+    "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+    "diagnostics::processing_provenance_matches_pending_result_and_acknowledged_summary",
+    "diagnostics::capture_processing_cannot_be_mislabelled_as_render_processing",
+    "diagnostics::render_records_only_accepted_prefix_and_typed_priming_silence",
+    "diagnostics::accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm",
+    "diagnostics::capture_sequence_gap_and_unannounced_epoch_change_fail",
+    "diagnostics::render_cursor_gap_does_not_insert_silence",
+    "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+    "diagnostics::closed_privacy_cannot_be_overridden_by_pcm_metadata",
+    "diagnostics::no_overwrite_private_parent_and_symlink_rejection",
+    "diagnostics::replaced_artifact_never_receives_original_pcm_or_valid_marker",
+    "diagnostics::duration_and_frame_shape_limits_disable_evidence_without_blocking",
+    "diagnostics::omitted_open_privacy_and_missing_opening_frames_are_invalid",
+    "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+    "diagnostics::playback_reset_requires_matching_old_discard_and_advancing_epoch",
+    "diagnostics::audio_fault_end_is_incomplete_even_with_good_written_pcm",
+    "diagnostics::replacement_directory_and_existing_final_marker_cannot_be_certified",
+    "diagnostics::repeated_privacy_observation_does_not_reset_the_render_cursor"
+  ],
+  "literal_summaries": [
+    {
+      "failed": 0,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7d652805487aab85)",
+      "ignored": 0,
+      "literal": "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 257 filtered out; finished in 0.78s",
+      "passed": 18
+    }
+  ],
+  "nested_summaries": 0,
+  "runtime_bindings": [
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7d652805487aab85)",
+      "sha256": "b680eda786c714d675ef1d34f2413fcacf6a850efbde9e07069f6b9df5533edd"
+    }
+  ],
+  "scope": "All diagnostics integration cases only. Parent hand-controls and privacy changes are not qualified by this filtered test scope."
+}

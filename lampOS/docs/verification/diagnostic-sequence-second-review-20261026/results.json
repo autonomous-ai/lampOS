@@ -1,0 +1,130 @@
+{
+  "complete": {
+    "actual_and_preserved_artifacts": 2,
+    "artifacts_unchanged": true,
+    "base": "c97dae33396a45657641c719794d162ca2d9c581",
+    "complete": true,
+    "head": "2cc71e720b72d4f2d9b4aa2303219d846d2e67de",
+    "ignored": 0,
+    "passed": 18,
+    "source_entries": 7236,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "c97dae33396a45657641c719794d162ca2d9c581",
+    "controller_sha256": "1f362d61fc699fda4f9a9c04ce0063bdca59646dd09557540ab2dbf33718d9de",
+    "head": "2cc71e720b72d4f2d9b4aa2303219d846d2e67de",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "metadata_sha256": "ec6852659472cf89cba69faac5d07b9a3155d7d2e5652fb72a74b16158ec1b1a",
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 93657759744,
+      "elapsed_seconds": 149.102,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "8d3ca464ab98ecbc53501d8613f4d9823867909d75118485cb8478766b26f96c",
+      "source_entries": 7236,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--test",
+        "it",
+        "diagnostics::",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 93277773824,
+      "elapsed_seconds": 169.148,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "c3aaedcc71463fc530dde360791b892e558879dbea36cebbc294152853f10468",
+      "source_entries": 7236,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 93657796608,
+      "elapsed_seconds": 6.32,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7236,
+      "source_unchanged": true
+    },
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 93659738112,
+      "elapsed_seconds": 0.957,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "ec6852659472cf89cba69faac5d07b9a3155d7d2e5652fb72a74b16158ec1b1a",
+      "source_entries": 7236,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--test",
+        "it",
+        "diagnostics::",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "disk_free_before": 90442342400,
+      "elapsed_seconds": 3.224,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "8ecdfde210f9c7cbf0d8ded1866a11d358493000230ed91114b7bf95e0c15040",
+      "source_entries": 7236,
+      "source_unchanged": true
+    }
+  },
+  "scope": "All diagnostics integration cases only; strict Voice all-target Clippy. No parent hand-controls or privacy acceptance claim.",
+  "source_inventory_sha256": "96640c49c245fceca27879b968c6889310209a32f4a53b847142deae159a380d"
+}

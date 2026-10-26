@@ -1,0 +1,76 @@
+[
+  {
+    "compiler_artifact": {
+      "executable": "<target>/debug/deps/it-7d652805487aab85",
+      "features": [],
+      "filenames": [
+        "<target>/debug/deps/it-7d652805487aab85"
+      ],
+      "fresh": false,
+      "manifest_path": "<source>/lampOS/crates/voice/Cargo.toml",
+      "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "reason": "compiler-artifact",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "src_path": "<source>/lampOS/crates/voice/tests/it/main.rs",
+        "test": true
+      }
+    },
+    "path": "<target>/debug/deps/it-7d652805487aab85",
+    "preserved_path": "<gate>/artifacts/0-it-7d652805487aab85",
+    "sha256": "b680eda786c714d675ef1d34f2413fcacf6a850efbde9e07069f6b9df5533edd"
+  },
+  {
+    "compiler_artifact": {
+      "executable": "<target>/debug/lamp-voice",
+      "features": [],
+      "filenames": [
+        "<target>/debug/lamp-voice"
+      ],
+      "fresh": false,
+      "manifest_path": "<source>/lampOS/crates/voice/Cargo.toml",
+      "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "reason": "compiler-artifact",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": true,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "<source>/lampOS/crates/voice/src/main.rs",
+        "test": true
+      }
+    },
+    "path": "<target>/debug/lamp-voice",
+    "preserved_path": "<gate>/artifacts/1-lamp-voice",
+    "sha256": "1e2fd6f7bf3cad45f2ff993123c825028763e620bf5b5af044a21f6e0e54acfd"
+  }
+]
