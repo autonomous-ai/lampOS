@@ -596,3 +596,30 @@ return-before-release observations. The 25 ms idle lower bound, the Group B
 request-budget checks and all production timeouts, queue bounds and code remain
 unchanged. A production writer timeout is still a test failure if it loses the
 held exchange; it is never counted as a successful acknowledgement or release.
+
+## Routine policy time and event transport
+
+Three Skills Routine fixtures step their Manager's clock to check delayed
+wall-clock samples and a future sample: `a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended`,
+`a_delayed_sample_inside_the_window_keeps_its_original_deadline`, and
+`a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window`.
+Their `clock_policy` fixture keeps only the request publisher's transport
+header alive for a bounded five host seconds. The request declaration stays
+an Event with a 500 ms lifespan; production publishers and all other fixtures
+keep that lifespan. The synthetic clock, payload deadlines, cancellation
+assertions and 50 ms receive bound stay unchanged.
+
+A paired real-bus control uses fresh fixtures and the same 700 ms host pause.
+It peeks the actual queued header and payload without consuming the message,
+then the original subscriber records a stock event expiring and the bounded
+fixture delivering its exact request. Both publications must be accepted,
+with no dropped sends; Manager time and deadlines must not advance. Header
+age checks reject clock steps or overruns, and all diagnostics wait until
+both observations are captured. Missing-request diagnostics identify the
+None/Rest/Wake iteration, expected operation, publisher/expiry counters and
+prior request before cancellation.
+
+This isolates policy assertions from unrelated host scheduling during a
+real-wall transport lease. It does not increase any product deadline,
+qualify arbitrary host stalls, prove device latency, or retrospectively
+identify the cause of older failures that retained no expiry evidence.
