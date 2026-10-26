@@ -1,0 +1,122 @@
+{
+  "head": "0945493814f494a49a0a23199ba35dc661bdc546",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "state": "full runtime active, not a pass",
+  "gates": {
+    "clean": 0,
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "capture": {
+    "at": "2026-10-26T18:41:23.172223+00:00",
+    "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "compiled_test_drivers": 70,
+    "declared_workspace_product_children": 47,
+    "executable_paths": 133,
+    "head": "0945493814f494a49a0a23199ba35dc661bdc546",
+    "inputs": {
+      "actual-artifacts.json": "3ca27a610ce8865fa02bbee1d35b5b56e8c765b3b51ff97f3a90e7c570928d2a",
+      "base.txt": "0f10e3f99e979c4335f64bddde8e59506efd3c50de74cc9791b7ae78bc5d51fe",
+      "build.log": "a1c339f89a7bb8197d6ad1acc0b512fa471ea332c93d46fa5de42f101ce58205",
+      "capture.py": "1ba857950be2b2d6e15b62f648db54bebd19cebd56278788f62608bcc15f3afe",
+      "gate.sh": "e08849d0bac8cf2e16612217a70e005ea576647d89b975d56402d1d1cdf461ca",
+      "head.txt": "d243c63640ca44e424b5d9070ae77bb1978cb71c58627a5d26a857ffd0234535",
+      "metadata-before.json": "b57ab76c55882f73652bb8c088b299cb047d4eb8579d2591685901232dcf7b72",
+      "run-full.py": "c72da43bae37427547599a7a944d41e7b3ac3cbec40ee165e556f91eb76965b0",
+      "source-before.json": "bf2d1db83afe91d10b3326e59c3526e48388f34171b26b340f330b4b0eee4a0c",
+      "test-compile.log": "1ff1020a8f67f3e00fae678985e9665afe31795ec748c3632f6d8aca96158479"
+    },
+    "limits": [
+      "Compiler fresh flags are recorded by stage, not inferred from timestamps.",
+      "Captured product children are not thereby claimed to have executed.",
+      "Ephemeral rustdoc executables are not emitted by cargo test --no-run."
+    ],
+    "normal_local_fresh_false": true,
+    "normal_local_packages": 48,
+    "normal_skills_consumers": [
+      "lamp-skills",
+      "lamp-cloud"
+    ],
+    "parents": [
+      "bdc277e2667e11ab04daf60e25f8f9fcf8220dce"
+    ],
+    "preimages": "independent APFS clones or copies; never hard links; captured after compile, before runtime",
+    "required_feature_children_not_emitted": [],
+    "runtime_scope": "full dev/test consumer closure, not only normal consumers",
+    "selected_packages": [
+      "lamp-skills",
+      "lamp-cloud",
+      "lamp-body",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "source_files": 7259,
+    "status": "complete",
+    "target": "./.claude/worktrees/third-reminder-dedicated-target",
+    "tree": "f5a9820ed450512953fd8e33f5eb34c9e4b3b7b5",
+    "workspace_product_children": 47,
+    "worktree": "./.claude/worktrees/third-reminder-pending/lampOS"
+  },
+  "command": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-voice-eval",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "./.claude/worktrees/third-reminder-pending/lampOS",
+    "deadline_seconds": 10800,
+    "environment_overrides": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_TARGET_DIR": "./.claude/worktrees/third-reminder-dedicated-target",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_TEST_THREADS": "1"
+    },
+    "retry": false
+  },
+  "limitations": [
+    "This checkpoint proves compilation and pre-runtime capture only; no runtime success or all-child execution claim.",
+    "Actual06c/008 broad pass remains separately attributed.",
+    "Earlier538/4/9 remains failed."
+  ]
+}
