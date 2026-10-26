@@ -1,0 +1,651 @@
+{
+  "artifact_bindings": {
+    "baseline": {
+      "artifacts": {
+        "it": {
+          "actual_path": "target/debug/deps/it-23c9038e5d7c5e7e",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "test"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": true
+          },
+          "sha256": "5601d6354ffe5d212dad9453fcb414de70201e2977daa4336d3fb50f292cc13b",
+          "source_path": "lampOS/crates/turn-end/tests/it/main.rs",
+          "target": "it"
+        },
+        "worker": {
+          "actual_path": "target/debug/lamp-turn-end",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "bin"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": false
+          },
+          "sha256": "8453b19fecc867a4af4e98351fabe61770a0041731aa0161eca024280671c916",
+          "source_path": "lampOS/crates/turn-end/src/main.rs",
+          "target": "lamp-turn-end"
+        }
+      },
+      "binding_receipt_sha256": "a0dc46fc66c586d23a15f7e317c58d70d74afa07c4cf58729984ad7033641ed8",
+      "source_inventory_sha256": "20457938fc235f3d187fff169426d5e284146c996f3142468b234885d9872843",
+      "source_sha256": {
+        "lampOS/Cargo.lock": "a1956e7445cc44bd721dd78c7fc29365d53d187234bec51e0122eafad1df1f03",
+        "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+        "lampOS/crates/turn-end/Cargo.toml": "d0e6b9b8517a7d173e2c885f5fba17870148efdfedd1aa0148eeebfbb6d50f8e",
+        "lampOS/crates/turn-end/tests/it/parity.rs": "04995f7beacb54144544da6457bf1721393478faccfc66c07c419bf2b9c5187c",
+        "lampOS/docs/endpoint-detection.md": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+      },
+      "worker_binding": "Integration harness executes the actual target worker path embedded in CARGO_BIN_EXE_lamp-turn-end; preserved copies identify both binaries."
+    },
+    "blocking-spawn": {
+      "artifacts": {
+        "it": {
+          "actual_path": "target/debug/deps/it-23c9038e5d7c5e7e",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "test"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": true
+          },
+          "sha256": "547479b35933a11e725e82246a1d1bb02b4f59c0b9b42ab332fa223f4355acd0",
+          "source_path": "lampOS/crates/turn-end/tests/it/main.rs",
+          "target": "it"
+        },
+        "worker": {
+          "actual_path": "target/debug/lamp-turn-end",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "bin"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": false
+          },
+          "sha256": "5f847a0322568d8e2088084cec4f87d2896337ce163c68ecdab13db3e37b5577",
+          "source_path": "lampOS/crates/turn-end/src/main.rs",
+          "target": "lamp-turn-end"
+        }
+      },
+      "binding_receipt_sha256": "f8e3d84ccf6dd3a7b39abb9b6e290fd208c93d22d5c1cc0e51c63018a05c7a52",
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 2.794,
+        "exit_code": 0,
+        "log_sha256": "fdd95e9f91b818f4f556dfeee8751877f5ef8a3ee221afde132c632b386c76a3",
+        "receipt_sha256": "22039cc84394a3a42a1db23c58913cbda525a8584229a946a68e87ef31aa7af1",
+        "source_unchanged": true
+      },
+      "source_inventory_sha256": "5ee9788cd50cea192b288e6ece7c3701ecd027fbf64e5738b380ffcad68b001a",
+      "source_sha256": {
+        "lampOS/Cargo.lock": "a1956e7445cc44bd721dd78c7fc29365d53d187234bec51e0122eafad1df1f03",
+        "lampOS/crates/turn-end-wire/src/client.rs": "df0c07564b3c4eae64488f4d17d61727f6e301738c31edf48a74bc35a4edd41f",
+        "lampOS/crates/turn-end/Cargo.toml": "d0e6b9b8517a7d173e2c885f5fba17870148efdfedd1aa0148eeebfbb6d50f8e",
+        "lampOS/crates/turn-end/tests/it/parity.rs": "04995f7beacb54144544da6457bf1721393478faccfc66c07c419bf2b9c5187c",
+        "lampOS/docs/endpoint-detection.md": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+      },
+      "worker_binding": "Integration harness executes the actual target worker path embedded in CARGO_BIN_EXE_lamp-turn-end; preserved copies identify both binaries."
+    },
+    "candidate-stall": {
+      "artifacts": {
+        "it": {
+          "actual_path": "target/debug/deps/it-23c9038e5d7c5e7e",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "test"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": true
+          },
+          "sha256": "6cfa2aba517583a75f31d06254905af511383a5877a418a1756e905a631585fe",
+          "source_path": "lampOS/crates/turn-end/tests/it/main.rs",
+          "target": "it"
+        },
+        "worker": {
+          "actual_path": "target/debug/lamp-turn-end",
+          "features": [],
+          "fresh": true,
+          "kind": [
+            "bin"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": false
+          },
+          "sha256": "8453b19fecc867a4af4e98351fabe61770a0041731aa0161eca024280671c916",
+          "source_path": "lampOS/crates/turn-end/src/main.rs",
+          "target": "lamp-turn-end"
+        }
+      },
+      "binding_receipt_sha256": "81c1cc9075920be4c9634bbf56ab56598cf8ac3000f88d1d7be464587dda75be",
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 1.084,
+        "exit_code": 0,
+        "log_sha256": "7c9ce335b30c3c482f8b471790167206ec150391b944efadf30b107c5af3cd08",
+        "receipt_sha256": "c10804b28b593e5deddc1c4fed6e34d8d5f872768cddd01097ef9de8f558c159",
+        "source_unchanged": true
+      },
+      "source_inventory_sha256": "002a3e813039c3c6e8b7e950748e9cea196a1c16c4555809e61bc91844921299",
+      "source_sha256": {
+        "lampOS/Cargo.lock": "a1956e7445cc44bd721dd78c7fc29365d53d187234bec51e0122eafad1df1f03",
+        "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+        "lampOS/crates/turn-end/Cargo.toml": "d0e6b9b8517a7d173e2c885f5fba17870148efdfedd1aa0148eeebfbb6d50f8e",
+        "lampOS/crates/turn-end/tests/it/parity.rs": "03d6fb17d88200718246160d4e2bee61243131716a98c8ff7201f1997fbed0ea",
+        "lampOS/docs/endpoint-detection.md": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+      },
+      "worker_binding": "Integration harness executes the actual target worker path embedded in CARGO_BIN_EXE_lamp-turn-end; preserved copies identify both binaries."
+    },
+    "original-stall": {
+      "artifacts": {
+        "it": {
+          "actual_path": "target/debug/deps/it-23c9038e5d7c5e7e",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "test"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": true
+          },
+          "sha256": "bbebaf2e0fef46a929d0eeefd80e440ce039b37db32f14750dd4df5d480bc4a4",
+          "source_path": "lampOS/crates/turn-end/tests/it/main.rs",
+          "target": "it"
+        },
+        "worker": {
+          "actual_path": "target/debug/lamp-turn-end",
+          "features": [],
+          "fresh": true,
+          "kind": [
+            "bin"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": false
+          },
+          "sha256": "8453b19fecc867a4af4e98351fabe61770a0041731aa0161eca024280671c916",
+          "source_path": "lampOS/crates/turn-end/src/main.rs",
+          "target": "lamp-turn-end"
+        }
+      },
+      "binding_receipt_sha256": "86420823501ff6c5ff6cb266958594634684f65d822ca4611c4640e44c6ab1a2",
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 1.087,
+        "exit_code": 0,
+        "log_sha256": "4471badceede32b76a09134b092c4764ead0e71dd5d830327b27c3c3db336553",
+        "receipt_sha256": "056b18fc444d9269fb649487062337b8051f55995275e0f71bde62329216b483",
+        "source_unchanged": true
+      },
+      "source_inventory_sha256": "80d4e370ef26ad2ce5edb1b2f02af2aad98375d1303350cb346562113b1112ca",
+      "source_sha256": {
+        "lampOS/Cargo.lock": "a1956e7445cc44bd721dd78c7fc29365d53d187234bec51e0122eafad1df1f03",
+        "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+        "lampOS/crates/turn-end/Cargo.toml": "d0e6b9b8517a7d173e2c885f5fba17870148efdfedd1aa0148eeebfbb6d50f8e",
+        "lampOS/crates/turn-end/tests/it/parity.rs": "bf254d2628a4c0e568663328bb10ad99142c97050705f039eb3aa60a636ae947",
+        "lampOS/docs/endpoint-detection.md": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+      },
+      "worker_binding": "Integration harness executes the actual target worker path embedded in CARGO_BIN_EXE_lamp-turn-end; preserved copies identify both binaries."
+    },
+    "restored": {
+      "artifacts": {
+        "it": {
+          "actual_path": "target/debug/deps/it-23c9038e5d7c5e7e",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "test"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": true
+          },
+          "sha256": "5601d6354ffe5d212dad9453fcb414de70201e2977daa4336d3fb50f292cc13b",
+          "source_path": "lampOS/crates/turn-end/tests/it/main.rs",
+          "target": "it"
+        },
+        "worker": {
+          "actual_path": "target/debug/lamp-turn-end",
+          "features": [],
+          "fresh": false,
+          "kind": [
+            "bin"
+          ],
+          "mode": 493,
+          "preserved_copy_hash_verified": true,
+          "profile": {
+            "debug_assertions": true,
+            "debuginfo": 2,
+            "opt_level": "0",
+            "overflow_checks": true,
+            "test": false
+          },
+          "sha256": "8453b19fecc867a4af4e98351fabe61770a0041731aa0161eca024280671c916",
+          "source_path": "lampOS/crates/turn-end/src/main.rs",
+          "target": "lamp-turn-end"
+        }
+      },
+      "binding_receipt_sha256": "5ef043244e8dd8479f2c33fd14c4f07d336acaf8e525c4e5de1a81188d6c339d",
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 2.686,
+        "exit_code": 0,
+        "log_sha256": "bf1609276bcbd72c09fa407400e6751b7e116314598a3bc5769975c31aa328c4",
+        "receipt_sha256": "9c9ffc30171e1b875887c997b895334532c74140912904a8f62148b28ff58865",
+        "source_unchanged": true
+      },
+      "source_inventory_sha256": "20457938fc235f3d187fff169426d5e284146c996f3142468b234885d9872843",
+      "source_sha256": {
+        "lampOS/Cargo.lock": "a1956e7445cc44bd721dd78c7fc29365d53d187234bec51e0122eafad1df1f03",
+        "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+        "lampOS/crates/turn-end/Cargo.toml": "d0e6b9b8517a7d173e2c885f5fba17870148efdfedd1aa0148eeebfbb6d50f8e",
+        "lampOS/crates/turn-end/tests/it/parity.rs": "04995f7beacb54144544da6457bf1721393478faccfc66c07c419bf2b9c5187c",
+        "lampOS/docs/endpoint-detection.md": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+      },
+      "worker_binding": "Integration harness executes the actual target worker path embedded in CARGO_BIN_EXE_lamp-turn-end; preserved copies identify both binaries."
+    }
+  },
+  "candidate": "Uncommitted fixture/doc/test-dependency delta on frozen base; no later carry qualified here.",
+  "candidate_patch_sha256": "2c02433c02dcec0348aff8aa38fb71773a5dfec9e999c8806c517127d199211a",
+  "controller_sha256": "2a36cb62a1c3d5c47964330eae7d77ae041571e0431aadd11b8f4c1355e34005",
+  "controls": {
+    "blocking-spawn": [
+      {
+        "command": [
+          "preserved/blocking-spawn/it-it-23c9038e5d7c5e7e",
+          "parity::spawn_returns_while_model_open_is_held",
+          "--exact",
+          "--test-threads=1",
+          "--color=never"
+        ],
+        "elapsed_seconds": 6.557,
+        "exit_code": 101,
+        "expected_negative": true,
+        "failed": 1,
+        "log_sha256": "a1a9cd19fd94646dd7b961a973377261e511e0c2a7ba45853331f6151e89f78b",
+        "name": "parity::spawn_returns_while_model_open_is_held",
+        "passed": 0,
+        "receipt_sha256": "b3834dd26529b0f64a189da94a94635ac4f04754c6ea818563fc5a5257388d18",
+        "source_unchanged": true
+      }
+    ],
+    "candidate-stall": [
+      {
+        "command": [
+          "preserved/candidate-stall/it-it-23c9038e5d7c5e7e",
+          "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+          "--exact",
+          "--test-threads=1",
+          "--color=never"
+        ],
+        "elapsed_seconds": 2.714,
+        "exit_code": 0,
+        "expected_negative": false,
+        "failed": 0,
+        "log_sha256": "9e27025390e2fd6590b647d1d3046f79b1a8248f757974649b63f2220f9678d9",
+        "name": "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+        "passed": 1,
+        "receipt_sha256": "be16797265c4be31e2b3eba71b823d240ca874174d7c7965aff8b82292c35837",
+        "source_unchanged": true
+      },
+      {
+        "command": [
+          "preserved/candidate-stall/it-it-23c9038e5d7c5e7e",
+          "parity::spawn_returns_while_model_open_is_held",
+          "--exact",
+          "--test-threads=1",
+          "--color=never"
+        ],
+        "elapsed_seconds": 0.852,
+        "exit_code": 0,
+        "expected_negative": false,
+        "failed": 0,
+        "log_sha256": "238ce69140bf1af5475c22d414394c0a80943688c12860824ad1fe800aa4228b",
+        "name": "parity::spawn_returns_while_model_open_is_held",
+        "passed": 1,
+        "receipt_sha256": "1a65ef1c5c824511dd49f978c1357470825aee656ea828cb1eefc54c57a9ebf7",
+        "source_unchanged": true
+      }
+    ],
+    "original-stall": [
+      {
+        "command": [
+          "preserved/original-stall/it-it-23c9038e5d7c5e7e",
+          "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+          "--exact",
+          "--test-threads=1",
+          "--color=never"
+        ],
+        "elapsed_seconds": 1.864,
+        "exit_code": 101,
+        "expected_negative": true,
+        "failed": 1,
+        "log_sha256": "2bd57ab52284148d68fde92224788f50beb6a6fc02c932522d4862628c77c02c",
+        "name": "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+        "passed": 0,
+        "receipt_sha256": "bf938cbf5a231b189385f6d05a1fb2bbe37396eda70002b9f7598b166aaae886",
+        "source_unchanged": true
+      }
+    ],
+    "restored": [
+      {
+        "command": [
+          "preserved/restored/it-it-23c9038e5d7c5e7e",
+          "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+          "--exact",
+          "--test-threads=1",
+          "--color=never"
+        ],
+        "elapsed_seconds": 2.068,
+        "exit_code": 0,
+        "expected_negative": false,
+        "failed": 0,
+        "log_sha256": "54451b3b82c21163b2ff365d3a28be57057e3b04fbc20c10adcffefcb45b5282",
+        "name": "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+        "passed": 1,
+        "receipt_sha256": "5a7fc56acf0ef19ecf9129ad8365bc50f8071e193fa059b45a02a900744cbb6c",
+        "source_unchanged": true
+      },
+      {
+        "command": [
+          "preserved/restored/it-it-23c9038e5d7c5e7e",
+          "parity::spawn_returns_while_model_open_is_held",
+          "--exact",
+          "--test-threads=1",
+          "--color=never"
+        ],
+        "elapsed_seconds": 0.42,
+        "exit_code": 0,
+        "expected_negative": false,
+        "failed": 0,
+        "log_sha256": "23c687ede19abd8767c168000ae9dca94d259e24c421e88ee19333632f793418",
+        "name": "parity::spawn_returns_while_model_open_is_held",
+        "passed": 1,
+        "receipt_sha256": "16bd0c4a35320b5074f2b38b6a4cc1d20e53584ef6b6746f8d6092af863008fe",
+        "source_unchanged": true
+      }
+    ]
+  },
+  "focused": {
+    "failed": 0,
+    "passed": 2,
+    "scope": "Separate focused observations, not added to full-crate total."
+  },
+  "frozen_base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "full_crate": {
+    "failed": 0,
+    "groups": [
+      {
+        "ignored": 0,
+        "passed": 15,
+        "target": "library"
+      },
+      {
+        "ignored": 0,
+        "passed": 9,
+        "target": "binary"
+      },
+      {
+        "ignored": 8,
+        "passed": 6,
+        "target": "integration"
+      },
+      {
+        "ignored": 0,
+        "passed": 0,
+        "target": "doctests"
+      }
+    ],
+    "ignored": 8,
+    "passed": 30
+  },
+  "gate": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 59.535,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "8ae5a280963c5ac818ec0cb254faa43039c462fe7195fd14d0d3457bf316fc1b",
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 81.703,
+      "exit_code": 0,
+      "log_sha256": "134b8c535a506e7f1383f6c6e9dd652fba1a86bff6ea4b0f7a76ac5021be3b0a",
+      "receipt_sha256": "c1074d066b0480dc8a15e0c22aed93358d0df7252e8d4b17b37ef4eb9da981ce",
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.27,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "5f627e915631e6992070c3d07037a2c21db2afed7529111df7ec1f036c3e45ab",
+      "source_unchanged": true
+    },
+    "focused-1": {
+      "command": [
+        "target/debug/deps/it-23c9038e5d7c5e7e",
+        "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 2.569,
+      "exit_code": 0,
+      "log_sha256": "98e6e37c4bf8475bc6374d30f389d83570eee34fded502e939275b0ee39aff8b",
+      "receipt_sha256": "3cdef7ca2c7ddf415b19164147f728a8948b917740ffefd026df6f81691ad7f4",
+      "source_unchanged": true
+    },
+    "focused-2": {
+      "command": [
+        "target/debug/deps/it-23c9038e5d7c5e7e",
+        "parity::spawn_returns_while_model_open_is_held",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.436,
+      "exit_code": 0,
+      "log_sha256": "23c687ede19abd8767c168000ae9dca94d259e24c421e88ee19333632f793418",
+      "receipt_sha256": "30b28c693108f87ef3cb057a0b6d1510ca5af77a672d098d5b956f4c1ee86c9d",
+      "source_unchanged": true
+    },
+    "full": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 5.629,
+      "exit_code": 0,
+      "log_sha256": "82a231a2585345435d679dac0494d4185746315bf8f5890bcadc08bceb5b422e",
+      "receipt_sha256": "6c2fceac03f895aec3f0c674324dd93533f208f1efc1b0757b43fc9d329bfcf3",
+      "source_unchanged": true
+    }
+  },
+  "gate_controller_sha256": "78d58320229d8cb956ab94739c5afe8283667305a72e72a3911ba8b04cc81e5d",
+  "original_control_complete": false,
+  "original_control_report_sha256": "4ab5888daf3ead358dc08000b2c46f5095ab7bea0747fd994ae20fa2eed5104a",
+  "restoration_receipt_sha256": "71f14611fd0f8c3604e8e6ba084632923f652e7067e8c5b4587b13b9dbab631c",
+  "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183",
+  "schema": 1,
+  "scope": "Mac host fixtures only. No ARM64, actual model, provider, lamp, acoustic or physical-latency qualification. Raw logs, source variants and binary copies are retained privately without a download/availability promise.",
+  "setup_history": {
+    "offline_metadata": {
+      "full_metadata_exit_code": null,
+      "full_metadata_exit_code_limitation": "Exact Cargo exit was not captured independently of the following git diff; it must not be invented. Empty captured stdout is retained.",
+      "full_metadata_result": "Retained setup note records an uncached curve25519-dalek-derive 0.1.1 workspace dependency error after resolving the lockfile. No compiler or tests ran.",
+      "full_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "lock_delta": "Only existing nix 0.29.0 is added to lamp-turn-end dependencies; no package or version added.",
+      "lock_resolution_receipt_sha256": "a08c382fd7f26f5df9791eab9fb8f36755d997503773b716c2579f8fbba2a672",
+      "locked_no_deps_result": "Success recorded; retained metadata validates the new test-only direct Nix dependency.",
+      "no_deps_metadata_sha256": "a380c88cb08b216abd2c6760c600da8e934e73104e05dbd4681f68523fc3f4cc"
+    },
+    "precompile_apple_correction": {
+      "before_source_sha256": {
+        "lampOS/crates/turn-end/Cargo.toml": "9f79b0995a142decdbc395104e4e3159352e04c67dfed431b8da16e46c69d731",
+        "lampOS/crates/turn-end/tests/it/parity.rs": "66e9a145091d8248d6e131d4f2a14b934bd4ca7ffee5b9d49730f10940c70da5",
+        "lampOS/docs/endpoint-detection.md": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+      },
+      "finding": "Rustix 1.1.5 mkfifoat is cfg-excluded on Apple; source review caught the uncompiled fixture before the first compiler/test gate.",
+      "finding_receipt_sha256": "4796824c1800d155815c957fbd60a020d5b507669d745885b41518eebb413d5c",
+      "fix": "Pinned Nix 0.29.0 test-only fs::mkfifo is available on Mac and Linux; explicit Rustix fs supplies openat and flags. No runtime or unsafe fixture code and no external mkfifo command.",
+      "fixed_receipt_sha256": "dbc01b901a1478369f901633fb4a0e65d57f64f3f151e83280a7b68d3e02190e"
+    }
+  },
+  "source_inventory": {
+    "entries": 7192,
+    "frozen_inputs": {
+      "lampOS/Cargo.lock": "a1956e7445cc44bd721dd78c7fc29365d53d187234bec51e0122eafad1df1f03",
+      "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+      "lampOS/crates/turn-end/Cargo.toml": "d0e6b9b8517a7d173e2c885f5fba17870148efdfedd1aa0148eeebfbb6d50f8e",
+      "lampOS/crates/turn-end/tests/it/parity.rs": "04995f7beacb54144544da6457bf1721393478faccfc66c07c419bf2b9c5187c",
+      "lampOS/docs/endpoint-detection.md": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+    },
+    "sha256": "20457938fc235f3d187fff169426d5e284146c996f3142468b234885d9872843"
+  }
+}

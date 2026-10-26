@@ -9,9 +9,13 @@ use lamp_turn_end_wire::{
 };
 use serde_json::Value;
 use std::{
+    fs, io,
+    os::unix::{fs::DirBuilderExt, process::CommandExt},
+    panic,
     path::{Path, PathBuf},
-    process::Command,
-    time::{Duration, Instant},
+    process::{Child, Command, ExitStatus, Stdio},
+    thread,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 const REFERENCE: &str = include_str!("../fixtures/pipecat-reference.json");
@@ -170,10 +174,8 @@ fn worker_process_refuses_missing_or_wrong_models_without_blocking() {
         (dir.join("missing.onnx"), "No such file"),
         (wrong, "unexpected size"),
     ] {
-        let started = Instant::now();
         let mut classifier = worker(&model);
         assert_eq!(classifier.submit(TOKEN, &[1; 160]), Submit::Unavailable);
-        assert!(started.elapsed() < Duration::from_millis(100));
         let Availability::Failed(reason) = settle(&classifier, Duration::from_secs(10)) else {
             panic!("{} did not fail", model.display());
         };
@@ -188,6 +190,222 @@ fn worker_process_refuses_missing_or_wrong_models_without_blocking() {
         assert!(classifier.poll().is_none());
     }
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+const MODEL_OPEN_ROOT: &str = "LAMP_ENDPOINT_MODEL_OPEN_TEST_ROOT";
+const MODEL_OPEN_TEST: &str = "parity::spawn_returns_while_model_open_is_held";
+// This must expire before the unchanged ten-second worker startup deadline,
+// so waiting synchronously for that deadline cannot rescue a broken spawn.
+const MODEL_OPEN_WATCHDOG: Duration = Duration::from_secs(5);
+
+struct ModelOpenProbe {
+    root: PathBuf,
+    child: Option<Child>,
+}
+
+impl ModelOpenProbe {
+    fn exited(&self) -> io::Result<Option<rustix::process::WaitIdStatus>> {
+        use rustix::process::{Pid, WaitId, WaitIdOptions, waitid};
+        let pid = Pid::from_raw(self.child.as_ref().unwrap().id() as i32).unwrap();
+        // Keep the leader PID owned until any group cleanup has finished.
+        waitid(
+            WaitId::Pid(pid),
+            WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+        )
+        .map_err(Into::into)
+    }
+
+    fn reap(&mut self) -> io::Result<ExitStatus> {
+        let deadline = Instant::now() + MODEL_OPEN_WATCHDOG;
+        loop {
+            if let Some(status) = self.child.as_mut().unwrap().try_wait()? {
+                self.child = None;
+                return Ok(status);
+            }
+            if Instant::now() >= deadline {
+                return Err(io::Error::new(io::ErrorKind::TimedOut, "model-open reap"));
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    fn stop(&mut self) -> io::Result<()> {
+        use rustix::{
+            fs::{CWD, Mode, OFlags, openat},
+            process::{Pid, Signal, kill_process_group},
+        };
+        // The observation has already failed. An RDWR open never waits for a
+        // reader; keep it alive only to release the worker for orderly cleanup.
+        let _release = openat(
+            CWD,
+            self.root.join("model.fifo"),
+            OFlags::RDWR | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        );
+        let deadline = Instant::now() + MODEL_OPEN_WATCHDOG;
+        loop {
+            if fs::read(self.root.join("worker-reaped")).ok().as_deref() == Some(b"reaped")
+                && self.exited()?.is_some()
+            {
+                return self.reap().map(|_| ());
+            }
+            if Instant::now() >= deadline {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        let pid = Pid::from_raw(self.child.as_ref().unwrap().id() as i32).unwrap();
+        match kill_process_group(pid, Signal::KILL) {
+            Ok(()) | Err(rustix::io::Errno::SRCH) => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.reap().map(|_| ())
+    }
+}
+
+impl Drop for ModelOpenProbe {
+    fn drop(&mut self) {
+        if self.child.is_some()
+            && let Err(error) = self.stop()
+        {
+            eprintln!(
+                "model-open cleanup failed; scratch retained at {}: {error}",
+                self.root.display()
+            );
+            return;
+        }
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+fn model_open_child(root: &Path) {
+    let mut classifier = worker(&root.join("model.fifo"));
+    // A stall here must not invalidate the return-before-release observation.
+    let observed = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        assert_eq!(classifier.availability(), Availability::Loading);
+        assert_eq!(classifier.submit(TOKEN, &[1; 160]), Submit::Unavailable);
+        fs::write(root.join("spawn-returned"), b"loading-and-unavailable").unwrap();
+        let Availability::Failed(reason) = settle(&classifier, MODEL_OPEN_WATCHDOG) else {
+            panic!("released FIFO model did not fail");
+        };
+        assert!(reason.contains("unexpected size"), "{reason}");
+        assert_eq!(
+            classifier.wait_finished(Duration::from_secs(2)),
+            Teardown::Reaped
+        );
+        let report = classifier.report();
+        assert_eq!((report.spawned, report.ready, report.kills), (1, 0, 0));
+        assert_eq!(classifier.submit(TOKEN, &[1; 160]), Submit::Unavailable);
+        assert!(classifier.poll().is_none());
+    }));
+    classifier.close();
+    assert_eq!(
+        classifier.wait_finished(Duration::from_secs(2)),
+        Teardown::Reaped
+    );
+    fs::write(root.join("worker-reaped"), b"reaped").unwrap();
+    if let Err(error) = observed {
+        panic::resume_unwind(error);
+    }
+    fs::write(root.join("finished"), b"failed-and-reaped").unwrap();
+}
+
+#[test]
+fn spawn_returns_while_model_open_is_held() {
+    use rustix::fs::{CWD, Mode, OFlags, openat};
+    if let Some(root) = std::env::var_os(MODEL_OPEN_ROOT) {
+        model_open_child(Path::new(&root));
+        return;
+    }
+    assert!(MODEL_OPEN_WATCHDOG < Limits::default().startup);
+    let root = std::env::temp_dir().join(format!(
+        "lamp-model-open-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    let mut probe = ModelOpenProbe { root, child: None };
+    let fifo = probe.root.join("model.fifo");
+    nix::unistd::mkfifo(
+        &fifo,
+        nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR,
+    )
+    .unwrap();
+    probe.child = Some(
+        Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", MODEL_OPEN_TEST, "--nocapture"])
+            .env(MODEL_OPEN_ROOT, &probe.root)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .process_group(0)
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + MODEL_OPEN_WATCHDOG;
+    loop {
+        assert!(
+            probe.exited().unwrap().is_none(),
+            "model-open child exited before return"
+        );
+        if fs::read(probe.root.join("spawn-returned")).ok().as_deref()
+            == Some(b"loading-and-unavailable")
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "spawn did not return before model release"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    // No FIFO writer exists before the event above. A successful nonblocking
+    // writer open now witnesses the actual model reader, and releases it. A
+    // never-started worker or an early startup timeout cannot pass this step.
+    let _writer = loop {
+        match openat(
+            CWD,
+            &fifo,
+            OFlags::WRONLY | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
+            Ok(writer) => break writer,
+            Err(rustix::io::Errno::NXIO) => {}
+            Err(error) => panic!("model FIFO rendezvous: {error}"),
+        }
+        assert!(
+            probe.exited().unwrap().is_none(),
+            "model-open child exited before rendezvous"
+        );
+        assert!(
+            Instant::now() < deadline,
+            "real model reader did not arrive"
+        );
+        thread::sleep(Duration::from_millis(5));
+    };
+    let deadline = Instant::now() + MODEL_OPEN_WATCHDOG;
+    let exit = loop {
+        if let Some(exit) = probe.exited().unwrap() {
+            break exit;
+        }
+        assert!(Instant::now() < deadline, "model-open child did not finish");
+        thread::sleep(Duration::from_millis(5));
+    };
+    assert_eq!(exit.exit_status(), Some(0), "model-open child failed");
+    assert_eq!(
+        fs::read(probe.root.join("finished")).unwrap(),
+        b"failed-and-reaped"
+    );
+    assert_eq!(
+        fs::read(probe.root.join("worker-reaped")).unwrap(),
+        b"reaped"
+    );
+    // Native success alone is insufficient: selecting zero child tests also
+    // exits zero. Both witnesses and the FIFO rendezvous are required first.
+    assert!(probe.reap().unwrap().success());
 }
 
 #[test]

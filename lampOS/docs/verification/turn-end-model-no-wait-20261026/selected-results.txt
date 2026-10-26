@@ -1,0 +1,21 @@
+Frozen base: 0c1f6437ee57eae3416e3281d91b813d1c3bec1d
+
+Full crate:
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 2.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Controls:
+original-stall: parity::worker_process_refuses_missing_or_wrong_models_without_blocking: native exit 101; 0 passed / 1 failed
+candidate-stall: parity::worker_process_refuses_missing_or_wrong_models_without_blocking: native exit 0; 1 passed / 0 failed
+candidate-stall: parity::spawn_returns_while_model_open_is_held: native exit 0; 1 passed / 0 failed
+blocking-spawn: parity::spawn_returns_while_model_open_is_held: native exit 101; 0 passed / 1 failed
+restored: parity::worker_process_refuses_missing_or_wrong_models_without_blocking: native exit 0; 1 passed / 0 failed
+restored: parity::spawn_returns_while_model_open_is_held: native exit 0; 1 passed / 0 failed
+
+Blocking control parent: parity.rs:359:9: spawn did not return before model release
+Blocking control: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 5.03s
+Child cleanup diagnostic: parity.rs:285:9: Failed(unexpected size) versus Loading
+Original controller result: complete=false; additive reconciliation only; no rerun
+All source bytes/modes restored; two restored exact cases pass.
