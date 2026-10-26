@@ -1763,3 +1763,33 @@ runs require 2–111 real publications across eleven logical seconds; unpushed
 runs require zero. The 24-second host watchdog, cleanup deadlines, topic freshness
 and `since_us` semantics are unchanged. This is test scheduling only, with no
 runtime, acoustic-latency or physical-hand acceptance claim.
+
+## Session-reader rollback fixtures prove their injected boundary
+
+`failed_private_rollback_disables_only_metadata` requires evidence that grant
+checkpoint 12 and rollback checkpoint 0 both ran. Its test-only observer keeps
+the first apply error, including its kind and OS error, and prints the actual
+report before asserting each original report field separately. The unchanged
+empty event file and private sentinel checks remain. An earlier verified
+private fallback is a different outcome, not a successful observation of this
+late failure.
+
+The focused Linux rollback fixtures use a thread-local, pinned filesystem root
+at their own private fixture directory. The common ancestor and no-follow
+component walk still checks real owners, modes, ACLs and identities at and
+below that root. This deliberately excludes host `/` and `/tmp` ancestry from
+these focused cases; every unscoped security fixture still uses the original
+root and path walk. The scope rejects paths outside its component prefix,
+checks the named root against its pinned identity, cannot move between
+threads, and restores the default on unwind. It needs no chroot capability or
+process-wide environment change.
+
+A separate real early-refusal case leaves a readable voice sibling after
+reader preparation. It requires that checkpoint 12 was not reached, preserves
+the original refusal diagnostic, and checks a degraded but initialized writer
+with private metadata. It retains the production-bounded finish report and
+uses the existing test-only completion event for eventual data assertions;
+the production finish bound is not extended. Another control retains refusal
+of an unsafe root mode, a real ACL and an escaped path. No production privacy
+validation, grant or rollback action, report policy or finish bound changes. These tests establish
+neither the cause of earlier CI failures nor physical-lamp acceptance.
