@@ -1,0 +1,13 @@
+{
+  "all_38_authored_blobs_modes_identical": true,
+  "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "head": "273c1b6f1c67288d7904d98909edddb1eed40a69",
+  "inherited_diff_exact": true,
+  "old_base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "old_head": "2aae46323701bf5b66c7627c88c9abaa6378a612",
+  "range_diff": "1:  8f9655ef44 = 1:  c10d0e62ba lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  34ac221833 = 2:  f7f576fbd1 lampOS: preserve customized own-keys drop-ins\n3:  9d2c3a261e = 3:  4991346bb2 lampOS: record current own-keys carry qualification\n4:  acd56d2cfd = 4:  894799fcd8 lampOS: clarify own-keys activation and per-unit overrides\n5:  3c278b39a1 = 5:  562133cb94 lampOS: record own-keys qualification on the d21 base\n6:  4abd03c191 = 6:  6e37cd441a lampOS: retain own-keys scheduling and product-reader checks\n7:  2aae463237 = 7:  273c1b6f1c lampOS: qualify own-keys carry with current product units",
+  "seven_equal_patches": true,
+  "whole_repository_changed_paths": [
+    "lampOS/crates/skills/tests/it/call_wait.rs"
+  ]
+}

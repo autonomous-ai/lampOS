@@ -1,0 +1,16 @@
+{
+  "attribution": "Exactly one integration-driver header, one running 1 test marker, one exact selected test prefix, no nested libtest start or summary, one standalone ok and one parent summary 1/0/0 with 312 filtered, runtime exit 0. Child is the product lamp-skills executable, not a libtest driver. Standalone ok is not independently treated as proof.",
+  "cause": "--nocapture child stderr interleaved after test NAME ...; final ok appears on its own line",
+  "literal_summary": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 312 filtered out; finished in 1.21s",
+  "original_controller_exit": 1,
+  "original_failure": "AssertionError: exact case observed list empty",
+  "parent_running_one_marker_count": 1,
+  "parent_summary_count": 1,
+  "retained_original_controller_sha256": "afad6b1641199bf953cb657035a4ec422408df8474313d844aba518072e3a8f4",
+  "runtime_exit": 0,
+  "runtime_log_sha256": "42308d13e3efee0cb595dfb8788f51baed8f6a507d962d7c73c9698d91abee47",
+  "single_exact_case_prefix_count": 1,
+  "source_and_artifact_guards_checked": true,
+  "standalone_ok_count": 1,
+  "test_rerun": false
+}

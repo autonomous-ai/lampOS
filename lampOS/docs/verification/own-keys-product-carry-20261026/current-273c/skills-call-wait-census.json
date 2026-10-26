@@ -1,0 +1,45 @@
+{
+  "cases": [
+    [
+      "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+      "ok"
+    ]
+  ],
+  "observations": [
+    "tool calls, fastest to slowest: [388.084\u00b5s, 400.125\u00b5s, 405.125\u00b5s, 427.25\u00b5s, 494.333\u00b5s, 536.333\u00b5s, 677.459\u00b5s, 1.720042ms, 1.751125ms, 2.283333ms]",
+    "spawn to tools.json observed: 858.059916ms",
+    "call 1/10 elapsed=2.283333ms; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 2/10 elapsed=536.333\u00b5s; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 3/10 elapsed=1.751125ms; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 4/10 elapsed=494.333\u00b5s; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 5/10 elapsed=405.125\u00b5s; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 6/10 elapsed=427.25\u00b5s; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 7/10 elapsed=677.459\u00b5s; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 8/10 elapsed=1.720042ms; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 9/10 elapsed=388.084\u00b5s; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\"",
+    "call 10/10 elapsed=400.125\u00b5s; response=\"{\\\"ok\\\":true,\\\"result\\\":{\\\"next\\\":\\\"Say hello.\\\"}}\\n\""
+  ],
+  "runtime_bindings": [
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-1a236b90d659ff16)",
+      "sha256": "ff081e81b01c80e1d8fa02e8f6889131e95098cc051eec4203b50ebb840daacd"
+    }
+  ],
+  "scope": "skills-call-wait",
+  "spawned_child": {
+    "binding": "CARGO_BIN_EXE_lamp-skills",
+    "path": "<target>/debug/lamp-skills",
+    "sha256": "1225852f6c7a42207dadaba7681037278c2072b24f82492b4e03251ddb08d48f",
+    "source": "lampOS/crates/skills/tests/it/call_wait.rs:112"
+  },
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 312,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-1a236b90d659ff16)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 312 filtered out; finished in 1.21s",
+      "passed": 1
+    }
+  ]
+}

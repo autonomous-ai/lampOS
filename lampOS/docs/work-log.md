@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 current 273c head pushed; original CI pending and activation HOLD.
+
+## Current checkpoint: 2026-10-26 23:26 +07, test-only latest-base carry qualified
+
+#3510 **273c1b6f1c/521dcb0068** preserves seven equal patches and all 38 authored blobs/modes. The sole inherited delta is Skills call_wait integration observations. [Scoped proof](verification/own-keys-product-carry-20261026/current-273c/README.md): fmt, strict Skills all-target Clippy and exact changed test **1/0/0**, 312 filtered, 1.21 s; integration driver rebuilt and product-child binding captured. All 7,260 source entries, two executables, 49 local compiler outputs and 1,054 depfiles pass supplemental final guards.
+
+The original supervisor failed after runtime exit 0 because uncaptured child diagnostics split the single test's terminal line. Its failure remains retained; read-only reconciliation uses the unique named start, running-one marker, sole parent summary, exit 0 and bound driver/child identity. No arbitrary child ok token is treated as proof, and no test or compilation was rerun. Earlier 2aae CI and 87a094/87af broad results remain source-bound; original 273c native qualification is pending. #2094 and explicit current-lamp own-keys acceptance still hold draft status. No device, provider, key or release action.
+
+---
+
 Ready for lamp-voice: #3510 original 2aae CI qualified; latest-base test-only carry active; activation HOLD.
 
 ## Current checkpoint: 2026-10-26 23:20 +07, original current CI audit closed

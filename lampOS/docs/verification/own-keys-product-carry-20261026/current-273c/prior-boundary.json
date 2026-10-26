@@ -1,0 +1,9 @@
+{
+  "carry_boundary_sha256": "46ab3c16189035f37aaf30f1a99f538318b73941c740aa312ad8c8306cc6a6db",
+  "carry_sha256": "78d4ecf8bad70361760ec81a1409f2b8bfec47d07d2bb8af18b7dd0e8ede725a",
+  "changed_paths": [
+    "lampOS/crates/skills/tests/it/call_wait.rs"
+  ],
+  "latest_actual_preserved_outputs_rechecked": true,
+  "previous_complete_sha256": "9e5b85700355e15224fa355182906d69528a8a168fe974e7d99b7b460e1310c0"
+}

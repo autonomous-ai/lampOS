@@ -1,0 +1,62 @@
+{
+  "complete": {
+    "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+    "complete": true,
+    "head": "273c1b6f1c67288d7904d98909edddb1eed40a69",
+    "postprocessing_reconciliation": "parser-reconciliation.json",
+    "runtime_runs": 1,
+    "scopes": [
+      "skills-call-wait"
+    ],
+    "source_entries": 7260,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+    "controller_sha256": "afad6b1641199bf953cb657035a4ec422408df8474313d844aba518072e3a8f4",
+    "head": "273c1b6f1c67288d7904d98909edddb1eed40a69",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 79144329216,
+      "elapsed_seconds": 19.522,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "2bb3ba79e9eb011f25918cf7a14536f2afb975ea03bd8705558a4d64eda38a95",
+      "source_entries": 7260,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 79146381312,
+      "elapsed_seconds": 6.604,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7260,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_sha256": "d1f54bba7b1671c1cd82c5ed0b3688791f3fcfc7095d0dcbb14d3fd340e86796"
+}

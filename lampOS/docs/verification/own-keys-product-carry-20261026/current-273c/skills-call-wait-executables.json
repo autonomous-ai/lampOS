@@ -1,0 +1,42 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/it-1a236b90d659ff16",
+    "sha256": "ff081e81b01c80e1d8fa02e8f6889131e95098cc051eec4203b50ebb840daacd",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<source>/lampOS/crates/skills/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/lamp-skills",
+    "sha256": "1225852f6c7a42207dadaba7681037278c2072b24f82492b4e03251ddb08d48f",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-skills",
+      "src_path": "<source>/lampOS/crates/skills/src/main.rs",
+      "test": true
+    }
+  }
+]

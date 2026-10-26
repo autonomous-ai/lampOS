@@ -1,0 +1,10 @@
+{
+  "name": "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+  "observed": [
+    [
+      "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+      "ok"
+    ]
+  ],
+  "platform_absent": false
+}
