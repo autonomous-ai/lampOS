@@ -13,6 +13,18 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:50 — Latest factory native gates green
+
+Ready for lamp-voice: no (#3546, final carry reads pending)
+
+**3c54671c0/9e5d3b9c6** original ARM64 **40281279737** passes 11,361
+unique cases, zero failures/leaks/timeouts, 106 skips; Linux **40281279763**
+passes. Preview **4b3b1d0a3** has exact parents and offered tree. Turn-wire
+13/0 and shell 86/0 remain separate.
+[Receipt](verification/factory-resume-refusal-20261026/native-40281279737.json).
+Reviewer-two clears current source; requesting final exact-head read
+lines. Latest reminder native qualification continues. No device claim.
+
 ## 2026-10-26 13:48 — Preserve superseded reminder cancellation
 
 Ready for lamp-voice: no (#3525)
