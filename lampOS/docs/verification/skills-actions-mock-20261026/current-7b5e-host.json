@@ -1,0 +1,85 @@
+{
+  "head": "7b5e999915e29ebff6982bb5e6af220c80aac9ea",
+  "base": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "aggregate": [
+    525,
+    0,
+    9
+  ],
+  "per_target_library_binary_it_release_requested_docs": [
+    [
+      158,
+      0,
+      0
+    ],
+    [
+      20,
+      0,
+      0
+    ],
+    [
+      314,
+      0,
+      1
+    ],
+    [
+      2,
+      0,
+      8
+    ],
+    [
+      31,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "three_required_case_counts": {
+    "a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way": 1,
+    "the_one_action_reply_reports_an_ack_write_error": 1,
+    "the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request": 1
+  },
+  "expected_caught_unwind_panic_hooks": 2,
+  "unexpected_panic_hooks_observed": 0,
+  "actual_ACK_write_failure_witness_asserted": true,
+  "ordinary_error_class_not_widened": true,
+  "terminal": {
+    "head": "7b5e999915e29ebff6982bb5e6af220c80aac9ea",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 2400,
+    "timed_out": false,
+    "elapsed_seconds": 237.933911212,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "process_group_absent_before_cleanup": true,
+    "forced_cleanup": false,
+    "pid": 13574,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "7474cbf32165330778980db0f440ac2f7f0b44fe34fdafb117a97b6ca5ff6636"
+  },
+  "limits": "First3bc523/1/9 stays failed, not retried; corrected code/new Routine base qualifies this run. The original failed stage remains unattributed. No product, device or 3s-run-completion claim."
+}

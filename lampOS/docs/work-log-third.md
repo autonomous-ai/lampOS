@@ -1,3 +1,11 @@
+## 2026-10-27 00:20 — scoped worker pushed as #3604
+
+Ready for lamp-voice: no (#3604)
+
+Pushed 7b5e99991/008e as a draft after current compiler gates and full 525/0/9, all three required cases once; only the two deliberately caught unwind hooks appear. [Host proof](verification/skills-actions-mock-20261026/current-7b5e-host.json). The first 523/1/9 is preserved, with no error-class widening. Current native gates and independent reads are pending; initial ACK/teardown is qualified, not completion of the 3 s run or product latency.
+
+#3525 new 06c42ba1f/008e has passed strict 12-consumer Clippy/workspace build/test compilation after a 48-local-package clean. Its all-driver preimage capture/full consumer run is starting; the offered 3fe remains draft until new qualification, and old 538/4/9 stays failed. No device changes.
+
 ## 2026-10-27 00:09 — Routine delivered and exact push green
 
 Ready for lamp-voice: yes (#3598 merged)
