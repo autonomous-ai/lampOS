@@ -1,0 +1,13 @@
+{
+  "ship_build": 6963,
+  "ship_commit": "41233c1b6",
+  "current": "cced42943",
+  "equal_git_blobs": {
+    "lampOS/crates/records/src/json_file.rs": "64a6d6cf929b74d50d0d8713fae601930bc0e21e",
+    "lampOS/crates/records/src/application.rs": "e2631bcde61ad547951bdb8ad608d77bf21ba9e6",
+    "lampOS/deploy/product/lamp-records.service": "5aae0238027a7bf6537a6d251b8d24245acbdcec",
+    "lampOS/crates/update/src/install.rs": "75c7fad7f51162b0aad21a6ad0ea30c79b386c9f",
+    "scripts/imager/build-orangepi-v2.sh": "ce513fb8add6b8139676e4f2672b93a947f1c183"
+  },
+  "limits": "Source identity only; no actual image filesystem metadata is known."
+}

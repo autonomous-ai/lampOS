@@ -1,0 +1,101 @@
+{
+  "head": "7c9da509f",
+  "app_sha256": "1cc4ff4c932b6d706b0933387501af632dc7c44619be65233c222951ee8097ab",
+  "fixture_git_sources": {
+    "new-changes": "7c9da509f",
+    "old-appears": "1c884f16c"
+  },
+  "fixture_sha256": {
+    "new-changes": {
+      "lampOS/skills/reminders/skill.toml": "9d0e6b27bba6f74c321bea97fd44a5fe49a4b6441e21d681808ecdda035b7b45",
+      "lampOS/skills/reminders/SKILL.md": "c8a525dac9074cedc30018d5f69cc8650991f799c59069ced61bad733f219dc9",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml": "53d657afa4c5fa4735b44c10a342f1753dae815f42ef89e7cd9461e6af737d94",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/humans_faces_tracked.jsonl": "1c0b72c040482d47cd6deb3854c428005e92d1c5554955ed3b7fd3429ca8184c",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/schedule_due.jsonl": "f19d3d3ab1f52b4dc633a46a843a18f51a633628063a4fa029fbdc2a98c6927d",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/voice_state.jsonl": "a96d725172ac51cc108eefef99dcae1c82b0809ef920640b1dfcc0dc03b779bd",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml": "e4bacd213d0cd2ad6e2828079fbe0e4fc89e8b9d736cfdf5ed66c366bfec726d",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/humans_faces_tracked.jsonl": "5abc80bfab89b00da549193ac3db6e696ef5b300918e9b85148d397e01183970",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/schedule_due.jsonl": "a0aa4d3f5bad2f75f90eb75ad7e8b57a7e85b2fce2cc0a64c8d92684ce831a5c",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/voice_state.jsonl": "a96d725172ac51cc108eefef99dcae1c82b0809ef920640b1dfcc0dc03b779bd",
+      "lampOS/skills/reminders/tests/each-reminder-once/expect.toml": "6880f969ba059ab357aa29c4cb9a9d9ab187c3bb0600bf096391c6dd32400146",
+      "lampOS/skills/reminders/tests/each-reminder-once/humans_faces_tracked.jsonl": "d919fc2e7753478bf92213e0fba53a4345680978a6cacdb9a6b4029bb64d41e8",
+      "lampOS/skills/reminders/tests/each-reminder-once/schedule_due.jsonl": "4f23a670deade44d39ed00851afeb8b2abc24968ccc47c0449b269f1a5e86ef3",
+      "lampOS/skills/reminders/tests/each-reminder-once/voice_state.jsonl": "a96d725172ac51cc108eefef99dcae1c82b0809ef920640b1dfcc0dc03b779bd",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml": "0df2ac9258fbc25f0c83156cd8bd264ae12ca0f3f1c79fb96c64eb3f27ea01f6",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/humans_faces_tracked.jsonl": "5abc80bfab89b00da549193ac3db6e696ef5b300918e9b85148d397e01183970",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/schedule_due.jsonl": "9573a1ef92626642e0d1bc8eee35748e62fe7cd33eacf5d1cbec1f53f0bcc035",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/voice_state.jsonl": "c3ac685c1fc3ff84b3397b5bd02c53ce909c1718612249986dbadf264b02314b",
+      "lampOS/skills/welcome-back/skill.toml": "44a808795655dfc3aff89f343a255066e5b2baa797f92fa12f39eb7460203ca6",
+      "lampOS/skills/welcome-back/SKILL.md": "de5c5d9d25c8a173638661384bbc41bc3c166978daa56f8381eaa724993c2967",
+      "lampOS/skills/welcome-back/lights/warm_glow.toml": "0b59393307d79f61de85448193bf19c176ff10ee9b28324793c45296b59dbcbc"
+    },
+    "old-appears": {
+      "lampOS/skills/reminders/skill.toml": "60207fe650905b2559b413b1771a8aa46594be193ce26f17c3e66228caa5a281",
+      "lampOS/skills/reminders/SKILL.md": "b136c05f6c21e6c448bb06f2c73ecd358f100650a39c8468a0ca07fd72689479",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml": "fa78c5b45a129dc0d3b31cdeedd7a0320ba13685ccc60907c03add9bafebb940",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/humans_faces_tracked.jsonl": "1c0b72c040482d47cd6deb3854c428005e92d1c5554955ed3b7fd3429ca8184c",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/schedule_due.jsonl": "f19d3d3ab1f52b4dc633a46a843a18f51a633628063a4fa029fbdc2a98c6927d",
+      "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/voice_state.jsonl": "a96d725172ac51cc108eefef99dcae1c82b0809ef920640b1dfcc0dc03b779bd",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml": "fcde8c4abe09996e2fe73eee55684f27f4d824e4e1cd6b9449c0033ec66abfaa",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/humans_faces_tracked.jsonl": "5abc80bfab89b00da549193ac3db6e696ef5b300918e9b85148d397e01183970",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/schedule_due.jsonl": "a0aa4d3f5bad2f75f90eb75ad7e8b57a7e85b2fce2cc0a64c8d92684ce831a5c",
+      "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/voice_state.jsonl": "a96d725172ac51cc108eefef99dcae1c82b0809ef920640b1dfcc0dc03b779bd",
+      "lampOS/skills/reminders/tests/each-reminder-once/expect.toml": "a44dd8e19e70b8c4a4d9c29cb5f06a52e565c724ed66db8ec1fd51d4129cb985",
+      "lampOS/skills/reminders/tests/each-reminder-once/humans_faces_tracked.jsonl": "d919fc2e7753478bf92213e0fba53a4345680978a6cacdb9a6b4029bb64d41e8",
+      "lampOS/skills/reminders/tests/each-reminder-once/schedule_due.jsonl": "4f23a670deade44d39ed00851afeb8b2abc24968ccc47c0449b269f1a5e86ef3",
+      "lampOS/skills/reminders/tests/each-reminder-once/voice_state.jsonl": "a96d725172ac51cc108eefef99dcae1c82b0809ef920640b1dfcc0dc03b779bd",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml": "0d679407d5e8184a30c7f86130fcb1eccc39544990125685bd1541b0955c072f",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/humans_faces_tracked.jsonl": "5abc80bfab89b00da549193ac3db6e696ef5b300918e9b85148d397e01183970",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/schedule_due.jsonl": "9573a1ef92626642e0d1bc8eee35748e62fe7cd33eacf5d1cbec1f53f0bcc035",
+      "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/voice_state.jsonl": "c3ac685c1fc3ff84b3397b5bd02c53ce909c1718612249986dbadf264b02314b",
+      "lampOS/skills/welcome-back/skill.toml": "44a808795655dfc3aff89f343a255066e5b2baa797f92fa12f39eb7460203ca6",
+      "lampOS/skills/welcome-back/SKILL.md": "de5c5d9d25c8a173638661384bbc41bc3c166978daa56f8381eaa724993c2967",
+      "lampOS/skills/welcome-back/lights/warm_glow.toml": "0b59393307d79f61de85448193bf19c176ff10ee9b28324793c45296b59dbcbc"
+    }
+  },
+  "rows": [
+    {
+      "case": "new-changes",
+      "args": [
+        "list",
+        "--dir",
+        "/private/tmp/third-reminder-pending-evidence/compatibility/new-changes"
+      ],
+      "exit": 0,
+      "stdout": "NAME          KIND  VERSION  MAY USE\nreminders     core  1.0.0    reads schedule/due, humans/faces/tracked, voice/state; speak, body\nwelcome-back  core  1.0.0    reads humans/faces/tracked, voice/state; speak, light, body, who is at the lamp\nThe skills here give the model no function.\n",
+      "stderr": ""
+    },
+    {
+      "case": "new-changes",
+      "args": [
+        "test",
+        "/private/tmp/third-reminder-pending-evidence/compatibility/new-changes/reminders"
+      ],
+      "exit": 0,
+      "stdout": "/private/tmp/third-reminder-pending-evidence/compatibility/new-changes/reminders: 4 cases pass, 0 have no recording yet\n",
+      "stderr": ""
+    },
+    {
+      "case": "old-appears",
+      "args": [
+        "list",
+        "--dir",
+        "/private/tmp/third-reminder-pending-evidence/compatibility/old-appears"
+      ],
+      "exit": 0,
+      "stdout": "NAME          KIND  VERSION  MAY USE\nreminders     core  1.0.0    reads schedule/due, humans/faces/tracked, voice/state; speak, body\nwelcome-back  core  1.0.0    reads humans/faces/tracked, voice/state; speak, light, body, who is at the lamp\nThe skills here give the model no function.\n",
+      "stderr": ""
+    },
+    {
+      "case": "old-appears",
+      "args": [
+        "test",
+        "/private/tmp/third-reminder-pending-evidence/compatibility/old-appears/reminders"
+      ],
+      "exit": 0,
+      "stdout": "/private/tmp/third-reminder-pending-evidence/compatibility/old-appears/reminders: 4 cases pass, 0 have no recording yet\n",
+      "stderr": ""
+    }
+  ],
+  "limits": "Current native Mac CLI loading and recorded plans only, not an Update or daemon crossing."
+}

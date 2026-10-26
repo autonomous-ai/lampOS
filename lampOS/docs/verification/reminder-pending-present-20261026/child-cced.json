@@ -1,0 +1,6 @@
+{
+  "head": "7c9da509f",
+  "binary_sha256": "1cc4ff4c932b6d706b0933387501af632dc7c44619be65233c222951ee8097ab",
+  "bytes": 20333484,
+  "scope": "Actual CARGO_BIN_EXE child application retained after completed workspace build and full Skills gate; no subsequent Cargo invocation before this copy."
+}

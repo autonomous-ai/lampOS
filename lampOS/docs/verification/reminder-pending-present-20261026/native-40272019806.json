@@ -1,0 +1,112 @@
+{
+  "pr": 3525,
+  "offered_head": "7c9da509ffe7e1e89d5ddf76eed7e8b3a81f00b4",
+  "offered_base": "cced429433211e06790f23ed8f51e07be613972d",
+  "arm64_run": 40272019806,
+  "linux_clippy_run": 40272019919,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "41d2cbef90d0604f248e74b6b47048a786970727",
+      "preview_parents": [
+        "cced429433211e06790f23ed8f51e07be613972d",
+        "7c9da509ffe7e1e89d5ddf76eed7e8b3a81f00b4"
+      ],
+      "preview_tree": "7e045ebac859c69bd6cf7e92a65b2f9ee0efbb55",
+      "offered_tree": "7e045ebac859c69bd6cf7e92a65b2f9ee0efbb55",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "41d2cbef90d0604f248e74b6b47048a786970727",
+      "preview_parents": [
+        "cced429433211e06790f23ed8f51e07be613972d",
+        "7c9da509ffe7e1e89d5ddf76eed7e8b3a81f00b4"
+      ],
+      "preview_tree": "7e045ebac859c69bd6cf7e92a65b2f9ee0efbb55",
+      "offered_tree": "7e045ebac859c69bd6cf7e92a65b2f9ee0efbb55",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11377,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11377,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11377
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": 1,
+    "lamp-skills::it skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": 1,
+    "lamp-skills::it skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "lamp-skills::it skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "lamp-skills::it skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "lamp-skills tests::a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "lamp-skills tests::a_change_trigger_requires_a_scalar_comparison": 1,
+    "lamp-skills::it skills::every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T05:16:13.5028613Z      Summary [ 210.581s] 11377 tests run: 11377 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/native-40272019806/linux-clippy-40272019919.log",
+      "bytes": 91565,
+      "sha256": "0fed363205ddaee8886033afecfe4981e7fa0cf62658925c88c2c1944b324b32"
+    },
+    "arm64": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/native-40272019806/arm64-40272019806.log",
+      "bytes": 2732567,
+      "sha256": "d873d22eaa13e8bc05fcae5973fcc5b8b2e5943893064b6052f8f3b73c07aa04"
+    }
+  },
+  "controls_source": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/validated-selection-1c884/sealed.json",
+    "sha256": "c5b1d12976f23e097d594d3d3e5c7d14b1cea98ee94da03517a048d540fe91a7"
+  },
+  "qualified": true,
+  "limits": "Original 7c9da509f reminder-changes carry on cced42943 only; prior 08ea native result remains separate. No local tests, workflow retries, device, provider or physical-latency claims.",
+  "turn_wire_custom_harness": {
+    "passed": 13,
+    "failed": 0,
+    "control_pass_counts": {
+      "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+      "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+      "verdict_carries_identity_and_one_request_at_a_time": 1,
+      "missing_model_is_final_and_never_restarted": 1,
+      "missing_executable_fails_at_once": 1,
+      "spawn_returns_while_worker_startup_is_held": 1,
+      "startup_failures_are_final": 1,
+      "serving_failures_are_replaced_within_budget": 1,
+      "protocol_violations_are_replaced": 1,
+      "cancelled_answers_are_never_delivered": 1,
+      "close_during_inference_never_waits": 1,
+      "sustained_requests_stay_bounded": 1
+    },
+    "summary": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T05:16:27.3257367Z test result: 13 passed; 0 failed"
+    ],
+    "counts_separate_from_nextest": true,
+    "qualified": true
+  }
+}

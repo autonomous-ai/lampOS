@@ -11,6 +11,39 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+
+## 2026-10-26 12:18 — Current reminder correction is native green
+
+Ready for lamp-voice: yes (#3525)
+
+**7c9da509f** still contains latest **cced42943**. Original ARM64
+**40272019806** passes **11,377 unique PASS**, zero FAIL/LEAK/TIMEOUT,
+106 skipped; all twenty-one controls once. Linux Clippy **40272019919**
+passes. Actual preview **41d2cbef9** has exact base/head parents and the
+offered tree; Turn-wire **13/0** remains separate.
+[Native receipt](verification/reminder-pending-present-20261026/native-40272019806.json).
+The current Mac CLI also loads old and new source-verified rules and passes
+four recordings each; this is not a new Update or physical execution.
+[CLI](verification/reminder-pending-present-20261026/cli-cced.json),
+[actual child](verification/reminder-pending-present-20261026/child-cced.json).
+Reviewer-three READ-OK and Tests' source carry clearance are posted;
+reviewer-two's current independent gate/read is separate. Physical replay
+remains First's, and prior failed or older events retain their identities.
+
+Independent IPC #3528 read at **d8dc4cca8** passes current Mac fmt,
+strict all-target IPC Clippy, 26 ordinary tests, one doctest and the relay
+signal harness. Seven authored blobs equal the prior read; source hashes
+remain unchanged and eight actual executables are retained. The receipt
+parser's initial wrong literal was corrected against the original log,
+without rerunning tests. [Receipt](verification/ipc-no-wait-reader-20261026/current-d8dc.json).
+No P1/P2 found. Prior failed a8 ARM sentinel event is not waived; current
+native qualification and Tests' sentinel work remain separate.
+
+Records diagnosis's inspected sources are byte-identical to ship build6963:
+[identity](verification/records-startup-diagnosis-20261026/ship-source.json).
+The affected image's actual metadata is still required; no product fix
+or device result is claimed.
+
 ## 2026-10-26 12:06 — Fresh-image Records failure narrowed
 
 Ready for lamp-voice: no (diagnosis, no product patch)
