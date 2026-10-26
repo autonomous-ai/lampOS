@@ -4822,7 +4822,7 @@ type Looked = Arc<Mutex<crate::addressed::Looks>>;
 /// 26 Oct, the first line after a start, "Lamp." and then "Remember that the
 /// plant by the window needs water on Fridays." in a room not yet known to be
 /// quiet, got "Mm? I'm here.", and the request was lost with nothing asked.
-pub(crate) const NAME_THEN_HELD: &str = "(For you to know, not to answer: right after your name someone went on talking, but you could not tell it was the one who called you, so you did not take in what they said. Ask them, briefly, what they wanted.)";
+pub(crate) const NAME_THEN_HELD: &str = "(For you to know, not to answer: right after your name someone went on talking, but you could not tell it was the one who called you, so you did not take in what they said. Say, briefly, that you didn't catch it, and ask them to say it again.)";
 
 pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
 
