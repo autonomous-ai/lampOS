@@ -23,6 +23,39 @@ expiry on a clean first look, boot, sequence, future stamps and later-message
 behavior are checked on explicit clocks; Linux null-device evidence is limited to
 real-loop consumption. V1 source was inspected, not run on a lamp.
 
+## Preserve completed Setup through an update (2026-10-26)
+
+V1's `scripts/provision/software-update` records prior device service
+activation and restores only the services that were active or enabled
+(`device_was_active`, `restore_device_service_state`). Its web update swaps
+setup assets; it has no equivalent of lampOS's transient Setup process or
+its per-part health watch. Keep the activation-preserving intent, not a
+claim of equivalent V1 lifecycle coverage.
+
+Reuse Update's exact noncomment unit comparison and conservative override
+inspection pattern. Change restart selection only for the recognized
+product Setup after completion: leave the phone's grace process alone,
+while updating the files for a future setup. Apply the same decision after
+restoration, including interrupted-switch recovery, without falsifying the
+journal's prior activity. Do not relax `Watch` or treat arbitrary inactive
+services as healthy. Custom conditions, unit overrides and uncertain local
+inputs retain the ordinary restart/watch rules. Reuse the bounded systemd
+query helper to check the effective identity, alias names, fragment and
+drop-in paths too: filesystem inspection alone misses alias drop-ins and
+loaded aliases whose files were removed. Explicit manager metadata in the
+fake is independent of the filesystem classifier; unknown metadata is no
+exception. There is no general systemd condition interpreter or new dependency.
+
+The synthetic regression on unchanged code produced both the new-build and
+fallback `lamp-setup.service stopped` errors. It models successful
+`systemctl restart` with an unmet start condition independently of the
+classifier. Controls cover completion after the activity snapshot, reset,
+ordinary failure/rollback, recovery and bounded override inputs. These
+are local filesystem/fake-systemd checks, not device expiry or latency
+measurements. The restart decision has no intentional delay; regular
+filesystem I/O has no wall-clock deadline, and marker rechecking is not
+atomic coordination with reset.
+
 ## Refuse nonregular local head-pair inputs without waiting (2026-10-26)
 
 V1's `scripts/provision/apply-overrides.py` checks that top-level override

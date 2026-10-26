@@ -38,6 +38,9 @@ use std::{
 #[path = "round/process_cuts.rs"]
 pub(crate) mod process_cuts;
 
+#[path = "round/setup_lifecycle.rs"]
+mod setup_lifecycle;
+
 #[path = "round/head_touch.rs"]
 mod head_touch;
 
@@ -202,6 +205,11 @@ struct FakeSystemd {
     lines_asked: Vec<String>,
     /// Units that crash whatever their build: the old build too.
     crashing: Vec<String>,
+    /// Starts rejected by an unmet condition: systemctl succeeds, unit stays inactive.
+    condition_skipped: Vec<String>,
+    /// Explicit manager facts, independent of the filesystem classifier.
+    setup_properties: Option<String>,
+    remove_setup_marker_on_query: bool,
     /// `systemctl show` fails from the first restart on.
     unreachable_after_restart: bool,
     unreachable: bool,
@@ -228,7 +236,13 @@ impl FakeSystemd {
         )
         .unwrap_or_default();
         self.next_pid += 1;
-        let running = if binary.contains("crash") || self.crashing.iter().any(|name| name == unit) {
+        let running = if self.condition_skipped.iter().any(|name| name == unit) {
+            Running {
+                active: "inactive".into(),
+                sub: "dead".into(),
+                ..Running::default()
+            }
+        } else if binary.contains("crash") || self.crashing.iter().any(|name| name == unit) {
             Running {
                 active: "activating".into(),
                 sub: "auto-restart".into(),
@@ -248,6 +262,12 @@ impl FakeSystemd {
 }
 
 impl Systemd for FakeSystemd {
+    fn setup_unit_properties(&mut self) -> Option<String> {
+        if self.remove_setup_marker_on_query {
+            fs::remove_file(self.root.join("var/lib/lampos-setup/done")).unwrap();
+        }
+        self.setup_properties.clone()
+    }
     fn self_recovery_ready(&mut self) -> Result<(), String> {
         self.self_recovery_queries += 1;
         if self.unreachable {
@@ -453,6 +473,9 @@ impl Lamp {
             lines: BTreeMap::new(),
             lines_asked: Vec::new(),
             crashing: Vec::new(),
+            condition_skipped: Vec::new(),
+            setup_properties: None,
+            remove_setup_marker_on_query: false,
             unreachable_after_restart: false,
             unreachable: false,
             applier: None,

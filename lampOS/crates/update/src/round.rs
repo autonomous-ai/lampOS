@@ -521,6 +521,20 @@ struct Back {
 }
 
 impl Run<'_, '_> {
+    fn leave_completed_setup(&mut self, back: &Back, after: &str) -> bool {
+        crate::setup_lifecycle::completed(
+            &self.config.root,
+            &self.config.on(&self.config.units),
+            &back.unit,
+            &back.text,
+            after,
+        ) && self.world.systemd.setup_unit_properties()
+            .as_deref().is_some_and(crate::setup_lifecycle::manager_matches)
+            // The bounded manager query can take time; reset may have removed
+            // completion meanwhile. This last observation is not a reset lock.
+            && crate::setup_lifecycle::done(&self.config.root)
+    }
+
     fn say(&mut self, line: &str) {
         (self.world.say)(line);
     }
@@ -1948,6 +1962,15 @@ impl Run<'_, '_> {
             if !backs[at].was_active || unrestarted.contains(&backs[at].unit) {
                 continue;
             }
+            let back = &backs[at];
+            if changes
+                .iter()
+                .find(|change| change.unit == back.unit)
+                .is_some_and(|change| self.leave_completed_setup(back, &change.after))
+            {
+                self.say("setup is complete; its phone grace period is not restarted");
+                continue;
+            }
             if backs[at].unit == VOICE_UNIT {
                 // A prerequisite's restart can take time. Drain speech
                 // queued during it and judge quiet at Voice's own boundary,
@@ -2156,6 +2179,13 @@ impl Run<'_, '_> {
         troubles.extend(skills.err());
         let mut watches = Vec::new();
         for back in again {
+            // Recovery's journal truthfully retains was_active, even when
+            // Setup completed while fetching. Recheck its restored product
+            // lifecycle here as well as at the forward restart boundary.
+            if files_back && self.leave_completed_setup(back, &back.text) {
+                self.say("setup is complete; restoring its files needs no restart");
+                continue;
+            }
             if back.unit == VOICE_UNIT && failed != Some(VOICE_UNIT) {
                 // A voice that is well is not cut off mid-sentence.
                 self.listen(Duration::ZERO);
