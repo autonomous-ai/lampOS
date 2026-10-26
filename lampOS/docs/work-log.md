@@ -1,3 +1,15 @@
+Ready for lamp-voice: #3510 software gates green; activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 14:50 +07, current own-keys native qualification complete
+
+[Original e953 native proof](verification/own-keys-product-carry-20261026/native-e953/README.md) qualifies current `e9535de6d` on `1ec33957c`: ARM64 40286257407 **11,371 unique PASS / zero failures, leaks, timeouts or unrun / 106 skipped**, with all nine own-keys controls and both census readers once. Linux Clippy 40286257269 passes. Actual preview `7ae61f28a` has the exact base/head parents and complete tree equal to the authored head. Separate process 13/0, docs 4/0, helper 25/0 and relay success retain their scopes. No rerun or cancellation replaced this event.
+
+Reviewer-two and Reviewer-three clear the current source carry. Host results remain on their executed heads: Update **230/0/2** and factory **86/0** on 46b5/883; nine-crate **6,708/0/44** on b2c/d5dc. Current fmt, strict Clippy and source/executable guards remain the docs-only continuation, not another test execution. Historical failures remain recorded. The PR stays draft for #2094 and explicit current-lamp acceptance; green software gates do not authorize activation.
+
+#3553 remains delivered. The reminder carry has its requested two current source reads. #1812 still needs the independently trusted public key and attended release acceptance; #2810 needs its assigned holder/person's attended unplug result. No device, key, provider, activation or release action ran. Next: new findings and current-base carries from the Queue.
+
+---
+
 Ready for lamp-voice: #3553 delivered; #3510 current native pending and activation HOLD.
 
 ## Current checkpoint: 2026-10-26 14:31 +07, documentation correction delivered and own-keys current
