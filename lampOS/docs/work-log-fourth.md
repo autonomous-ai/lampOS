@@ -1,3 +1,13 @@
+## 2026-10-26 12:09 — Current carries and hand-pump controls
+
+Ready for lamp-voice: no
+
+The remaining-only train153 continuation exited zero: thirteen turn-end process cases passed, both Update custom targets were ignored on Mac, and all four Voice/Update/Memory/Eyes doctest targets completed with zero cases. All thirteen witnesses and source inputs remained stable and owned processes closed. The old full gate still has its hand-pump failure. Free space recovered without any new cache deletion.
+
+Common is locally rebased to train156 cced42943 as 452769bc53, preserving both independent reuse sections and all six repair blobs. Current Onboarding and Peek preparations preserve their eleven/twelve paths and controls, with new gates unrun. Callback and Name child patches compose cleanly against the current Common tree; Photo's private preview retains both conflicting imports, with its original trusted-capture admission and physical holds unchanged. None of these source carries is a new runtime result or activation.
+
+The separate three-file hand-pump repair is on current Main. Both fixed cases passed once under thirty-second owned process watchdogs. Wrong-duration, missing-observation and missing-readiness controls each failed at the intended assertion; their three executables are retained independently. Fixed source was restored before the broader gate. Its full coverage will combine the two direct cases with every other Voice case once; deliberate fault failures are separate, and the original 31-pass observation remains failed. Workspace formatting, strict Clippy, build and remaining Voice qualification are in progress. No device work occurred.
+
 ## 2026-10-26 11:51 — Common runtime closed with one fixture failure
 
 Ready for lamp-voice: no
