@@ -63,13 +63,37 @@ pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The switch for one test's own thread ([`on_for_test`]): the process
+    /// switch is set once, and other tests read it off.
+    static ON_FOR_TEST: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether this test's thread has the switch on ([`set_on_for_test`]).
+#[cfg(test)]
+fn on_for_test() -> bool {
+    ON_FOR_TEST.with(std::cell::Cell::get)
+}
+
+#[cfg(not(test))]
+fn on_for_test() -> bool {
+    false
+}
+
+/// The switch on or off for the calling test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_on_for_test(on: bool) {
+    ON_FOR_TEST.with(|cell| cell.set(on));
+}
+
 /// Set once, by [`crate::remember::start`].
 pub(crate) fn switch(on: bool) {
     let _ = ON.set(on);
 }
 
 pub fn on() -> bool {
-    ON.get() == Some(&true)
+    ON.get() == Some(&true) || on_for_test()
 }
 
 /// Where the typed fact is published: the bus's root, when the voice has a
@@ -559,6 +583,11 @@ pub fn forgets_light(call: &ToolCall) -> bool {
 /// replaced. A bus that cannot be used is said once and changes nothing
 /// else.
 pub fn publish(facts: &lamp_msgs::Rules) {
+    // A test's own switch ([`set_on_for_test`]) never says anything on the
+    // process's one bus, which another test may be reading.
+    if on_for_test() {
+        return;
+    }
     let Some(root) = BUS.get() else { return };
     SAID.store(true, std::sync::atomic::Ordering::Release);
     // Held only to put or take one fact, never across the bus's work: a
@@ -594,6 +623,9 @@ pub fn said() -> bool {
 /// session or rule has said one first, so a newer fact with a known
 /// person's limits is never replaced by the room's alone.
 pub fn publish_first(facts: &lamp_msgs::Rules) {
+    if on_for_test() {
+        return;
+    }
     if !said() {
         publish(facts);
     }
