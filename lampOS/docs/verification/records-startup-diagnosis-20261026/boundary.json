@@ -1,0 +1,46 @@
+{
+  "source_head": "7c9da509f",
+  "binary_sha256": "e50df3ca06eb231c1d98c568eff1a86c7e84e8cd8197a7948ab448c50071f92b",
+  "cases": [
+    {
+      "case": "config0755",
+      "command": [
+        "<private-evidence>/third-records-startup-evidence/lamp-records",
+        "check",
+        "/private/tmp/third-records-trust-zo50mfh7/config/records.json",
+        "--apply"
+      ],
+      "exit": 0,
+      "stdout": "{\"schema_version\":1,\"config_fingerprint\":\"1a49e87fc36cbf10a39692d226988f3190d3ff78b7f5cf04fa15868a3ecf591c\",\"at_unix_s\":1792991047,\"mode\":\"apply\",\"enabled\":false,\"roots\":[],\"error\":null}\n",
+      "stderr": ""
+    },
+    {
+      "case": "config0775",
+      "command": [
+        "<private-evidence>/third-records-startup-evidence/lamp-records",
+        "check",
+        "/private/tmp/third-records-trust-zo50mfh7/config/records.json",
+        "--apply"
+      ],
+      "exit": 64,
+      "stdout": "",
+      "stderr": "lamp-records: untrusted JSON file directory\n"
+    },
+    {
+      "case": "report0755",
+      "command": [
+        "<private-evidence>/third-records-startup-evidence/lamp-records",
+        "check",
+        "/private/tmp/third-records-trust-zo50mfh7/config/records.json",
+        "--apply",
+        "--report",
+        "/private/tmp/third-records-trust-zo50mfh7/report/last.json"
+      ],
+      "exit": 2,
+      "stdout": "{\"schema_version\":1,\"config_fingerprint\":\"1a49e87fc36cbf10a39692d226988f3190d3ff78b7f5cf04fa15868a3ecf591c\",\"at_unix_s\":1792991047,\"mode\":\"apply\",\"enabled\":false,\"roots\":[],\"error\":\"cannot persist full cleanup result: untrusted JSON file directory\"}\n",
+      "stderr": "lamp-records: cannot persist even the failure receipt\n"
+    }
+  ],
+  "configured_root_never_created": true,
+  "limits": "Actual native Mac CLI with cleanup explicitly disabled and all configured paths disposable. Reproduces guard boundary, not affected image cause or Linux permissions."
+}

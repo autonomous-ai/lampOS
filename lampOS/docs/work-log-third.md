@@ -10,6 +10,28 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+
+## 2026-10-26 12:06 — Fresh-image Records failure narrowed
+
+Ready for lamp-voice: no (diagnosis, no product patch)
+
+Claimed the unowned Records startup refusal reported on #3530. At current
+**cced42943** the exact error is a directory trust refusal before cleanup;
+ordinary 0755 config ancestors are accepted. The product unit requests a
+root-owned 0700 report directory. Installer creation uses 0755 but preserves
+existing ancestor metadata inherited from the hardware image. No shipped-code
+mismatch or affected-image cause has been established.
+
+Using the actual Records CLI from the current workspace build on the Mac,
+with cleanup disabled and disposable paths only: config-parent 0755 exits 0;
+0775 reproduces the exact message and exit 64; report-parent 0755 instead
+fails persistence with exit 2. No session root was created, and disabled apply
+returns before opening roots. [Boundary receipt](verification/records-startup-diagnosis-20261026/boundary.json).
+The executable and raw output are retained privately. This is a permission
+boundary reproduction, not a Linux/image/device result. Requested numeric
+ancestor ownership/modes and effective unit from the image owner before
+choosing a correction. Trust checks remain unchanged.
+
 ## 2026-10-26 12:03 — Current reminder trigger carry passes local gates
 
 Ready for lamp-voice: no (#3525, native checks and carry reads next)
