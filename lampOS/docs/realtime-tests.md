@@ -91,8 +91,8 @@ profile's exclusion:
 - two tests of `lamp-voice`'s `hand_controls`, named exactly, that count
   the input pump's real wakes for a second by design (#1806, #1569 row 35,
   2026-10-19): `with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once`
-  (at most 10 passes waiting, 100 or more ticking, and a wake brought round
-  within 100 ms) and `with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`.
+  (at most 10 passes waiting, and a wake brought round within 100 ms;
+  the off-mode observer checks actual park arguments and bounded progress) and `with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`.
   They took 2.6 s and 1.3 s on ARM64; beside 8 busy cores and four SQLite
   stores syncing on a Mac, the first's stop took 103 ms to 1.09 s in 18 of 20
   runs. That was the pump letting go of its subscriptions on disk, not its
@@ -100,7 +100,36 @@ profile's exclusion:
   to 234 ms while the wake's next pass came within 1.5 ms. So since
   2026-10-20 the wake is judged by that pass (a wake ignored: about 176 ms,
   every run). The 2 ms tick's count can still fall short beside busy cores
-  and syncs together (26, 30 and 74 passes in 3 of 25 runs);
+  and syncs together (26, 30 and 74 passes in 3 of 25 runs). A later 31-pass
+  failure remains a failed observation, with no measured cause claimed.
+  The fixture now starts counting only after the pump observes its first
+  completed drain following subscriptions, with a two-second readiness bound.
+  A held-start control rejects readiness before entry and requires it after
+  release. Readiness and wake failures stop and join the owned worker before
+  asserting; a stuck join is left to the outer test watchdog rather than
+  detaching a live pump. The two-second stop limit is checked after joining.
+  The off-mode fixture records the duration passed to each actual park
+  call, after it returns, in an instance-local `cfg(test)` observer. It
+  requires progress since the sample began, allowing at most two further
+  diagnostic seconds after the sample, before stop; every recorded park
+  argument must be exactly 2 ms. Stop and join
+  complete before the receipt is checked. The one-second pass count remains
+  diagnostic output, not a 100-passes/s host or hardware guarantee. The
+  waiting ceiling, 100 ms wake check, two-second stop bound and production
+  waits are unchanged; the previously documented late-wake false-positive
+  remains. Observer atomics do not wait or allocate, and do not exist in
+  ordinary builds. The separate head-touch bus-to-poll fixture also waits
+  for that first subscribed drain. Its readiness and receipt watchdogs each
+  allow two seconds; the 21-sample median latency limit stays 100 ms. A
+  test-owned guard stops and joins the worker before reporting a failure,
+  including an assertion unwind. A missing receipt records the round,
+  publication durations, source ages at publication, receipt wait and health
+  counters. These diagnose the failure; they do not extend message freshness.
+  The b333/1cad Mac run's head-touch receipt failure and 192.48 ms owner-poll
+  mute observation remain failures, alongside four privacy-reader failures
+  (combined Voice 4,084/6/21). The identical-tree ARM64 run passed 7,497 cases
+  with 53 reported skips. Neither observation establishes a host-load cause
+  or erases the other;
 - two more of `lamp-skills::it`'s `skills::`, named exactly, that start the real
   program twice on the host's clock, a restart between, and wait 800 ms of
   real time for a nudge that must not come (#1837):
