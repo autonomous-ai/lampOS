@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 05:45 — Composed Mood pushed after full current host gate
+
+Ready for lamp-voice: no (#3623 fresh native and composed-head reads pending)
+
+[Mood f4419/90ca host proof](verification/tests-mood-90ca-composed-20261027/) passed **340/0/0 once**, with both Journal and Mood repaired cases once in the whole serial package. Formatting, strict twelve-package Clippy, workspace, the complete owner/source binding, all eight actual executable guards and **254** frozen witnesses passed. The controller exited **0/PASS**, all groups closed and its lease released. The full Cargo command took 111.505 s; the controller 495.080 s, without an idle-host or latency claim.
+
+The composed source retains one shared helper and both fixes/docs, and both full blobs equal the reviewed composition. Its one `!` range-diff is explicitly attributed to the helper now in Main; no equal-patch claim is made. Pushed exact fa67 lease to `f4419f830`. Current original ARM64 **40414617660** and Linux **40414617657** started; peers have been asked to read the combined head. Older fa67 gates keep their older source.
+
+Current Sentinel `0c1d8bc14/90ca` has started its reviewed fresh gate after Mood closed, retaining all 236 parent witnesses; its canonical alias matches the clean official source. Carrier unstarted-only continuation remains active, with no compiler phase allocated. No device action.
+
 ## 2026-10-27 05:38 — Current composed Mood and carrier continuation run; Reader parent passed
 
 Ready for lamp-voice: no (remaining carries have explicit gates/base holds)
