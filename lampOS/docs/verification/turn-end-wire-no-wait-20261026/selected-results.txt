@@ -1,0 +1,37 @@
+[fmt]
+
+[clippy]
+
+[compile]
+
+[focused]
+test result: 2 passed; 0 failed
+
+[full]
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: 13 passed; 0 failed
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[original-stall]
+test missing_executable_fails_at_once ... FAILED (406 ms)
+test result: 0 passed; 1 failed
+assertion failed: started.elapsed() < Duration::from_millis(20)
+
+[candidate-stall]
+test missing_executable_fails_at_once ... ok (410 ms)
+test spawn_returns_while_worker_startup_is_held ... ok (429 ms)
+test result: 2 passed; 0 failed
+
+[blocking-spawn]
+test spawn_returns_while_worker_startup_is_held ... FAILED (15031 ms)
+test result: 0 passed; 1 failed
+timed out waiting for spawn return before startup release
+
+[restored]
+test missing_executable_fails_at_once ... ok (3 ms)
+test spawn_returns_while_worker_startup_is_held ... ok (13 ms)
+test result: 2 passed; 0 failed
+
+[initial failed fixture]
+test result: 1 passed; 1 failed
+Operation not permitted; full suite not run

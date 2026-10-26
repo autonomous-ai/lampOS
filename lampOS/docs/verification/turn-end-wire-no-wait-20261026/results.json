@@ -1,0 +1,407 @@
+{
+  "base_commit": "756be347e13d2e52e7268414295dda8fc554c267",
+  "baseline_artifact": {
+    "compiler_fresh": false,
+    "sha256": "e5c260b7566f9d06a117ab578e1f5ff7738772722467aa62fe5e577021d8625f",
+    "source_inventory_sha256": "16ebe59fd636ad79402482bdf8cb5f9f92d0493e2248cae93a0cedc8a0901f22",
+    "source_sha256": {
+      "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+      "lampOS/crates/turn-end-wire/tests/process.rs": "24d9fb0977dfcf68311a690a856eba179e011a9b3294c28d5b0abb10d1eafa44"
+    }
+  },
+  "campaign_receipt_sha256": "f06f3d2b2baa88be73e3cd7683e8f375c2cc0b124374caa0c0b4e84f1604b6ca",
+  "candidate_is_uncommitted_patch": true,
+  "candidate_patch_sha256": "81455028f166a0b5ed69808726825ca245c546a724984229e1caadfa9895eac0",
+  "committed_head_at_gate": "756be347e13d2e52e7268414295dda8fc554c267",
+  "compiled_artifacts": [
+    {
+      "sha256": "e5c260b7566f9d06a117ab578e1f5ff7738772722467aa62fe5e577021d8625f",
+      "target": "process"
+    },
+    {
+      "sha256": "3ce827a037c88c4484057179ed4dd92344d9abbff5b526f6f5f4d138455bbc41",
+      "target": "lamp_turn_end_wire"
+    }
+  ],
+  "controllers": {
+    "controls": "6799599dc6995403f21a02980e53776e663f62dd25181647cffdf8f3d7ef0761",
+    "gate": "b34e33eb3c10d8cb1f0b9e1071720117e52919a3c64b3fe60587f6064a09e059",
+    "publisher": "ebbb011035ae780ab9db42733958acda38f686b689c88cf82202033dbc41f7dc",
+    "runner": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "controls": [
+    {
+      "artifact": {
+        "compiler_fresh": false,
+        "sha256": "31682fa8d6ea55e2c69a0273f9266cd95b57495a72d7f6707252152436971a07",
+        "source_inventory_sha256": "b82b52dfe3ce065855f96ac02abdfaf4a2156321d83fb6a22d80200a5a8f8898",
+        "source_sha256": {
+          "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+          "lampOS/crates/turn-end-wire/tests/process.rs": "4dcf9995457d832f535ae7701c2d974c33991953d08bf713cf476a1986eb168d"
+        }
+      },
+      "command": [
+        "<bound process test executable>",
+        "missing_executable_fails_at_once"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end-wire",
+          "--test",
+          "process",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "control-original-stall-compile",
+        "log_sha256": "3b2dd6a2709a27b7c1ea3186b6ca421a70fff5083e0dd65f0636934b99433914",
+        "receipt_sha256": "49ba45e16f26c588df3eb083c199c2ca6a6ee6641aa109b6cbc0b37f5302eb64",
+        "source_unchanged": true
+      },
+      "exit_code": 1,
+      "failed": 1,
+      "intended_failure": [
+        311,
+        "assertion failed: started.elapsed() < Duration::from_millis(20)"
+      ],
+      "label": "control-original-stall-cases",
+      "log_sha256": "f86fd0dc6ec69073dbc2b0b517a4143f839d782299267215e88a81c3f87dd02f",
+      "passed": 0,
+      "preexec_sha256": "8052f07d42e7099ada44b059bdff83ca0dc9835158dd83ae8b9bba74d7000055",
+      "receipt_sha256": "5ea0300436e8bd1c6ee151eba39b18c9fb7817640a0b7c042fa8ac3221f171f9",
+      "source_unchanged": true
+    },
+    {
+      "artifact": {
+        "compiler_fresh": false,
+        "sha256": "bacbde3e8f3ea74777c471effddae6baea7a1da374f582a69d26cc9431eba111",
+        "source_inventory_sha256": "cd7cfc37f16161c302ebac9a354d518653a1a1cd8301953ced6065cda3a2a7f5",
+        "source_sha256": {
+          "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+          "lampOS/crates/turn-end-wire/tests/process.rs": "0e759068c03f8d9d1d47f06baf35bb7df488f1d880a49ef2ef0ad7c1b7fd2ea6"
+        }
+      },
+      "command": [
+        "<bound process test executable>",
+        "missing_executable_fails_at_once",
+        "spawn_returns_while_worker_startup_is_held"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end-wire",
+          "--test",
+          "process",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "control-candidate-stall-compile",
+        "log_sha256": "01dc439837a635d98584a0efa9204874ecb6ec77b274b6c21338379f3da2cc06",
+        "receipt_sha256": "cdc66dd0d2270f06c765b5626c031fce2607abcfb9f13a8d28b0eca5c10496b8",
+        "source_unchanged": true
+      },
+      "exit_code": 0,
+      "failed": 0,
+      "intended_failure": null,
+      "label": "control-candidate-stall-cases",
+      "log_sha256": "f285f1c9e093e294fdc12338a08d33fcc815898fc3cf3661718e3b3b21d6f2fb",
+      "passed": 2,
+      "preexec_sha256": "7f9637071857da1b3cce68a44c56e5eaf4c3de145b957a106b5e8172003ef0d2",
+      "receipt_sha256": "354ab17b762d1573e64c7e58c82649eed95883440c7f5a667949f2acfb1034d3",
+      "source_unchanged": true
+    },
+    {
+      "artifact": {
+        "compiler_fresh": false,
+        "sha256": "a20f05ab7abf4a16f31a803ef1ad1222cdd00aa59489b9b7ba36decef43c63b1",
+        "source_inventory_sha256": "c8532cb29bbe13e3a7de573c12a45f374b8763ca4d114197c133620cd4582cc8",
+        "source_sha256": {
+          "lampOS/crates/turn-end-wire/src/client.rs": "df0c07564b3c4eae64488f4d17d61727f6e301738c31edf48a74bc35a4edd41f",
+          "lampOS/crates/turn-end-wire/tests/process.rs": "24d9fb0977dfcf68311a690a856eba179e011a9b3294c28d5b0abb10d1eafa44"
+        }
+      },
+      "cleanup_diagnostic": "After the parent failure releases startup, the child reports Ready versus Loading; this is not another top-level case.",
+      "command": [
+        "<bound process test executable>",
+        "spawn_returns_while_worker_startup_is_held"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end-wire",
+          "--test",
+          "process",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "control-blocking-spawn-compile",
+        "log_sha256": "99c1b50addbe96ac0d23c872eb0c448edd6dfa5fa7d6d52b8bf1fe826ace2db9",
+        "receipt_sha256": "d6c7c3a252c47c359207f3f8e17e078ca40c175dc20d6023d4988a9be7837ded",
+        "source_unchanged": true
+      },
+      "exit_code": 1,
+      "failed": 1,
+      "intended_failure": [
+        194,
+        "timed out waiting for spawn return before startup release"
+      ],
+      "label": "control-blocking-spawn-cases",
+      "log_sha256": "2b90bcb3a3e41cf0e79b92bdede614c1a333fdb131f278395894197eda78f63c",
+      "passed": 0,
+      "preexec_sha256": "c0ade4e5ad8acd6fb000cd7cbfe8d8f67965e1117a1caf6ef31ba0d4822244d3",
+      "receipt_sha256": "6a96e54e4ac7465a0a0d43432c4e9988a33ac55ad52b49214f6acbaa90099abd",
+      "source_unchanged": true
+    },
+    {
+      "artifact": {
+        "compiler_fresh": false,
+        "sha256": "e5c260b7566f9d06a117ab578e1f5ff7738772722467aa62fe5e577021d8625f",
+        "source_inventory_sha256": "16ebe59fd636ad79402482bdf8cb5f9f92d0493e2248cae93a0cedc8a0901f22",
+        "source_sha256": {
+          "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+          "lampOS/crates/turn-end-wire/tests/process.rs": "24d9fb0977dfcf68311a690a856eba179e011a9b3294c28d5b0abb10d1eafa44"
+        }
+      },
+      "command": [
+        "<bound process test executable>",
+        "missing_executable_fails_at_once",
+        "spawn_returns_while_worker_startup_is_held"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end-wire",
+          "--test",
+          "process",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "control-restored-compile",
+        "log_sha256": "09127fae1dc5bba88ed2433c85fd088cb53b4836281cbad10b639ab4c13e0b9a",
+        "receipt_sha256": "8d5a5ba3950401732e23baa85603d73ab3a802dfe48f9bfca4f1888f9592dc00",
+        "source_unchanged": true
+      },
+      "exit_code": 0,
+      "failed": 0,
+      "intended_failure": null,
+      "label": "control-restored-cases",
+      "log_sha256": "006a94f0135c18a67271ee37c0b81cd47c0e30356333e820848b654e5ad143b7",
+      "passed": 2,
+      "preexec_sha256": "a8a277f8f926bbf894e2809ff56c754f079610c781d19728b7df1fc1d0f6cdb7",
+      "receipt_sha256": "3e4fb41a941cbeea9245cde23c9b7bab91e004fce93e1a1450fbfe64da9b2580",
+      "source_unchanged": true
+    }
+  ],
+  "fixed_gate": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "label": "fmt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "633cde2a3f295194fc44e44f09a85dac9adf3ada94b6b94b9c6e02418c788cb9",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end-wire",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "label": "clippy",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "17c627f0dbecedb8d10989d433c9e000fc4211c91773c88aa8ca1c425a493fe8",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end-wire",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "label": "compile",
+      "log_sha256": "45a58179c295c5c9f7bc3c960afe89d1597a0428927dc66023aa8999c769b582",
+      "receipt_sha256": "ba21a0d3be5d8f7e59a105161a113057f2b1db3e3480fd3d247b76dfc34c8c93",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "<bound process test executable>",
+        "missing_executable_fails_at_once",
+        "spawn_returns_while_worker_startup_is_held"
+      ],
+      "counted_in_full_total": false,
+      "exit_code": 0,
+      "failed": 0,
+      "label": "focused",
+      "log_sha256": "815792652323ece3ecb5c2c1bf1645e118b1683d5e92f3c73014ed5b2e9eb9d1",
+      "passed": 2,
+      "receipt_sha256": "646d89b6fcdc09f7e1d09598421dad047616cf01bcf7c76db9b002e496206ff4",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end-wire",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "failed": 0,
+      "ignored": 0,
+      "label": "full",
+      "library_passed": 5,
+      "log_sha256": "8fffc7b9338051d57662ece3891d94bfc35fca30f4a4a793c9c1093ec5695ce3",
+      "passed": 18,
+      "process_passed": 13,
+      "receipt_sha256": "7003e10687713fdd779dfcbad20854b1533d0bc0332a2ccde9f1f3b8cb340597",
+      "source_unchanged": true
+    }
+  ],
+  "initial_failed_fixture": {
+    "command": [
+      "<bound process test executable>",
+      "missing_executable_fails_at_once",
+      "spawn_returns_while_worker_startup_is_held"
+    ],
+    "executable_sha256": "93ac30f7d859f397be08f1a94b513221afb2095e4ebbe56014ce7ea30cd6ed38",
+    "exit_code": 1,
+    "failed": 1,
+    "failure": "EPERM while signalling an exited group; underlying OS cause not established.",
+    "fixture_sha256": "a13a15437f07ad3e1c604d4d755a27822b2d0498aaa5a33e50c98638bb898817",
+    "full_suite_run": false,
+    "label": "focused",
+    "log_sha256": "15ce65cc50a2a6e8582edea4b13248f1f5945b6a49f8b9d826de56dfb64355cf",
+    "passed": 1,
+    "preceding_gates": [
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "label": "fmt",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "receipt_sha256": "0221ac25518f2027f5d56964fbffc3aec60fd983a7e3ac7cb377a0add3cd40ec",
+        "source_unchanged": true
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end-wire",
+          "--all-targets",
+          "--message-format=short",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "label": "clippy",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "receipt_sha256": "eaa4e0ae986c7fd71ddf732bd49d31124034bbce6347b7da4a3fa7392323085f",
+        "source_unchanged": true
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-turn-end-wire",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "compile",
+        "log_sha256": "8b44ae8098e16b1dabb201ee3a97524129778fb4122cd3a11d30b47cdfcec79a",
+        "receipt_sha256": "25b1e2c7c42652944d28fcb8fceb5d637c12a0cda60d87b6f63d75c4c4e8d631",
+        "source_unchanged": true
+      }
+    ],
+    "receipt_sha256": "df45edfa35bea43c71b6d3cd56f2e152903f682bd5da94bb73053f7ef1f48026",
+    "retention_receipt_sha256": "1549040b670dcf78921d48e8520518f3fb381717502da0e04067a04aca71a312",
+    "source_inventory_sha256": "4ebc464bb9c31d2dfe4fd9ac002b6383a1e2a6bef5240065f98b0f63b116266e",
+    "source_unchanged": true
+  },
+  "input_sha256": {
+    "lampOS/crates/turn-end-wire/src/client.rs": "8bccf1d648fb968585c09106a114248016bb975ffbb7c1a35f9e03d162b9e999",
+    "lampOS/crates/turn-end-wire/tests/process.rs": "24d9fb0977dfcf68311a690a856eba179e011a9b3294c28d5b0abb10d1eafa44",
+    "lampOS/docs/endpoint-detection.md": "2ca42748a5111df710d7fa7eacdf4db7e30b248e35e6baea55c6a26714980588"
+  },
+  "owned_paths": [
+    "lampOS/crates/turn-end-wire/tests/process.rs",
+    "lampOS/docs/endpoint-detection.md"
+  ],
+  "restoration": {
+    "all_source_restored": true,
+    "baseline_copy_preserved": true,
+    "source_modes_restored": true
+  },
+  "source_entries": 7160,
+  "source_inventory_sha256": "16ebe59fd636ad79402482bdf8cb5f9f92d0493e2248cae93a0cedc8a0901f22"
+}
