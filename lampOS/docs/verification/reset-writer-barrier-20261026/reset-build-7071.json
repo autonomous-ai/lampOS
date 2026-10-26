@@ -1,0 +1,22 @@
+{
+  "sequence": 7071,
+  "release": "https://github.com/autonomous-ai/lampOS/releases/tag/lampos-lamp-voice-7071",
+  "tag_commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+  "release_published": true,
+  "release_draft": false,
+  "release_prerelease": true,
+  "published_at": "2026-10-26T13:07:40Z",
+  "original_workflow": 40324653501,
+  "workflow_conclusion": "success",
+  "arm64_conclusion": "success",
+  "arm64_logged_summary": {
+    "passed": 11373,
+    "failed": 0,
+    "skipped": 106,
+    "binaries": 182
+  },
+  "sign_publication_conclusion": "success",
+  "stable_promotion": "skipped",
+  "original_log_sha256": "62d628618b524cefce29cc60375995c40382be352441446b947579f0d23409a2",
+  "limits": "Summary and release/tag/workflow bindings verified. This receipt does not claim a separate case-by-case cold-run census, local signature verification, binary execution, stable promotion or installed product-lamp acceptance. First owns the acceptance round."
+}

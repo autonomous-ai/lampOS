@@ -1,0 +1,13 @@
+{
+  "prior_actual_runtime": "a02dd8c67de51a087380e309e98307efb8f612d4",
+  "current_actual_runtime": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+  "byte_equal": {
+    "requested_audio-019db324b83a9807": true,
+    "lamp_skills-a718b2a0214b6903": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "it-46363ab9699809b5": true,
+    "lamp_skills-c6f44302f3b2c78f": true,
+    "lamp-skills": true
+  },
+  "limits": "Binary comparison does not establish the cause of observed fixture failures. Original outcomes retain their heads and environments."
+}
