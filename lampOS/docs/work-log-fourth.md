@@ -1,3 +1,11 @@
+## 2026-10-26 18:26 — Diagnostic acknowledgement increment published
+
+Ready for lamp-voice: no
+
+Pushed fourth/diagnostic-sequence-ack-20261026 at 2cc71e720, one diagnostic commit atop #3544's c97. [Current gate receipt](verification/diagnostic-sequence-20261026/current-ba950.json): entire macOS Voice integration target 275/0/0, one exact changed case plus 274 disjoint nextest cases, zero leaks/timeouts/retries; fmt, strict workspace/all-target Clippy, workspace build and zero-case Voice docs pass. Native controller exited 0 and all owned processes closed. Source, witnesses and debug inputs were preserved. Parent executable hashes are identical, but their historical counts are not new runtime credit and the old environment was not serialized. Linux-only integration cases require native CI.
+
+The test requires all four submissions to queue, exact Complete/Invalid writer acknowledgement, matching faults, counts, end record and completion marker. Only this validity fixture uses the existing one-second maximum; the production 500 ms default remains unchanged. A draft PR follows with its #3544 dependency explicit. Common's expiry source and Callback remain prepared and UNRUN; their next gate follows this released lane.
+
 ## 2026-10-26 18:18 — Current hand-control carry pushed; diagnostic gate next
 
 Ready for lamp-voice: no
