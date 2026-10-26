@@ -7348,6 +7348,300 @@ async fn words_cut_short_by_a_held_line_are_answered_in_its_place() {
     );
 }
 
+/// One line's words (`said`, its call `first`), cut while their answer
+/// waits after that call, then answered again by an empty held line whose
+/// model calls `remember`. With `gap`, the first line is held only by a
+/// known face's gap, so its memory call is refused before it is sent
+/// (`HELD_MEMORY_CALL`), and the second line is the face's own. How many
+/// calls reached a runner, and whether the second chat was told the write
+/// was tried. With `requested`, the route also runs requested audio, whose
+/// runner takes a captured line's calls (Reviewer-two, 03:38 on #3614).
+async fn a_carried_write(said: &str, first: ToolCall, gap: bool, requested: bool) -> (usize, bool) {
+    use crate::memory_scope::{FaceCache, GAP};
+    let begun = Arc::new(tokio::sync::Notify::new());
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(said.to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new(
+            [
+                vec![Ok(ChatEvent::ToolCalls(vec![first])), Ok(ChatEvent::Done)],
+                vec![], // The first request waits for its reply when cut.
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        "remember",
+                        json!({"text":"Their favorite planet is Saturn."}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("I may have kept that already."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        chat_began: Some(begun.clone()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let writes = Arc::new(AtomicUsize::new(0));
+    let counted = writes.clone();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        counted.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async { json!({"ok":true}) })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+    let known = std::env::temp_dir().join(format!("carried-write-{}", std::process::id()));
+    if gap {
+        let counted = writes.clone();
+        let scoped: ScopedToolRunner =
+            Arc::new(move |_, _, _, _, _: crate::memory_scope::ScopeLease| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async { json!({"ok":true}) })
+            });
+        engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+            cache.clone(),
+            scoped,
+            None,
+        );
+        if requested {
+            let counted = writes.clone();
+            let runner: RequestedAudioRunner = Arc::new(move |_, _, _| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async { crate::tools::ToolAnswer::plain(json!({"ok":true})) })
+            });
+            engine =
+                engine.requesting_audio(lamp_turn_owner::BootId::new([7; 16]).unwrap(), runner);
+        }
+        engine.memory_camera(true, 1);
+        // Maya answered, then gone from view: her next line is held by the
+        // gap alone.
+        std::fs::write(&known, "Maya").unwrap();
+        let seen = crate::known_faces::FaceObservation::read(&known).unwrap();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+        cache.answered(&cache.snapshot(Instant::now()), Instant::now());
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+    }
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while script.asked.lock().unwrap().len() < 2 {
+            begun.notified().await;
+        }
+    })
+    .await
+    .expect("the first call was answered before its reply was cut");
+    if gap {
+        assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+        // Maya is back for the second line.
+        let seen = crate::known_faces::FaceObservation::read(&known).unwrap();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if matches!(
+                engine.next().await,
+                ProviderOutput::TurnComplete { request: 2, .. }
+            ) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("the held line answers the carried words");
+    let told = script.asked.lock().unwrap().iter().any(|messages| {
+        messages
+            .iter()
+            .any(|message| format!("{message:?}").contains("already tried for these words"))
+    });
+    let _ = std::fs::remove_file(&known);
+    (writes.load(Ordering::SeqCst), told)
+}
+
+/// lamp-06c1, 26 Oct, build 6963: one spoken remember was kept three times,
+/// two later sounds with no words answering its words again. The held line
+/// still answers them, but cannot write memory again ([`WriteOwner`]); nor
+/// after a forget their words asked for. A first call refused before it
+/// was sent claims nothing, so the held line's runs (Reviewer-two and
+/// reviewer-three on #3614).
+#[tokio::test]
+async fn an_empty_held_line_does_not_repeat_a_carried_memory_write() {
+    let remember = call(
+        "c1",
+        "remember",
+        json!({"text":"Their favorite planet is Saturn."}),
+    );
+    assert_eq!(
+        a_carried_write("Remember Saturn.", remember.clone(), false, false).await,
+        (1, true)
+    );
+    assert_eq!(
+        a_carried_write(
+            "Forget my coffee.",
+            call("c1", "forget", json!({})),
+            false,
+            false
+        )
+        .await,
+        (1, true),
+        "after a forget their words asked for"
+    );
+    assert_eq!(
+        a_carried_write("Remember Saturn.", remember.clone(), true, false).await,
+        (1, false),
+        "a first remember refused before it was sent claims nothing"
+    );
+    assert_eq!(
+        a_carried_write("Remember Saturn.", remember, true, true).await,
+        (1, false),
+        "a gap-held captured line's remember reaches no runner, then runs once"
+    );
+}
+
+/// Reviewer-two's P3 on #3614: a held forget their yes runs owns the yes's
+/// words' memory writes. Maya, known and in view: "Who am I?" gets a
+/// `forget_everything` the lamp holds and asks about; her "Yes." runs it,
+/// and its answer is cut; an empty held line answering "Yes." again cannot
+/// write memory.
+#[tokio::test]
+async fn a_held_forget_their_yes_runs_owns_the_yes_words_writes() {
+    use crate::memory_scope::FaceCache;
+    let begun = Arc::new(tokio::sync::Notify::new());
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Who am I?".to_owned()),
+                Ok("Yes.".to_owned()),
+                Ok(String::new()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::remember::FORGET_EVERYTHING,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("Shall I forget everything about you?"),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![], // The yes's answer waits when cut.
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        "remember",
+                        json!({"text":"Their favorite planet is Saturn."}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Done."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        chat_began: Some(begun.clone()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let seen = calls.clone();
+    let scoped: ScopedToolRunner =
+        Arc::new(move |_, _, name, _, _: crate::memory_scope::ScopeLease| {
+            seen.lock().unwrap().push(name);
+            Box::pin(async { json!({"ok":true}) })
+        });
+    let runner: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok":true}) }));
+    let cache = Arc::new(FaceCache::holding_gaps(None));
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .with_memory_scope(
+        lamp_turn_owner::BootId::new([8; 16]).unwrap(),
+        cache.clone(),
+        scoped,
+        None,
+    );
+    engine.memory_camera(true, 1);
+    let known = std::env::temp_dir().join(format!("held-yes-write-{}", std::process::id()));
+    std::fs::write(&known, "Maya").unwrap();
+    let face = crate::known_faces::FaceObservation::read(&known).unwrap();
+    cache.replace_seen(cache.begin_refresh(), Some(face), Some(1));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if matches!(
+                engine.next().await,
+                ProviderOutput::TurnComplete { request: 1, .. }
+            ) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("the lamp asks about the held forget");
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while script.asked.lock().unwrap().len() < 3 {
+            begun.notified().await;
+        }
+    })
+    .await
+    .expect("the yes ran the held forget before its answer was cut");
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [crate::remember::FORGET_EVERYTHING.to_owned()]
+    );
+    engine.submit(start(3));
+    engine.retire_through(2);
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if matches!(
+                engine.next().await,
+                ProviderOutput::TurnComplete { request: 3, .. }
+            ) {
+                break;
+            }
+        }
+    })
+    .await
+    .expect("the held line answers the yes's words");
+    std::fs::remove_file(&known).unwrap();
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [crate::remember::FORGET_EVERYTHING.to_owned()],
+        "no second write for the yes's words"
+    );
+    assert!(script.asked.lock().unwrap().iter().any(|messages| {
+        messages
+            .iter()
+            .any(|message| format!("{message:?}").contains("already tried for these words"))
+    }));
+}
+
 /// #1712: a line let out for the lamp is answered itself, and the words it
 /// cut short are let go: the person has moved on.
 #[tokio::test]
