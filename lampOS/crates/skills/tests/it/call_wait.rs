@@ -66,6 +66,11 @@ impl Drop for Running {
     }
 }
 
+fn observation(message: String) {
+    // Format before writing, so the child's stderr cannot split the fields.
+    let _ = std::io::stderr().write_all(format!("{message}\n").as_bytes());
+}
+
 #[test]
 fn a_tool_call_is_answered_while_the_program_listens_on_three_topics() {
     // Short: a socket's whole path has to fit in 103 bytes.
@@ -85,47 +90,87 @@ fn a_tool_call_is_answered_while_the_program_listens_on_three_topics() {
         skill(&skills, name, &toml, Some(topic));
     }
     let tools = root.join("tools");
-    let _running = Running(
-        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
-            .args([
-                "--dir".as_ref(),
-                skills.as_os_str(),
-                "--bus-root".as_ref(),
-                root.join("bus").as_os_str(),
-                "--actions-socket".as_ref(),
-                root.join("actions.sock").as_os_str(),
-                "--mood-socket".as_ref(),
-                root.join("mood.sock").as_os_str(),
-                "--tools-dir".as_ref(),
-                tools.as_os_str(),
-            ])
-            .spawn()
-            .unwrap(),
-    );
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    command.args([
+        "--dir".as_ref(),
+        skills.as_os_str(),
+        "--bus-root".as_ref(),
+        root.join("bus").as_os_str(),
+        "--actions-socket".as_ref(),
+        root.join("actions.sock").as_os_str(),
+        "--mood-socket".as_ref(),
+        root.join("mood.sock").as_os_str(),
+        "--tools-dir".as_ref(),
+        tools.as_os_str(),
+    ]);
+    let spawn_started = Instant::now();
+    let _running = Running(command.spawn().unwrap_or_else(|error| {
+        panic!("spawn failed after {:?}: {error}", spawn_started.elapsed())
+    }));
     let deadline = Instant::now() + Duration::from_secs(20);
     while !tools.join("tools.json").exists() {
-        assert!(Instant::now() < deadline, "no tools file");
+        assert!(
+            Instant::now() < deadline,
+            "no tools file; spawn elapsed={:?}",
+            spawn_started.elapsed()
+        );
         std::thread::sleep(Duration::from_millis(50));
     }
+    // Observed registry visibility, not an acknowledgement of loop readiness.
+    let startup = spawn_started.elapsed();
+    observation(format!("spawn to tools.json observed: {startup:?}"));
     let mut took = Vec::new();
-    for _ in 0..10 {
+    for ordinal in 1..=10 {
         // A moment apart, as calls come.
         std::thread::sleep(Duration::from_millis(30));
         let started = Instant::now();
-        let mut stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+        let mut stream = UnixStream::connect(tools.join("call.sock")).unwrap_or_else(|error| {
+            panic!(
+                "call {ordinal}/10 connect failed after {:?}; startup={startup:?}: {error}",
+                started.elapsed()
+            )
+        });
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
-            .unwrap();
-        writeln!(stream, r#"{{"op":"call","name":"wave","args":{{}}}}"#).unwrap();
+            .unwrap_or_else(|error| {
+                panic!(
+                    "call {ordinal}/10 read timeout setup failed after {:?}; startup={startup:?}: {error}",
+                    started.elapsed()
+                )
+            });
+        writeln!(stream, r#"{{"op":"call","name":"wave","args":{{}}}}"#).unwrap_or_else(|error| {
+            panic!(
+                "call {ordinal}/10 write failed after {:?}; startup={startup:?}: {error}",
+                started.elapsed()
+            )
+        });
         let mut line = String::new();
-        BufReader::new(&stream).read_line(&mut line).unwrap();
-        took.push(started.elapsed());
-        assert!(line.contains("Say hello."), "{line}");
+        BufReader::new(&stream)
+            .read_line(&mut line)
+            .unwrap_or_else(|error| {
+                panic!(
+                    "call {ordinal}/10 read failed after {:?}; startup={startup:?}; partial response={line:?}: {error}",
+                    started.elapsed()
+                )
+            });
+        let elapsed = started.elapsed();
+        took.push(elapsed);
+        observation(format!(
+            "call {ordinal}/10 elapsed={elapsed:?}; response={line:?}"
+        ));
+        assert!(
+            line.contains("Say hello."),
+            "call {ordinal}/10 elapsed={elapsed:?}; startup={startup:?}; response={line:?}"
+        );
     }
-    took.sort();
-    eprintln!("tool calls, fastest to slowest: {took:?}");
+    let mut sorted = took.clone();
+    sorted.sort();
+    observation(format!("tool calls, fastest to slowest: {sorted:?}"));
     // Taken as it comes, not after a topic's turn: about 49 ms each before
     // #1806 on the Intel Mac, with these three topics, and under 1 ms after.
-    let middle = took[took.len() / 2];
-    assert!(middle < Duration::from_millis(25), "{took:?}");
+    let middle = sorted[sorted.len() / 2];
+    assert!(
+        middle < Duration::from_millis(25),
+        "startup={startup:?}; calls in ordinal order={took:?}; fastest to slowest={sorted:?}"
+    );
 }
