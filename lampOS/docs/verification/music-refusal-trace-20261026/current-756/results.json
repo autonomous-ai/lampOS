@@ -1,0 +1,140 @@
+{
+  "artifact": {
+    "compiler_fresh": false,
+    "sha256": "0256086595df2bf916f917520d944e1d83ee5b0c3e20c53652f1e03628bbec45",
+    "target": "it"
+  },
+  "binding": {
+    "base": "756be347e13d2e52e7268414295dda8fc554c267",
+    "gate_sha256": "9eda9fcd0d5f72f3056fa0b4ba3dbf4e62a29501fac0ec262bd8bf369580976a",
+    "head": "4ce8d06715e93f568805696162651d6a8efff15c",
+    "identity_sha256": "af9811fc2d06f80a15dc8e272295656e66db2c29e3840c60c194b0b46f317e69",
+    "prior_proof_sha256": {
+      "lampOS/docs/verification/music-refusal-trace-20261026/README.md": "3ac69d591dc9afb241d55091130226171b19f197ff380631f1bedc6e34ee5ed7",
+      "lampOS/docs/verification/music-refusal-trace-20261026/SHA256SUMS": "057abf1968e09245174b16b46ea865be1aa8271a475c4b28b74de41c1c05774e",
+      "lampOS/docs/verification/music-refusal-trace-20261026/census.json": "847bd0e43038d65b129ba5ee7d6ab50610ab6a9b91bc6998fb678c7d03ee1983",
+      "lampOS/docs/verification/music-refusal-trace-20261026/current-274/README.md": "a38624a127b755081b2de808bd62b0e2b49b3f45e2e1e8099623cdafa4dd1984",
+      "lampOS/docs/verification/music-refusal-trace-20261026/current-274/SHA256SUMS": "d3c766e989ace97de5921fd78e60a55c7c5547ce29514852e793186f62df89ed",
+      "lampOS/docs/verification/music-refusal-trace-20261026/current-274/inputs.sha256": "abf472a6a3c36ed9837d019c77c53788112d20f4d579988ad408dae7eee0ec9c",
+      "lampOS/docs/verification/music-refusal-trace-20261026/current-274/results.json": "7e64eecabbb899168b2f16cf4170a7a73de05bce520bbd6d6216f0d0fc11de43",
+      "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/README.md": "c4369e52f033f123863964cbf7c15d1eaa5d3a42b568a1a5442f545e41f01b46",
+      "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/SHA256SUMS": "e2756d160b3786719aedde72b973d56a5c7f2df68bd9408973435b16bf3746e2",
+      "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/census.json": "1dcbfb689a8f80d06fc4fc2c0f61c96f04ce07d941d362bacd781d3b1e758ee0",
+      "lampOS/docs/verification/music-refusal-trace-20261026/review-d21/selected-results.txt": "ad39c6326a961dfe4a4d1188451f47978a358788235c5f2271ab6fe2478aee9b",
+      "lampOS/docs/verification/music-refusal-trace-20261026/selected-results.txt": "ee3b7d88ff74571c1bc202cf23cb39a80ecefdc8e8c69c7c4b16216fa1d23393"
+    },
+    "range_diff_sha256": "e8daea2ba5043c4f9f2d75ab2c2aae9ca9d6162fb6cebfb3cbe2375db6e5ff77",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183",
+    "source_entries": 7172,
+    "source_inventory_sha256": "01478c484e151ec735d6e018bda65a41c48aad82d22efb9694a72604ea086e42",
+    "tree": "50df4b939398e5fc8f8008d7deb63ade8bd7957f"
+  },
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "label": "fmt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "97f703bdd04af0f3fc6e01cbc8127afda42d7ec15b0d63aa50b0eb3e62a6d4f4",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "label": "clippy",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "872a2529cbcea6e7f5277e71a83d56d14ed52843d561436ca99bc8306ee30c49",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "label": "compile-switch-census",
+      "log_sha256": "2c69a5b87c309813d4338a893f9ef19547dab537e7de44e3100340bc50ad1654",
+      "receipt_sha256": "fdc7c0d7c8ddfd164eabb9fa7bc4dff05522e2ce6a1fad481b702c8272587ad4",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "<compiled Voice-eval integration test>",
+        "switches::",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "label": "switch-census",
+      "log_sha256": "639db423b2a94af15cd0049096e01594686b39b94a2947393145e005d106822d",
+      "receipt_sha256": "4ed0966635e745c1e3c9aa9024e0ba147834ecb3c2606dd14cd49fcb04c32d19",
+      "source_unchanged": true
+    }
+  ],
+  "identity": {
+    "all_crate_inputs_unchanged": true,
+    "base": "756be347e13d2e52e7268414295dda8fc554c267",
+    "base_delta": [
+      "lampOS/deploy/product/lamp-update.service",
+      "lampOS/deploy/product/lamp-waking.service",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/updates.md",
+      "scripts/imager/build-orangepi-v2.sh"
+    ],
+    "head": "4ce8d06715e93f568805696162651d6a8efff15c",
+    "old_base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+    "old_head": "b04c78803e6fc8180270d91a6052527bc44d0598",
+    "prior_music_proofs_unchanged": true
+  },
+  "literal_test_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 236 filtered out; finished in 0.01s",
+  "publisher_sha256": "5ae24f1721bb7c81d9b1374d62992aaf413cd91271202acb9db06950368e269b",
+  "retained_preflight_error": {
+    "actual_files": 12,
+    "cargo_commands_run": 0,
+    "expected_files": 13,
+    "kind": "preflight-proof-count-assumption",
+    "original_controller_sha256": "a4c422f933d09ef1579d060050f0ec3447dcaaa8195fbe6d55f79486a0bd61cf",
+    "outcome": "controller stopped before formatting or compilation; corrected inventory count against Git",
+    "source_changed": false
+  },
+  "scope": "Only two compiled switch-census tests; no new complete Voice or native run.",
+  "summary": {
+    "artifact_sha256": "0256086595df2bf916f917520d944e1d83ee5b0c3e20c53652f1e03628bbec45",
+    "complete": true,
+    "failed": 0,
+    "ignored": 0,
+    "passed": 2,
+    "prior_proofs_unchanged": true,
+    "source_unchanged": true
+  }
+}
