@@ -1,0 +1,3 @@
+1:  41cf74ef6 = 1:  c0a02fe5c lampOS: test requested-audio admission trace boundaries
+2:  6c3169bd3 = 2:  587183d50 lampOS: verify requested-audio preparation refusal and stderr
+3:  b04c78803 = 3:  4ce8d0671 lampOS: retain current-base music boundary checks
