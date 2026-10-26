@@ -1,0 +1,24 @@
+{
+  "head": "b333d4759478216fcad858c30b16962345d57c2e",
+  "tree": "a7980d76155953404f946d4a1b0cfd5c1c68a885",
+  "main_head": "1cad670df4fdc3995974d0c15a75fc25bbe8e73d",
+  "actual_native_session_id": 45590,
+  "actual_native_exit": 125,
+  "actual_native_chunk": "acd09c",
+  "source_stable": true,
+  "all_owned_sessions_groups_closed": true,
+  "target_release_permitted": true,
+  "voice": {
+    "passed": 4084,
+    "failed": 6,
+    "ignored": 21,
+    "leaks": 0,
+    "timeouts": 0
+  },
+  "nextest_exit": 100,
+  "docs_and_update": "not run after Voice failure",
+  "release_sha256": "06e4511a38a0aa25c178456c2c2c9684e496094fc6328bf6edc1676e92a7a70e",
+  "retained_witnesses": 22,
+  "reruns": 0,
+  "cause": "not established"
+}

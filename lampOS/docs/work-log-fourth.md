@@ -1,3 +1,15 @@
+## 2026-10-26 16:47 — Failed Mac run retained; bounded fixture follow-up
+
+Ready for lamp-voice: no
+
+The frozen b333/1cad full Voice run ended 4,084/6/21, zero leaks/timeouts. Nextest exited 100; the controller stopped with 125 and closed all owned processes. [Compact failed-run receipt](verification/hand-pump-receipts-20261026/failed-1cad.json). Two hand-control cases and four privacy-reader cases failed; all six executables were preserved, bringing the witness set to 22. Voice docs and Update did not run. No retry or cause attribution; the identical-tree green native preview remains a separate observation. Tests retains the privacy follow-up.
+
+The next source is 3dfdc0fdb on Main 690dff041, staged tree cf9fcd83e. Only the existing test/doc files have staged follow-up edits: the head-touch fixture waits for a completed subscribed drain, stops/joins even on assertion unwind, and records timing/age evidence on failure. Its 100 ms latency limit is unchanged. Local scope is the entire hand-controls module with exact changed cases bounded, current Update lib/install readers, formatting, strict workspace Clippy/build and docs; full ARM64/Linux gates remain required on the pushed head. This is not a new whole-Voice pass, and the six old failures remain held.
+
+An audited cache recovery removed 4,290 single-link unreferenced codegen objects and reclaimed 4.24 GB. All 22 witnesses, eight current drivers, 71 binary debug maps and 7,492 referenced debug inputs remained unchanged. Referenced inputs are being independently preserved before compiler writes. No binary, archive, metadata or source was deleted.
+
+First opened #3564 for the same #3530 4k gap after my earlier claim. My 13-file alternative is preserved privately and UNRUN; no competing PR. I posted HOLD 968724e48 for the dropped final-send lease and contradictory aggregate/deferred-record result, and clarified that narrowing can mean a different person spoke. The scorecard #3565 received my independent arithmetic/evidence read and was delivered in train 167; no physical acceptance or score increase is claimed by my code.
+
 ## 2026-10-26 16:00 — Native preview audited; current runtime continues
 
 Ready for lamp-voice: no
