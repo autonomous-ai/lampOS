@@ -1,0 +1,631 @@
+{
+  "schema_version": 1,
+  "scope": "Completed whole cleanup of one retired Cargo target; no product qualification or throughput claim",
+  "date": "2026-10-27",
+  "private_evidence_directory": "recovery/evidence/old-3d-target-reclaim-audit-20261027",
+  "target": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target",
+    "device": 16777222,
+    "inode": 479398918,
+    "retired_target_restoration_expectation_explicitly_superseded": true,
+    "target_exists_after_clean": false,
+    "cache_shape": {
+      "target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target",
+      "device": 16777222,
+      "inode": 479398918,
+      "top_level_entries": [
+        ".rustc_info.json",
+        "CACHEDIR.TAG",
+        "debug",
+        "tmp"
+      ],
+      "metadata_entry_count": 11954,
+      "allocated_file_bytes_not_inode_deduplicated": 4781723648,
+      "unexpected_noncache_entries": [],
+      "cargo_generated_build_out_rs": [
+        "debug/build/tract-linalg-db842db0c5a93c56/out/extern_kernel_macro.rs",
+        "debug/build/thiserror-5230ef55fc212df5/out/private.rs",
+        "debug/build/serde_core-f94eff566d586395/out/private.rs",
+        "debug/build/serde-e513c6bafb73fcf7/out/private.rs",
+        "debug/build/serde_core-42493bdad4b4dfb1/out/private.rs",
+        "debug/build/tract-linalg-7d2d3f7732784943/out/extern_kernel_macro.rs",
+        "debug/build/serde_core-3b31030dc1ca564a/out/private.rs",
+        "debug/build/serde-dfe5475947bf2338/out/private.rs",
+        "debug/build/serde-36803c7717987155/out/private.rs",
+        "debug/build/libsqlite3-sys-bee7fae2ea8307f5/out/bindgen.rs",
+        "debug/build/libsqlite3-sys-954c98f6cb321aa0/out/bindgen.rs"
+      ],
+      "method": "Metadata/name census only; no symlinks, only ordinary Cargo root shape; Rust generated sources only inside debug/build/<package>/out; no artifact content reads",
+      "allocated_unique_inode_bytes": 4781723648,
+      "unique_file_inodes": 10298,
+      "all_files_single_link": true
+    }
+  },
+  "source_guard": {
+    "worktree": "/private/tmp/tests-sleep-mood-clock-20261027",
+    "head": "fa67e6889e350d3f67165ef85f7319439a9b196a",
+    "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+    "branch": "tests/1806-sleep-mood-clock",
+    "status": "",
+    "index_sha256": "7d1083446a5201296b620dce6a3872a665c9f8ceb828c9402673565775c2d6e8",
+    "tracked_file_count": 10674,
+    "full_snapshot_sha256": "0bf761b1568490817c967433b521f01eb8fbc33be58538a25dabb3a9097d7e7e",
+    "same_before_and_after_both_operations": true,
+    "verification_basis": "Completed controller full-source guard receipts; this publication audit read evidence only"
+  },
+  "external_guards": {
+    "count": 606,
+    "manifest_sha256": "4905e83919a1850b569ebb969319e62dda71e1ced377030c58ab7b10d31de88a",
+    "bytes_summed_from_manifest": 3721952120,
+    "raw_stdout_stderr_file_count": 116,
+    "fields": [
+      "sha256",
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device",
+      "inode"
+    ],
+    "pass_before_after_both_operations": true,
+    "current_sealed_maps": [
+      {
+        "evidence_relative_path": "skills-a3b-gates/semantic-protected-after.json",
+        "count": 235,
+        "sha256": "88476b2c9f9e746ed33976dc912e365d9821a5d322df03bedcf454a5db24d708",
+        "old_target_path_matches": 0
+      },
+      {
+        "evidence_relative_path": "mood-a3b-plain-gates/protected-after.json",
+        "count": 246,
+        "sha256": "b0c69d20513c86a0b170d49cf5540389dea3440f9b82d1906ee1c15b538fd196",
+        "old_target_path_matches": 0
+      },
+      {
+        "evidence_relative_path": "journal-a3b-plain-gates/semantic-protected-after.json",
+        "count": 246,
+        "sha256": "bbf8b319308c8cf21215b37be89de8ba508874be929ef1cf6013f8f0709c3258",
+        "old_target_path_matches": 0
+      },
+      {
+        "evidence_relative_path": "carrier-a3b-serial-gates/protected-after.json",
+        "count": 258,
+        "sha256": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+        "old_target_path_matches": 0
+      },
+      {
+        "evidence_relative_path": "sentinel-a3b-after-skills-gates/protected-handoff.json",
+        "count": 235,
+        "sha256": "88476b2c9f9e746ed33976dc912e365d9821a5d322df03bedcf454a5db24d708",
+        "old_target_path_matches": 0
+      }
+    ],
+    "current_actual_executable_map_exclusions": {
+      "old_target": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target",
+      "method": "Read-only completed evidence JSON string/key path census; no current target access",
+      "manifests": [
+        {
+          "file": "skills-a3b-gates/semantic-protected-after.json",
+          "sha256": "88476b2c9f9e746ed33976dc912e365d9821a5d322df03bedcf454a5db24d708",
+          "top_level_count": 235,
+          "absolute_path_count": 235,
+          "old_target_matches": [],
+          "target_roots": []
+        },
+        {
+          "file": "skills-a3b-gates/semantic-actual-executables.json",
+          "sha256": "95f2c5076cdea33853fc8747826d5ebb7d081154e83da203291c7c8bd3f975e8",
+          "top_level_count": 7,
+          "absolute_path_count": 7,
+          "old_target_matches": [],
+          "target_roots": [
+            "ready-008-gates-20261026"
+          ]
+        },
+        {
+          "file": "skills-a3b-gates/semantic-actual-executables-after.json",
+          "sha256": "09a3bbebc09b4b84a7f93efa92130b1896bf52cafde235cb6d5a351c0115a4b3",
+          "top_level_count": 7,
+          "absolute_path_count": 7,
+          "old_target_matches": [],
+          "target_roots": [
+            "ready-008-gates-20261026"
+          ]
+        },
+        {
+          "file": "mood-a3b-plain-gates/protected-after.json",
+          "sha256": "b0c69d20513c86a0b170d49cf5540389dea3440f9b82d1906ee1c15b538fd196",
+          "top_level_count": 246,
+          "absolute_path_count": 246,
+          "old_target_matches": [],
+          "target_roots": []
+        },
+        {
+          "file": "mood-a3b-plain-gates/actual-executables.json",
+          "sha256": "fb7eaf8947016a58b01d8992da8ad0f85e5892b86cea9dc3aa9a2e6dd9dd519c",
+          "top_level_count": 8,
+          "absolute_path_count": 8,
+          "old_target_matches": [],
+          "target_roots": [
+            "sleep-mood-clock-pair-20261027"
+          ]
+        },
+        {
+          "file": "journal-a3b-plain-gates/semantic-protected-after.json",
+          "sha256": "bbf8b319308c8cf21215b37be89de8ba508874be929ef1cf6013f8f0709c3258",
+          "top_level_count": 246,
+          "absolute_path_count": 246,
+          "old_target_matches": [],
+          "target_roots": []
+        },
+        {
+          "file": "journal-a3b-plain-gates/semantic-actual-executables.json",
+          "sha256": "45ea7d7c5191ca8fadb28a49934062d46108c4a801a4dee5bd02e49f598ddbd3",
+          "top_level_count": 8,
+          "absolute_path_count": 8,
+          "old_target_matches": [],
+          "target_roots": [
+            "sleep-name-settle-pair-20261027"
+          ]
+        },
+        {
+          "file": "carrier-a3b-serial-gates/protected-after.json",
+          "sha256": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+          "top_level_count": 258,
+          "absolute_path_count": 258,
+          "old_target_matches": [],
+          "target_roots": []
+        },
+        {
+          "file": "carrier-a3b-serial-gates/update-originals.json",
+          "sha256": "440b13f4e50fe5f6a349a45c455efc01bc8bbe4120286898b430aa9f27ceb616",
+          "top_level_count": 10,
+          "absolute_path_count": 10,
+          "old_target_matches": [],
+          "target_roots": [
+            "carrier-ba950-gates-20261026"
+          ]
+        },
+        {
+          "file": "sentinel-a3b-after-skills-gates/protected-handoff.json",
+          "sha256": "88476b2c9f9e746ed33976dc912e365d9821a5d322df03bedcf454a5db24d708",
+          "top_level_count": 235,
+          "absolute_path_count": 235,
+          "old_target_matches": [],
+          "target_roots": []
+        }
+      ],
+      "all_present": true,
+      "all_old_target_matches_empty": true
+    },
+    "old_driver_coverage": {
+      "driver_count": 11,
+      "all_external": true,
+      "drivers": [
+        {
+          "gate": "ready",
+          "old_driver_name": "lamp_expression-7d5e7ac9619c42c0",
+          "external_witness_name": "0-lamp_expression-7d5e7ac9619c42c0",
+          "sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+          "bytes": 2299560
+        },
+        {
+          "gate": "ready",
+          "old_driver_name": "it-707453661fb429d2",
+          "external_witness_name": "1-it-707453661fb429d2",
+          "sha256": "fbd68ca00dd372308723710b749b26116bc27628c60994476dc4ffd8e3a57d9c",
+          "bytes": 12734440
+        },
+        {
+          "gate": "ready",
+          "old_driver_name": "runtime-f9b92bb4002b831f",
+          "external_witness_name": "4-runtime-f9b92bb4002b831f",
+          "sha256": "870f0d2c8cbf1577b419bcf70080624c8b4f77f0bd2d2e032403b37ad02bb181",
+          "bytes": 6381528
+        },
+        {
+          "gate": "ready",
+          "old_driver_name": "lamp_expression-97b0d6d78b5cc498",
+          "external_witness_name": "7-lamp_expression-97b0d6d78b5cc498",
+          "sha256": "550ea9c5c345743f75e6b28f34709ae1b83c2c515ebbe1415678fb0e660ac20c",
+          "bytes": 5785064
+        },
+        {
+          "gate": "sentinel",
+          "old_driver_name": "lamp_voice-6d619bbdd1df3a0d",
+          "external_witness_name": "0-lamp_voice-6d619bbdd1df3a0d",
+          "sha256": "31f1d199a4354d8b8332c95befc045c1d99e35e6f6520adba6f6c5c81ff9dab4",
+          "bytes": 115477776
+        },
+        {
+          "gate": "restart",
+          "old_driver_name": "lamp_voice-6d619bbdd1df3a0d",
+          "external_witness_name": "0-lamp_voice-6d619bbdd1df3a0d",
+          "sha256": "dbf54aaa2827cb62083030ddf104e46d4fef7f04b8c146f198f6f7fcf85809cf",
+          "bytes": 115488560
+        },
+        {
+          "gate": "skills",
+          "old_driver_name": "lamp_skills-a718b2a0214b6903",
+          "external_witness_name": "1-lamp_skills-a718b2a0214b6903",
+          "sha256": "3b3d0a5bf31215ec9a75026c04361aafe0044c5a4bb9475756bbbfcf5a6206e0",
+          "bytes": 13298780
+        },
+        {
+          "gate": "skills",
+          "old_driver_name": "release_pair-88349d4c2302e5ab",
+          "external_witness_name": "2-release_pair-88349d4c2302e5ab",
+          "sha256": "451586536b7df523847145fdf43f01a02040107aab189cc91c782b6c148b27f8",
+          "bytes": 3694632
+        },
+        {
+          "gate": "skills",
+          "old_driver_name": "it-46363ab9699809b5",
+          "external_witness_name": "4-it-46363ab9699809b5",
+          "sha256": "0e99e2c198762502c43843f4a90e1851804fe3cdb6de0912f7d642afe426e2ac",
+          "bytes": 21110732
+        },
+        {
+          "gate": "skills",
+          "old_driver_name": "requested_audio-019db324b83a9807",
+          "external_witness_name": "5-requested_audio-019db324b83a9807",
+          "sha256": "787e5064cd4a51df7aacc4dcbc9fc651b40175208789d4306bfee2c2aeb70bbd",
+          "bytes": 13169668
+        },
+        {
+          "gate": "skills",
+          "old_driver_name": "lamp_skills-c6f44302f3b2c78f",
+          "external_witness_name": "6-lamp_skills-c6f44302f3b2c78f",
+          "sha256": "250db3199d310065428349afdea8398a1f175d4436c656171a1b0be4c697c7bb",
+          "bytes": 13907580
+        }
+      ],
+      "original_round_carrier_external_witness_retained": true
+    }
+  },
+  "history": {
+    "last_old_gate": "shared-current-gates-prep/skills",
+    "last_old_head": "91ca92d058adae8ce8992065afadd5e5753c55c8",
+    "counts": {
+      "passed": 521,
+      "failed": 1,
+      "ignored": 9
+    },
+    "failure_identity": [
+      "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline"
+    ],
+    "runtime_attempts": 1,
+    "direct_exit": 101,
+    "owned_group_closed": true,
+    "finished_utc": "2026-10-26T10:14:39.788084Z",
+    "failure_retained": true,
+    "no_test_result_waiver": true,
+    "historical_source_raw_and_frozen_preserved": true
+  },
+  "dry_run_scope": {
+    "path_rows": 11955,
+    "all_rows_at_or_below_exact_old_target": true,
+    "raw_path_list_bytes": 2107761,
+    "raw_path_list_exported_to_git": false
+  },
+  "stages": {
+    "dry-run": {
+      "terminal": {
+        "status": "PASS",
+        "operation": "dry-run",
+        "source_and_external_evidence_guards_pass": true,
+        "no_compile_or_runtime_command": true,
+        "direct_exit": 0,
+        "owned_groups_closed": true,
+        "target_exists_after": true,
+        "observed_recovered_bytes": -2170880,
+        "compiler_admission_space_sufficient": false,
+        "minimum_desired_recovery_met": false
+      },
+      "command_result": {
+        "argv": [
+          "/Users/autonomous/.cargo/bin/cargo",
+          "+1.96.0",
+          "--config",
+          "build.build-dir=\"/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target\"",
+          "clean",
+          "--offline",
+          "--locked",
+          "--manifest-path",
+          "/private/tmp/tests-sleep-mood-clock-20261027/lampOS/Cargo.toml",
+          "--target-dir",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target",
+          "--verbose",
+          "--dry-run"
+        ],
+        "cleanup": [
+          {
+            "action": "leader exited unreaped; no other owned group members",
+            "members": [
+              {
+                "pid": 13329,
+                "state": "Z"
+              }
+            ]
+          }
+        ],
+        "direct_exit": 0,
+        "owned_groups_closed": true,
+        "free_before": 2511867904,
+        "operation": "dry-run",
+        "free_after": 2509697024,
+        "observed_recovered_bytes": -2170880,
+        "compiler_admission_space_sufficient": false,
+        "minimum_desired_recovery_met": false,
+        "stdout_sha256": "1a44ae17c765b6bead56692c16a25ac3d764589f025f04f0aa3139e377d1d472",
+        "stderr_sha256": "bfa1d0f4e37e000404c57d3d3f77af4d8b75af1faeac2161413426ad6f020fb3"
+      },
+      "native_controller_result": {
+        "controller_exit": 0
+      },
+      "source_before_equals_after_equals_prepared": true,
+      "lsof_before": {
+        "exit": 1,
+        "stdout_empty": true,
+        "stderr_empty": true,
+        "target_exists": true
+      },
+      "lsof_after": {
+        "exit": 1,
+        "stdout_empty": true,
+        "stderr_empty": true,
+        "target_exists": true,
+        "stderr_scope": "empty"
+      }
+    },
+    "clean": {
+      "terminal": {
+        "status": "PASS",
+        "operation": "clean",
+        "source_and_external_evidence_guards_pass": true,
+        "no_compile_or_runtime_command": true,
+        "direct_exit": 0,
+        "owned_groups_closed": true,
+        "target_exists_after": false,
+        "observed_recovered_bytes": 3717193728,
+        "compiler_admission_space_sufficient": true,
+        "minimum_desired_recovery_met": true
+      },
+      "command_result": {
+        "argv": [
+          "/Users/autonomous/.cargo/bin/cargo",
+          "+1.96.0",
+          "--config",
+          "build.build-dir=\"/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target\"",
+          "clean",
+          "--offline",
+          "--locked",
+          "--manifest-path",
+          "/private/tmp/tests-sleep-mood-clock-20261027/lampOS/Cargo.toml",
+          "--target-dir",
+          "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target",
+          "--verbose"
+        ],
+        "cleanup": [
+          {
+            "action": "leader exited unreaped; no other owned group members",
+            "members": [
+              {
+                "pid": 14735,
+                "state": "Z"
+              }
+            ]
+          }
+        ],
+        "direct_exit": 0,
+        "owned_groups_closed": true,
+        "free_before": 2501062656,
+        "operation": "clean",
+        "free_after": 6218256384,
+        "observed_recovered_bytes": 3717193728,
+        "compiler_admission_space_sufficient": true,
+        "minimum_desired_recovery_met": true,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "9720524e0cb4378ef5243f5b406eac054ddd2921ea5fc3e3b7755534add23d76"
+      },
+      "native_controller_result": {
+        "controller_exit": 0
+      },
+      "source_before_equals_after_equals_prepared": true,
+      "lsof_before": {
+        "exit": 1,
+        "stdout_empty": true,
+        "stderr_empty": true,
+        "target_exists": true
+      },
+      "lsof_after": {
+        "exit": 1,
+        "stdout_empty": true,
+        "stderr_empty": false,
+        "target_exists": false,
+        "stderr_scope": "Expected missing-directory warning after whole clean"
+      }
+    }
+  },
+  "raw_files": {
+    "dry-run.stdout": {
+      "sha256": "1a44ae17c765b6bead56692c16a25ac3d764589f025f04f0aa3139e377d1d472",
+      "bytes": 2107761
+    },
+    "dry-run.stderr": {
+      "sha256": "bfa1d0f4e37e000404c57d3d3f77af4d8b75af1faeac2161413426ad6f020fb3",
+      "bytes": 82
+    },
+    "clean.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clean.stderr": {
+      "sha256": "9720524e0cb4378ef5243f5b406eac054ddd2921ea5fc3e3b7755534add23d76",
+      "bytes": 170
+    }
+  },
+  "current_targets_excluded": [
+    "ready-008-gates-20261026",
+    "sleep-mood-clock-pair-20261027",
+    "sleep-name-settle-pair-20261027",
+    "carrier-ba950-gates-20261026"
+  ],
+  "disk_interpretation": {
+    "observed_free_space_delta_bytes": 3717193728,
+    "free_before_bytes": 2501062656,
+    "free_after_bytes": 6218256384,
+    "cargo_removed_file_count": 10298,
+    "cargo_displayed_logical_summary": "4.4GiB total",
+    "APFS_physical_reclaim_attribution_guaranteed": false,
+    "other_disk_activity_isolation_claim": false,
+    "throughput_claim": false,
+    "compiler_or_runtime_executed_by_cleanup": false
+  },
+  "receipt_hashes": {
+    "cleanup.py": {
+      "sha256": "038b62009aceb90aa710d1dc67c9d413bbc768bae89b59c70c59a24cde4da8c5",
+      "bytes": 6418
+    },
+    "cleanup-plan.json": {
+      "sha256": "f656a54c5140ed8020f99b193337c736d55603d8b97c6db65e1ac8de6b9d485c",
+      "bytes": 2473
+    },
+    "cleanup-plan-disabled-original.json": {
+      "sha256": "679d07b4088b51e43117827cf167b0e7fcf09fa3a3f107c8ae82c83d022caf08",
+      "bytes": 2446
+    },
+    "cleanup-launch-template.json": {
+      "sha256": "0b95fe79eb9e8d95aeb1260eb980333fa44ea03532bb3eb3954d1a663454768a",
+      "bytes": 529
+    },
+    "cleanup-launch-dry-run-reviewed.json": {
+      "sha256": "856e9a61a62c7bf5951991097acdb5a143458ea4292f08743efce33dbab1d712",
+      "bytes": 526
+    },
+    "cleanup-launch.json": {
+      "sha256": "d766bc8fb970b72670afdfaa5e901886bd6ec7da485af526ad2345794a1dbe1b",
+      "bytes": 576
+    },
+    "cleanup-review.json": {
+      "sha256": "29370b7b9b648d0f7b2ab86ec0c811a9bacf3df117220afc6bb5d274e6dbed73",
+      "bytes": 1317
+    },
+    "cleanup-protected-manifest.json": {
+      "sha256": "4905e83919a1850b569ebb969319e62dda71e1ced377030c58ab7b10d31de88a",
+      "bytes": 244200
+    },
+    "cleanup-source-before-prepared.json": {
+      "sha256": "0bf761b1568490817c967433b521f01eb8fbc33be58538a25dabb3a9097d7e7e",
+      "bytes": 2405765
+    },
+    "current-guard-path-exclusion.json": {
+      "sha256": "77a554425274c6ce3a4202616f81ab96e1a1aa646db600faeece48fa206d8495",
+      "bytes": 3380
+    },
+    "old-target-cache-shape.json": {
+      "sha256": "f01e6b80534cc5eb7ecade96a1eb20114f5e1bf07ca9508ebce4dcc51c823424",
+      "bytes": 1435
+    },
+    "old-driver-external-witness-coverage.json": {
+      "sha256": "09759ca0cffa590889c2c41dd11de082f42863fa9e24cc4a40b2371f713efbac",
+      "bytes": 8000
+    },
+    "historical-owned-command-closure.json": {
+      "sha256": "942d2250f4f4c0b20bc82bbbb7b179131b094812ef6796694d7150fa293579bc",
+      "bytes": 17451
+    },
+    "scoped-clean-source-and-identity.json": {
+      "sha256": "00ee7c3cf9a7acd10a4a672718f82609ed7196f995f7579d244ad717084ca9bf",
+      "bytes": 689
+    },
+    "dry-run-started.json": {
+      "sha256": "af17a59019b1af6fc854e00a641f575076d5d3b1e996d27e78d6ae329d5fe6c7",
+      "bytes": 600
+    },
+    "dry-run-result.json": {
+      "sha256": "06690c47b2ce947b44cfcb01f983435732350baccca9ba2804c295b666ec446b",
+      "bytes": 1190
+    },
+    "dry-run-terminal.json": {
+      "sha256": "f22f574cc08b0937f77df03cd09827c68bbc923cc8bee8de3b0086391ab28a83",
+      "bytes": 353
+    },
+    "dry-run-native-result.json": {
+      "sha256": "782897c0661cc7124eb85d713dae23f5ea92eb1776c3fd14b3205afad1b2b7a9",
+      "bytes": 22
+    },
+    "dry-run-source-before.json": {
+      "sha256": "0bf761b1568490817c967433b521f01eb8fbc33be58538a25dabb3a9097d7e7e",
+      "bytes": 2405765
+    },
+    "dry-run-source-after.json": {
+      "sha256": "0bf761b1568490817c967433b521f01eb8fbc33be58538a25dabb3a9097d7e7e",
+      "bytes": 2405765
+    },
+    "dry-run-before-lsof.json": {
+      "sha256": "fffe8bc503e84bec6b1e14075117af5ad4fe683a766b963f6ca6f1865e28c3f9",
+      "bytes": 280
+    },
+    "dry-run-after-lsof.json": {
+      "sha256": "fffe8bc503e84bec6b1e14075117af5ad4fe683a766b963f6ca6f1865e28c3f9",
+      "bytes": 280
+    },
+    "dry-run-controller.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "dry-run-controller.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clean-started.json": {
+      "sha256": "593aaefd0ce7921174512b706c14873ba616d5dd16bb07871eae9712aff9af2a",
+      "bytes": 583
+    },
+    "clean-result.json": {
+      "sha256": "d6dc3f79d241d19972d491dc0ad2229998d6e6d4b377f0ddc4551fec72ff1f9d",
+      "bytes": 1171
+    },
+    "clean-terminal.json": {
+      "sha256": "684bb482e0fe3a5b084d94b388fe6ad2e1a0f3d9834ba61a815a6de885793378",
+      "bytes": 352
+    },
+    "clean-native-result.json": {
+      "sha256": "782897c0661cc7124eb85d713dae23f5ea92eb1776c3fd14b3205afad1b2b7a9",
+      "bytes": 22
+    },
+    "clean-source-before.json": {
+      "sha256": "0bf761b1568490817c967433b521f01eb8fbc33be58538a25dabb3a9097d7e7e",
+      "bytes": 2405765
+    },
+    "clean-source-after.json": {
+      "sha256": "0bf761b1568490817c967433b521f01eb8fbc33be58538a25dabb3a9097d7e7e",
+      "bytes": 2405765
+    },
+    "clean-before-lsof.json": {
+      "sha256": "fffe8bc503e84bec6b1e14075117af5ad4fe683a766b963f6ca6f1865e28c3f9",
+      "bytes": 280
+    },
+    "clean-after-lsof.json": {
+      "sha256": "c285e82b44a0a511712c3c8925f0975e7e72d31530acdc2ec188968dae882448",
+      "bytes": 933
+    },
+    "clean-controller.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "clean-controller.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "publication": {
+    "exact_files": [
+      "README.md",
+      "audit.json"
+    ],
+    "binary_or_full_raw_log_export": false,
+    "source_target_compiler_access_during_publication": false,
+    "commit_push_or_GitHub_write_by_preparer": false
+  }
+}

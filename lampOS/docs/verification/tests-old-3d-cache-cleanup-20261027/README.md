@@ -1,0 +1,21 @@
+# Retired 3d Cargo cache cleanup — 2026-10-27
+
+Root completed an explicitly approved cleanup of the retired `update-carrier-current-3d-cargo-target`. The reviewed dry-run and cleanup both returned direct exit **0**, recorded native controller exit **0**, passed full source and **606 external-file guards**, and closed their owned process groups. The retired target was absent afterward. [audit.json](audit.json) binds the exact private receipts and raw output hashes.
+
+The selected target was `/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/update-carrier-current-3d-cargo-target`, device **16777222**, inode **479398918**. Root explicitly superseded its old restoration/use expectation. Its pre-clean census contained **10,298 regular file inodes**, no symlinks or unexpected non-cache entries, and 11 generated Rust files confined to Cargo `debug/build/.../out`. The supported Cargo 1.96.0 command set both `target-dir` and `build-dir` to that exact target, with `--offline --locked`; it used no package or profile restriction. The actual dry-run listed **11,955 paths**, all at or below that exact target, and remained separate from the reviewed cleanup authorization.
+
+| Recorded disk observation | Bytes |
+| --- | ---: |
+| Free before cleanup | 2,501,062,656 |
+| Free after cleanup | 6,218,256,384 |
+| Observed increase | 3,717,193,728 |
+
+Cargo reported **10,298 files, 4.4 GiB total** removed. The observed free-space increase was approximately **3.462 GiB**. The cache metadata census counted 4,781,723,648 allocated bytes; Cargo's displayed size and the filesystem free-space delta measure different things. APFS copy-on-write, snapshots, and unrelated disk activity prevent attributing every byte of the delta to physical blocks reclaimed by this command. No throughput measurement or claim is made. The post-clean observation exceeded the recorded 3 GiB compiler-admission space threshold; this proof authorizes no subsequent compiler work.
+
+The source manifest was the clean official Mood head `fa67e6889e350d3f67165ef85f7319439a9b196a`, based on `a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33`. The full **10,674 tracked-file** source snapshot, branch, index, and clean status matched before and after both operations. Its snapshot SHA-256 is `0bf761b1568490817c967433b521f01eb8fbc33be58538a25dabb3a9097d7e7e`. The external guard manifest SHA-256 is `4905e83919a1850b569ebb969319e62dda71e1ced377030c58ab7b10d31de88a`. Its **606** guarded files include **116 historical raw stdout/stderr files**, source snapshots, receipts, controllers, and external frozen witnesses. Every one of the **11 inventoried old test drivers** has an external frozen witness; all 17 shared-gate frozen files and the original round-carrier frozen file remain protected.
+
+The current sealed maps of **235 / 246 / 246 / 258** files and the next Reader **235**-file handoff contain zero old-target paths. Their current actual-executable maps refer to the four other targets: `ready-008-gates-20261026`, `sleep-mood-clock-pair-20261027`, `sleep-name-settle-pair-20261027`, and `carrier-ba950-gates-20261026`. Those targets were outside both configured cleanup roots; no cleanup was issued against them. The targeted pre-operation `lsof +D` checks found no visible owner. After clean, `lsof` reported the expected missing-directory warning with no matching open-file records. This is scoped ownership evidence, without a host-idle claim.
+
+The latest historical Skills run on this retired cache remains **521 passed / 1 failed / 9 ignored**, head `91ca92d058adae8ce8992065afadd5e5753c55c8`. The retained failure is `routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline`; its runtime exited **101** at **2026-10-26 10:14:39.788084 UTC**, with its owned group closed. Its original source, raw results, and frozen witnesses remain outside the deleted cache. Cleanup neither reran that suite nor waived its failure.
+
+This packet contains exactly `README.md` and `audit.json`. Binaries and the 2,107,761-byte dry-run path list remain private. Publication preparation read completed evidence only and performed no source, target, compiler, runtime, GitHub, commit, or push operation.

@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 05:28 — Journal landed; disk recovered; Sentinel qualification active
+
+Ready for lamp-voice: no (remaining current carries active; #3622 delivered by train)
+
+Journal #3622 landed through train #3626 as current Main `90ca725c5`; the a3b-to-Main diff is exactly the journal runtime fixture and Expression documentation. The PR closed with the train record; its separate offered-head checks retain their source identity. Mood composition is being carried onto this base with one shared helper, both fixture repairs and both doc paragraphs; new qualification remains required. Skills has a current source read from Reviewer-three; Reviewer-two is reading. Its full native proof is published at `12fe0774d`.
+
+[Reviewed retired-cache cleanup](verification/tests-old-3d-cache-cleanup-20261027/) passed dry-run and cleanup with direct/native exit **0**, full source and **606** external-file guards, and owned groups closed. Free space rose from **2,501,062,656** to **6,218,256,384 bytes**; Cargo's separate logical report was 10,298 files / 4.4 GiB. All current targets and external frozen witnesses were preserved, along with historical failures. The old cache's restoration expectation is superseded.
+
+Sentinel `5ac039201/a3b` now runs its reviewed strict twelve-package/workspace gates and four-case Mac Reader module once on the allocated warm target, with 235 inherited sealed witnesses. Its pinned qualification remains at a3b while newer source-only carries are prepared in separate official worktrees; the active source is untouched. Carrier's continuation is still disabled pending exact controller/selection review. No device action.
+
 ## 2026-10-27 05:18 — Skills current native audit complete
 
 Ready for lamp-voice: no (#3545 current peer reads requested next)
