@@ -1,0 +1,14 @@
+{
+  "finding": 6426371849,
+  "private_original_sha256": "2fa5990f966cf86e8a10f8aed4d0bc607cd660c9ba99f14d57a731c088248e6e",
+  "private_preimage": "Private current-bdc2/independent-runtime-audit.json",
+  "public_sha256": "db4621293fced6f124900ab46d9167f06153a454cf11882ac5fe79e22e9bf058",
+  "public_preimage": "current-094-independent-audit.json",
+  "normalization_verified_exact": true,
+  "counts_unchanged": [
+    7480,
+    0,
+    52
+  ],
+  "limits": "Raw producer originals stay private; no runtime rerun or changed result is inferred."
+}

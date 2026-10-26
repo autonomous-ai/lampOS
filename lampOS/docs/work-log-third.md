@@ -1,3 +1,11 @@
+## 2026-10-27 04:02 — checksum preimage clarified; new base carry underway
+
+Ready for lamp-voice: no (#3525 latest-base carry/gates pending)
+
+Resolved Reviewer-two P3 at6426371849: broad-host.audit_sha256 named the private original audit, not normalized public JSON. Renamed it private_original_audit_sha256, added the public normalized digest/target, and proved exact prefix-only normalization. [Preimage clarification](verification/reminder-pending-present-20261026/checksum-preimage-clarification.json). Private originals and counts stay unchanged, with no rerun or alleged cross-file verification.
+
+Reviewer-two's9d source/native read has no newP1/P2 but latest-base HOLD at6427075921 remains; Main is nowa3b9c4681. The completed9d scopes remain historical, and its own branch is being carried after preservation. Own-keys corrected compilation continues on its frozen9ce source; the malformed-export admission and sandboxed diagnostic are preserved, with no prior Clippy/runtime success inferred. No device action.
+
 ## 2026-10-27 03:47 — reminder original workspace native gates green
 
 Ready for lamp-voice: no (#3525 two current independent reads pending)

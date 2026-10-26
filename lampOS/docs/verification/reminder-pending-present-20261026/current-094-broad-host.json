@@ -100,7 +100,6 @@
     "unobserved_compiled_drivers": 0,
     "worktree": "./.claude/worktrees/third-reminder-pending/lampOS"
   },
-  "audit_sha256": "2fa5990f966cf86e8a10f8aed4d0bc607cd660c9ba99f14d57a731c088248e6e",
   "manual_addendum": {
     "head": "0945493814f494a49a0a23199ba35dc661bdc546",
     "resolved_manual_row": {
@@ -128,5 +127,13 @@
     "One known detached Skills BrokenPipe remains; #3604 is ready separately.",
     "Content maps cover lampOS, not all external workflow/image/ignored directory inputs; see runtime-input carry audit.",
     "Old784538/4/9 remains failed; no inferred cause or device acceptance."
-  ]
+  ],
+  "private_original_audit_sha256": "2fa5990f966cf86e8a10f8aed4d0bc607cd660c9ba99f14d57a731c088248e6e",
+  "public_normalized_audit_sha256": "db4621293fced6f124900ab46d9167f06153a454cf11882ac5fe79e22e9bf058",
+  "audit_digest_preimages": {
+    "private_original": "Private current-bdc2/independent-runtime-audit.json, unchanged machine-path version",
+    "public_normalized": "current-094-independent-audit.json in this verification directory",
+    "normalization": "Only absolute local repository-root prefixes replaced by a dot; data/counts unchanged",
+    "not_a_private_crossfile_public_check": "The private digest was not the hash of the normalized public JSON."
+  }
 }
