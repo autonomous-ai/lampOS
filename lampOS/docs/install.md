@@ -669,7 +669,20 @@ units stopped:
    The same existing key is kept, and a different one is never replaced.
    This step writes no Store switch and restarts no service.
 
-Then `lamp-selftest --occasion factory` ([selftest.md](selftest.md)).
+Then `lamp-selftest --occasion factory` ([selftest.md](selftest.md)), **on a
+lamp set up from the app**. The self-test reads each part from its running
+owner, and on a product lamp every one of them waits for setup's marker. So
+on a lamp not set up the body never starts, and every part would be
+`not_checked`, exit 3, which counts as done: a pass that checked nothing
+(lamp-52e6 with the V2 image on 2026-10-26: step 4 timed out on lamp-body's
+mood socket). The factory therefore runs steps 1 to 3 on the unset lamp, sets
+it up from the app on the factory's Wi-Fi, runs step 4 (`--from 4`), and
+holds the button 5 s, the reset, before packing. The product reset plan
+keeps what steps 1 to 3 wrote (`/etc/lampOS/body/lamp.env`, the pins file,
+`/etc/lampOS/update`) and the self-test's record in `/var/lib/lamp-selftest`;
+it wipes the person's data, the Wi-Fi, the credentials and the marker. A
+written step 4 on a lamp not set up refuses before it starts anything, and
+says so.
 
 `deploy/factory/steps.sh --unit-id <this lamp> --update-key <key.pub> [--store-key <store-key.pub>]` runs
 the four in this order, as root on the lamp. Without `--write` every step is
