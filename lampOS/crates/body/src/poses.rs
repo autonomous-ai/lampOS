@@ -44,7 +44,7 @@ pub const HOME_PITCH_TOLERANCE: u16 = 20;
 /// (`body.rs`'s `TRAVEL_CAP`).
 pub const TRAVEL_CAP: u16 = 1_400;
 
-/// The five joints as read at rest, torque off, and the pitch servo's own
+/// The five joints as read at rest, torque off, and each servo's own
 /// stored limits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RestRead {
@@ -53,12 +53,14 @@ pub struct RestRead {
     pub elbow: u16,
     pub roll: u16,
     pub pitch: u16,
-    pub pitch_limits: (u16, u16),
+    /// Each servo's own lower and upper limits, by bus ID less one: yaw,
+    /// shoulder, elbow, roll, pitch (#3558).
+    pub limits: [(u16, u16); 5],
 }
 
 /// The rest read from one completed inspection: every joint's position from
 /// its telemetry, torque off on all five (so where it lies is where it rests,
-/// not where it was held), and the pitch servo's limits. Anything else is
+/// not where it was held), and every servo's limits. Anything else is
 /// refused, with why.
 pub fn rest_read(report: &InspectionReport) -> Result<RestRead, String> {
     if !report.completed || report.fault.is_some() {
@@ -92,15 +94,16 @@ pub fn rest_read(report: &InspectionReport) -> Result<RestRead, String> {
             ));
         }
     }
-    let pitch_limits = replies(Stage::Limits)?
-        .iter()
-        .find_map(|reply| match reply.data {
-            Readback::Limits { min_raw, max_raw } if reply.joint_id == PITCH => {
-                Some((min_raw, max_raw))
-            }
-            _ => None,
-        })
-        .ok_or("the inspection has no limits for the head's pitch")?;
+    let mut limits = [None; 6];
+    for reply in replies(Stage::Limits)? {
+        if let Readback::Limits { min_raw, max_raw } = reply.data
+            && let Some(slot) = limits.get_mut(usize::from(reply.joint_id))
+        {
+            *slot = Some((min_raw, max_raw));
+        }
+    }
+    let limit =
+        |joint: u8| limits[usize::from(joint)].ok_or(format!("joint {joint} has no limits"));
     let at =
         |joint: u8| position[usize::from(joint)].ok_or(format!("joint {joint} has no position"));
     Ok(RestRead {
@@ -109,7 +112,13 @@ pub fn rest_read(report: &InspectionReport) -> Result<RestRead, String> {
         elbow: at(ELBOW)?,
         roll: at(ROLL)?,
         pitch: at(PITCH)?,
-        pitch_limits,
+        limits: [
+            limit(YAW)?,
+            limit(SHOULDER)?,
+            limit(ELBOW)?,
+            limit(ROLL)?,
+            limit(PITCH)?,
+        ],
     })
 }
 
@@ -142,6 +151,7 @@ pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<Str
         "# At rest: yaw {}, shoulder {}, elbow {}, roll {}, pitch {}; the pitch servo's limits {min}-{max}.",
         read.yaw, read.shoulder, read.elbow, read.roll, read.pitch
     );
+    let _ = writeln!(text, "{}", limits_line(read));
     let _ = writeln!(
         text,
         "# home, folded-arm: found at rest. stand: lamp-4ace's with this lamp's roll and yaw. pitch-window: the default, checked. gaze: NOT measured (body.md, with a face and the camera)."
@@ -160,6 +170,16 @@ pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<Str
 /// A low and a high count.
 type Span = (u16, u16);
 
+/// The comment line with every servo's own stored limits, as the body reads
+/// them at start with `LAMP_BODY_OWN_RANGES=on` (#3558). One storing
+/// 0-4095 was never calibrated by V1 and needs the hand sweep.
+fn limits_line(read: &RestRead) -> String {
+    let [yaw, shoulder, elbow, roll, pitch] = read.limits.map(|(min, max)| format!("{min}-{max}"));
+    format!(
+        "# The servos' own limits: yaw {yaw}, shoulder {shoulder}, elbow {elbow}, roll {roll}, pitch {pitch}."
+    )
+}
+
 /// The checks a seated and a standing lamp share: every position inside
 /// 4095, `--home`'s pitch inside the body's home range (see
 /// [`home_pitch`]), and the window inside the pitch servo's own limits.
@@ -172,7 +192,7 @@ fn head_checked(read: &RestRead) -> Result<(Span, Span, u16, Option<String>), St
     }
     let (low, high) = PITCH_WINDOW;
     let (pitch, clamp) = home_pitch(read.pitch)?;
-    let (min, max) = read.pitch_limits;
+    let (min, max) = read.limits[usize::from(PITCH - 1)];
     if low < min || high > max {
         return Err(format!(
             "the window {low}-{high} is outside the pitch servo's own limits {min}-{max}: measure this lamp's own --pitch-window first (body.md)"
@@ -235,6 +255,7 @@ pub fn seated_lamp_env(
         "# At rest: yaw {}, shoulder {}, elbow {}, roll {}, pitch {}; the pitch servo's limits {min}-{max}.",
         read.yaw, read.shoulder, read.elbow, read.roll, read.pitch
     );
+    let _ = writeln!(text, "{}", limits_line(read));
     let _ = writeln!(
         text,
         "# SEATED: the first stand is not confirmed by a person yet, so no stand and no folded arm; torque is taken on the head and base only. home: found at rest. pitch-window: the default, checked. gaze: NOT measured."
@@ -364,7 +385,7 @@ mod tests {
                 elbow: 2059,
                 roll: 2057,
                 pitch: 1772,
-                pitch_limits: (1451, 3067),
+                limits: [(0, 4095), (0, 4095), (0, 4095), (0, 4095), (1451, 3067)],
             }
         );
         let text = lamp_env("lamp-06c1", &read, "2026-10-19T08:00Z").unwrap();
@@ -372,6 +393,9 @@ mod tests {
             "BODY_POSES=\"--home 1772,2057,2034 --folded-arm 2050,2059 --stand 1772,2057,2034,2657,2602 --pitch-window 1740,2030 --torque on\""
         ));
         assert!(text.contains("gaze: NOT measured"));
+        assert!(text.contains(
+            "# The servos' own limits: yaw 0-4095, shoulder 0-4095, elbow 0-4095, roll 0-4095, pitch 1451-3067."
+        ));
         assert!(text.lines().filter(|line| !line.starts_with('#')).count() == 1);
     }
 
@@ -441,10 +465,8 @@ mod tests {
                 .unwrap_err()
                 .contains("off its stop")
         );
-        let narrow = RestRead {
-            pitch_limits: (1800, 3067),
-            ..read
-        };
+        let mut narrow = read;
+        narrow.limits[4] = (1800, 3067);
         assert!(
             lamp_env("x", &narrow, "t")
                 .unwrap_err()

@@ -210,7 +210,28 @@ every hold) and `Bus::write_goal`, one joint's goal by itself (taking hold of
 a joint found without torque, telling an overloaded one to stop pushing),
 and both ask it first. Head and base goals are asked too, and only to be 0
 to 4,095: their goals are bounded where they are made, and the head is sent
-home in one write at the end. An arm goal must be inside its joint's
+home in one write at the end. With `LAMP_BODY_OWN_RANGES=on` (#3558; off
+unless exactly `on`) the body also reads, read-only at every start, the
+lower and upper limits each of the five servos stores (registers 9 and 11,
+which V1's calibration wrote on its lamps), says them in its report
+(`own_ranges`), and bounds the lamp by them as V1 bounds every goal:
+- a head or base goal must then be inside its joint's own range less 20
+  counts either side (`OWN_RANGE_MARGIN`), or the run ends on `Stop::Window`
+  as for an arm goal;
+- a `--home`, a pitch window or a `--stand` pitch, roll or yaw outside that
+  same window, or a `--folded-arm` or `--stand` shoulder or elbow outside
+  the servo's own range, is refused at start, writing nothing (a folded arm
+  may rest on its stop: lamp-52e6's shoulder folds at 2,053, its limit
+  2,047, so the arm is checked against the range itself and its goals keep
+  their own window);
+- a joint that stores the whole turn, 0 to 4,095 (lamp-52e6's elbow), was
+  never calibrated by V1 and keeps today's guard.
+
+It is a bound, never a remap: poses and clips stay shared. Off, the limits
+are not read and the body runs exactly as before
+(`without_own_ranges_the_servos_limits_change_nothing`). `lamp-body-measure`
+writes every servo's limits into `lamp.env` as a comment, so factory step 1
+shows them. An arm goal must be inside its joint's
 window: the joint's way between `--folded-arm` and `--stand`,
 with 420 counts either side (the most a gesture adds to it, 360, and 60 to
 spare). On lamp-4ace that is shoulder 1,628 to 3,077 and elbow 1,627 to
