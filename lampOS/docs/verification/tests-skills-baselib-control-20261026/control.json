@@ -1,0 +1,83 @@
+{
+  "candidate_commit": "91ca92d058adae8ce8992065afadd5e5753c55c8",
+  "baseline_commit": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "candidate_full_package": {
+    "runtime_attempts": 1,
+    "total_cases": 531,
+    "counts": {
+      "passed": 521,
+      "failed": 1,
+      "ignored": 9
+    },
+    "command_exit": 101,
+    "changed_addon_case": "ok",
+    "failed_case": "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline"
+  },
+  "baseline_library": {
+    "runtime_attempts": 1,
+    "total_cases": 157,
+    "counts": {
+      "passed": 157,
+      "failed": 0,
+      "ignored": 0
+    },
+    "command_exit": 0,
+    "previously_failed_case": "ok"
+  },
+  "comparability": {
+    "all_15_library_inputs_equal": true,
+    "root_profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "root_features": [],
+    "root_profile_features_equal": true,
+    "matched_dependency_artifact_keys": 209,
+    "dependency_feature_differences": [],
+    "candidate_binary": {
+      "sha256": "250db3199d310065428349afdea8398a1f175d4436c656171a1b0be4c697c7bb",
+      "bytes": 13907580
+    },
+    "baseline_binary": {
+      "sha256": "525c80ed3d3c5824197430feace23ff9c3cab4219cb9502752fe2f413e3f621e",
+      "bytes": 13910148
+    },
+    "binary_equal": false,
+    "text_section_hash_equal": false,
+    "scope_note": "Full candidate package and baseline library are different scopes; no runtime latency comparison is claimed."
+  },
+  "guards": {
+    "source_unchanged": true,
+    "prior_protected_witnesses": 169,
+    "prior_protected_witnesses_unchanged": true,
+    "actual_and_new_frozen_executable_hashes_unchanged": true
+  },
+  "qualification": {
+    "original_failure_preserved": true,
+    "byte_equivalence_claim": false,
+    "causal_attribution_established": false,
+    "clearance_to_push_or_mark_ready": false
+  },
+  "receipt_sha256": {
+    "terminal.json": "4306016568c94c17e956c67da3d544e49333e7c60855fbaa4f27550dd3718f02",
+    "source-before.json": "4baf0427efd0615a1a9f05398501d823e748572b6cd5619a4b05d955c8286fe4",
+    "source-after.json": "4baf0427efd0615a1a9f05398501d823e748572b6cd5619a4b05d955c8286fe4",
+    "binary-comparison.json": "95614c2c196269d0a5e9b033cceb2c6148a9cfbc3194d3c0eea43dc2fbb7158a",
+    "case-census.json": "fe51636e1a31ecbec90be8da48d9369c7dcdc6af6d426d0036fb13b9fb91808d",
+    "tests.json": "08e44458ee02ebc26b40202375c6b1053eca03e69ad37b55c4c59d6ae8263c9b",
+    "tests.stdout.txt": "07e2d101068754be1c848911e6fb5d56d4e9e8c6e8cda5873de7a9a3407b90bc",
+    "tests.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-artifact.json": "81281abc08eb026d49d53c3927431af70dd4b6fcc443530645d058e6149860ec",
+    "inventory.json": "c9c1c0f3f6f3e521473f3f36d2a70a1e8c711e027f437aa809ee4a77464d8c7c",
+    "source-independence-audit.json": "8ad1cf9261c5c02016edcd75eb7b7a76cb82d6a6fea0b05c631d3959e101e230",
+    "dependency-profile-comparison.json": "5a6c69090f31a063dd37af2189a4ace407af0dc2f263763bb1d0f883c14a11bf",
+    "mach-o-section-comparison.json": "ab4dc13514426b63817b965bfcc2068d3e5fc9185dccca00929cda353961e1c2"
+  },
+  "candidate_receipt_sha256": {
+    "terminal.json": "390f1cf6877bd57926e1c0edefd14ad435686618ff0f58192f38eae41ddff08a",
+    "completed-failure-census.json": "36318b8829282969a2cbaf65344a73dd7915e9c11ea36ac61636f009679da92a"
+  }
+}
