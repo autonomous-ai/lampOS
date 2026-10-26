@@ -1,3 +1,13 @@
+## 2026-10-26 08:15 — Common fixes frozen; compile gates passed
+
+Ready for lamp-voice: no
+
+Both Common #3064 producer fixes are implemented on train 150, with frozen staged tree 90bdf0b70. The raw-empty boundary withdraws the old name before the recognition cadence; the captured camera hold/time fences delayed inference across expiry/regrant. Source review also corrected permission arrival timestamps before the publication mutex. Two selective fault controls each produced their intended 0 PASS / 1 assertion failure; fixed files were restored byte-for-byte and both failed executables retained independently. These are controlled faults, not unmodified published-binary or lamp results.
+
+The fixed-source imager syntax check, workspace formatting, strict workspace/all-target Clippy and workspace build pass. Full Eyes/Voice test discovery is running; no positive runtime result is claimed yet. The gate includes six new producer controls, existing private-context/Checking/IPC/HTTP boundaries, current installation/workflow/switch readers and doctests. The old Seen observation interval remains explicit with the reviewers: previously published proof may remain readable until main observes permission loss or the existing three-second freshness expires. Matching pins and First's physical privacy round remain held.
+
+Train 151 c5c7603a7 changes only build-rows.md, and will be carried after this frozen gate. Onboarding's eleven-path proposal and paired refusal/success test are prepared on 756be, staged tree ce189adb7, with its old results marked historical and new checks UNRUN. Its two-person physical acceptance remains First's. Peek is prepared on the same base. Name and Callback child patches pass read-only application checks against the current Common tree; neither was applied or runtime-qualified. No device work or activation occurred.
+
 ## 2026-10-26 07:46 — Common producer findings under repair
 
 Ready for lamp-voice: no
