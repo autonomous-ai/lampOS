@@ -1990,7 +1990,13 @@ then use that person's scope:
   them it may say "you told me" about that and never about the rest.
 - **"Forget everything about me"** forgets their face too, with
   `LAMP_MEMORY_FORGET_ALL=on`: on a line said at the lamp whose admitted scope
-  is the known person's, once their memory answers that it is emptied, the
+  is the known person's, and only on a request the second route's guard marked
+  as their own ask for everything (#3608: their words now, their ask just
+  before, or their yes to one held; `ScopeLease::mark_everything_asked`, which
+  only that route can call). Live and texts never mark a request, so there a
+  forget of everything keeps the face, and a model's own pick of
+  `forget_everything` never takes it (Reviewer-two's P2s on #3564). Once their
+  memory answers that it is emptied, the
   voice asks the eyes to forget that person's face and the name it keeps, as
   "forget my face" asks (`remember::forget_everything_face`). The model hears
   `face: "forgotten too"`, or that it could not be forgotten now: the eyes

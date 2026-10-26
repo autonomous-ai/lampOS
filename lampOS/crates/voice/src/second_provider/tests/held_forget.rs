@@ -41,6 +41,10 @@ struct Ran {
     /// For each tool call, its request and what the eyes saw saying that
     /// request's line, read as it ran ([`crate::speaking_faces::line_seen`]).
     lines: Vec<(u64, Option<crate::speaking_faces::LineSeen>)>,
+    /// For each forget run, by name, whether its request was marked as
+    /// asking for everything when it ran
+    /// ([`crate::memory_scope::ScopeLease::everything_marked`], #3564).
+    marked: Vec<(String, bool)>,
 }
 
 async fn run(turns: &[Turn]) -> Ran {
@@ -106,7 +110,15 @@ async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> R
     let seen = forgets.clone();
     let lines = Arc::new(Mutex::new(Vec::new()));
     let lines_seen = lines.clone();
-    let runner: ScopedToolRunner = Arc::new(move |request, heard, name, args, _| {
+    let marked = Arc::new(Mutex::new(Vec::new()));
+    let marks = marked.clone();
+    let runner: ScopedToolRunner = Arc::new(move |request, heard, name, args, scope| {
+        if crate::remember::is_forget(&name) {
+            marks
+                .lock()
+                .unwrap()
+                .push((name.clone(), scope.everything_marked()));
+        }
         seen.lock().unwrap().push((name, args, heard));
         lines_seen
             .lock()
@@ -227,10 +239,12 @@ async fn run_seen_from(turns: &[Turn], sight: Option<&[Sight]>, first: u64) -> R
         .collect();
     let asked = script.asked.lock().unwrap().clone();
     let lines = lines.lock().unwrap().clone();
+    let marked = marked.lock().unwrap().clone();
     Ran {
         forgets,
         asked,
         lines,
+        marked,
     }
 }
 
@@ -432,6 +446,100 @@ async fn a_bare_forget_never_runs_or_holds_forget_everything() {
             ran.forgets,
             [(EVERYTHING.to_owned(), json!({"name": "A"}))],
             "{said}"
+        );
+    }
+}
+
+/// #3564 on #3608's guard: a `forget_everything` the guard runs marks its
+/// request as asking for everything, and only then is the face forgotten
+/// too (`remember::forget_everything_face`): their words now, their own ask
+/// just before, their yes to one held. A forget of one thing, a face forget,
+/// and a later request never carry the mark; a bare "forget that" never
+/// runs `forget_everything` at all (Reviewer-two's P2s, 01:12 and 02:20).
+#[tokio::test]
+async fn only_an_ask_the_guard_showed_marks_everything_for_the_face() {
+    // A forget run, by name, and whether its request was marked.
+    type Marked = (&'static str, bool);
+    let held = (
+        "A",
+        "Who am I?",
+        Lamp::Calls(EVERYTHING, "Shall I forget everything about you?"),
+        0,
+    );
+    let marked = |runs: &[Marked]| -> Vec<(String, bool)> {
+        runs.iter()
+            .map(|(name, marked)| ((*name).to_owned(), *marked))
+            .collect()
+    };
+    let cases: &[(&[Turn], &[Marked])] = &[
+        // Their words now.
+        (
+            &[(
+                "A",
+                "Forget everything about me.",
+                Lamp::Calls(EVERYTHING, "Done."),
+                0,
+            )],
+            &[(EVERYTHING, true)],
+        ),
+        // Their own ask just before, run on the call at their yes.
+        (
+            &[
+                (
+                    "A",
+                    "Forget everything about me.",
+                    Lamp::Says("Everything, really?"),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Calls(EVERYTHING, "Done."), 5),
+            ],
+            &[(EVERYTHING, true)],
+        ),
+        // Their yes to one held.
+        (
+            &[held, ("A", "Yes.", Lamp::Says("Done."), 5)],
+            &[(EVERYTHING, true)],
+        ),
+        // A face forget, asked for in words: not everything.
+        (
+            &[("A", "delete my face", Lamp::Calls(FACE, "Done."), 0)],
+            &[(FACE, false)],
+        ),
+        // The mark is the request's own: the next one starts without it.
+        (
+            &[
+                (
+                    "A",
+                    "Forget everything about me.",
+                    Lamp::Calls(EVERYTHING, "Done."),
+                    0,
+                ),
+                ("A", "delete my face", Lamp::Calls(FACE, "Done."), 5),
+            ],
+            &[(EVERYTHING, true), (FACE, false)],
+        ),
+        // A bare forget: `forget_everything` refused, nothing run, nothing
+        // marked.
+        (
+            &[
+                (
+                    "A",
+                    "Forget that.",
+                    Lamp::Calls(EVERYTHING, "Which thing?"),
+                    0,
+                ),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            &[],
+        ),
+    ];
+    for (turns, runs) in cases {
+        let ran = run(turns).await;
+        assert_eq!(
+            ran.marked,
+            marked(runs),
+            "{:?}",
+            turns.iter().map(|turn| turn.1).collect::<Vec<_>>()
         );
     }
 }
