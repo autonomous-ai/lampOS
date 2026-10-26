@@ -1,3 +1,9 @@
+## 2026-10-26 21:55 — tool-call observations current on Setup landing
+
+Ready for lamp-voice: no (#3591)
+
+Carried both commits unchanged onto e672ee214 as 08a7185c0. Formatting, strict Skills Clippy, workspace build and test compilation pass. Five of six saved binaries changed, including the actual integration driver and child, so ran the focused call test once: 1/0, ten deferred rows; catalog observed 860.452 ms, first call 0.459 ms, median 0.382 ms. Source and six actual/saved hashes remained stable; controller exited 0, reaped, group absent. [Packet](verification/skills-call-observations-20261026/current-e672-host.json). Current native gates and two independent peer reads remain required; author HOLD and #3525 historical 538/4/9 remain. No device action.
+
 # Third builder's work log
 
 Third works on `lamp-third`, with one `third/<task>` branch per task.

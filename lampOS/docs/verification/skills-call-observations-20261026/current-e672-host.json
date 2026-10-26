@@ -1,0 +1,81 @@
+{
+  "head": "08a7185c0ca646a025c5d61d89b4202ee07183f6",
+  "base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+  "range_diff": "Both authored commits = versus 12f/22a",
+  "source_delta_from_previous_base": [
+    "crates/update/src/lib.rs",
+    "crates/update/src/round.rs",
+    "crates/update/src/setup_lifecycle.rs",
+    "crates/update/src/world.rs",
+    "crates/update/tests/round.rs",
+    "crates/update/tests/round/setup_lifecycle.rs",
+    "docs/reuse-decisions.md",
+    "docs/updates.md"
+  ],
+  "test_source_sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f",
+  "fmt_strict_clippy_workspace_build_test_compile": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "all_six_artifact_sha256": {
+    "it-46363ab9699809b5": "9c9b536a7fa9f656e55d6515b0df2b420b7fc3f41d1e49d2488fee9624429484",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "lamp_skills-a718b2a0214b6903": "e07bfd0eb6eddc016fb5fb3bf658a8f28db2af72e3c20eebceab60c69e449b91",
+    "requested_audio-019db324b83a9807": "527bf33ce8cab7385afd75b545284358b68d89301635e20f9a18b7a5706afc45",
+    "lamp_skills-c6f44302f3b2c78f": "7c70b60debb3c02f06ed352759ca1b95d1c5f8c3ba4624ba79cac6e3c556e09a",
+    "lamp-skills": "66f94450d96eb490b586940119f2065584c7da53c5616626b00e5ff026dca74e"
+  },
+  "same_bytes_as_previous_gate": {
+    "it-46363ab9699809b5": false,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-a718b2a0214b6903": false,
+    "requested_audio-019db324b83a9807": false,
+    "lamp_skills-c6f44302f3b2c78f": false,
+    "lamp-skills": false
+  },
+  "runtime_terminal": {
+    "head": "08a7185c0ca646a025c5d61d89b4202ee07183f6",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 120,
+    "timed_out": false,
+    "elapsed_seconds": 3.0118041509999998,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "pid": 68767,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "7a642b30d47c213d66d396d30cc2f4c9874d1e011dcb93ba4514a4fd5c2af11d"
+  },
+  "focused_result": [
+    1,
+    0,
+    0
+  ],
+  "complete_call_rows": 10,
+  "observations": {
+    "catalog_observed_ms": 860.452438,
+    "first_call_us": 458.679,
+    "median_us": 381.7
+  },
+  "actual_executed_scope": "Integration driver and Skills child only. Four other saved executables not executed by this focused test.",
+  "limits": "Host only. New child and integration bytes required this once-only focused run. No historical failure waiver; #3525 stays 538/4/9. Original ARM64/Linux CI for current head still required."
+}
