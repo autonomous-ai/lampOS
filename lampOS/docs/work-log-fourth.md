@@ -1,3 +1,11 @@
+## 2026-10-27 00:56 — Current Common checkpoint pushed
+
+Ready for lamp-voice: no
+
+Pushed #3064 ef831cec9 on Main 008e7a974 with qualified source tree 72468a28e. [Current host receipt](verification/common-current-008-20261027/receipt.json): 633 clean passes, zero failures/leaks/timeouts/retries, one declared ignore in scope; [all 35 named controls](verification/common-current-008-20261027/required-controls.json) pass once within that count. Formatting, strict workspace/all-target Clippy, workspace build/discovery and four zero-case documentation commands pass. Normal Cargo reuse and actual rebuilt artifacts are separate. Controller exit 0 and fresh owned-process/source/evidence closure were verified before amendment. Both fixture-parent range-diffs are equal; Common's new delta is three Linux question-mark edits and atomic callback request accounting.
+
+Original new ARM64 40372162227 and Linux Clippy 40372162211 started; no native pass is claimed at this snapshot. The prior db11 failures remain failed. A separate review source now contains final-send permission checks, a complete callback setup receipt, deliberate face-operation private retirement and fixed public outcomes, plus dated documentation corrections. These repairs are uncompiled/unrun and receive their own composed-source gate before folding. Explicit blocked-loop close, independent privacy, matching-pin and physical holds remain. No device action.
+
 ## 2026-10-27 00:31 — Public boundary names and new review repairs
 
 Ready for lamp-voice: no

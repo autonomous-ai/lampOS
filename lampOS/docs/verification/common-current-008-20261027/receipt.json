@@ -1,0 +1,191 @@
+{
+  "platform": "macOS host",
+  "published_checkpoint": "ef831cec9b0a2c3b21d8f3798a600c7dacc73f66",
+  "qualified_head": "b3b0e9aea50c74ab967af17a848c2c923060e11d",
+  "qualified_staged_tree": "72468a28e895548bd13511462418af2000f122f3",
+  "base": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+  "scope": "one union: Skills lib+it, Update install, Voice kept_name_callback module,33 exact Eyes/Voice boundaries,VoiceEval switches",
+  "source_tree_matches_published_checkpoint": true,
+  "results": [
+    {
+      "label": "current-thin-union",
+      "counts": {
+        "accounting_valid": true,
+        "all_selected_terminal": true,
+        "selected_cases": 633,
+        "passed_including_LEAK": 633,
+        "clean_passed": 633,
+        "passed_but_LEAK": 0,
+        "failed": 0,
+        "ignored_discovery_and_human_SKIP": 4480,
+        "ignored_JSON_terminals": 21,
+        "raw_nextest_exit": 0,
+        "failed_keys": [],
+        "leaky_keys": [],
+        "timeout_case_count": 0,
+        "suite_terminal_rows_retained": 18,
+        "suite_rows_not_independent_test_counts": true,
+        "natural_ignored_in_scope": 1,
+        "natural_ignored_outside_scope": 40,
+        "filter_exclusions": 5529,
+        "no_repeated_cases_within_union": true,
+        "full_workspace_runtime": false,
+        "native_ARM64": false
+      }
+    },
+    {
+      "label": "lamp-eyes-doctests",
+      "package": "lamp-eyes",
+      "eligible_targets": [
+        "lamp_eyes"
+      ],
+      "headers": [
+        "lamp_eyes"
+      ],
+      "summaries": [
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ]
+      ],
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_exit": 0,
+      "zero_case_targets_not_tests": true
+    },
+    {
+      "label": "lamp-voice-doctests",
+      "package": "lamp-voice",
+      "eligible_targets": [
+        "lamp_voice"
+      ],
+      "headers": [
+        "lamp_voice"
+      ],
+      "summaries": [
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ]
+      ],
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_exit": 0,
+      "zero_case_targets_not_tests": true
+    },
+    {
+      "label": "lamp-update-doctests",
+      "package": "lamp-update",
+      "eligible_targets": [
+        "lamp_update"
+      ],
+      "headers": [
+        "lamp_update"
+      ],
+      "summaries": [
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ]
+      ],
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_exit": 0,
+      "zero_case_targets_not_tests": true
+    },
+    {
+      "label": "lamp-skills-doctests",
+      "package": "lamp-skills",
+      "eligible_targets": [
+        "lamp_skills"
+      ],
+      "headers": [
+        "lamp_skills"
+      ],
+      "summaries": [
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ]
+      ],
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "raw_exit": 0,
+      "zero_case_targets_not_tests": true
+    }
+  ],
+  "required_controls_count": 35,
+  "required_controls_are_included_in_union_not_extra_credit": true,
+  "compiler": {
+    "clippy": {
+      "rebuilt_package_count": 14,
+      "reused_package_count": 37,
+      "report_sha256": "2c3867bf8e6b7264c9f291c083e4d0042749deaa683ea154448151384afb2783",
+      "all48_fresh_false_claimed": false
+    },
+    "workspace-build": {
+      "rebuilt_package_count": 14,
+      "reused_package_count": 37,
+      "report_sha256": "8b7eb21fba29648cde062545af10e003240d9fcaf8022b549f32f1f6fa278dc8",
+      "all48_fresh_false_claimed": false
+    },
+    "integration-list": {
+      "rebuilt_package_count": 32,
+      "reused_package_count": 37,
+      "report_sha256": "35c0e171684769161e821c56c8fe270ba9854ca4ba5f6d50bd46a38ba36d6e63",
+      "all48_fresh_false_claimed": false
+    },
+    "integration-run": {
+      "rebuilt_package_count": 32,
+      "reused_package_count": 45,
+      "report_sha256": "33616b4ef0edcc4d9054e7d3821b26af9f552fad402d42e199bda0d3c8aa1351",
+      "all48_fresh_false_claimed": false
+    }
+  },
+  "compiler_cache_policy": "normal Cargo reuse,incremental off;cached is not new compilation",
+  "actual_controller_exit": 0,
+  "actual_native_handle": 27668,
+  "actual_completion_chunk": "fe5206",
+  "release_sha256": "c7cba3d6f01827cf648e0e985f91e3e6a0ede15076c50124f6adda067382b712",
+  "all_owned_sessions_groups_closed": true,
+  "source_and_retained_evidence_stable": true,
+  "earlier_refused_attempt": {
+    "handle": 25126,
+    "controller_exit": 125,
+    "boundary": "ps unavailable during formatter process verification;no compiler/runtime stage ran",
+    "owned_process_closure_later_verified": true,
+    "unverified_fmt_not_claimed_pass": true
+  },
+  "new_CI": {
+    "ARM64": 40372162227,
+    "LinuxClippy": 40372162211,
+    "status_at_record": "running,not qualified here"
+  },
+  "limits": [
+    "No full workspace runtime claim",
+    "No later HTTP/face/held-setup/doc repair qualification",
+    "No earlier failed run waived",
+    "No lamp or acoustic/physical acceptance",
+    "Explicit-close and independent privacy holds remain"
+  ]
+}
