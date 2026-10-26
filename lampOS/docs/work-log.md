@@ -1,3 +1,15 @@
+Ready for lamp-voice: startup delivered; own-keys activation HOLD; local cache qualification narrowed.
+
+## Current checkpoint: 2026-10-26 17:51 +07, historical cache provenance audit
+
+[Read-only audit](verification/local-cache-provenance-20261026/README.md) confirms shared-target reuse. Thirty of 33 fresh local library/build-script rows in the completed startup compile match newly compiled outputs from its preceding interrupted compile; all 33 package snapshots match. Three current old-review depfile variants are outside the 102 bound startup executables. All 102 preserved binaries match; three live updater paths were subsequently replaced. These observations narrow the concern but do not prove every historical transitive dependency's source. Earlier local counts remain observed results with this qualification, not isolated fresh-build proof. Original audited native CI remains separately qualified.
+
+The private own-keys d378/6663 reused-target Voice command completed **4,093/0/21**, with four new controls once and 14 executable-pair guards. Its historical shared-target provenance has the same limitation. A new exclusive-target scoped qualification is underway. Offline full-workspace metadata preparation failed on an uncached unrelated platform dependency; a subsequent empty-target assertion stopped on metadata's rustc-info file, before compilation. Both preparation outcomes are retained; metadata and compilation targets are now separated. No test failure was retried or erased.
+
+Main advanced to ba950f289 through the installer fixture repair. Frozen source stays unchanged during qualification; the later carry will be assessed separately. #3510 stays draft on #2094 and current-lamp acceptance. No device, provider, release or signing action ran.
+
+---
+
 Ready for lamp-voice: startup delivered; #3510 activation HOLD and next-base qualification active.
 
 ## Current checkpoint: 2026-10-26 17:30 +07, own-keys original native qualified

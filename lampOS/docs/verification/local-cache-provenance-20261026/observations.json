@@ -1,0 +1,1825 @@
+{
+  "observed_at": "2026-10-26T10:44:02.334450+00:00",
+  "timeline": {
+    "<scratch>/second-voice-memory-target-20261026": {
+      "birth": "2026-10-26T03:10:43.953358+00:00",
+      "mtime": "2026-10-26T03:13:11.395344+00:00"
+    },
+    "<scratch>/second-reference-first-handshake-20261026/lampOS/Cargo.toml": {
+      "birth": "2026-10-26T08:01:43.605273+00:00",
+      "mtime": "2026-10-26T08:01:43.605311+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026.py": {
+      "birth": "2026-10-26T08:24:07.514438+00:00",
+      "mtime": "2026-10-26T08:24:07.514547+00:00"
+    },
+    "<scratch>/second-reference-carry-gate-1aa-20261026.py": {
+      "birth": "2026-10-26T09:06:29.237397+00:00",
+      "mtime": "2026-10-26T09:06:29.239311+00:00"
+    },
+    "<scratch>/second-reference-carry-continuation-1aa-20261026.py": {
+      "birth": "2026-10-26T09:12:46.990595+00:00",
+      "mtime": "2026-10-26T09:12:46.992785+00:00"
+    },
+    "<scratch>/second-reference-full-gate-20261026.py": {
+      "birth": "2026-10-26T08:14:38.786710+00:00",
+      "mtime": "2026-10-26T08:14:38.788723+00:00"
+    },
+    "<scratch>/second-reference-final-690-20261026.py": {
+      "birth": "2026-10-26T09:25:22.201198+00:00",
+      "mtime": "2026-10-26T09:25:22.203924+00:00"
+    },
+    "<scratch>/second-reference-packet-1cad-20261026.py": {
+      "birth": "2026-10-26T09:01:07.106153+00:00",
+      "mtime": "2026-10-26T09:01:07.109097+00:00"
+    },
+    "<scratch>/second-reference-carry-packet-20261026.py": {
+      "birth": "2026-10-26T09:26:17.391325+00:00",
+      "mtime": "2026-10-26T09:27:03.943675+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026.py": {
+      "birth": "2026-10-26T08:10:41.963760+00:00",
+      "mtime": "2026-10-26T08:10:41.965375+00:00"
+    },
+    "<scratch>/second-review-3543-gate.py": {
+      "birth": "2026-10-26T05:34:55.070431+00:00",
+      "mtime": "2026-10-26T05:34:55.070513+00:00"
+    },
+    "<scratch>/second-review-3548-gate.py": {
+      "birth": "2026-10-26T06:20:04.122001+00:00",
+      "mtime": "2026-10-26T06:20:04.122073+00:00"
+    },
+    "<scratch>/second-review-3544-gate.py": {
+      "birth": "2026-10-26T05:53:29.795981+00:00",
+      "mtime": "2026-10-26T05:53:29.796053+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/focused-1.json": {
+      "birth": "2026-10-26T03:17:28.531162+00:00",
+      "mtime": "2026-10-26T03:17:28.531284+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/clippy.json": {
+      "birth": "2026-10-26T03:13:11.842109+00:00",
+      "mtime": "2026-10-26T03:13:11.842230+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/fmt.json": {
+      "birth": "2026-10-26T03:10:43.428194+00:00",
+      "mtime": "2026-10-26T03:10:43.428320+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/full.json": {
+      "birth": "2026-10-26T03:27:05.026532+00:00",
+      "mtime": "2026-10-26T03:27:05.026660+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/census.json": {
+      "birth": "2026-10-26T03:27:05.026809+00:00",
+      "mtime": "2026-10-26T03:27:05.026860+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/identity.json": {
+      "birth": "2026-10-26T03:10:36.804218+00:00",
+      "mtime": "2026-10-26T03:10:36.804290+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/complete.json": {
+      "birth": "2026-10-26T03:27:05.779352+00:00",
+      "mtime": "2026-10-26T03:27:05.779463+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/compiled-artifacts.json": {
+      "birth": "2026-10-26T03:17:26.004131+00:00",
+      "mtime": "2026-10-26T03:27:05.437629+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/candidate-source.json": {
+      "birth": "2026-10-26T03:10:36.724555+00:00",
+      "mtime": "2026-10-26T03:10:36.724781+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/focused-2.json": {
+      "birth": "2026-10-26T03:17:29.311401+00:00",
+      "mtime": "2026-10-26T03:17:29.311527+00:00"
+    },
+    "<scratch>/second-voice-memory-gate-20261026/compile.json": {
+      "birth": "2026-10-26T03:17:25.840666+00:00",
+      "mtime": "2026-10-26T03:17:25.840795+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/affected-full.json": {
+      "birth": "2026-10-26T06:52:09.867608+00:00",
+      "mtime": "2026-10-26T06:52:09.867723+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/clippy.json": {
+      "birth": "2026-10-26T06:51:29.809529+00:00",
+      "mtime": "2026-10-26T06:51:29.809655+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/source.json": {
+      "birth": "2026-10-26T06:51:06.024268+00:00",
+      "mtime": "2026-10-26T06:51:06.024472+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/fmt.json": {
+      "birth": "2026-10-26T06:51:12.684429+00:00",
+      "mtime": "2026-10-26T06:51:12.684541+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/census.json": {
+      "birth": "2026-10-26T06:52:09.867865+00:00",
+      "mtime": "2026-10-26T06:52:09.867913+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/identity.json": {
+      "birth": "2026-10-26T06:51:06.024603+00:00",
+      "mtime": "2026-10-26T06:51:06.024662+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/complete.json": {
+      "birth": "2026-10-26T06:52:10.309990+00:00",
+      "mtime": "2026-10-26T06:52:10.310097+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/compiled-artifacts.json": {
+      "birth": "2026-10-26T06:51:50.754174+00:00",
+      "mtime": "2026-10-26T06:52:09.946474+00:00"
+    },
+    "<scratch>/second-review-3548-gate-20261026/compile.json": {
+      "birth": "2026-10-26T06:51:50.723272+00:00",
+      "mtime": "2026-10-26T06:51:50.723411+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/focused-1.json": {
+      "birth": "2026-10-26T05:56:17.940028+00:00",
+      "mtime": "2026-10-26T05:56:17.940157+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/clippy.json": {
+      "birth": "2026-10-26T05:54:30.176690+00:00",
+      "mtime": "2026-10-26T05:54:30.176794+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/source.json": {
+      "birth": "2026-10-26T05:53:30.540319+00:00",
+      "mtime": "2026-10-26T05:53:30.540555+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/fmt.json": {
+      "birth": "2026-10-26T05:53:36.788158+00:00",
+      "mtime": "2026-10-26T05:53:36.788272+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/identity.json": {
+      "birth": "2026-10-26T05:53:30.558543+00:00",
+      "mtime": "2026-10-26T05:53:30.558629+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/complete.json": {
+      "birth": "2026-10-26T05:56:21.660727+00:00",
+      "mtime": "2026-10-26T05:56:21.660779+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/focused-2.json": {
+      "birth": "2026-10-26T05:56:21.013815+00:00",
+      "mtime": "2026-10-26T05:56:21.013911+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/compile.json": {
+      "birth": "2026-10-26T05:56:15.470619+00:00",
+      "mtime": "2026-10-26T05:56:15.470730+00:00"
+    },
+    "<scratch>/second-review-3544-gate-20261026/artifact.json": {
+      "birth": "2026-10-26T05:56:21.660483+00:00",
+      "mtime": "2026-10-26T05:56:21.660617+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/clippy.json": {
+      "birth": "2026-10-26T05:35:57.555658+00:00",
+      "mtime": "2026-10-26T05:35:57.555761+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/source.json": {
+      "birth": "2026-10-26T05:34:55.603055+00:00",
+      "mtime": "2026-10-26T05:34:55.603284+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/fmt.json": {
+      "birth": "2026-10-26T05:35:01.888755+00:00",
+      "mtime": "2026-10-26T05:35:01.888876+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/identity.json": {
+      "birth": "2026-10-26T05:34:55.621056+00:00",
+      "mtime": "2026-10-26T05:34:55.621144+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/supported-reader.json": {
+      "birth": "2026-10-26T05:37:46.066961+00:00",
+      "mtime": "2026-10-26T05:37:46.067092+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/complete.json": {
+      "birth": "2026-10-26T05:37:46.641844+00:00",
+      "mtime": "2026-10-26T05:37:46.641917+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/compile.json": {
+      "birth": "2026-10-26T05:37:43.549190+00:00",
+      "mtime": "2026-10-26T05:37:43.549311+00:00"
+    },
+    "<scratch>/second-review-3543-gate-20261026/artifact.json": {
+      "birth": "2026-10-26T05:37:46.641673+00:00",
+      "mtime": "2026-10-26T05:37:46.641781+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/fmt.json": {
+      "birth": "2026-10-26T08:10:48.677515+00:00",
+      "mtime": "2026-10-26T08:10:48.677645+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/disabled-allowance.json": {
+      "birth": "2026-10-26T08:12:37.903666+00:00",
+      "mtime": "2026-10-26T08:12:37.903782+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/restored-transport.json": {
+      "birth": "2026-10-26T08:13:58.783285+00:00",
+      "mtime": "2026-10-26T08:13:58.783426+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/final-source.json": {
+      "birth": "2026-10-26T08:10:42.362535+00:00",
+      "mtime": "2026-10-26T08:10:42.362749+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/identity.json": {
+      "birth": "2026-10-26T08:10:42.379804+00:00",
+      "mtime": "2026-10-26T08:10:42.379892+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/disabled-allowance-expected-failure.json": {
+      "birth": "2026-10-26T08:12:37.903970+00:00",
+      "mtime": "2026-10-26T08:12:37.904028+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/complete.json": {
+      "birth": "2026-10-26T08:13:59.134859+00:00",
+      "mtime": "2026-10-26T08:13:59.134972+00:00"
+    },
+    "<scratch>/second-reference-start-control-20261026/disabled-allowance-source.json": {
+      "birth": "2026-10-26T08:10:49.008554+00:00",
+      "mtime": "2026-10-26T08:10:49.008764+00:00"
+    },
+    "<scratch>/second-reference-full-gate-20261026/clippy.json": {
+      "birth": "2026-10-26T08:16:54.861523+00:00",
+      "mtime": "2026-10-26T08:16:54.861661+00:00"
+    },
+    "<scratch>/second-reference-full-gate-20261026/source.json": {
+      "birth": "2026-10-26T08:14:46.159663+00:00",
+      "mtime": "2026-10-26T08:14:46.159899+00:00"
+    },
+    "<scratch>/second-reference-full-gate-20261026/interruption.json": {
+      "birth": "2026-10-26T08:22:58.784309+00:00",
+      "mtime": "2026-10-26T08:22:58.784396+00:00"
+    },
+    "<scratch>/second-reference-full-gate-20261026/fmt.json": {
+      "birth": "2026-10-26T08:14:52.771604+00:00",
+      "mtime": "2026-10-26T08:14:52.771750+00:00"
+    },
+    "<scratch>/second-reference-full-gate-20261026/identity.json": {
+      "birth": "2026-10-26T08:14:46.176372+00:00",
+      "mtime": "2026-10-26T08:14:46.176462+00:00"
+    },
+    "<scratch>/second-reference-full-gate-20261026/compile.json": {
+      "birth": "2026-10-26T08:22:13.906959+00:00",
+      "mtime": "2026-10-26T08:22:13.907067+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/affected-full.json": {
+      "birth": "2026-10-26T08:56:55.428581+00:00",
+      "mtime": "2026-10-26T08:56:55.428695+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/clippy.json": {
+      "birth": "2026-10-26T08:25:25.869427+00:00",
+      "mtime": "2026-10-26T08:25:25.869545+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/source.json": {
+      "birth": "2026-10-26T08:24:10.089338+00:00",
+      "mtime": "2026-10-26T08:24:10.089554+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/fmt.json": {
+      "birth": "2026-10-26T08:24:16.774838+00:00",
+      "mtime": "2026-10-26T08:24:16.774977+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/census.json": {
+      "birth": "2026-10-26T08:56:55.428954+00:00",
+      "mtime": "2026-10-26T08:56:55.429034+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/identity.json": {
+      "birth": "2026-10-26T08:24:10.106638+00:00",
+      "mtime": "2026-10-26T08:24:10.106717+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/complete.json": {
+      "birth": "2026-10-26T08:56:57.088552+00:00",
+      "mtime": "2026-10-26T08:56:57.088696+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/totals.json": {
+      "birth": "2026-10-26T08:58:52.677205+00:00",
+      "mtime": "2026-10-26T08:58:52.677296+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/final-artifact-guard.json": {
+      "birth": "2026-10-26T08:56:56.751884+00:00",
+      "mtime": "2026-10-26T08:56:56.752016+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/compile.json": {
+      "birth": "2026-10-26T08:29:06.193287+00:00",
+      "mtime": "2026-10-26T08:29:06.193394+00:00"
+    },
+    "<scratch>/second-reference-full-gate-1cad-20261026/artifacts.json": {
+      "birth": "2026-10-26T08:29:08.338188+00:00",
+      "mtime": "2026-10-26T08:29:08.338274+00:00"
+    }
+  },
+  "compile_reports": {
+    "second-reference-full-gate-20261026": {
+      "receipt": {
+        "command": [
+          "<cargo-bin>/cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "disk_free_before": 111720964096,
+        "elapsed_seconds": 318.7,
+        "error": "",
+        "exit_code": -15,
+        "log_sha256": "f1c6251ae6940c9429d697a0b9c95ef45bdf9f1f80289cea8c2c55fce52013e8",
+        "source_entries": 7236,
+        "source_unchanged": true
+      },
+      "compile_log_sha256": "f1c6251ae6940c9429d697a0b9c95ef45bdf9f1f80289cea8c2c55fce52013e8",
+      "local_artifact_rows": 106,
+      "fresh": 3,
+      "nonfresh": 103,
+      "local_library_rows": 37,
+      "fresh_library_rows": 3,
+      "voice_rows": 14,
+      "voice_fresh": 0,
+      "voice_nonfresh": 14,
+      "fresh_libraries": [
+        {
+          "target": "build-script-build",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/build/lamp-camera-ab31f4ad76d61eec/build-script-build"
+          ]
+        },
+        {
+          "target": "sonora",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/libsonora-4bce285281aee78a.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/libsonora-4bce285281aee78a.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_voice_processes",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_voice_processes-b90a3866b01e4ab3.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_voice_processes-b90a3866b01e4ab3.rmeta"
+          ]
+        }
+      ]
+    },
+    "second-reference-full-gate-1cad-20261026": {
+      "receipt": {
+        "command": [
+          "<cargo-bin>/cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "disk_free_before": 107897458688,
+        "elapsed_seconds": 219.975,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "aeaf4e98373a527f658ff87bfd28763654c5601b5ced7be0a6e5179e2621506f",
+        "source_entries": 7236,
+        "source_unchanged": true
+      },
+      "compile_log_sha256": "aeaf4e98373a527f658ff87bfd28763654c5601b5ced7be0a6e5179e2621506f",
+      "local_artifact_rows": 139,
+      "fresh": 45,
+      "nonfresh": 94,
+      "local_library_rows": 37,
+      "fresh_library_rows": 33,
+      "voice_rows": 15,
+      "voice_fresh": 0,
+      "voice_nonfresh": 15,
+      "fresh_libraries": [
+        {
+          "target": "lamp_bus",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_bus-1fbec8760bf83f67.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_bus-1fbec8760bf83f67.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_msgs",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_msgs-f1ab88111f342707.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_msgs-f1ab88111f342707.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_ipc",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_ipc-462d67a2441dcd1e.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_ipc-462d67a2441dcd1e.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_update",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_update-037b395c4ad875a6.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_update-037b395c4ad875a6.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_turn_owner",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_turn_owner-1da7b35bf3fd4313.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_turn_owner-1da7b35bf3fd4313.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_keeper",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_keeper-4de55013beb7f0f3.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_keeper-4de55013beb7f0f3.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_lean",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_lean-68fd33221f27b81f.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_lean-68fd33221f27b81f.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_local_time",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_local_time-a94bd49b993aa9ff.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_local_time-a94bd49b993aa9ff.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_body",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_body-35da7990abbfb2f4.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_body-35da7990abbfb2f4.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_ring",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_ring-2405efb842a8b335.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_ring-2405efb842a8b335.rmeta"
+          ]
+        },
+        {
+          "target": "build-script-build",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/build/lamp-camera-ab31f4ad76d61eec/build-script-build"
+          ]
+        },
+        {
+          "target": "sonora",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/libsonora-4bce285281aee78a.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/libsonora-4bce285281aee78a.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_schedule",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_schedule-163529bb42e4b95c.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_schedule-163529bb42e4b95c.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_turn_end_wire",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_turn_end_wire-f10ac37de84182b6.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_turn_end_wire-f10ac37de84182b6.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_camera",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_camera-ff31f384651d2510.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_camera-ff31f384651d2510.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_audio",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_audio-a01a6a8182cad93e.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_audio-a01a6a8182cad93e.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_gemini",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_gemini-d5ef1761159caa73.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_gemini-d5ef1761159caa73.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_controls",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_controls-cd405c1d416fe586.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_controls-cd405c1d416fe586.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_health",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_health-35f172afdb4d04b7.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_health-35f172afdb4d04b7.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_near_call",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_near_call-fe58d353a466d52f.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_near_call-fe58d353a466d52f.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_voice_processes",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_voice_processes-b90a3866b01e4ab3.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_voice_processes-b90a3866b01e4ab3.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_expression",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_expression-539903df3b82d1dc.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_expression-539903df3b82d1dc.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_memory",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_memory-606a8728a90b649c.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_memory-606a8728a90b649c.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_actions",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_actions-3770b28a6f427ac8.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_actions-3770b28a6f427ac8.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_policy",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_policy-d7c2afd0ac327ea7.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_policy-d7c2afd0ac327ea7.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_ears",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_ears-112183cebbb59338.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_ears-112183cebbb59338.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_tasks",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_tasks-09737d473d586318.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_tasks-09737d473d586318.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_setup",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_setup-e9af1bbfa4354adf.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_setup-e9af1bbfa4354adf.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_observer",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_observer-f15839d14a6bbadd.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_observer-f15839d14a6bbadd.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_sound_fixtures",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_sound_fixtures-7a803e4fa70ce847.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_sound_fixtures-7a803e4fa70ce847.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_turn_end",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_turn_end-5979accd63fa232e.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_turn_end-5979accd63fa232e.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_same_voice",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_same_voice-e9c9ba1895b3635d.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_same_voice-e9c9ba1895b3635d.rmeta"
+          ]
+        },
+        {
+          "target": "lamp_peek",
+          "filenames": [
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_peek-959f91e7b32e72d0.rlib",
+            "<scratch>/second-voice-memory-target-20261026/debug/deps/liblamp_peek-959f91e7b32e72d0.rmeta"
+          ]
+        }
+      ]
+    }
+  },
+  "current_depfile_roots": {
+    "second-reference-first-handshake-20261026": 51,
+    "second-review-3548-20261026": 2,
+    "second-review-3544-20261026": 1
+  },
+  "old_root_depfiles": [
+    {
+      "d": "debug/deps/it-93e63a1a342de60d.d",
+      "sha256": "a717d90211b4acb2cb691b13a5c95f89dee15e6395d7505cd945f16d3a7a610c",
+      "roots": [
+        "second-review-3548-20261026"
+      ],
+      "matches_bound_executable_stem": false
+    },
+    {
+      "d": "debug/deps/it-a3132b514901b7e4.d",
+      "sha256": "91f4fc26044907ac9fd46312c39d015b85d691451d02dea06f3c8ffd75d7697d",
+      "roots": [
+        "second-review-3548-20261026"
+      ],
+      "matches_bound_executable_stem": false
+    },
+    {
+      "d": "debug/deps/lamp_voice-b7042175c959f076.d",
+      "sha256": "ed26673dac554905f03ae9677152748051370631051960a18eccc3bb9606611e",
+      "roots": [
+        "second-review-3544-20261026"
+      ],
+      "matches_bound_executable_stem": false
+    }
+  ],
+  "artifact_bindings": [
+    {
+      "target": "lamp-peek",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-peek",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-peek",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_peek-d6933b14265fa15d",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "peek",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/peek-9f30a3a22d150551",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "release_pair",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/release_pair-f1640921eeefd6e0",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-cloud",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-cloud",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-3e0d523900dc9b16",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-cloud",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_cloud-98575ddcd1dfb4a4",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "turn_end_replay",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/turn_end_replay",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "same_voice_pairs",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/same_voice_pairs",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_voice_eval",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_voice_eval-8963e8cb131a4790",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-71cdc8e9a66bee71",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-voice-eval",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_voice_eval-fadbda892ed95aa9",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-voice-eval",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-voice-eval",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_cloud",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_cloud-2d85590c5b488b1f",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "wake",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/wake-d308af7a0a70e612",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-29160a7d1fe7e363",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-setup",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_setup-9c702477f431b4a8",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-setup",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-setup",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "release_pair",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/release_pair-421d899db2f1ea43",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "admission_latency",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/admission_latency",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "stop_words_stt_replay",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/stop_words_stt_replay-00c3d5ade90339de",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "render_line_second",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/render_line_second-0bd40a322a0ccf32",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "reference_pace",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/reference_pace",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "hearing_replay",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/hearing_replay",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-voice",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_voice-c2104e0b231de0af",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "ring_process_probe",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/ring_process_probe",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "head_qualification_operator",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/head_qualification_operator",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "duplex_lab",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/duplex_lab",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-ff8814137b406f09",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "probe_handover",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/probe_handover",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_voice",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_voice-9cb3bb6d29219bbc",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "render_relaxing_music",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/render_relaxing_music",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "release_pair",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/release_pair-fe88cce8c241f77a",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "functions",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/functions-a79539d1b683d78e",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_update",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_update-bf1ff12e0c522c55",
+      "preserved_hash_matches": true,
+      "current_hash_matches": false,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-update",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_update-21a27aecedff36b1",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "round",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/round-7e901bc5f5991b1d",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "requested_audio",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/requested_audio-dc0356d0f2a100c3",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "install",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/install-9191cffef374a606",
+      "preserved_hash_matches": true,
+      "current_hash_matches": false,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-b4c361f80933d986",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "self-cli-exec",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/self_cli_exec-8281cc7af00bd2ca",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_skills",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_skills-a033a3b884bf3ee4",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-skills",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_skills-a4fb845bf2fc4439",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-cb0bbc97d2930593",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "release_pair",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/release_pair-256f992c10791363",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "self-process-cuts",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/self_process_cuts-d5ced55ee0a7935e",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_peek",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_peek-c04cb8464eabb3bc",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_setup",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_setup-5f9e487dc0ded486",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-skills",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-skills",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_forget_named",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_forget_named-43b7cb065fd6de5b",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_forget",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_forget-74f427745157799f",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-memory",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-memory",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "forget_person",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/forget_person-092c1b2075247468",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "forgot",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/forgot-9dff199d99645d9b",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-memory",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_memory-8940c2cb57c255d2",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_observe_named_forget",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_observe_named_forget-f088b42f8cd2f168",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "release_pair",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/release_pair-fa4de417e90a8d58",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_observe_room",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_observe_room-0e4584cbc9f45624",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_since_until",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_since_until-2e64893599bca735",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "health_control",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/health_control-ccd689d59e5927d6",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-memory-eval",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-memory-eval",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-memory-fixture",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-memory-fixture",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "forget_shared_exchange",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/forget_shared_exchange-586236edd058f9ac",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-memory-eval",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_memory_eval-c414b615715b1cc2",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_link_used",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_link_used-c269c1ba120b091d",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_follows_face",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_follows_face-ea24c872fe1a290c",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_observe_forget",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_observe_forget-b217185ee2135986",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_early_words",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_early_words-7924e5efe3312d9c",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_observe",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_observe-51b27f0351572930",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "voice_forget_about",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/voice_forget_about-44e5dd563903ff9e",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "paraphrase_fixture",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/paraphrase_fixture-14b6ad392f07c11d",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-ea9b06d0f8d5f4c2",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-expression",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_expression-2fdf40af67fe27b3",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "recent_playout_cost",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/recent_playout_cost",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-7ec422dbd000fd43",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_lean",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_lean-fea1f88300821b40",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "check",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/check",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "replay_cost",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/replay_cost",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-cee9cb6322910cf1",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "rest_cost",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/rest_cost",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "runtime",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/runtime-ef42b38ccead2078",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-expression",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-expression",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-voice",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-voice",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_memory",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_memory-4217c9b549931686",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_expression",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_expression-4d1f4bcd6ed14bdb",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-worker",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_body_worker-f05fb009c6a8e5b2",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-body",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-mood",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_body_mood-dee3aeb305b9b03d",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "expression_ask",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/expression_ask",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-inspect",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_body_inspect-c4e685f3e3bbd1fd",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-worker",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-body-worker",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-measure",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_body_measure-d67bc25feec15034",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "head_plan",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/examples/head_plan",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-inspect",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-body-inspect",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-mood",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-body-mood",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body-measure",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-body-measure",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-body",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_body-4525c7991b7ac4de",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "it",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/it-c680473205e5e63d",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_body",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_body-1634a7d723f25bdc",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-keeper",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_keeper-8ed1b9236c2a3758",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp_keeper",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/deps/lamp_keeper-f2f4afc165f8f1e8",
+      "preserved_hash_matches": true,
+      "current_hash_matches": true,
+      "current_d_exists": true,
+      "current_d_source_mismatches_vs_snapshot": []
+    },
+    {
+      "target": "lamp-update",
+      "path": "<scratch>/second-voice-memory-target-20261026/debug/lamp-update",
+      "preserved_hash_matches": true,
+      "current_hash_matches": false,
+      "current_d_exists": false,
+      "current_d_source_mismatches_vs_snapshot": []
+    }
+  ],
+  "bound102_preserved_match": 102,
+  "bound102_current_match": 99,
+  "bound102_depfiles_present": 86,
+  "source_snapshot_sha256": "5c9d2a53e6983415ebbbef88559f0a933b6e251e7c9af99c66fb9f01d9d0a4db",
+  "limits": [
+    "Current depfiles and current source are not historical compiler-input snapshots.",
+    "Compiler JSON may name current root while fresh dependencies originated from compatible older worktrees.",
+    "Executable hash guards do not alone bind transitive rlibs/rmeta to historical source.",
+    "No target-empty/absence assertion exists in these shared-target controllers."
+  ],
+  "fresh_library_reconciliation": [
+    {
+      "target": "lamp_bus",
+      "source_prefix": "lampOS/crates/bus/",
+      "snapshot_files": 18,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_msgs",
+      "source_prefix": "lampOS/crates/msgs/",
+      "snapshot_files": 45,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_ipc",
+      "source_prefix": "lampOS/crates/ipc/",
+      "snapshot_files": 11,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_update",
+      "source_prefix": "lampOS/crates/update/",
+      "snapshot_files": 57,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_turn_owner",
+      "source_prefix": "lampOS/crates/turn-owner/",
+      "snapshot_files": 11,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_keeper",
+      "source_prefix": "lampOS/crates/keeper/",
+      "snapshot_files": 9,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_lean",
+      "source_prefix": "lampOS/crates/lean/",
+      "snapshot_files": 15,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_local_time",
+      "source_prefix": "lampOS/crates/local-time/",
+      "snapshot_files": 3,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_body",
+      "source_prefix": "lampOS/crates/body/",
+      "snapshot_files": 62,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_ring",
+      "source_prefix": "lampOS/crates/ring/",
+      "snapshot_files": 10,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "build-script-build",
+      "source_prefix": "lampOS/crates/camera/",
+      "snapshot_files": 18,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": false,
+      "earlier_fresh": true
+    },
+    {
+      "target": "sonora",
+      "source_prefix": "lampOS/third_party/sonora/",
+      "snapshot_files": 37,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": false,
+      "earlier_fresh": true
+    },
+    {
+      "target": "lamp_schedule",
+      "source_prefix": "lampOS/crates/schedule/",
+      "snapshot_files": 31,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_turn_end_wire",
+      "source_prefix": "lampOS/crates/turn-end-wire/",
+      "snapshot_files": 6,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_camera",
+      "source_prefix": "lampOS/crates/camera/",
+      "snapshot_files": 18,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_audio",
+      "source_prefix": "lampOS/crates/audio/",
+      "snapshot_files": 31,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_gemini",
+      "source_prefix": "lampOS/crates/gemini/",
+      "snapshot_files": 39,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_controls",
+      "source_prefix": "lampOS/crates/controls/",
+      "snapshot_files": 75,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_health",
+      "source_prefix": "lampOS/crates/health/",
+      "snapshot_files": 13,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_near_call",
+      "source_prefix": "lampOS/crates/near-call/",
+      "snapshot_files": 2,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_voice_processes",
+      "source_prefix": "lampOS/crates/voice-processes/",
+      "snapshot_files": 2,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": false,
+      "earlier_fresh": true
+    },
+    {
+      "target": "lamp_expression",
+      "source_prefix": "lampOS/crates/expression/",
+      "snapshot_files": 50,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_memory",
+      "source_prefix": "lampOS/crates/memory/",
+      "snapshot_files": 62,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_actions",
+      "source_prefix": "lampOS/crates/actions/",
+      "snapshot_files": 18,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_policy",
+      "source_prefix": "lampOS/crates/policy/",
+      "snapshot_files": 48,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_ears",
+      "source_prefix": "lampOS/crates/ears/",
+      "snapshot_files": 11,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_tasks",
+      "source_prefix": "lampOS/crates/tasks/",
+      "snapshot_files": 23,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_setup",
+      "source_prefix": "lampOS/crates/setup/",
+      "snapshot_files": 33,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_observer",
+      "source_prefix": "lampOS/crates/observer/",
+      "snapshot_files": 10,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_sound_fixtures",
+      "source_prefix": "lampOS/crates/sound-fixtures/",
+      "snapshot_files": 4,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_turn_end",
+      "source_prefix": "lampOS/crates/turn-end/",
+      "snapshot_files": 16,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_same_voice",
+      "source_prefix": "lampOS/crates/same-voice/",
+      "snapshot_files": 4,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    },
+    {
+      "target": "lamp_peek",
+      "source_prefix": "lampOS/crates/peek/",
+      "snapshot_files": 11,
+      "package_snapshot_equal": true,
+      "earlier_same_outputs": 1,
+      "earlier_nonfresh": true,
+      "earlier_fresh": false
+    }
+  ]
+}
