@@ -1,0 +1,431 @@
+{
+  "base_commit": "c5c7603a743690e291f85a664a7ee18624232581",
+  "candidate_is_uncommitted_patch": true,
+  "candidate_patch_sha256": "e6f0e0891a7f70db3d305f3d5831944b24d7d471aeaea32154461781b52d4455",
+  "committed_head_at_gate": "c5c7603a743690e291f85a664a7ee18624232581",
+  "compiled_targets": [
+    {
+      "kind": [
+        "test"
+      ],
+      "name": "relay_shared",
+      "sha256": "49859607ff921cddc97d31abcd2d73a7c80c77757a1ec6d9ed9cc67e17aaecc5"
+    },
+    {
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-ipc-probe",
+      "sha256": "e796bbb35dfdd57a8937fe3ed410503e448722c213e4669fe49663697769cfc8"
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "name": "probe",
+      "sha256": "5d3818fa0db1825b01a32df4879f48673fafb2c95fd6b9260622534771a9abf7"
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "name": "sockets",
+      "sha256": "88890f45d607af8d4fd5eb60fa8895263b7e937dd436d85e7d1436f5a213b18d"
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "name": "relay_exit",
+      "sha256": "5cee78eab3c040cbb8046784fdd33caffbb259cac8b659e4d25f54e42446d616"
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "name": "relay_signals",
+      "sha256": "40070bbb6686e92fad2ebbd0cb1ab35bc88fedfd10054bf80448f4e5ec96c58a"
+    },
+    {
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_ipc",
+      "sha256": "aaebadc42c77b6a3fd92d01afd24f733d379bac37f5a89045c74c5d58ff71c82"
+    }
+  ],
+  "controller_sha256": {
+    "continuation": "6f7294d2d863df330f3598ac1de9d111484f9e110bcdff8f0d256bd03bd5b3c4",
+    "controls": "68f09040e71ac8f8c22a3bff2c69eb56f9af4f46bc07bfd0c972de9a864a7fb0",
+    "gate": "b70805369abfc42999e239135bb73a93d18b2b957b8cd37c7c96e4816982040b",
+    "runner": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "controls": [
+    {
+      "command": [
+        "${RECEIPT_DIR}/control-artifacts/original-stall",
+        "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-ipc",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "original-stall-compile",
+        "log_sha256": "b4f2e8e5b6603ed4dce6f8e3dea1f4f5c438ff4e28ec19eb13032911da05df38",
+        "receipt_sha256": "3617c73265755acd5a6723194cdfcad18b3297a979195c9c590add54d8a3b602",
+        "source_unchanged": true
+      },
+      "compiler_fresh": false,
+      "diagnostic_source_line": 454,
+      "executable_sha256": "6c5a52d9ca685bf9d771c799e34a530750fea8573808bdfc6c220387f9f2f4ba",
+      "exit_code": 101,
+      "failed": 1,
+      "intended_diagnostic": "started.elapsed() < Duration::from_millis(100)",
+      "label": "original-stall",
+      "log_sha256": "d5791e659efda26161d7fea5ee70a545fe40d1f2a6ac4040f29f6c6c96d6bef0",
+      "passed": 0,
+      "qualified_watchdog_control": false,
+      "receipt_sha256": "4c1910ec455b2ff3bc263fddfa9afd13ee4e95da713a33e53b47dcd30f4cecaa",
+      "source_inventory_sha256": "2a221bfda3da772acb8fba311cfa387c969745830d30a76c6423a5abcacf90f4",
+      "source_sha256": "5d52fabf34e917b533b2023cb21fe12ef563ead4a700cbca7aaf17cd9b604a3d",
+      "source_unchanged": true,
+      "summary_rows_in_log": 1
+    },
+    {
+      "command": [
+        "${RECEIPT_DIR}/control-artifacts/fixed-stall",
+        "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-ipc",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "fixed-stall-compile",
+        "log_sha256": "97ca45b363662fef1492fdbb1ab54549138f4a1bf5ddeb624dfd7e71fd8082df",
+        "receipt_sha256": "32d62205b66d0aeffb13bc06195722fc74f01fd1160a62fe055fe69c58d88c0d",
+        "source_unchanged": true
+      },
+      "compiler_fresh": false,
+      "diagnostic_source_line": null,
+      "executable_sha256": "10b5d3a3b0a463b0f6254ac156e8d959e6bda20d099f3e4825fa4a884d17d0f9",
+      "exit_code": 0,
+      "failed": 0,
+      "intended_diagnostic": null,
+      "label": "fixed-stall",
+      "log_sha256": "251a524c00c2dfa0e30e443b95b901c60ebd3293f332ebb38a27857520bb68e6",
+      "passed": 1,
+      "qualified_watchdog_control": false,
+      "receipt_sha256": "f1b007246dc895f0f44d1ebf17597860cf3f3b5afa4c783f14e82eb2211a4d95",
+      "source_inventory_sha256": "82cc9b7e31d515b2c9b0ae8cf0a8fd188185384c506107968fcc5bab3d2f4934",
+      "source_sha256": "7aaaaa1728577bc925db655c2e4a1d91994bd6b555d32d95beafdd51c375fca2",
+      "source_unchanged": true,
+      "summary_rows_in_log": 1
+    },
+    {
+      "command": [
+        "${RECEIPT_DIR}/control-artifacts/blocking-write",
+        "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-ipc",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "blocking-write-compile",
+        "log_sha256": "49b17ee7ede8f4093b7ae4cd9a5ae063bbf8ce2d36c79406522b4aaad7ab4835",
+        "receipt_sha256": "04760688002c6c268acc4462ebf8bb50b6c59aa8db79d8bbf2bfe933b7b56458",
+        "source_unchanged": true
+      },
+      "compiler_fresh": false,
+      "diagnostic_source_line": 506,
+      "executable_sha256": "f8621bf2aa32a2f2ba21f845fc7582e209db33326f986f1a2d6e9ebc62d55d58",
+      "exit_code": 101,
+      "failed": 1,
+      "intended_diagnostic": "left: Ok(14)",
+      "label": "blocking-write",
+      "log_sha256": "fc19d2911b3e90388c5d6f0ed3e611ee4686f3f44fd3cefb222bb7ff396cebcf",
+      "passed": 0,
+      "qualified_watchdog_control": false,
+      "reason": "Small blocking write accepted Ok(14); child and parent failed, and the child summary was echoed. The strict controller rejected this attempt.",
+      "receipt_sha256": "ed402fb5e25082ab736fadc58772b3194e7be93c8ef7f51bfa073cf1e9f390ac",
+      "rejection_receipt_sha256": "3cff609c40e8615fc70b2dc4a0d62069359a28829ee397327af9599c880b7e03",
+      "source_inventory_sha256": "72d17e1ddb8f3e151c45ccd2cd523ccde8b33f9982ddd52d61f18e54dcd8a13e",
+      "source_sha256": "db96e75446515364214d40eab431237fb8fdf7baff8433ce396a1fba0cb3c31d",
+      "source_unchanged": true,
+      "summary_rows_in_log": 2
+    },
+    {
+      "command": [
+        "${RECEIPT_DIR}/control-artifacts-continuation/blocking-large-write",
+        "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-ipc",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "blocking-large-write-compile",
+        "log_sha256": "26bdd13f4f5c2ffbc378414715036f5aa2ad0b025d14bffa754d3c1e22b89aef",
+        "receipt_sha256": "591b740f3323897c7be02476c9a85f6091d1e788a47c12ce073cd30640bbb838",
+        "source_unchanged": true
+      },
+      "compiler_fresh": false,
+      "diagnostic_source_line": 473,
+      "executable_sha256": "a73e8aa03a6012f203686a7b2592b9d4b914bccd61cddfdca17af134ca4a3a64",
+      "exit_code": 101,
+      "failed": 1,
+      "intended_diagnostic": "journal write did not return while its pipe/socket stayed full",
+      "label": "blocking-large-write",
+      "log_sha256": "49b90de6f6e6728324d48e72c5e35b45dbe3b51474f0cfaf73f754e99a314a07",
+      "passed": 0,
+      "qualified_watchdog_control": true,
+      "receipt_sha256": "8f4e4017b854f5f8a499b7915cc45a29d966ea704c30332ad546701f0dbf62ab",
+      "source_inventory_sha256": "88f952daf08b5632151362b99c4dbcf6c14462e8b8b73c4dd2cdb7bdf32ad4a3",
+      "source_sha256": "a9aacf6158d7071ed9280ef0947e74f16b22a5b4408ee4f544b75f75cf284b79",
+      "source_unchanged": true,
+      "summary_rows_in_log": 1
+    },
+    {
+      "command": [
+        "${RECEIPT_DIR}/control-artifacts-continuation/restored-after-controls",
+        "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "compile": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-ipc",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "exit_code": 0,
+        "label": "restored-after-controls-compile",
+        "log_sha256": "f163d6038853a92529d7075b58650c997724516cbd112f7fb87295c45c6b5a77",
+        "receipt_sha256": "69f2bc4116b251d5a998e7e341ea38687157f7ffee745dd2814bf25b51fc2150",
+        "source_unchanged": true
+      },
+      "compiler_fresh": false,
+      "diagnostic_source_line": null,
+      "executable_sha256": "aaebadc42c77b6a3fd92d01afd24f733d379bac37f5a89045c74c5d58ff71c82",
+      "exit_code": 0,
+      "failed": 0,
+      "intended_diagnostic": null,
+      "label": "restored-after-controls",
+      "log_sha256": "a94a95eda9cd530693073990d2f7974518bce590197022c49853001f4de58029",
+      "passed": 1,
+      "qualified_watchdog_control": false,
+      "receipt_sha256": "781b50fc5d2355596c040783edbf26923dc3498464da28a122e518cfbc4e9741",
+      "source_inventory_sha256": "dc1e3d22ca05db8115bccfb722d15962210a2198b3f0ef9a7eeca9d9d14d93ca",
+      "source_sha256": "45e32867938eb0c93cab3a8444451d70fe0ec1831b130f1d830922958d2ab44f",
+      "source_unchanged": true,
+      "summary_rows_in_log": 1
+    }
+  ],
+  "focused_baseline": {
+    "artifact_sha256": "aaebadc42c77b6a3fd92d01afd24f733d379bac37f5a89045c74c5d58ff71c82",
+    "command": [
+      "${CARGO_TARGET_DIR}/debug/deps/lamp_ipc-08c40ae4c014ae57",
+      "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "counted_separately_from_full": true,
+    "exit_code": 0,
+    "failed": 0,
+    "label": "focused",
+    "log_sha256": "88f22d3b030bc7c5ba0e353b3596517ca13f75deb16b814238e95460bbc1f63d",
+    "passed": 1,
+    "receipt_sha256": "ebfa51b31b681ca81414e3cfce6110e5553e65010e84d98aa1b87c1a97c074ca",
+    "source_unchanged": true
+  },
+  "gate": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "label": "fmt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "7194eb8416f84a59e230c72060dc25ae4eee45d4558a0f46d0869144c25f64a2",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "label": "clippy",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "f49b5a9ddade11a73d5fb2ad35a174dd7d5db8eea7cfe75d0bd0553363794558",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "label": "compile",
+      "log_sha256": "ca5bae53732af45ea67a3a512d69e85382c2da7da3b08d84fcb4bc559b353269",
+      "receipt_sha256": "ec8888855aa967549ce6240d0b1ce7d68f3c23b1127a566d5362309a52a711fb",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "doctests_passed": 1,
+      "exit_code": 0,
+      "failed": 0,
+      "ignored": 0,
+      "label": "full",
+      "log_sha256": "0d9221f0eab4ccdf8b9abc1cdc0bf47cdc489b7cffe0f61c44db672ebc6fba5e",
+      "ordered_passed_groups": [
+        8,
+        0,
+        3,
+        1,
+        1,
+        13,
+        1
+      ],
+      "ordinary_tests_passed": 26,
+      "receipt_sha256": "06bc1ba8f7d4e1682b9256c5d7641a08586b18a79516cbb73551b6cd5e93fb96",
+      "relay_signals": "ok",
+      "source_unchanged": true
+    }
+  ],
+  "input_sha256": {
+    "lampOS/crates/ipc/src/log_relay.rs": "45e32867938eb0c93cab3a8444451d70fe0ec1831b130f1d830922958d2ab44f",
+    "lampOS/docs/logging.md": "69e92873cb28698813a09310a255ba714d25a078e37060cf09864a0a6953840a"
+  },
+  "limits": [
+    "No Linux or ARM64 result is claimed.",
+    "No physical latency, persisted-journal delivery or device acceptance is established.",
+    "The existing Polled-pipe race with another writer is unchanged and not covered by this fixture.",
+    "Watchdogs are fixture diagnostics, not hard storage/OS teardown bounds.",
+    "Raw logs, inventories, controllers and binaries remain private; their hashes do not imply public download availability."
+  ],
+  "owned_paths": [
+    "lampOS/crates/ipc/src/log_relay.rs",
+    "lampOS/docs/logging.md"
+  ],
+  "pre_execution_syntax_error": {
+    "exit_code": 1,
+    "line": 37,
+    "not_a_cargo_or_test_observation": true,
+    "original_terminal_exit_receipt_available": true,
+    "parse_error": "invalid syntax. Perhaps you forgot a comma?",
+    "phase": "Python parse before any script execution",
+    "receipt_sha256": "d775da40352d5593939b9d73e2dca8e2dd9919a1c655497f1f275763c87ec0ac",
+    "retained_script_sha256": "4ddbac60c94dc62ba8ef0b66e2566023c68b62b34d133d94e0a55aa4fc5dbd8a",
+    "verification": "Static parsing only; no statements executed."
+  },
+  "production_prefix": {
+    "byte_equal_to_base": true,
+    "bytes": 14968,
+    "sha256": "dd0486198f0e178510bed0d2c8a95549f9c0b8b1e5b5a819e06464522aa7398e"
+  },
+  "proof_preparation_audit": {
+    "correction": "Explicitly matched that receipt to retained invalid script; no test or compiler rerun.",
+    "first_attempt": "Refused an unclassified parse-error receipt; no packet was written.",
+    "retained_receipt_sha256": "a1614cf319c62bc6c2a449335986ca1a106fa69ef6f1072d5a2e39af09aa95c3"
+  },
+  "publisher_sha256": "9617b1c36199ecd205d2d24f642a70e5ae8ed76304cc2ab0456890824e90cf83",
+  "restoration": {
+    "baseline_and_restored_library_sha256": "aaebadc42c77b6a3fd92d01afd24f733d379bac37f5a89045c74c5d58ff71c82",
+    "complete_source_inventory_equal": true,
+    "continuation_progress_sha256": "158d7375060a2707953897fafc62b00eb76919a928bea0d3fececff0e9482d93",
+    "controls_complete_sha256": "6817a37a6a3d0d8edcca2b8430c51848d5fbb41075983d52a5a1dd9925584537",
+    "first_progress_sha256": "394ea68f610cede67e80690a9cf282989df7ac566a2b0de254977d547d79add3",
+    "production_prefix_unchanged": true
+  },
+  "source_entries": 7160,
+  "source_inventory_sha256": "dc1e3d22ca05db8115bccfb722d15962210a2198b3f0ef9a7eeca9d9d14d93ca"
+}

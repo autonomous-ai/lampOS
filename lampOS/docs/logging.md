@@ -12,6 +12,15 @@ lines flowing to the journal without blocking. The relay carries everything a
 part prints, as text, to one machine's journal; this stream carries chosen
 operational records, typed, to anyone on the Bus who follows them.
 
+The IPC relay's full-pipe/socket regression keeps each destination full until
+`write_now` returns `AGAIN`; only then does it drain the destination and check
+that the shared descriptor remains blocking. The case runs in an isolated
+test process with a 15-second diagnostic watchdog, so a blocking regression
+can be killed and reaped. Its successful exit must include the exact selected
+test's passing result. This replaces a 100 ms host stopwatch, not a product
+deadline or a measurement of journal latency. Linux CI also covers the private
+pipe descriptor and `MSG_DONTWAIT` socket paths.
+
 The stream is for bounded operational summaries: readiness checks, a dependency
 failure, or a state transition. It is separate from periodic `Diagnostic`
 health reports, voice evidence, conversation memory and recordings.
