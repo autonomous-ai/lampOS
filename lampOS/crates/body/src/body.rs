@@ -1570,6 +1570,11 @@ struct Bus<'a, P, R> {
     /// Each head and base joint's window, by `Joint::index`: 0..=4095, or
     /// with `Limits::own_ranges` its own (`own_window`).
     windows: [(u16, u16); 5],
+    /// Each head and base joint's own stored range, by `Joint::index`:
+    /// 0..=4095, or with `Limits::own_ranges` the range itself. A hold
+    /// where a joint already is (`write_goal`) is checked against it, not
+    /// the inset window: it is not motion.
+    ranges: [(u16, u16); 5],
     /// An arm goal refused before it was written: the run ends on it.
     refused: Option<Stop>,
     /// When positions were last read, each joint's last good position,
@@ -1628,6 +1633,7 @@ impl<'a, P: PortIo, R: Runtime> Bus<'a, P, R> {
             runtime,
             arm_windows: arm_windows(standing),
             windows: [(0, 4_095); 5],
+            ranges: [(0, 4_095); 5],
             refused: None,
             read_at: None,
             good: [None; 5],
@@ -2080,13 +2086,15 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         Ok(())
     }
 
-    /// One joint's goal by itself, checked as `send_goals` checks, written
-    /// and acknowledged (with `patiently`, as `write_patiently`).
+    /// One joint's goal by itself, a hold where it already is, written and
+    /// acknowledged (with `patiently`, as `write_patiently`). An arm goal is
+    /// checked as `send_goals` checks; a head or base hold against its own
+    /// stored range (`hold_refused`).
     fn write_goal(&mut self, joint: Joint, goal: u16, patiently: bool) -> Result<(), String> {
         if self.left[joint.index()] {
             return Ok(());
         }
-        if let Some(stop) = self.goal_refused(joint, goal) {
+        if let Some(stop) = self.hold_refused(joint, goal) {
             return Err(self.refuse(stop));
         }
         let packet = goal_write(joint, goal);
@@ -2172,6 +2180,26 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
             goal,
             window: (low, high),
             from: from.unwrap_or(goal),
+        })
+    }
+
+    /// Whether a hold where `joint` already is may be written: an arm hold
+    /// as `goal_refused`; a head or base hold if inside the joint's own
+    /// stored range (`ranges`). A joint resting within `OWN_RANGE_MARGIN`
+    /// of a stop still takes hold there (#3558): holding is not motion, and
+    /// a clamped hold would move it.
+    fn hold_refused(&self, joint: Joint, goal: u16) -> Option<Stop> {
+        if ARM.contains(&joint) {
+            return self.goal_refused(joint, goal);
+        }
+        let (low, high) = self.ranges[joint.index()];
+        (!(low..=high).contains(&goal)).then(|| Stop::Window {
+            joint: joint.id(),
+            goal,
+            window: (low, high),
+            from: self.goals[joint.index()]
+                .or(self.good[joint.index()])
+                .unwrap_or(goal),
         })
     }
 
@@ -3798,6 +3826,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             return report;
         }
         bus.windows = ranges.map(own_window);
+        bus.ranges = ranges;
     }
     if standing.is_some() && home.is_none() {
         standing = None;

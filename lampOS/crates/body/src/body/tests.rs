@@ -13863,6 +13863,62 @@ fn with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window() {
     assert_eq!(bus.window(Joint::ElbowPitch), (0, 4_095));
 }
 
+/// #3558: a hold where a head or base joint already is (take hold, its
+/// write-back, stop pushing) is checked against the servo's own range, not
+/// the inset window: lamp-52e6's roll resting at 2410, inside its stored
+/// max 2413 but past max - 20, takes hold, while a motion goal there is
+/// still refused.
+#[test]
+fn with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let mut bus = Bus::new(&mut lamp, &mut clock, None);
+    bus.windows = LAMP_52E6_RANGES.map(own_window);
+    bus.ranges = LAMP_52E6_RANGES;
+    assert_eq!(bus.hold_refused(Joint::WristRoll, 2_410), None);
+    assert!(matches!(
+        bus.goal_refused(Joint::WristRoll, 2_410),
+        Some(Stop::Window {
+            goal: 2_410,
+            window: (1_085, 2_393),
+            ..
+        })
+    ));
+    // Past the servo's own stop, a hold is refused too.
+    assert!(matches!(
+        bus.hold_refused(Joint::WristRoll, 2_414),
+        Some(Stop::Window {
+            goal: 2_414,
+            window: (1_065, 2_413),
+            ..
+        })
+    ));
+}
+
+/// #3558: with the bound on, a lamp whose roll rests at 2410 with torque
+/// off is taken hold of where it is at start, as without the bound.
+#[test]
+fn with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start() {
+    let holding = Limits {
+        torque_on: true,
+        ..own()
+    };
+    let (mut lamp, mut clock) = ranged(LAMP_52E6_RANGES, Duration::from_secs(1));
+    lamp.may_take_hold = true;
+    lamp.servos[ROLL].torque = 0;
+    lamp.servos[ROLL].position = 2_410.0;
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        holding,
+        None,
+        || Some((Mood::Resting, 0)),
+        |_| {},
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.torque_given, vec!["wrist_roll"]);
+    assert_eq!(lamp.servos[ROLL].position, 2_410.0);
+}
+
 /// #3558: the folded arm, the stand and the pitch window are each checked
 /// against their joints' own limits; a joint storing 0..=4095 (lamp-52e6's
 /// elbow) is never checked, and its goals keep 0..=4095.
