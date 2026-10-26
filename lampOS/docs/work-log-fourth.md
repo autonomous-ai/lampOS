@@ -1,3 +1,9 @@
+## 2026-10-27 03:16 — Thin checkpoint terminal ordinals published
+
+Ready for lamp-voice: no
+
+[Exact35 terminal positions](verification/common-current-008-20261027/terminal-ordinals.json) add the requested one-based raw file lines and global test-terminal ordinals to the already published identities. They match the retained public ledger, recount and selected discovery exactly, each started then ok once. The two additions above baseline33 are the Skills host-stall/header control and Voice already-waiting callback retry. Raw ignored events count only toward stream positions; no new execution or natural-ignore claim is made. This is an offline derivation from unchanged retained inputs. Current897/tree6a026 formatting passes; strict workspace Clippy is active before the exact60 composition union. No gate credit transfers to that active source.
+
 ## 2026-10-27 03:10 — HTTP counter fault discriminates old behavior
 
 Ready for lamp-voice: no
