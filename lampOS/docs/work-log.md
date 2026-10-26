@@ -1,5 +1,17 @@
 Ready for lamp-voice: #3542 and #3528 delivered; #3510 current native pending and activation HOLD.
 
+## Current checkpoint: 2026-10-26 14:15 +07, own-keys factory-base carry pushed
+
+[#3510 latest host proof](verification/own-keys-product-carry-20261026/current-883/README.md): pushed `46b5c220d` on latest `88335bfbe`, seven equal patches. Fresh fmt/strict nine-crate Clippy, shell syntax and factory **86/0** pass. The changed factory script and install documentation are embedded by Update tests; those complete targets were freshly rebuilt and pass **230/0/2** (library 122/0/2, install 108/0/0), with three current compiler-artifact bindings and 7,258 source entries guarded. The historical sixty-executable check preceded that rebuild and is not relabeled as a current sixty-file guard. Prior **6,708/0/44** remains on b2c/d5dc; its exact tested commit is now public on `second/own-keys-executed-d5dc-20261026` for independent source inspection.
+
+[Original 4d19 native proof](verification/own-keys-product-carry-20261026/native-4d19/README.md) finished before the newer push: ARM64 40282211747 **11,371 unique PASS / zero failures, leaks, timeouts or unrun / 106 skipped**, all eleven own-keys/census controls once; Linux Clippy 40282212093 green. Exact preview parents/tree match. Process 13/0, docs 4/0, helper 25/0 and relay success remain separate. No cancellation or rerun erased that event. New original current ARM64 40284337109 and Clippy 40284337110 are running; activation HOLD remains.
+
+The log carry preserves all 14,294 prior evidence entries. Independent Expression review is published at its actual offered 5713/cced head, full 340/0/0; its author's carry remains pending. No device, provider, key or release action ran.
+
+---
+
+Ready for lamp-voice: #3542 and #3528 delivered; #3510 current native pending and activation HOLD.
+
 ## Current checkpoint: 2026-10-26 13:54 +07, own-keys current carry pushed and Expression review passed
 
 [#3510 current carry proof](verification/own-keys-product-carry-20261026/current-9e5/README.md): pushed `4d19d739b` on latest `9e5d3b9c6`. The combined nine-crate gate on `b2c75ba61`/d5dc passes **6,708/0/44**, with 7,258 source entries and all sixty actual/preserved executable hashes unchanged. Its first evidence-parser attempt rejected two valid summary lines without semicolons; the narrow additive parser correction retains every original line and repeats no test. Final-head fmt/strict nine-crate Clippy pass, all sixty executable pairs still match, and the complete repository comparison differs only at addons.md. Counts retain their executed head; no full suite was repeated for that documentation-only carry. Original current ARM64 40282211747 and Linux Clippy 40282212093 now run. Activation HOLD remains.

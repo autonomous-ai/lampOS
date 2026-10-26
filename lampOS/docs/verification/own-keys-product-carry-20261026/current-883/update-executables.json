@@ -1,0 +1,44 @@
+[
+  {
+    "actual": "<target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_and_preserved_rechecked": true,
+    "compiler_fresh": false,
+    "features": [],
+    "kind": [
+      "lib"
+    ],
+    "preserved_copy": "<update-gate>/artifacts/0-lamp_update-e14d54c83f68ff7f",
+    "profile_test": true,
+    "sha256": "e1e24e3cf858efaac65c0c7b0ab444ddb3a40b5234bf2617bc66ed69d1e03db0",
+    "source": "<source>/lampOS/crates/update/src/lib.rs",
+    "target": "lamp_update"
+  },
+  {
+    "actual": "<target>/debug/deps/install-08004915d5b421f7",
+    "actual_and_preserved_rechecked": true,
+    "compiler_fresh": false,
+    "features": [],
+    "kind": [
+      "test"
+    ],
+    "preserved_copy": "<update-gate>/artifacts/1-install-08004915d5b421f7",
+    "profile_test": true,
+    "sha256": "770ddbd00ff135e82f36234f104e1eb7a301afe961b4994f6571584e62f4769c",
+    "source": "<source>/lampOS/crates/update/tests/install.rs",
+    "target": "install"
+  },
+  {
+    "actual": "<target>/debug/lamp-update",
+    "actual_and_preserved_rechecked": true,
+    "compiler_fresh": false,
+    "features": [],
+    "kind": [
+      "bin"
+    ],
+    "preserved_copy": "<update-gate>/artifacts/2-lamp-update",
+    "profile_test": false,
+    "sha256": "799a71ccd12590795d2b340662c6027fee26a69ac70888844c0ca34d980aff3b",
+    "source": "<source>/lampOS/crates/update/src/main.rs",
+    "target": "lamp-update"
+  }
+]

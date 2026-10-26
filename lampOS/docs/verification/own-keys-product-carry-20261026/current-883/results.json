@@ -1,0 +1,201 @@
+{
+  "artifact_scope": "The host stage verified 60 original actual/preserved executable pairs BEFORE the fresh Update compile. That guard is historical, not a claim that all 60 current target paths still match. The new three Update artifacts have separately verified actual/preserved bindings; two are test drivers, one is the compiled Update binary. No claim that every compiled artifact was executed.",
+  "base": "88335bfbef7a964ff5918b0dec06892dc9a4ea4d",
+  "complete_markers": {
+    "host": {
+      "receipt": {
+        "all_tested_executables_unchanged": true,
+        "base": "88335bfbef7a964ff5918b0dec06892dc9a4ea4d",
+        "complete": true,
+        "executable_count": 60,
+        "head": "46b5c220d72baf9a2b737cc93102fa73d6fe05a6",
+        "source_unchanged": true,
+        "test_execution": "6708/0/44 remains b2c75ba61/d5dc; only addons.md, factory scripts and install.md differ in complete repository comparison; fresh factory stand-ins 86/0"
+      },
+      "sha256": "e794e416763b71ab1cb152f30e606a4292d1bb22886700c3d4a3ced4b8df7e01"
+    },
+    "update": {
+      "receipt": {
+        "artifacts_unchanged": true,
+        "base": "88335bfbef7a964ff5918b0dec06892dc9a4ea4d",
+        "complete": true,
+        "head": "46b5c220d72baf9a2b737cc93102fa73d6fe05a6",
+        "source_entries": 7258,
+        "source_unchanged": true
+      },
+      "sha256": "72b4b3e5feed347353b0d08da1863b55b27dcb53916f28b520d23db33b3ec146"
+    }
+  },
+  "factory_stand_ins": {
+    "failed": 0,
+    "literal_final_line": "0 failed",
+    "passed": 86,
+    "separate_from_rust_counts": true,
+    "success_line_count": 86
+  },
+  "head": "46b5c220d72baf9a2b737cc93102fa73d6fe05a6",
+  "historical_nine_crate_execution": {
+    "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+    "exact_head_url": "https://github.com/autonomous-ai/lampOS/tree/b2c75ba618dd15e97dfaa133c81320b6d8095777",
+    "executables_manifest_sha256": "dce6fa42ca9895f4b9e68a6af638cc47527add6c7fb73d1f26f6d25f620686a8",
+    "failed": 0,
+    "head": "b2c75ba618dd15e97dfaa133c81320b6d8095777",
+    "ignored": 44,
+    "no_relabel_to_current": true,
+    "passed": 6708,
+    "results_sha256": "319d568d5fb764dcc60f04860ff137eab06af3d14eb7a8841aa2d4190a3edf60"
+  },
+  "limits": "Host checks only; native CI, activation, real key/provider, installation, device and physical latency remain separate.",
+  "raw_update_manifest_sha256": "00d403cc0c0f50f2e7e9fedf66f09e5b2e5ec7725ad4d45afcc5b946548afe44",
+  "schema": 1,
+  "source_bytes_modes_and_file_set_rechecked": true,
+  "source_entries": 7258,
+  "source_inventory_sha256": "fd1a9f08ae3ccac31cfa9df9a909be9f91dc139a45eb82efb6b6a9860af1a9d2",
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.057,
+      "exit_code": 0,
+      "label": "fmt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "de357ea5599b6a701298d4ec20e3a1a828206b26200779f30e00e71900211f00",
+      "scope": "host",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 67.818,
+      "exit_code": 0,
+      "label": "clippy",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "3d109958c7c2293a2b961648d537d013cbd2c29b6f213565ee0c2d43a1da491c",
+      "scope": "host",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "bash",
+        "-n",
+        "deploy/factory/steps.sh",
+        "deploy/factory/steps-test.sh"
+      ],
+      "elapsed_seconds": 0.342,
+      "exit_code": 0,
+      "label": "shell-syntax",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "b38dc09678ae5ff94899ab45d897f4076d88f68050aef770498029253e25dd07",
+      "scope": "host",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "bash",
+        "deploy/factory/steps-test.sh"
+      ],
+      "elapsed_seconds": 105.385,
+      "exit_code": 0,
+      "label": "factory",
+      "log_sha256": "728190c9294561aaa040960f837c578c202d8b196b5c3eb85254fe5600b0fce9",
+      "receipt_sha256": "acb20bc7ef4a13550c5119622a53c42c66af95d24b746d0b6e42c4c9bd3d2f9f",
+      "scope": "host",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--test",
+        "install",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 58.367,
+      "exit_code": 0,
+      "label": "compile",
+      "log_sha256": "248d4fda35841de4180d1f95d905dc0ffca2cb89dc12df98738a17a965356f41",
+      "receipt_sha256": "cf421b869878e50d5db13f99a63a9dda121d3b82f438745232036474568c1e3f",
+      "scope": "update",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--test",
+        "install",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 175.063,
+      "exit_code": 0,
+      "label": "affected-full",
+      "log_sha256": "c831ab00bb396bd044b5c0cc9d31510e80a28a0d8de81861db271e987357c208",
+      "receipt_sha256": "966237320612cd7427211daa39425a79d8e57dbea1fe392c1047de2897a15fe4",
+      "scope": "update",
+      "source_unchanged": true
+    }
+  ],
+  "update_tests": {
+    "failed": 0,
+    "ignored": 2,
+    "literal_summaries": [
+      "test result: ok. 122 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.66s",
+      "test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 169.52s"
+    ],
+    "passed": 230,
+    "scope": [
+      "complete lamp-update library target",
+      "complete install integration target"
+    ]
+  }
+}

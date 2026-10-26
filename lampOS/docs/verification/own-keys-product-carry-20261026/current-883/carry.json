@@ -1,0 +1,46 @@
+{
+  "carry_receipt_sha256": "6962acb35d515fdec5f3da62b9bcb4bea06a62a9394f33c971ea6981e9d30d38",
+  "compile_input_limit": "steps.sh is included by Update library tests and install.md by the install integration target. Their changed bytes are Rust test compilation inputs, so all Rust executable inputs are NOT claimed unchanged. addons.md references found in crates are prose; steps-test.sh is executed as a separate shell stand-in suite.",
+  "differences": [
+    {
+      "after": "100755 blob 661938c275bcea068e60f56f60c649d98a8388f2",
+      "before": "100755 blob 89b00e5d706ddc5a36bd5ebbd1dc44e51977488c",
+      "path": "lampOS/deploy/factory/steps-test.sh"
+    },
+    {
+      "after": "100755 blob db5e34995108ffc5d8d9e0b45eb4daa9dedd3c8b",
+      "before": "100755 blob 692809d451383b359059f1f83c56596700d5aa7b",
+      "path": "lampOS/deploy/factory/steps.sh"
+    },
+    {
+      "after": "100644 blob 6e704abbd46d3d033ffa11827fa5c8e210894ef8",
+      "before": "100644 blob c7e772ed476821dbb404fd9d8ee02d6133645b94",
+      "path": "lampOS/docs/addons.md"
+    },
+    {
+      "after": "100644 blob 77b1c77b2bcba0951ba37d860e6ce4004ac8140b",
+      "before": "100644 blob 6461baf77713d49e8c905670bbbd2ddde6ba87c1",
+      "path": "lampOS/docs/install.md"
+    }
+  ],
+  "embedded_inputs": [
+    {
+      "affected_target": "lamp-update --lib",
+      "path": "lampOS/deploy/factory/steps.sh",
+      "reader": "lampOS/crates/update/src/install.rs",
+      "reader_line": 2809
+    },
+    {
+      "affected_target": "lamp-update --test install",
+      "path": "lampOS/docs/install.md",
+      "reader": "lampOS/crates/update/tests/install.rs",
+      "reader_line": 1058
+    }
+  ],
+  "from_executed_head": "b2c75ba618dd15e97dfaa133c81320b6d8095777",
+  "range_diff": "1:  d545049430 = 1:  63630532bb lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  d692ff9cdc = 2:  1e53de741c lampOS: preserve customized own-keys drop-ins\n3:  4f22699fe1 = 3:  1e59afb1fd lampOS: record current own-keys carry qualification\n4:  df4722d4c1 = 4:  517881aafa lampOS: clarify own-keys activation and per-unit overrides\n5:  db41e2c157 = 5:  e6f025cbeb lampOS: record own-keys qualification on the d21 base\n6:  f1d053c000 = 6:  83293965b0 lampOS: retain own-keys scheduling and product-reader checks\n7:  4d19d739ba = 7:  46b5c220d7 lampOS: qualify own-keys carry with current product units",
+  "repository_entries": 10690,
+  "same_path_set": true,
+  "to_current_head": "46b5c220d72baf9a2b737cc93102fa73d6fe05a6",
+  "unchanged_blob_mode_entries": 10686
+}
