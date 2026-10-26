@@ -1009,12 +1009,21 @@ impl Days {
     }
 
     pub fn forget(&mut self, person: &Person, id: u64) -> Result<u64> {
-        let count = self.forget_here(person, id)?;
+        self.forget_linked(person, id, false)
+    }
+
+    /// [`Self::forget`], with `links_used` when the voice links an exchange
+    /// only to what its turn used (`LAMP_MEMORY_LINK_USED`, the request's
+    /// `links_used`): then everything linked to a kept thing or an
+    /// observation goes with it, as before, since a link says it was used;
+    /// without, only what carries its words ([`selective_descendants`]).
+    pub fn forget_linked(&mut self, person: &Person, id: u64, links_used: bool) -> Result<u64> {
+        let count = self.forget_here(person, id, links_used)?;
         self.forget_set_aside()?;
         Ok(count)
     }
 
-    fn forget_here(&mut self, person: &Person, id: u64) -> Result<u64> {
+    fn forget_here(&mut self, person: &Person, id: u64, links_used: bool) -> Result<u64> {
         let Some(record) = self.record(person, id)? else {
             return Ok(0);
         };
@@ -1051,7 +1060,14 @@ impl Days {
         } else {
             Vec::new()
         };
-        descendants(&tx, None)?;
+        // A kept thing or an observation takes what carries its words, not
+        // all that was shown it ([`selective_descendants`]); an exchange,
+        // all that derives from it, as before.
+        if record.kind == "observation" || record.kind == "kept" {
+            selective_descendants(&tx, person, links_used)?;
+        } else {
+            descendants(&tx, None)?;
+        }
         for rid in evidence {
             tx.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
         }
@@ -2369,6 +2385,84 @@ fn versions(db: &Connection) -> Result<()> {
     db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT r.newer FROM replacements r JOIN chain c ON r.older=c.rid UNION SELECT r.older FROM replacements r JOIN chain c ON r.newer=c.rid) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[])?;
     Ok(())
 }
+
+/// What goes with a targeted forget of a kept thing or an observation (the
+/// doomed rows, with their versions), by their distinctive words
+/// ([`search::content_words`]): through old source links, every exchange
+/// or observation, of any scope, that carries one of them; and of
+/// `person`'s own, linked or not, every one that carries all of them, a
+/// copy of the fact. A row only shown them, with none of their words,
+/// stays (lamp-06c1, 26 Oct: a forgotten peanut allergy took 75 exchanges,
+/// 73 with no allergy word, all linked because each turn's session was
+/// shown it).
+///
+/// The first builder's condition (#3504): a copy left behind is the
+/// failure that matters, so a linked row goes on one shared word, a few
+/// unrelated ones with it ("allergic to cats" with "allergic to peanuts").
+/// An unlinked one needs every word, or "favourite colour is violet" would
+/// take every "favourite" the person ever said. A mixed exchange goes
+/// whole. A paraphrase with none of the words ("avoid those") stays: old
+/// links say what was shown, not used, and typed provenance is what
+/// replaces this. Facts with no distinctive word take the whole walk
+/// ([`descendants`]), as before, and so does a forget whose links say what
+/// was used (`links_used`), the copies with it. Kept things never go here
+/// unless named.
+fn selective_descendants(db: &Connection, person: &Person, links_used: bool) -> Result<()> {
+    let facts: Vec<String> = db
+        .prepare("SELECT text FROM entries WHERE rid IN (SELECT rid FROM doomed)")?
+        .query_map([], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let terms: BTreeSet<String> = facts
+        .iter()
+        .flat_map(|fact| search::content_words(fact))
+        .collect();
+    if terms.is_empty() {
+        return descendants(db, None);
+    }
+    // Links that say what was used: all that derives goes, as before; the
+    // copies below go too.
+    if links_used {
+        descendants(db, None)?;
+    }
+    let doom = |candidates: Vec<(i64, String)>, every: bool| -> Result<usize> {
+        let mut added = 0;
+        for (rid, body) in candidates {
+            let words: BTreeSet<String> = search::content_words(&body).into_iter().collect();
+            let carries = if every {
+                terms.is_subset(&words)
+            } else {
+                !terms.is_disjoint(&words)
+            };
+            if carries {
+                added += db.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid])?;
+            }
+        }
+        Ok(added)
+    };
+    // The person's own rows that carry the words, wherever they came from.
+    doom(
+        db.prepare("SELECT rid,heard||' '||said||' '||text FROM entries WHERE person=?1 AND kind!='kept' AND rid NOT IN (SELECT rid FROM doomed)")?
+            .query_map([person.as_str()], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?,
+        true,
+    )?;
+    versions(db)?;
+    // And what derives from anything doomed, through links, while it
+    // carries them too.
+    loop {
+        let added = doom(
+            db.prepare("SELECT DISTINCT e.rid,e.heard||' '||e.said||' '||e.text FROM entries e JOIN sources s ON s.child=e.rid WHERE s.parent IN (SELECT rid FROM doomed) AND e.kind!='kept' AND e.rid NOT IN (SELECT rid FROM doomed)")?
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<_>>()?,
+            false,
+        )?;
+        if added == 0 {
+            break;
+        }
+        versions(db)?;
+    }
+    Ok(())
+}
 /// What goes with the doomed rows: for a forget (`expiry` None), all that
 /// derives from them and every version, except a kept thing that isn't
 /// itself doomed already (#3113); for expiry, from the first day whose
@@ -2560,10 +2654,180 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    /// lamp-06c1, 26 Oct (75 exchanges went with one allergy): a targeted
+    /// forget takes every exchange of theirs that carries the fact's words,
+    /// linked to it or not, and none that was only shown it (the first
+    /// builder's condition on #3504, both ways).
+    #[test]
+    fn targeted_forget_keeps_unrelated_exchanges_shown_the_fact() {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-days-selective-forget-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let mut store = Days::open(
+            Options {
+                dir: dir.clone(),
+                keep_days: 30,
+                local: LocalTime::Offset(0),
+            },
+            now,
+        )
+        .unwrap();
+        let person = Person::new("p-0123456789abcdef").unwrap();
+        let evidence = store
+            .append(
+                &person,
+                now,
+                "I am allergic to peanuts",
+                "I will remember",
+                &[],
+            )
+            .unwrap();
+        let allergy = store
+            .remember_from(&person, now, "allergic to peanuts", &[evidence])
+            .unwrap();
+        let weather = store
+            .append(
+                &person,
+                now + 1,
+                "Will it rain tomorrow?",
+                "Sunny skies",
+                &[allergy],
+            )
+            .unwrap();
+        let related = store
+            .append(
+                &person,
+                now + 2,
+                "Can I eat peanuts?",
+                "Avoid peanuts because of your allergy",
+                &[allergy],
+            )
+            .unwrap();
+        let later_weather = store
+            .append(&person, now + 3, "What about Friday?", "Cloudy", &[related])
+            .unwrap();
+        let allergy_reply = store
+            .append(&person, now + 4, "Do I have an allergy?", "Yes", &[allergy])
+            .unwrap();
+        // Never linked to the fact, but a copy of it all the same; and one
+        // with only some of its words, never linked, stays.
+        let unlinked = store
+            .append(
+                &person,
+                now + 5,
+                "Remember I'm allergic to peanuts",
+                "Noted",
+                &[],
+            )
+            .unwrap();
+        let some_words = store
+            .append(
+                &person,
+                now + 6,
+                "I bought peanuts for the party",
+                "Nice",
+                &[],
+            )
+            .unwrap();
+        let unlinked_weather = store
+            .append(&person, now + 7, "Is it windy?", "A little", &[])
+            .unwrap();
+        let unrelated = store.remember(&person, now, "likes jazz").unwrap();
+        assert_eq!(store.forget(&person, allergy).unwrap(), 5);
+        for id in [evidence, allergy, related, allergy_reply, unlinked] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        for id in [
+            weather,
+            later_weather,
+            unlinked_weather,
+            some_words,
+            unrelated,
+        ] {
+            assert!(store.record(&person, id).unwrap().is_some(), "{id}");
+        }
+        // What a search for the fact still finds shares one of its words at
+        // most, and is no copy of it.
+        let found = store
+            .search(
+                &person,
+                &Ask {
+                    query: Some("allergic peanuts"),
+                    day: None,
+                    limit: 8,
+                    max_bytes: 4096,
+                },
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            found.iter().map(|record| record.id).collect::<Vec<_>>(),
+            [some_words]
+        );
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// With `links_used` (the voice's `LAMP_MEMORY_LINK_USED`), a link says
+    /// the turn used the fact, so a linked follow-up without its words goes
+    /// too; without, it stays. An unlinked copy goes either way.
+    #[test]
+    fn with_links_used_a_targeted_forget_takes_all_that_derives() {
+        for links_used in [false, true] {
+            let dir = std::env::temp_dir().join(format!(
+                "lamp-days-links-used-{links_used}-{}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&dir);
+            let now = 1_791_892_800_000;
+            let mut store = Days::open(
+                Options {
+                    dir: dir.clone(),
+                    keep_days: 30,
+                    local: LocalTime::Offset(0),
+                },
+                now,
+            )
+            .unwrap();
+            let person = Person::new("p-0123456789abcdef").unwrap();
+            let teal = store
+                .remember(&person, now, "My favourite colour is teal")
+                .unwrap();
+            let follow_up = store
+                .append(
+                    &person,
+                    now + 1,
+                    "why do I like it?",
+                    "It reminds you of the sea",
+                    &[teal],
+                )
+                .unwrap();
+            let copy = store
+                .append(
+                    &person,
+                    now + 2,
+                    "my favourite colour is teal",
+                    "Noted",
+                    &[],
+                )
+                .unwrap();
+            store.forget_linked(&person, teal, links_used).unwrap();
+            assert!(store.record(&person, copy).unwrap().is_none());
+            assert_eq!(
+                store.record(&person, follow_up).unwrap().is_none(),
+                links_used
+            );
+            drop(store);
+            fs::remove_dir_all(dir).unwrap();
+        }
+    }
+
     /// #2176 (5a): the room's exchange and kept thing become A's, with the
     /// link between them, their search rows, and an exchange derived only
     /// from them; one also derived from something staying stays, its link
-    /// kept, so forgetting either still reaches it. Another person's ids,
+    /// kept. Targeted forgetting keeps the mixed line whose words do not
+    /// expose the named fact. Another person's ids,
     /// an inactive one, or any refused id move nothing.
     #[test]
     fn the_rooms_early_words_are_adopted_whole_and_nothing_else_is() {
@@ -2706,14 +2970,14 @@ mod tests {
         );
         // The room's generation moved on, as for anything of it gone.
         assert_eq!(super::generation(&store.db, &room).unwrap(), generation + 1);
-        // Still the room's, still linked: forgetting A's kept thing takes it.
+        // Still the room's, still linked: its words do not expose this fact.
         assert!(store.record(&room, mixed).unwrap().is_some());
         assert_eq!(
             store.adopt(&room, &a, &[derived]).unwrap_err().code,
             "bad_request"
         );
-        assert_eq!(store.forget(&a, 4).unwrap(), 4);
-        assert!(store.record(&room, mixed).unwrap().is_none());
+        assert_eq!(store.forget(&a, 4).unwrap(), 3);
+        assert!(store.record(&room, mixed).unwrap().is_some());
         assert!(store.record(&room, older).unwrap().is_some());
         drop(store);
         fs::remove_dir_all(dir).unwrap();

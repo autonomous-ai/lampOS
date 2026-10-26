@@ -82,6 +82,10 @@ enum Extra {
         #[serde(default)]
         person: Who,
         id: u64,
+        /// The voice's `LAMP_MEMORY_LINK_USED`: links say what was used
+        /// ([`Days::forget_linked`]). Sent only with the switch.
+        #[serde(default)]
+        links_used: bool,
     },
     SessionOpen {
         #[serde(default)]
@@ -445,8 +449,12 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 )?,
             })
         }
-        Extra::Forget { person, id } => {
-            json!({"ok":true,"removed":store.forget(&one(person)?,id)?})
+        Extra::Forget {
+            person,
+            id,
+            links_used,
+        } => {
+            json!({"ok":true,"removed":store.forget_linked(&one(person)?,id,links_used)?})
         }
         Extra::SessionOpen {
             person,

@@ -1652,7 +1652,11 @@ fn about_same(one: &str, other: &str) -> bool {
         (word.chars().count() > 4 && word.ends_with("ies"))
             .then(|| format!("{}y", &word[..word.len() - 3]))
     };
-    one == other
+    // "Forget my peanut allergy" names a kept "allergic to peanuts"
+    // (lamp-06c1, 26 Oct), as the store's forget groups them.
+    (matches!(one, "allergic" | "allergy" | "allergies")
+        && matches!(other, "allergic" | "allergy" | "allergies"))
+        || one == other
         || about_stem(one) == about_stem(other)
         || ies(one).is_some_and(|one| one == other)
         || ies(other).is_some_and(|other| other == one)
@@ -5634,6 +5638,11 @@ impl DaysClient {
                 true,
             );
         };
+        // An exchange linked only to what its turn used: the store takes all
+        // that derives, not only what carries the words (`links_used`).
+        if request["op"] == "forget" && self.link_used.load(Ordering::Acquire) {
+            request["links_used"] = json!(true);
+        }
         if call.name == RECALL && self.recall_v2.load(Ordering::Acquire) {
             recall_v2_request(&mut request, call, now, zone);
         }
@@ -6126,7 +6135,10 @@ impl DaysClient {
         let mut count = 0usize;
         let mut lapsed = false;
         for id in matching {
-            let forget = for_person(json!({"op":"forget","id":id}), scope);
+            let mut forget = for_person(json!({"op":"forget","id":id}), scope);
+            if self.link_used.load(Ordering::Acquire) {
+                forget["links_used"] = json!(true);
+            }
             let removed = left()
                 .and_then(|left| bounded_exchange_scoped(&self.socket, &forget, left, lease))
                 .and_then(|answer| answer["removed"].as_u64().filter(|_| answer["ok"] == true));
@@ -17743,6 +17755,8 @@ mod tests {
             ("key", "keys"),
             ("glass", "glasses"),
             ("story", "stories"),
+            ("allergy", "allergic"),
+            ("allergies", "allergic"),
             ("address", "address"),
         ] {
             assert!(about_same(one, other), "{one} {other}");

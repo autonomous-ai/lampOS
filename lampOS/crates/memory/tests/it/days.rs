@@ -1381,10 +1381,12 @@ fn protocol_round_trip_records_links_prepares_and_applies_a_job_then_verifies_fo
         NOW,
     );
     assert_eq!(opened["snapshot"]["invalidated"], false);
-    // The fact and the exchange it was taken from go; the earlier exchange
-    // that one was only shown stays (one step back, #2003).
+    // The fact and the exchange it was taken from go, and so does the
+    // earlier exchange that one was only shown, by its words alone: it is a
+    // copy of the fact ("Coffee black"; the first builder's condition on
+    // #3504). Only shown, without them, it would stay (#2003).
     let (forgotten, _) = request(&mut store, json!({"op":"forget","id":fact}), NOW);
-    assert_eq!(forgotten, json!({"ok":true,"removed":2}));
+    assert_eq!(forgotten, json!({"ok":true,"removed":3}));
     let (search, _) = request(&mut store, json!({"op":"search","query":"coffee"}), NOW);
     let found: Vec<u64> = search["entries"]
         .as_array()
@@ -1392,7 +1394,7 @@ fn protocol_round_trip_records_links_prepares_and_applies_a_job_then_verifies_fo
         .iter()
         .map(|entry| entry["id"].as_u64().unwrap())
         .collect();
-    assert_eq!(found, [first]);
+    assert!(found.is_empty(), "{found:?} (first was {first})");
     let (invalidated, _) = request(
         &mut store,
         json!({"op":"session_open","session":"active"}),
@@ -2967,15 +2969,22 @@ fn a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else() {
     }
     assert!(store.record(&mai, theirs).unwrap().is_some());
 
-    // Kept without its conversation, it is as before: that stays.
+    // Kept without its conversation, an exchange that is a copy of it goes
+    // all the same, by its words (the first builder's condition on #3504:
+    // a copy left behind is the failure that matters); one with other
+    // words stays.
     let plain_said = store
         .append(&room, NOW, "the bins go out Friday", "OK", &[])
+        .unwrap();
+    let other = store
+        .append(&room, NOW, "the bins are green", "OK", &[])
         .unwrap();
     let bins = store
         .remember(&room, NOW, "the bins go out on Friday")
         .unwrap();
     store.forget(&room, bins).unwrap();
-    assert!(store.record(&room, plain_said).unwrap().is_some());
+    assert!(store.record(&room, plain_said).unwrap().is_none());
+    assert!(store.record(&room, other).unwrap().is_some());
 }
 
 /// #2176: a kept thing remembered with its conversation outlives that
