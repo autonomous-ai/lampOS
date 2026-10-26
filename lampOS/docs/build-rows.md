@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-26 20:38 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-27 01:30 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 94.0% over 70 rows. Quality 68.2% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 94.0% over 70 rows. Quality 68.9% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -90,7 +90,7 @@ Written by the first builder from the team's review page at 2026-10-26 20:38 (+0
 | Row | Now | Target | Where it is |
 |---|---|---|---|
 | Fast answers | 0.75 | 0.85 | 23 Oct 10:1x, up from 0.7: a real person (the lead, lamp-52e6, build G, 09:16–09:31): the first sound at 1.18–1.71 s on five of six lines, one tool follow-up at 7.8 s. |
-| Knows when you have finished | 0.70 | 0.85 | 25 Oct 16:0x, up from 0.65: on the ship candidate (6786, every part on it, the voice exactly as the product unit sets it) all ten of the owner’s “Lamp, (pause) question” lines were answered, six of them split at the paus… |
+| Knows when you have finished | 0.70 | 0.85 | 27 Oct 01:3x, unchanged: a bare “Lamp.”, a pause, then the request, right after a voice start, still splits and is held in a room not yet known to be quiet. |
 | Cutting in | 0.55 | 0.75 | 25 Oct 19:0x, up from 0.5: on lamp-52e6 with the ship candidate’s own product switches (Seventh, played ElevenLabs lines, an empty room), every real cut-in stopped the story, 4 of 4, with no false stop; |
 | Stop words | 0.55 | 0.75 | 24 Oct 02:0x, up from 0.5: in a quiet room on lamp-52e6, “Stop” during an answer stopped the lamp 10 of 10 times with the stop words on, against 7 of 10 off, with no false stops (Sixth, #2863, made voices from the Mac). |
 | Its own echo | 0.65 | 0.70 | Measured right today (#968): the canceller takes a median 54 dB off the lamp’s own voice on lamp-52e6, the same hardware; |
@@ -98,7 +98,7 @@ Written by the first builder from the team's review page at 2026-10-26 20:38 (+0
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.82 | 0.85 | 26 Oct 14:5x, up from 0.8: on 6999 every reminder set was said: one cut off by people talking is offered again and said (#3523, Third), and the next one triggers the reminders skill again, so no 10 s wait. |
-| Remembers you: your name and what you told it | 0.55 | 0.90 | 26 Oct 09:5x, up from 0.5: on 6963 (the memory switches on in the product) a person nobody knows asking “how do I take my coffee?” got “I don’t actually know that one — you’ve never told me”, not the room’s latte (6919 a… |
+| Remembers you: your name and what you told it | 0.65 | 0.90 | 27 Oct 01:3x, up from 0.6: LAMP_MEMORY_FORGET_ASKS is on in the product (#3601, trains 182 and 183). |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
 | Body | 0.70 | 0.80 | 25 Oct 17:0x, up from 0.65: the livelier postures and nods (#3387) are in the product since train 109 (04:25), and on the ship candidate (6786) lamp-4ace stood for a played question, turned and tilted its head a little b… |
