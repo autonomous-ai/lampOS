@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 e672 scope passed; current product-unit carry qualification active, activation HOLD.
+
+## Current checkpoint: 2026-10-26 22:19 +07, frozen e672 runtime complete
+
+[Executed 87af/e672 proof](verification/own-keys-product-carry-20261026/executed-87af/README.md): fmt/strict nine-crate all-target Clippy, full Body **616/0/0**, Cloud **196/0/4**, Setup **185/0/1**, Update **433/0/6**; total **1,430/0/11**, with four zero-doctest summaries separate. Separate Voice-eval switches **2/0/0**, 236 filtered. All 32 inherited Body/reset/lifecycle controls pass once. No failed target rerun. Source guards cover 7,260 entries; each executable/library/depfile boundary closes before subsequent compilation, so earlier actual-path claims are not transferred after overwrite.
+
+Main's later 2d18 product Voice switch changes embedded readers in Controls, Setup, Skills, Voice, Update, Memory docs and Voice-eval. The next carry preserves both own-keys and room-not-asker settings, with source-derived positive selectors and strict eleven-crate compilation, full Update lib/install and its actual reader targets plus focused readers/activation controls. It does not repeat unrelated Skills or Voice suites or waive their recorded failures. Original 7ae6 native stays separately qualified; 87af source execution will be published for reproducibility. No new device or release action; #2094/current-lamp own-keys acceptance remains.
+
+---
+
 Ready for lamp-voice: #1812 published real-key install supported by combined evidence; attended Body remains open.
 
 ## Current checkpoint: 2026-10-26 22:13 +07, real-signed 7071 release audit

@@ -1,0 +1,356 @@
+{
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_body-9a3084cffe7c83d3)",
+      "sha256": "673c0bcb9571da9b4f00db02b9c2387896aba5a87b5771d6531f75b9361a4cbd"
+    },
+    {
+      "header": "Running unittests src/bin/lamp-body.rs (<target>/debug/deps/lamp_body-d2b3df66074350ff)",
+      "sha256": "1a8a46873d712b8b44ae55e9785f58629f4bda8c717a10176a6695634764af45"
+    },
+    {
+      "header": "Running unittests src/bin/lamp-body-inspect.rs (<target>/debug/deps/lamp_body_inspect-c60b7568c4cb5f76)",
+      "sha256": "af8b0258bd51e45f7408fefe05e5aed789bb9ec128f12a16bb0ac4903d09b1c4"
+    },
+    {
+      "header": "Running unittests src/bin/lamp-body-measure.rs (<target>/debug/deps/lamp_body_measure-ff7ede88daa7f802)",
+      "sha256": "3a496b337c5276d97dd0558405652bc6d769d308dd88ef04eea20720dde2da2f"
+    },
+    {
+      "header": "Running unittests src/bin/lamp-body-mood.rs (<target>/debug/deps/lamp_body_mood-7d4a4c39f55e0514)",
+      "sha256": "5f00a83645178f3073da23c8b77eaa0a4710dc84a474296854526c45d8461b33"
+    },
+    {
+      "header": "Running unittests src/bin/lamp-body-worker.rs (<target>/debug/deps/lamp_body_worker-c068d37832f930aa)",
+      "sha256": "b771bbcdf756ddd1d5f0c959b2c2b89306571e5718801959f658bfb2715e1e07"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-5dc0cdfbe04edf67)",
+      "sha256": "c6fe3f86af33953a4a7c4b4a5ce2256f8007440ff56aa6d7129c19f769011e49"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "sha256": "b041d3b5cd983b420221f8cd1b916138a0c49e03c3ead4acd382dd334ab1bf9b"
+    },
+    {
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_cloud-1c47c58298f82759)",
+      "sha256": "0797db8eeff66ee115d325a54fa9613e51bf7657a55cb816d02e47c22999113e"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-22ec483085f489b5)",
+      "sha256": "8fc129227384dfa6bdd43e82851d68f32919955d5587bc8adad1380a44e77cfe"
+    },
+    {
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-5789435aefd285ed)",
+      "sha256": "83c509e30ad92746a4099ed08b10e940f6d0bf1735b710dd6b0d5fab3046d65a"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_setup-f0a62477763d1dfe)",
+      "sha256": "4639af108ecb363d6897859440be5443571b052deb3fc67895735f320ba6b1ff"
+    },
+    {
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_setup-4d754dc858adcfd1)",
+      "sha256": "d1ec923029f16b3418f25891c7e49d834b8ed25d4e3f87fc42f8dfc7c6bc5a45"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-b746a6002254d9b5)",
+      "sha256": "cf0e59efec6e19e70777945d186593209830a21b36ee765d42c8eb5501e7ae83"
+    },
+    {
+      "header": "Running tests/wake.rs (<target>/debug/deps/wake-5c5bb89a9b6429fc)",
+      "sha256": "531d901cea0ed92a6d9cf60897d4b1839c9540c77fbec2c6330c26a8bfc3b2eb"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-f4e848b1a6aff562)",
+      "sha256": "54c3008298f6522c33a0fd82b27a2c07b5ece49eb3c41221ac462f17b4f93d88"
+    },
+    {
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_update-843c35cf761e2286)",
+      "sha256": "8b8c5c0fd2c41192857466d213835a85b33e3c30a28eea22f247077044c78244"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-1eb7b1b7705581e4)",
+      "sha256": "ea2afd4b67c1042db24ac193ce80870097e6938f2cedcc6dc9cdc2f1de6c3380"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-43fc3d52075118c7)",
+      "sha256": "adfab6c2096ef61ec1f1184431bcd8f92f7651427324e770212115e5cd128173"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-a52c58bd90cde5cb)",
+      "sha256": "ba5b38287f5859a5fcba6fd714f1afe1bdaf2168871d3ad80eee5276fa59ef37"
+    },
+    {
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-39e380413e007b93)",
+      "sha256": "f9b44dd5537faaa973fffb758f5bc9229ef649d8bf465b0b14dc7af44aec62b1"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-05c322f97c297719)",
+      "sha256": "5bc74e54b95f01199cd9a8d443794d00f45e346b8c9f5c2e035827618f6d70c7"
+    },
+    {
+      "header": "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-8c3679ee7bcadbf9)",
+      "sha256": "a8f8f36b51e8164d4d5ac65126dc9b52c2ba3fca9d6823e8c9786b52fa3bc5ae"
+    },
+    {
+      "header": "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-2c934a199982f37e)",
+      "sha256": "b881ff78ffae1393208e641cdb58c56407ed0cc3189d8ea6e17a7956e0135379"
+    }
+  ],
+  "scope": "four-crates",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_body-9a3084cffe7c83d3)",
+      "ignored": 0,
+      "literal": "test result: ok. 448 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.10s",
+      "passed": 448,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/bin/lamp-body.rs (<target>/debug/deps/lamp_body-d2b3df66074350ff)",
+      "ignored": 0,
+      "literal": "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "passed": 32,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/bin/lamp-body-inspect.rs (<target>/debug/deps/lamp_body_inspect-c60b7568c4cb5f76)",
+      "ignored": 0,
+      "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 2,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/bin/lamp-body-measure.rs (<target>/debug/deps/lamp_body_measure-ff7ede88daa7f802)",
+      "ignored": 0,
+      "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "passed": 5,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/bin/lamp-body-mood.rs (<target>/debug/deps/lamp_body_mood-7d4a4c39f55e0514)",
+      "ignored": 0,
+      "literal": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 3,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/bin/lamp-body-worker.rs (<target>/debug/deps/lamp_body_worker-c068d37832f930aa)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 1,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-5dc0cdfbe04edf67)",
+      "ignored": 0,
+      "literal": "test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+      "passed": 125,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_cloud-a5bd7092cbd06c22)",
+      "ignored": 2,
+      "literal": "test result: ok. 166 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 6.23s",
+      "passed": 166,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_cloud-1c47c58298f82759)",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-22ec483085f489b5)",
+      "ignored": 0,
+      "literal": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.32s",
+      "passed": 30,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-5789435aefd285ed)",
+      "ignored": 2,
+      "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_setup-f0a62477763d1dfe)",
+      "ignored": 0,
+      "literal": "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+      "passed": 16,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_setup-4d754dc858adcfd1)",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-b746a6002254d9b5)",
+      "ignored": 1,
+      "literal": "test result: ok. 163 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.40s",
+      "passed": 163,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/wake.rs (<target>/debug/deps/wake-5c5bb89a9b6429fc)",
+      "ignored": 0,
+      "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s",
+      "passed": 6,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-f4e848b1a6aff562)",
+      "ignored": 2,
+      "literal": "test result: ok. 124 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.32s",
+      "passed": 124,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_update-843c35cf761e2286)",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-1eb7b1b7705581e4)",
+      "ignored": 0,
+      "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+      "passed": 5,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/install.rs (<target>/debug/deps/install-43fc3d52075118c7)",
+      "ignored": 0,
+      "literal": "test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 118.74s",
+      "passed": 108,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-a52c58bd90cde5cb)",
+      "ignored": 0,
+      "literal": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s",
+      "passed": 13,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-39e380413e007b93)",
+      "ignored": 2,
+      "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/round.rs (<target>/debug/deps/round-05c322f97c297719)",
+      "ignored": 0,
+      "literal": "test result: ok. 183 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 268.24s",
+      "passed": 183,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-8c3679ee7bcadbf9)",
+      "ignored": 1,
+      "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-2c934a199982f37e)",
+      "ignored": 1,
+      "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Doc-tests lamp_body",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Doc-tests lamp_cloud",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Doc-tests lamp_setup",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Doc-tests lamp_update",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    }
+  ]
+}

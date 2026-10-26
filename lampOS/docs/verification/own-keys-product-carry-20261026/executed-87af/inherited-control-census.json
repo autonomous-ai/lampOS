@@ -1,0 +1,226 @@
+[
+  {
+    "observed_lines": [
+      "test body::tests::without_own_ranges_the_servos_limits_change_nothing ... ok"
+    ],
+    "path": "lampOS/crates/body/src/body/tests.rs",
+    "test": "without_own_ranges_the_servos_limits_change_nothing"
+  },
+  {
+    "observed_lines": [
+      "test body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before ... ok"
+    ],
+    "path": "lampOS/crates/body/src/body/tests.rs",
+    "test": "with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before"
+  },
+  {
+    "observed_lines": [
+      "test body::tests::with_own_ranges_a_home_outside_them_is_refused ... ok"
+    ],
+    "path": "lampOS/crates/body/src/body/tests.rs",
+    "test": "with_own_ranges_a_home_outside_them_is_refused"
+  },
+  {
+    "observed_lines": [
+      "test body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window ... ok"
+    ],
+    "path": "lampOS/crates/body/src/body/tests.rs",
+    "test": "with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window"
+  },
+  {
+    "observed_lines": [
+      "test body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold ... ok"
+    ],
+    "path": "lampOS/crates/body/src/body/tests.rs",
+    "test": "with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold"
+  },
+  {
+    "observed_lines": [
+      "test body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start ... ok"
+    ],
+    "path": "lampOS/crates/body/src/body/tests.rs",
+    "test": "with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start"
+  },
+  {
+    "observed_lines": [
+      "test body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone ... ok"
+    ],
+    "path": "lampOS/crates/body/src/body/tests.rs",
+    "test": "own_ranges_check_every_pose_and_leave_a_full_turn_alone"
+  },
+  {
+    "observed_lines": [
+      "test reset::a_reset_waits_for_every_part_of_the_target_before_wiping ... ok"
+    ],
+    "path": "lampOS/crates/setup/tests/it/reset.rs",
+    "test": "a_reset_waits_for_every_part_of_the_target_before_wiping"
+  },
+  {
+    "observed_lines": [
+      "test reset::a_reset_stops_the_writers_outside_the_target_after_what_starts_them ... ok"
+    ],
+    "path": "lampOS/crates/setup/tests/it/reset.rs",
+    "test": "a_reset_stops_the_writers_outside_the_target_after_what_starts_them"
+  },
+  {
+    "observed_lines": [
+      "test reset::the_updaters_way_back_restarts_nothing_after_the_barrier ... ok"
+    ],
+    "path": "lampOS/crates/setup/tests/it/reset.rs",
+    "test": "the_updaters_way_back_restarts_nothing_after_the_barrier"
+  },
+  {
+    "observed_lines": [
+      "test reset::a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile ... ok"
+    ],
+    "path": "lampOS/crates/setup/tests/it/reset.rs",
+    "test": "a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile"
+  },
+  {
+    "observed_lines": [
+      "test reset::parts_that_cannot_be_read_reboot_without_wiping ... ok"
+    ],
+    "path": "lampOS/crates/setup/tests/it/reset.rs",
+    "test": "parts_that_cannot_be_read_reboot_without_wiping"
+  },
+  {
+    "observed_lines": [
+      "test reset::a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup ... ok"
+    ],
+    "path": "lampOS/crates/setup/tests/it/reset.rs",
+    "test": "a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup"
+  },
+  {
+    "observed_lines": [
+      "test reset::only_a_systemctl_stop_of_a_target_names_its_parts ... ok"
+    ],
+    "path": "lampOS/crates/setup/tests/it/reset.rs",
+    "test": "only_a_systemctl_stop_of_a_target_names_its_parts"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins ... ok"
+    ],
+    "path": "lampOS/crates/update/src/setup_lifecycle.rs",
+    "test": "manager_identity_requires_the_exact_loaded_product_with_known_dropins"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown ... ok"
+    ],
+    "path": "lampOS/crates/update/src/setup_lifecycle.rs",
+    "test": "incomplete_duplicate_or_malformed_manager_records_are_unknown"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "completed_product_setup_keeps_serving_without_restart_or_false_rollback"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "incomplete_product_setup_still_restarts_and_is_watched"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "custom_base_units_and_candidate_changes_keep_normal_watch_rules"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "unknown_dropins_at_each_scope_keep_normal_watch_rules"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "uncertain_override_files_do_not_hang_or_grant_the_exception"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "a_different_failed_part_still_rolls_back_without_restarting_completed_setup"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "completion_after_the_activity_snapshot_is_rechecked_before_restart"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "reset_removing_completion_before_restart_retains_the_normal_watch"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "reset_removing_completion_before_recovery_restarts_the_old_setup"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::completion_removed_during_the_manager_query_is_not_used ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "completion_removed_during_the_manager_query_is_not_used"
+  },
+  {
+    "observed_lines": [
+      "test setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit ... ok"
+    ],
+    "path": "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "test": "recovery_rechecks_effective_aliases_after_restoring_the_old_unit"
+  }
+]

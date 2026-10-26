@@ -1,0 +1,44 @@
+{
+  "per_crate": {
+    "body": [
+      616,
+      0,
+      0
+    ],
+    "cloud": [
+      196,
+      0,
+      4
+    ],
+    "setup": [
+      185,
+      0,
+      1
+    ],
+    "update": [
+      433,
+      0,
+      6
+    ]
+  },
+  "outer_total": [
+    1430,
+    0,
+    11
+  ],
+  "nested_child_summaries": 0,
+  "doctest_summaries": 4,
+  "voice_eval_switches": {
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 236
+  },
+  "required_inherited_controls": {
+    "body": 7,
+    "setup": 7,
+    "update": 18,
+    "each_passed_once": true
+  },
+  "runtime_elapsed_seconds": 424.709
+}

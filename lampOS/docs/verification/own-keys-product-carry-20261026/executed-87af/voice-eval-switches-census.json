@@ -1,0 +1,21 @@
+{
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-1253a8d74d54cde9)",
+      "sha256": "9ad81ea5002d6ab90fa499d019d61e1c3b4c4db92ba5d9ffeeb22579ddbad273"
+    }
+  ],
+  "scope": "voice-eval-switches",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 236,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-1253a8d74d54cde9)",
+      "ignored": 0,
+      "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 236 filtered out; finished in 0.00s",
+      "passed": 2,
+      "status": "ok"
+    }
+  ]
+}

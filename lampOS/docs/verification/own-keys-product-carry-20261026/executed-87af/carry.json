@@ -1,0 +1,36 @@
+{
+  "base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+  "clean": true,
+  "head": "87afb0cb0e7a91c0f8377afde3a181edc99d55a2",
+  "old_base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+  "old_head": "7ae6afbd9f9cef3610362e3310792401833f6d91",
+  "range_diff": "1:  b6ae01b219 = 1:  db55a49056 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  fd6233ef7f = 2:  6d540ae159 lampOS: preserve customized own-keys drop-ins\n3:  8a73662900 = 3:  30f5a94bed lampOS: record current own-keys carry qualification\n4:  ca74229fa9 = 4:  9796f63089 lampOS: clarify own-keys activation and per-unit overrides\n5:  8835be7069 = 5:  671faa845e lampOS: record own-keys qualification on the d21 base\n6:  6eb81c91f2 = 6:  f039640990 lampOS: retain own-keys scheduling and product-reader checks\n7:  7ae6afbd9f = 7:  87afb0cb0e lampOS: qualify own-keys carry with current product units",
+  "seven_equal_patches": true,
+  "shared_docs_inherit_exact_upstream_patch": [
+    "lampOS/docs/setup.md",
+    "lampOS/docs/switches.md"
+  ],
+  "source_entries": 7260,
+  "unchanged_authored_files": 36,
+  "whole_repository_changed_paths": [
+    "lampOS/crates/body/src/bin/lamp-body.rs",
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/crates/body/src/poses.rs",
+    "lampOS/crates/setup/src/main.rs",
+    "lampOS/crates/setup/src/reset.rs",
+    "lampOS/crates/setup/tests/it/reset.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/src/setup_lifecycle.rs",
+    "lampOS/crates/update/src/world.rs",
+    "lampOS/crates/update/tests/round.rs",
+    "lampOS/crates/update/tests/round/setup_lifecycle.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/build-rows.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/setup.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/updates.md"
+  ]
+}

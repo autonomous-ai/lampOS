@@ -1,0 +1,42 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "path": "<target>/debug/deps/it-1253a8d74d54cde9",
+    "sha256": "9ad81ea5002d6ab90fa499d019d61e1c3b4c4db92ba5d9ffeeb22579ddbad273",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<source>/lampOS/crates/voice-eval/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "path": "<target>/debug/lamp-voice-eval",
+    "sha256": "d8df1fe5f77da8025fbdbbedeeb3e97e00e38bf8e4745ae910552e3af159e5f7",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-voice-eval",
+      "src_path": "<source>/lampOS/crates/voice-eval/src/main.rs",
+      "test": true
+    }
+  }
+]

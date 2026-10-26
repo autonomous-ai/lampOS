@@ -1,0 +1,78 @@
+{
+  "complete": {
+    "base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+    "complete": true,
+    "head": "87afb0cb0e7a91c0f8377afde3a181edc99d55a2",
+    "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+    "scopes": [
+      "four-crates",
+      "voice-eval-switches"
+    ],
+    "source_entries": 7260,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+    "controller_sha256": "dfaa0e63e2651134a7944b5ed17b66a1ace1603be55f06946d79b26d89428693",
+    "head": "87afb0cb0e7a91c0f8377afde3a181edc99d55a2",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 90076987392,
+      "elapsed_seconds": 78.526,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "5ff0bb128a067a8c9520c6568a851421aa340880573c02e5f3c13229d92031b3",
+      "source_entries": 7260,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 89820864512,
+      "elapsed_seconds": 6.816,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7260,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_sha256": "228570875fa327ba62a39ce0416f19436b2759292eae4b0b0f0c296cf2ad3650"
+}
