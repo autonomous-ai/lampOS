@@ -1,0 +1,106 @@
+{
+  "actual_and_preserved_copy_rechecked": true,
+  "compiler_artifact_receipt_sha256": "d647f380c6897ac657703ff8e8fcfae372ad87241b1d5c3b57cfde10b860258d",
+  "complete_receipt_sha256": "1ea2bd7a9240a1f84859b28de324dbd4ef65caf4a90b7639168be09885facde1",
+  "identity": {
+    "base": "cced429433211e06790f23ed8f51e07be613972d",
+    "head": "077734181546b581d00ecb2bc507f57ff72f6460",
+    "scope": "Independent Mac source review and four supported Reader cases; changed sentinel is Linux-only and is not executed here."
+  },
+  "library_executable_sha256": "a57663fd4301ae5c3a705f3b8775a62286128b5d0657a8138d42a6010a0c196a",
+  "limits": "Four supported Mac Reader cases only. Changed sentinel is Linux-only and was not executed. No original failure cause, privileged DAC, full Voice, device or physical acceptance claim.",
+  "schema": 1,
+  "source_inventory_sha256": "8a4c5e35f14b61336a93350acf441b3c812e255a365dd4a16740e71c87b78423",
+  "source_review": {
+    "all_other_test_source_bytes_unchanged_except_scope_comment": true,
+    "base": "cced429433211e06790f23ed8f51e07be613972d",
+    "changed_paths": [
+      "lampOS/crates/voice/src/session_reader/tests.rs",
+      "lampOS/docs/realtime-tests.md"
+    ],
+    "guard_lifetime": "Declared after fixture and before prepare; persists through grant refusal and sentinel mode assertion; drops before fixture. Thread-local and Rc PhantomData prevent cross-thread transfer.",
+    "head": "077734181546b581d00ecb2bc507f57ff72f6460",
+    "limits": "Read only; no proof of the earlier failure cause and no Linux runtime result.",
+    "only_test_code_insertion": "let _root = FixtureRoot::enter(&fixture.root);",
+    "production_files_unchanged": true
+  },
+  "source_review_sha256": "1141897c24a3e43cedec95849331eea974bce9cf3113793f4b67073a58942b06",
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.953,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "b89e426684d38eda1e9e31827912441c4cf1b905ff1e019435e3d4fca07a5911",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "fmt"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 55.352,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "ab92e715aca3143a7b908364ebc785e3cb667d36f5bb6a41eb3ae650256a4e58",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "clippy"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 105.666,
+      "exit_code": 0,
+      "log_sha256": "3abb6ca894cab54ddde59d60fdb63936288f952518a5f94b786c417468070474",
+      "receipt_sha256": "704b1388f1a464fcde8b250c4d5ecf0a076d93902002a4eca1d45077a50aabd1",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "compile"
+    },
+    {
+      "command": [
+        "<target>/debug/deps/lamp_voice-d0423b4e04fbfa63",
+        "session_reader::tests::",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 2.087,
+      "exit_code": 0,
+      "log_sha256": "9eabbbe0bbf53ec274236899843ad35d62e5eaabffa2c0b629bc63e6386d1feb",
+      "receipt_sha256": "4b6aef19b54bc7d61bd9e8547b3cd0cf218a329311fb3dfce9e2153688026a9e",
+      "source_entries": 7220,
+      "source_unchanged": true,
+      "stage": "supported-reader"
+    }
+  ],
+  "supported_test_output": "\nrunning 4 tests\ntest session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group ... ok\ntest session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure ... ok\ntest session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded ... ok\ntest session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3810 filtered out; finished in 0.05s\n\n"
+}

@@ -1,5 +1,15 @@
 Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
 
+## Current checkpoint: 2026-10-26 12:38 +07, independent Reader sentinel review complete
+
+[Independent #3543 review](verification/reader-sentinel-second-review-20261026/README.md) at `077734181` finds no P1/P2. Exact-head Mac fmt, strict all-target Voice Clippy, compilation and four supported Reader tests pass **4/0/0**, with source and actual/preserved library executable hashes unchanged. The changed Linux-only sentinel case was not executed locally. The one new guard and comment wording are the only test-file differences; production, every assertion and unscoped security fixtures remain unchanged. The pinned scope covers prepare through grant and sentinel verification. No cause is inferred for the earlier a8 failure, and the existing generic grant-error assertion remains generic.
+
+Both Second fixture PRs remain current and offered for the train. Own-keys current native Linux Clippy passed; ARM64 continues, with activation HOLD unchanged. No release, provider, key, device or local ARM64 action ran.
+
+---
+
+Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
+
 ## Current checkpoint: 2026-10-26 12:32 +07, IPC current native pass and sentinel review next
 
 [#3528](https://github.com/autonomous-ai/lampOS/pull/3528) current `d8dc4cca8` on cced has [original native qualification](verification/ipc-log-no-wait-20261026/native-d8dc/README.md): ARM64 **40272890604** reports **11,357 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**, with the changed IPC case once at ordinal 3081 and 35 identical display echoes excluded. Separate process **13/0**, docs **4/0** across 46 summaries, relay success and helper **25/0** pass. Linux Clippy **40272890603** passes. Both actual checkouts are preview `8df5d3993`, with exact cced/d8dc parents and the authored complete tree. No run was retried. Third's independent current-head IPC gate passes **26 ordinary tests + one doctest + relay success**, all eight executable copies retained. No P1/P2 is open and the PR is offered ready; Reviewer-two's current audit remains separate.
