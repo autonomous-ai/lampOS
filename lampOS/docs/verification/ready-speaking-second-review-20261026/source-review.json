@@ -1,0 +1,11 @@
+{
+  "head": "5713bece435526832373cc9de38db99a39fc706f",
+  "production_prefix_unchanged": true,
+  "target_assertions_unchanged": true,
+  "source_sha256": "3c3ab3a8c50234b2b40962546cb6fc053efe94c391da2df3de5c19871cd859e1",
+  "notes": [
+    "Original fixture callers route through with_initial_voice(..., true).",
+    "Changed case opts out of initial voice, declares its publisher before Ready, publishes identical Speaking value once immediately before one step.",
+    "500 ms declaration lifespan and expiry grace unchanged. No retry, refresh loop, expiry extension, or private control execution."
+  ]
+}

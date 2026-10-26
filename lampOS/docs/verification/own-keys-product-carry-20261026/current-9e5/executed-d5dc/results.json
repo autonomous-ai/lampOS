@@ -1,0 +1,585 @@
+{
+  "artifact_manifest_sha256": "d1b2e8d48fe1a3f4b01a87e7ca47fe5ba000dd9bfb56306ca21f6f4e069a2bb6",
+  "artifact_scope": "Actual compiler-emitted executable hashes rechecked unchanged; preserved copies also rechecked.",
+  "complete_marker_sha256": "faa35c87793bdb2d3370df23968127b487e0cc015545c671665491712694e835",
+  "controller_sha256": "2ba07145b0692060d1e8126ba34826dad6e774b0a10069eda89c4159170b89ad",
+  "count_scope": "Sum of the listed full-run libtest summaries only. Focused reruns and relay are separate. This is not a native nextest unique-case census; interleaved summaries are not assigned to crate headers.",
+  "full_literal_summary_totals": {
+    "failed": 0,
+    "ignored": 44,
+    "passed": 6708
+  },
+  "full_scope_packages": [
+    "lamp-update",
+    "lamp-voice",
+    "lamp-selftest",
+    "lamp-setup",
+    "lamp-cloud",
+    "lamp-health",
+    "lamp-controls",
+    "lamp-skills",
+    "lamp-voice-eval"
+  ],
+  "identity": {
+    "affected": [
+      "lamp-update",
+      "lamp-voice",
+      "lamp-selftest",
+      "lamp-setup",
+      "lamp-cloud",
+      "lamp-health",
+      "lamp-controls",
+      "lamp-skills",
+      "lamp-voice-eval"
+    ],
+    "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+    "head": "b2c75ba618dd15e97dfaa133c81320b6d8095777",
+    "reason": "New upstream Voice name routing and product unit changes require current own-keys product readers; run the nine selected crates in the same feature graph as compilation. IPC upstream changes are test-only. No local full workspace, ARM64 or device test."
+  },
+  "kind": "ownkeys",
+  "limits": "Mac host gate only. No ARM64, device, provider, activation, release or physical latency acceptance. This packet does not waive or rewrite any earlier failed gate or artifact guard.",
+  "packet_generator_sha256": "23505fcae9afa2237a1dce4a2491b4cd359eb0036549cd49c8e2eaa9e10a8f5e",
+  "schema": 1,
+  "source_inventory": {
+    "bytes_modes_and_file_set_rechecked": true,
+    "entry_count": 7258,
+    "sha256": "a974219c5fd585f90dcea7c7f5d71d56fecc92fa862efb1a6389d99e35b3309a"
+  },
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.84,
+      "exit_code": 0,
+      "label": "fmt",
+      "literal_summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "da387c8cb1d39889f572231b4f2753d86dbff2b6ddba52a8d5cef830df1f46c1",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 78.593,
+      "exit_code": 0,
+      "label": "clippy",
+      "literal_summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "95b47c8bd5b87bb1242fec692042eef60eced3d85155035e457a68a672df0706",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 231.968,
+      "exit_code": 0,
+      "label": "compile",
+      "literal_summaries": [],
+      "log_sha256": "0f96a1d9c4ab9865c140da5406768a84f46f698a9f1243433bfb6deb01887bf9",
+      "receipt_sha256": "6e5eb674c999f3b8437390273c5f874e4c47ec734ba56005ac3e7a431c67398e",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 1531.744,
+      "exit_code": 0,
+      "label": "affected-full",
+      "literal_summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "literal": "test result: ok. 166 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 35.37s",
+          "measured": 0,
+          "passed": 166
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.61s",
+          "measured": 0,
+          "passed": 30
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s",
+          "measured": 0,
+          "passed": 34
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 2
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "literal": "test result: ok. 470 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 14.37s",
+          "measured": 0,
+          "passed": 470
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "literal": "test result: ok. 1 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 7.20s",
+          "measured": 0,
+          "passed": 1
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+          "measured": 0,
+          "passed": 9
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s",
+          "measured": 0,
+          "passed": 42
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 3
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.36s",
+          "measured": 0,
+          "passed": 46
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 77 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.52s",
+          "measured": 0,
+          "passed": 77
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 1
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+          "measured": 0,
+          "passed": 16
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "literal": "test result: ok. 156 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.71s",
+          "measured": 0,
+          "passed": 156
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.90s",
+          "measured": 0,
+          "passed": 6
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 157 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.40s",
+          "measured": 0,
+          "passed": 157
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.41s",
+          "measured": 0,
+          "passed": 20
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "literal": "test result: ok. 312 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 174.83s",
+          "measured": 0,
+          "passed": 312
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 8,
+          "literal": "test result: ok. 2 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+          "measured": 0,
+          "passed": 2
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.71s",
+          "measured": 0,
+          "passed": 31
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "literal": "test result: ok. 122 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.60s",
+          "measured": 0,
+          "passed": 122
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+          "measured": 0,
+          "passed": 5
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 172.76s",
+          "measured": 0,
+          "passed": 108
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.49s",
+          "measured": 0,
+          "passed": 13
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 167 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 393.92s",
+          "measured": 0,
+          "passed": 167
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 15,
+          "literal": "test result: ok. 3803 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 542.66s",
+          "measured": 0,
+          "passed": 3803
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 1
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.19s",
+          "measured": 0,
+          "passed": 275
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 6,
+          "literal": "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 4
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+          "measured": 0,
+          "passed": 6
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 378 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.58s",
+          "measured": 0,
+          "passed": 378
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.54s",
+          "measured": 0,
+          "passed": 7
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 67.19s",
+          "measured": 0,
+          "passed": 238
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "log_sha256": "b36dfee18601c667f619e6f81210b6bf1fca799b09b1d47bd16bf67d54c1f1ea",
+      "receipt_sha256": "9191107efca99d94513b1dddf7acc6dca929633c0d054df12798c3ae6fa672fe",
+      "relay_lines": [],
+      "source_unchanged": true
+    }
+  ]
+}

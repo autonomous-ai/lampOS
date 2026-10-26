@@ -1,0 +1,21 @@
+{
+  "different_entry": {
+    "after": "100644 blob 6e704abbd46d3d033ffa11827fa5c8e210894ef8",
+    "before": "100644 blob c7e772ed476821dbb404fd9d8ee02d6133645b94",
+    "path": "lampOS/docs/addons.md"
+  },
+  "final_base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+  "final_fmt_clippy_and_artifact_guards": "completed successfully; see final-checks.json",
+  "final_head": "4d19d739ba5c71bf4316baf584bf10a2155f78f4",
+  "full_gate_remains_bound_to_tested_head": true,
+  "full_repository_entry_count": 10690,
+  "only_differing_blob_or_mode": [
+    "lampOS/docs/addons.md"
+  ],
+  "range_diff": "1:  c75606ed6c = 1:  d545049430 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  56a65a5541 = 2:  d692ff9cdc lampOS: preserve customized own-keys drop-ins\n3:  fbdd0109d5 = 3:  4f22699fe1 lampOS: record current own-keys carry qualification\n4:  c3b5626374 = 4:  df4722d4c1 lampOS: clarify own-keys activation and per-unit overrides\n5:  bcf2b1e2e6 = 5:  db41e2c157 lampOS: record own-keys qualification on the d21 base\n6:  c7ffb5298c = 6:  f1d053c000 lampOS: retain own-keys scheduling and product-reader checks\n7:  b2c75ba618 = 7:  4d19d739ba lampOS: qualify own-keys carry with current product units\n",
+  "same_path_set": true,
+  "seven_equal_patches": true,
+  "tested_base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+  "tested_head": "b2c75ba618dd15e97dfaa133c81320b6d8095777",
+  "unchanged_entries": 10689
+}

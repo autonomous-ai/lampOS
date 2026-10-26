@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3542 and #3528 delivered; #3510 current native pending and activation HOLD.
+
+## Current checkpoint: 2026-10-26 13:54 +07, own-keys current carry pushed and Expression review passed
+
+[#3510 current carry proof](verification/own-keys-product-carry-20261026/current-9e5/README.md): pushed `4d19d739b` on latest `9e5d3b9c6`. The combined nine-crate gate on `b2c75ba61`/d5dc passes **6,708/0/44**, with 7,258 source entries and all sixty actual/preserved executable hashes unchanged. Its first evidence-parser attempt rejected two valid summary lines without semicolons; the narrow additive parser correction retains every original line and repeats no test. Final-head fmt/strict nine-crate Clippy pass, all sixty executable pairs still match, and the complete repository comparison differs only at addons.md. Counts retain their executed head; no full suite was repeated for that documentation-only carry. Original current ARM64 40282211747 and Linux Clippy 40282212093 now run. Activation HOLD remains.
+
+[Independent #3548 review](verification/ready-speaking-second-review-20261026/review.md) finds no P1/P2 on offered `5713bece4`/cced. Mac fmt, strict Expression Clippy and full Expression **340/0/0** pass; all 7,220 source entries and eight executable pairs remain unchanged. Production and target assertions are unchanged; one Speaking observation follows setup, without a refresh loop. The author's newer-base carry is pending; this execution is not relabeled onto it. No device or physical timing claim.
+
+---
+
 Ready for lamp-voice: #3542 and #3528 delivered; #3510 activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 13:45 +07, public add-on contract review complete

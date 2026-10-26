@@ -1,0 +1,10 @@
+{
+  "old": "b2c75ba618dd15e97dfaa133c81320b6d8095777",
+  "head": "4d19d739ba5c71bf4316baf584bf10a2155f78f4",
+  "base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+  "changed_files": [
+    "lampOS/docs/addons.md"
+  ],
+  "range_diff": "1:  c75606ed6c = 1:  d545049430 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  56a65a5541 = 2:  d692ff9cdc lampOS: preserve customized own-keys drop-ins\n3:  fbdd0109d5 = 3:  4f22699fe1 lampOS: record current own-keys carry qualification\n4:  c3b5626374 = 4:  df4722d4c1 lampOS: clarify own-keys activation and per-unit overrides\n5:  bcf2b1e2e6 = 5:  db41e2c157 lampOS: record own-keys qualification on the d21 base\n6:  c7ffb5298c = 6:  f1d053c000 lampOS: retain own-keys scheduling and product-reader checks\n7:  b2c75ba618 = 7:  4d19d739ba lampOS: qualify own-keys carry with current product units",
+  "scope": "All repository blobs and modes except addons.md unchanged; 6708/0/44 execution remains on old head, not relabeled."
+}

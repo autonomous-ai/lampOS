@@ -1,0 +1,89 @@
+{
+  "actual_and_preserved_executables_rechecked": 60,
+  "complete_marker": {
+    "all_tested_executables_unchanged": true,
+    "base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+    "complete": true,
+    "executable_count": 60,
+    "head": "4d19d739ba5c71bf4316baf584bf10a2155f78f4",
+    "source_unchanged": true,
+    "test_execution": "6708/0/44 remains b2c75ba61/d5dc; only addons.md differs in complete repository comparison"
+  },
+  "complete_marker_sha256": "9e59b76ea01bdd90062d88f0d4ac1d0425d86df9363a2080efc416fe5d21caf9",
+  "full_test_execution": {
+    "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+    "failed": 0,
+    "head": "b2c75ba618dd15e97dfaa133c81320b6d8095777",
+    "ignored": 44,
+    "passed": 6708,
+    "rerun_after_docs_only_carry": false
+  },
+  "identity": {
+    "base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+    "head": "4d19d739ba5c71bf4316baf584bf10a2155f78f4"
+  },
+  "original_executable_manifest_sha256": "d1b2e8d48fe1a3f4b01a87e7ca47fe5ba000dd9bfb56306ca21f6f4e069a2bb6",
+  "schema": 1,
+  "scope": "Current formatting, strict nine-crate Clippy and source/executable guards; prior full test execution retains its original source identity. No native/device/activation/release acceptance.",
+  "source_bytes_modes_and_file_set_rechecked": true,
+  "source_entries": 7258,
+  "source_inventory_sha256": "9e81a29b191a40ba4daf6cc9519de3d92fed4a0abfbaf988014843cca720f7a2",
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.24,
+      "exit_code": 0,
+      "label": "fmt",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_receipt_sha256": "533f5d9f8cb899da745d7d8c07c84189e0c0666d2b924d4b71a009d51184f6f3",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 69.971,
+      "exit_code": 0,
+      "label": "clippy",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_receipt_sha256": "fd0aa1431e12f5d061a43ecbc4be1fa8e63a49ae2cd47fc2369715cff456c8a6",
+      "source_entries": 7258,
+      "source_unchanged": true
+    }
+  ]
+}

@@ -1,0 +1,1022 @@
+[
+  {
+    "actual_executable": "<target>/debug/deps/lamp_selftest-7e2f610b1475f41d",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/selftest/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/selftest#lamp-selftest@0.1.0",
+    "preserved_copy": "<gate>/artifacts/0-lamp_selftest-7e2f610b1475f41d",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "27415e633910e588b2dc91048b382cb52bee5ae62e6fa7625ed2de3e5b956730",
+    "source": "<source>/lampOS/crates/selftest/src/main.rs",
+    "target": "lamp-selftest",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_selftest-00a2f75ed0e580b5",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/selftest/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/selftest#lamp-selftest@0.1.0",
+    "preserved_copy": "<gate>/artifacts/1-lamp_selftest-00a2f75ed0e580b5",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "cef4bf4d012a1daaf4f40a9cd183e723d6d8f0227be8e9dd7c2125c80897fc5a",
+    "source": "<source>/lampOS/crates/selftest/src/lib.rs",
+    "target": "lamp_selftest",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-cloud",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/cloud/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "preserved_copy": "<gate>/artifacts/2-lamp-cloud",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "7b1edf90a8346288668aa0dc95985eb3605e3817d6c63dc00be98bef5fe2eaea",
+    "source": "<source>/lampOS/crates/cloud/src/main.rs",
+    "target": "lamp-cloud",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-8fb2ff5dbc59b712",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/cloud/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "preserved_copy": "<gate>/artifacts/3-it-8fb2ff5dbc59b712",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "79fac324e01245e95fe5aea49d126d13db2423631e6e63b346141e06970a8fc8",
+    "source": "<source>/lampOS/crates/cloud/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_cloud-257c3619991949e9",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/cloud/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "preserved_copy": "<gate>/artifacts/4-lamp_cloud-257c3619991949e9",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "8450c630fe1689843a24104afa988db9cd73a1da314d9c2c0658d2009ff42cb1",
+    "source": "<source>/lampOS/crates/cloud/src/main.rs",
+    "target": "lamp-cloud",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/release_pair-58fdfae096b67123",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/cloud/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "preserved_copy": "<gate>/artifacts/5-release_pair-58fdfae096b67123",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "7d8c0a052fba811776453ee56d12ea050fd55853843ae099694f3c02abecc0d6",
+    "source": "<source>/lampOS/crates/cloud/tests/release_pair.rs",
+    "target": "release_pair",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/turn_end_replay",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice-eval/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "preserved_copy": "<gate>/artifacts/6-turn_end_replay",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "e8e765100d50678bd5db3d5f8b2a731cc9d5c299b26d43f78ba536d60c785b63",
+    "source": "<source>/lampOS/crates/voice-eval/examples/turn_end_replay.rs",
+    "target": "turn_end_replay",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_voice_eval-96cc83f35d8c3694",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice-eval/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "preserved_copy": "<gate>/artifacts/7-lamp_voice_eval-96cc83f35d8c3694",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "d7402033c00de7c5abe590a73d14c0e60f8f8703dfd72047baeeea81dd6250c6",
+    "source": "<source>/lampOS/crates/voice-eval/src/main.rs",
+    "target": "lamp-voice-eval",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/same_voice_pairs",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice-eval/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "preserved_copy": "<gate>/artifacts/8-same_voice_pairs",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "1209ffcf9e9080242d6e985d439c4ac820adf613956c933c7c26252929e5ba2e",
+    "source": "<source>/lampOS/crates/voice-eval/examples/same_voice_pairs.rs",
+    "target": "same_voice_pairs",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_voice_eval-5df6d61afb2e70a2",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice-eval/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "preserved_copy": "<gate>/artifacts/9-lamp_voice_eval-5df6d61afb2e70a2",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "b48356eeb9d0a0d187ffb6266c2d8a30631c55f8b127095c0869c75bd0be20fa",
+    "source": "<source>/lampOS/crates/voice-eval/src/lib.rs",
+    "target": "lamp_voice_eval",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-3ee0b2e066ec4585",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice-eval/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "preserved_copy": "<gate>/artifacts/10-it-3ee0b2e066ec4585",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "252e8992ca694f026dada9c3e00fb707218bac0f6685866b73a57bb53a3589d4",
+    "source": "<source>/lampOS/crates/voice-eval/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-voice-eval",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice-eval/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "preserved_copy": "<gate>/artifacts/11-lamp-voice-eval",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "5fb883720553f9d1a568c2cc36237e5c6b4ed099df6b9a620d785a5fef3b842f",
+    "source": "<source>/lampOS/crates/voice-eval/src/main.rs",
+    "target": "lamp-voice-eval",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_cloud-79f23dbb7f2c1495",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/cloud/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "preserved_copy": "<gate>/artifacts/12-lamp_cloud-79f23dbb7f2c1495",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "0346b6c2bd30a5bd470e58db10a83d20e9df01acc96fefa078d76bf10fa34adf",
+    "source": "<source>/lampOS/crates/cloud/src/lib.rs",
+    "target": "lamp_cloud",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_setup-9c702477f431b4a8",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/setup/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "preserved_copy": "<gate>/artifacts/13-lamp_setup-9c702477f431b4a8",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "ff27819189fe7efb6eceb0cedaffe38d1e154e3eef4309da7e5c4f612c437f49",
+    "source": "<source>/lampOS/crates/setup/src/main.rs",
+    "target": "lamp-setup",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-setup",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/setup/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "preserved_copy": "<gate>/artifacts/14-lamp-setup",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "56968f4a73e55dfc574b454f6f091d3844f1336f262ad9330be82bc693739ffd",
+    "source": "<source>/lampOS/crates/setup/src/main.rs",
+    "target": "lamp-setup",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/wake-d308af7a0a70e612",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/setup/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "preserved_copy": "<gate>/artifacts/15-wake-d308af7a0a70e612",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "18a7642fef8dcd3d668e1bbacd4543610d03bec10ab3ee4f5d3b18ca6160e288",
+    "source": "<source>/lampOS/crates/setup/tests/wake.rs",
+    "target": "wake",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-29160a7d1fe7e363",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/setup/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "preserved_copy": "<gate>/artifacts/16-it-29160a7d1fe7e363",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "784d9bd86e4e0804e38b94016024d2f293dfad8b128bb4a6fd24f0f7bad4651a",
+    "source": "<source>/lampOS/crates/setup/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_setup-5f9e487dc0ded486",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/setup/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "preserved_copy": "<gate>/artifacts/17-lamp_setup-5f9e487dc0ded486",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "f092b327043af4e586dd2079c72f4e58fbc6773250c5cceb2dcd2c360e1ccfd7",
+    "source": "<source>/lampOS/crates/setup/src/lib.rs",
+    "target": "lamp_setup",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/reference_pace",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/18-reference_pace",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "3f827899c66582986e6e1dd781bd784ff696ddde46865bdb184a6f4f0ac2405b",
+    "source": "<source>/lampOS/crates/voice/examples/reference_pace.rs",
+    "target": "reference_pace",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_voice-8e8eae5aca75c69b",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/19-lamp_voice-8e8eae5aca75c69b",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "a53f3ed988592f9a5acd6e3eff6d5f557e5d7cba25012dd4af38ed0dcb64126c",
+    "source": "<source>/lampOS/crates/voice/src/lib.rs",
+    "target": "lamp_voice",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/hearing_replay",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/20-hearing_replay",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "b6cbd3c5e60201726f768cbab3d7b95e899bfd86e00f53608899d4399911c371",
+    "source": "<source>/lampOS/crates/voice/examples/hearing_replay.rs",
+    "target": "hearing_replay",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/admission_latency",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/21-admission_latency",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "c55423f74ca9e03b1afa1f09f9909e31aed55a21bcaee7c6167fab15afa6b078",
+    "source": "<source>/lampOS/crates/voice/examples/admission_latency.rs",
+    "target": "admission_latency",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_voice-d49bb4ab163711e9",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/22-lamp_voice-d49bb4ab163711e9",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "6de03da8b28801d17ac6ccb28b41aeca6622046bf0c8b40d0e1d3fb04be867b9",
+    "source": "<source>/lampOS/crates/voice/src/main.rs",
+    "target": "lamp-voice",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/head_qualification_operator",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/23-head_qualification_operator",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "70ed07973efba94b2b21d509a60595eaf4ef915bd5dc6bcea3b53bac9ed268ae",
+    "source": "<source>/lampOS/crates/voice/examples/head_qualification_operator.rs",
+    "target": "head_qualification_operator",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-3710c51093979da9",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/24-it-3710c51093979da9",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "a1336cc7e757fccf7d5fc52f2f4ab277d37623a80061f1260902db1006a27511",
+    "source": "<source>/lampOS/crates/voice/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/ring_process_probe",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/25-ring_process_probe",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "a7b3d4a38701785cda040d3c9f89044a7f4bb66cf9fc97d42da7c7739998e21a",
+    "source": "<source>/lampOS/crates/voice/examples/ring_process_probe.rs",
+    "target": "ring_process_probe",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/duplex_lab",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/26-duplex_lab",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "ad29930e154c6aa1d889550fe99283ce431109c932314d6c3abb169b6e73f308",
+    "source": "<source>/lampOS/crates/voice/examples/duplex_lab.rs",
+    "target": "duplex_lab",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/release_pair-649036224750f0b2",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/27-release_pair-649036224750f0b2",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "5d4fb60b0e093bb4059741aa1e91ae99bd6473f28c7f612f391662b3df9c8336",
+    "source": "<source>/lampOS/crates/voice/tests/release_pair.rs",
+    "target": "release_pair",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/probe_handover",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/28-probe_handover",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "4f26d4059fe2b64729f0cfa68e86773de9b75faa23eb5de13e8763c209411464",
+    "source": "<source>/lampOS/crates/voice/examples/probe_handover.rs",
+    "target": "probe_handover",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/render_line_second-3f23b443d3deb3a9",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/29-render_line_second-3f23b443d3deb3a9",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "13d3c6b00e706784a6739ccf4fadfd46237b4e45778be665f90c3cb2b5afb1fd",
+    "source": "<source>/lampOS/crates/voice/examples/render_line_second.rs",
+    "target": "render_line_second",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/stop_words_stt_replay-67f05de6641fd6b1",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/30-stop_words_stt_replay-67f05de6641fd6b1",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "e62a9cbfd6fe5a48ce9b849abe57afa4021af2a2417240b84b72fe8fe9effe88",
+    "source": "<source>/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+    "target": "stop_words_stt_replay",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_update-dba4c340d910c2c4",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/31-lamp_update-dba4c340d910c2c4",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "0f39ba1324b3f4d0bba6a550fa9fefbc64480be23f6c0c4f5ffa1e9e4fb728d4",
+    "source": "<source>/lampOS/crates/update/src/lib.rs",
+    "target": "lamp_update",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_skills-cf9025f1157f9993",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/skills/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "preserved_copy": "<gate>/artifacts/32-lamp_skills-cf9025f1157f9993",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "688eb6800ce41f61c106855aeb6789985b352552e1c5fec87d942738e39c5fdb",
+    "source": "<source>/lampOS/crates/skills/src/main.rs",
+    "target": "lamp-skills",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/round-69cd52738ddbc94b",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/33-round-69cd52738ddbc94b",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "84916c274904414b9b61c64a3e8742151214736605f6760941c9f7ea00872d79",
+    "source": "<source>/lampOS/crates/update/tests/round.rs",
+    "target": "round",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-ef4234e8d1bb15b7",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/34-it-ef4234e8d1bb15b7",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "e03e23568b718a1c80e6c7679a3f505f713ada512f407cfd46c918ff03e14133",
+    "source": "<source>/lampOS/crates/update/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-6ccbb646c2ce9204",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/skills/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "preserved_copy": "<gate>/artifacts/35-it-6ccbb646c2ce9204",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "f47928e19b473a9db799803f6a534e5b0cb545213716e0758ce1ad6006b3a8e2",
+    "source": "<source>/lampOS/crates/skills/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_update-23fc3873c6d2464d",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/36-lamp_update-23fc3873c6d2464d",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "73eb1c9c6521702768e29b6957c7f555e0d37c5b571bf9b9524ed2ab25c64285",
+    "source": "<source>/lampOS/crates/update/src/main.rs",
+    "target": "lamp-update",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/release_pair-cd58e0f45398e4b0",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/skills/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "preserved_copy": "<gate>/artifacts/37-release_pair-cd58e0f45398e4b0",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "37c73c784df27cb1e2507b0b59073bddd11b96a5c9a1dab09915a03a74f5fbba",
+    "source": "<source>/lampOS/crates/skills/tests/release_pair.rs",
+    "target": "release_pair",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/install-8e4369a3024848fb",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/38-install-8e4369a3024848fb",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "aa6e3179ecc71692647a47288fdc9a1ab447cc518f68153f3dbb8d3803210198",
+    "source": "<source>/lampOS/crates/update/tests/install.rs",
+    "target": "install",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/functions-42646f0466488114",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/39-functions-42646f0466488114",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "53c5e0a44735dc01846f759c8f92fd919de837e6469ec680af528579c1bb765e",
+    "source": "<source>/lampOS/crates/update/tests/functions.rs",
+    "target": "functions",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/self_process_cuts-ea59a29e0b0ae453",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/40-self_process_cuts-ea59a29e0b0ae453",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "f8e50e4ea347a2fd291bb4c75a3e18a6eca05caaf55b7256f889a2b621bf1577",
+    "source": "<source>/lampOS/crates/update/tests/self_process_cuts.rs",
+    "target": "self-process-cuts",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_skills-402c5c496640690b",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/skills/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "preserved_copy": "<gate>/artifacts/41-lamp_skills-402c5c496640690b",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "7a355cff8dd2adf3c0fb7f8aeba1074c25207da523e44f2fa1fa3f2cdd7ebc6e",
+    "source": "<source>/lampOS/crates/skills/src/lib.rs",
+    "target": "lamp_skills",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/render_relaxing_music",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/skills/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "preserved_copy": "<gate>/artifacts/42-render_relaxing_music",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "74812627fe0f10804888e6027893951dd765a9fbd7c855868b522bb003557080",
+    "source": "<source>/lampOS/crates/skills/examples/render_relaxing_music.rs",
+    "target": "render_relaxing_music",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/release_pair-becdb5990427c78f",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/43-release_pair-becdb5990427c78f",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "1f8824dfdd9544d7514428d038dc353070253432b6832f4fe66fbcadc03f8352",
+    "source": "<source>/lampOS/crates/update/tests/release_pair.rs",
+    "target": "release_pair",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/requested_audio-23866672a8ed1839",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/skills/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "preserved_copy": "<gate>/artifacts/44-requested_audio-23866672a8ed1839",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "8cfc59012d94f6d3d97f9e170047fbcfd246d9c9186dc20e3c749f93885966bc",
+    "source": "<source>/lampOS/crates/skills/tests/requested_audio.rs",
+    "target": "requested_audio",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/self_cli_exec-0c694b5322c899cf",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/45-self_cli_exec-0c694b5322c899cf",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "675b50176c40dd7f2fdfb7efd7d1c1e8f34cc80fb1f1804e7da528941575caf8",
+    "source": "<source>/lampOS/crates/update/tests/self_cli_exec.rs",
+    "target": "self-cli-exec",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-skills",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/skills/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "preserved_copy": "<gate>/artifacts/46-lamp-skills",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "801a3cc35657bb4663a5bdb76fef81dfbf620ceb3867941407fa3d9c0add4da4",
+    "source": "<source>/lampOS/crates/skills/src/main.rs",
+    "target": "lamp-skills",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-update",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "preserved_copy": "<gate>/artifacts/47-lamp-update",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "4c7171a605626be3413753330b349e0ee27539325853ebea81ca4e83b3222c8f",
+    "source": "<source>/lampOS/crates/update/src/main.rs",
+    "target": "lamp-update",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-voice",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/48-lamp-voice",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "d0a0e51499299b19aeb7e29ff807516388e7ddb90b2f8f52a456adfcfdf219fb",
+    "source": "<source>/lampOS/crates/voice/src/main.rs",
+    "target": "lamp-voice",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-health",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/health/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/health#lamp-health@0.1.0",
+    "preserved_copy": "<gate>/artifacts/49-lamp-health",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "cfd1846cd33f148417a62c066b4e392c200a1b7e2a0196b657a35975b5b22471",
+    "source": "<source>/lampOS/crates/health/src/main.rs",
+    "target": "lamp-health",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_health-46dd59e111d03608",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/health/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/health#lamp-health@0.1.0",
+    "preserved_copy": "<gate>/artifacts/50-lamp_health-46dd59e111d03608",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "f5d804f2149a39030fe2f0f40821cc8100b5c40f8b8d654ec14c7fa8183002a7",
+    "source": "<source>/lampOS/crates/health/src/main.rs",
+    "target": "lamp-health",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-a136b597872fa801",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/health/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/health#lamp-health@0.1.0",
+    "preserved_copy": "<gate>/artifacts/51-it-a136b597872fa801",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "829669393648ac7dc412496351b44071037cb9a755828ccc8f5075eef1f4f103",
+    "source": "<source>/lampOS/crates/health/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-315beaa901d2de04",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/controls/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "preserved_copy": "<gate>/artifacts/52-it-315beaa901d2de04",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "10cbe425094a4515dc3f906e2a1323cfd1e45d11afaa44775af9de042b50e13b",
+    "source": "<source>/lampOS/crates/controls/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-controls",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/controls/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "preserved_copy": "<gate>/artifacts/53-lamp-controls",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "e95ce3450db10589e88d195d2df0c538a03d3e47ae657fa8787a0c1f2798b66a",
+    "source": "<source>/lampOS/crates/controls/src/main.rs",
+    "target": "lamp-controls",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/strip_worker-3959512df80cd00a",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/controls/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "preserved_copy": "<gate>/artifacts/54-strip_worker-3959512df80cd00a",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "a6c27976912649f61414f87549b5e6eff3b8c7e02c84acbafd7ea920ad3bb3cf",
+    "source": "<source>/lampOS/crates/controls/tests/strip_worker.rs",
+    "target": "strip_worker",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/release_pair-03d342c021a18e54",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/controls/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "preserved_copy": "<gate>/artifacts/55-release_pair-03d342c021a18e54",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "fdebd148ef9c84fc199d725230a924e947a3af3e0d5b0796c16655f88d67e96f",
+    "source": "<source>/lampOS/crates/controls/tests/release_pair.rs",
+    "target": "release_pair",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/replay_cost",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/controls/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "preserved_copy": "<gate>/artifacts/56-replay_cost",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "27096bd147a6b4ea87433c3bda04846683320ade099b50e4a0be489697593327",
+    "source": "<source>/lampOS/crates/controls/examples/replay_cost.rs",
+    "target": "replay_cost",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_controls-c15145da6a96ab52",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/controls/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "preserved_copy": "<gate>/artifacts/57-lamp_controls-c15145da6a96ab52",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "cf6249d043d23740e5b8793b4a76fb12816bcbdcca5e7db2c593abd34a795901",
+    "source": "<source>/lampOS/crates/controls/src/main.rs",
+    "target": "lamp-controls",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_controls-9ff9f41d2ce45473",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/controls/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/controls#lamp-controls@0.1.0",
+    "preserved_copy": "<gate>/artifacts/58-lamp_controls-9ff9f41d2ce45473",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "f74a983e8df1ef5f0082d270ea9e6dee363238934ef9f406312c282937e941cc",
+    "source": "<source>/lampOS/crates/controls/src/lib.rs",
+    "target": "lamp_controls",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_health-b76951016323e4d1",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/health/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/health#lamp-health@0.1.0",
+    "preserved_copy": "<gate>/artifacts/59-lamp_health-b76951016323e4d1",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "e003f55f7d6c1b06b87c338227f73c9ac15781faa3af4890f60855b7185bf49a",
+    "source": "<source>/lampOS/crates/health/src/lib.rs",
+    "target": "lamp_health",
+    "target_kind": [
+      "lib"
+    ]
+  }
+]

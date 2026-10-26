@@ -1,0 +1,138 @@
+[
+  {
+    "actual_executable": "<target>/debug/deps/runtime-fc85dcb0aeaf3b5e",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/0-runtime-fc85dcb0aeaf3b5e",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "9c813ad33d9ec85ddbb47aa173c7c55ec96f7c365fe48c8f72233d2c5fa96507",
+    "source": "<source>/lampOS/crates/expression/tests/runtime.rs",
+    "target": "runtime",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/recent_playout_cost",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/1-recent_playout_cost",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "a6fab6a766aa777866e46a733d7ae1823cb89d64bcf5044de5c7261603b0795e",
+    "source": "<source>/lampOS/crates/expression/examples/recent_playout_cost.rs",
+    "target": "recent_playout_cost",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-expression",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/2-lamp-expression",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "a0756765a1493b4567d922fbaec89c5cca14108a9f08c38c920388803b538f08",
+    "source": "<source>/lampOS/crates/expression/src/main.rs",
+    "target": "lamp-expression",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/replay_cost",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/3-replay_cost",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "5fa0f856dc38ed166df488c4f10b7e1de2dd3f7c025bff9b645fbfb3a0140aa9",
+    "source": "<source>/lampOS/crates/expression/examples/replay_cost.rs",
+    "target": "replay_cost",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_expression-0ad4f336d0245487",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/4-lamp_expression-0ad4f336d0245487",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "17e61d3ea3d277d04db60dc9197c38d04383e740d77edb6dfbfb6f1de81faaba",
+    "source": "<source>/lampOS/crates/expression/src/main.rs",
+    "target": "lamp-expression",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-a3132b514901b7e4",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/5-it-a3132b514901b7e4",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "b804282200fe43da2e8f1e082d79f59e0aa129244f1d20c3af374feb4fa3f7a3",
+    "source": "<source>/lampOS/crates/expression/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/rest_cost",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/6-rest_cost",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "d2174b8b3daf44c572a0df8c94b32b862ce5813a4849ae2a664e70b3fe36d217",
+    "source": "<source>/lampOS/crates/expression/examples/rest_cost.rs",
+    "target": "rest_cost",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_expression-76da23656c5dc461",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/expression/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/expression#lamp-expression@0.1.0",
+    "preserved_copy": "<gate>/artifacts/7-lamp_expression-76da23656c5dc461",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "dcbc1fd91b38087e34140129cf27bac3cb50852f730c0b2fbcb525ed3b860fed",
+    "source": "<source>/lampOS/crates/expression/src/lib.rs",
+    "target": "lamp_expression",
+    "target_kind": [
+      "lib"
+    ]
+  }
+]

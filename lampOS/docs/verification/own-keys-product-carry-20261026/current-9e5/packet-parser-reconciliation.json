@@ -1,0 +1,7 @@
+{
+  "original_parser_sha256": "54409c1f502e41c48d299d0b789931b1b12139809303f51209252a8fdd67dce3",
+  "failure": "unrecognized test summary in affected-full",
+  "cause": "Two ignored summaries end with filtered out and no semicolon or timing suffix. Gate exited zero and final guards passed.",
+  "change": "Accept only an optional semicolon and trailing timing suffix after the unchanged numeric fields. All literal lines retained.",
+  "test_rerun": false
+}
