@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-26 12:13 — Current carrier runtime; restart leak claimed
+
+Ready for lamp-voice: no (#3466; test follow-ups)
+
+Carrier b635671c2 on cced42943 passes formatting, strict fourteen-package
+Clippy, updater compilation, 126 unit tests (two ignored) and ten carrier
+cases. The serial head-touch stage is running; its previous complete run took
+about 28 minutes. No current full-gate pass is claimed. The five-commit carry
+has equal range-diff patches. The prior artifact-parser failure stays failed.
+
+[Original restart-leak evidence](verification/tests-restart-leak-20261026/)
+records the delivered train's single LEAK separately from ordinary passes.
+Tests claimed its cleanup on the Queue before code. The two-file repair and
+its qualification controller are prepared; runtime remains unrun. Sentinel,
+Skills and Ready-speaking preparations are current on cced42943 and wait for
+the sole compiler. No product assertion, process timeout or device changes.
+
+The #3525 source read closes the earlier busy-fixture HOLD at 08ea15585 and
+carries to 7c9da509f: the original assertions remain, code/tests/rules are
+byte-identical and both reuse-note sections survive. This was a source read,
+not an independent runtime READ-OK. Fourth retains the hand-pump repair.
+
 ## 2026-10-26 11:53 — Reader merged; carrier harness failure retained
 
 Ready for lamp-voice: yes (#3527 merged in train 156)

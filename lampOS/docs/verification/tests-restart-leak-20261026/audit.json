@@ -1,0 +1,25 @@
+{
+  "run": 40264839031,
+  "preview": "66c6111994934bb69c49e938edef368da196bcd6",
+  "landed": "cced429433211e06790f23ed8f51e07be613972d",
+  "counts": {
+    "PASS": 11356,
+    "LEAK": 1,
+    "FAIL": 0,
+    "TIMEOUT": 0
+  },
+  "skipped": 106,
+  "summary_passed_including_leaky": 11357,
+  "leaky_cases": [
+    "lamp-voice:same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+  ],
+  "raw_sha256": "8358668a8eee4176a1938613f352d73a1381838e7e6ba9d354bbbad1e329e832",
+  "runtime_seconds": 208.625,
+  "cause": "unproven",
+  "no_rerun": true,
+  "identical_repeat_records": 35,
+  "audit_note": "Initial parser counted35 identical repeated result records; deduplicated only after verifying identical status,duration,index,binary,case. No test rerun.",
+  "preview_tree": "a5dffe5f39733f866ceb60875420cffb9a9ad2ec",
+  "landed_tree": "a5dffe5f39733f866ceb60875420cffb9a9ad2ec",
+  "tree_equal": true
+}
