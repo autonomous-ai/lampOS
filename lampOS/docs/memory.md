@@ -1852,6 +1852,16 @@ then use that person's scope:
   (`remember::tests::with_nobody_known_every_line_to_the_memory_is_as_before`
   pins the bytes).
 
+- **A forget misheard asks** (`LAMP_MEMORY_FORGET_ASKS=on`, with the Days
+  client only; off unless set; both voice routes). `forget`'s description
+  gains one sentence (`remember::FORGET_ASKS_DESCRIBED`): when nothing was
+  forgotten and the words may have been misheard, a word close to something
+  the lamp was shown as kept, it says nothing matched and asks whether they
+  meant that one, and forgets it only when they ask again; never something
+  else. On lamp-4ace on 26 Oct, "forget what I told you about the plant" was
+  heard as "slant" or "plan" in 3 of 4 rounds, forgot nothing, and the lamp
+  said so and stopped with the plant still kept.
+
 - **The room's isn't the asker's** (#2176, the "Dylan" case,
   `LAMP_MEMORY_ROOM_NOT_ASKER=on`, with the Days client only; on in the
   product since 26 Oct; both voice routes, since each opens its sessions

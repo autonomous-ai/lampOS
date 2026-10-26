@@ -1011,6 +1011,10 @@ fn worker_command(
             role,
             var(crate::remember::REPLACES_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_forget_asks_worker_environment(
+            role,
+            var(crate::remember::FORGET_ASKS_ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_stable_id_worker_environment(
             role,
             var(lamp_msgs::known::ENVIRONMENT).as_deref(),
@@ -1233,6 +1237,17 @@ fn memory_replaces_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::REPLACES_ENVIRONMENT, "on"))
+}
+
+// A forget that found nothing asks about a kept thing near misheard words,
+// passed the same narrow way: the exact `on`, to the two routes that run
+// `remember` (each reads it in `remember::start`).
+fn memory_forget_asks_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::FORGET_ASKS_ENVIRONMENT, "on"))
 }
 
 // Memory keyed on the eyes' stable id (#2176), passed the same narrow way:
@@ -1723,6 +1738,10 @@ mod tests {
                 ["provider", "second"].as_slice(),
             ),
             (
+                crate::remember::FORGET_ASKS_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
                 lamp_msgs::known::ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
@@ -1917,6 +1936,12 @@ mod tests {
                     (
                         memory_replaces_worker_environment,
                         "LAMP_MEMORY_REPLACES",
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // A forget that found nothing asks about a near kept thing.
+                    (
+                        memory_forget_asks_worker_environment,
+                        "LAMP_MEMORY_FORGET_ASKS",
                         ["provider", "second"].as_slice(),
                     ),
                     // Memory keyed on the eyes' stable id (#2176).
@@ -2177,6 +2202,7 @@ mod tests {
                     crate::remember::heard::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
                     crate::remember::REPLACES_ENVIRONMENT,
+                    crate::remember::FORGET_ASKS_ENVIRONMENT,
                     lamp_msgs::known::ENVIRONMENT,
                     crate::early_words::ENVIRONMENT,
                     crate::follows_face::ENVIRONMENT,
@@ -2315,6 +2341,7 @@ mod tests {
                     "LAMP_MEMORY_EVENTS=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_FORGET_ASKS=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
                     "LAMP_MEMORY_LINK_USED=on",
@@ -2350,6 +2377,7 @@ mod tests {
                     "LAMP_MEMORY_FOLLOWS_FACE=on",
                     "LAMP_MEMORY_FORGET_ABOUT=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_FORGET_ASKS=on",
                     "LAMP_MEMORY_JOURNAL_RESUMES=on",
                     "LAMP_MEMORY_KEEP_ASKED=on",
                     "LAMP_MEMORY_KEEP_HEARD=on",
