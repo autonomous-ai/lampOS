@@ -4,6 +4,8 @@
 # done too, so a lamp still in its box is current when it is first set up.
 # On: a lamp in a home installs, switches at a quiet moment and puts a build back by itself.
 # The public key it checks every build with comes with the image (#806), never from the channel.
+# It follows the stable feed: a lamp in a home gets only a build promoted to it after its checks (docs/updates.md,
+# "Selecting a published build for the stable feed"), never each lamp-voice publish. The signed channel stays lamp-voice.
 [Unit]
 Description=lampOS updates (lamp-update serve)
 After=network-online.target
@@ -21,7 +23,7 @@ Group=root
 Slice=lampos-parts.slice
 Nice=10
 IOSchedulingClass=idle
-ExecStart=/opt/lampOS/update/current/lamp-update serve --channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/ --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on
+ExecStart=/opt/lampOS/update/current/lamp-update serve --channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/ --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on
 Restart=on-failure
 RestartSec=30s
 StandardInput=null

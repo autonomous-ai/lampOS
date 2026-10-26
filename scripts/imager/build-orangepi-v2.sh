@@ -29,7 +29,7 @@ if [[ ! "$VARIANT" =~ ^[a-z][a-z0-9_-]{0,63}$ ]]; then
   exit 1
 fi
 # The product's channel (deploy/product/lamp-update.service); a local channel folder replaces it at build.
-LAMPOS_CHANNEL_URL="${LAMPOS_CHANNEL_URL:-https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/}"
+LAMPOS_CHANNEL_URL="${LAMPOS_CHANNEL_URL:-https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/}"
 LAMPOS_CHANNEL="${LAMPOS_CHANNEL:-lamp-voice}"
 
 V2_INPUT="/input/lamp-v2"
