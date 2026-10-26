@@ -1,0 +1,15 @@
+{
+  "old": "a8d6a4970dcf73a9007850703d9f27af24ea74e5",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "head": "d8dc4cca80626faed14d7ab8f675fabfc1199d6f",
+  "range_diff": "1:  a8d6a4970d = 1:  d8dc4cca80 lampOS: observe full journal writes without a stopwatch",
+  "unchanged_authored_files": [
+    "lampOS/crates/ipc/src/log_relay.rs",
+    "lampOS/docs/logging.md",
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/README.md",
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/SHA256SUMS",
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/inputs.sha256",
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/results.json",
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/selected-results.txt"
+  ]
+}

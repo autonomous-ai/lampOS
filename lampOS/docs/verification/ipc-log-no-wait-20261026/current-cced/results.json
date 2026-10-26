@@ -1,0 +1,177 @@
+{
+  "artifact_manifest_sha256": "85ba9a525e518ecca1a070cb61e29fd072c8a52a002497cb717a6bc6b759de49",
+  "artifact_scope": "Actual compiler-emitted executable hashes rechecked unchanged. IPC has no preserved executable copies; no copy binding is claimed.",
+  "complete_marker_sha256": "20e02cafb5792d53ad6e40d8c67138bf401ebf67a0dbe7fc31d82433670db692",
+  "controller_sha256": "3691b427355e072a41c5550f6ee7da8cdfc834a94f2138b53e8e74d1f51d75b6",
+  "count_scope": "Sum of the listed full-run libtest summaries only. Focused reruns and relay are separate. This is not a native nextest unique-case census; interleaved summaries are not assigned to crate headers.",
+  "full_literal_summary_totals": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 27
+  },
+  "full_scope_packages": [
+    "lamp-ipc"
+  ],
+  "identity": {
+    "base": "cced429433211e06790f23ed8f51e07be613972d",
+    "clean_at_start": true,
+    "head": "d8dc4cca80626faed14d7ab8f675fabfc1199d6f",
+    "source_matches_carry_receipt": true
+  },
+  "kind": "ipc",
+  "limits": "Mac host gate only. No ARM64, device, provider, activation, release or physical latency acceptance. This packet does not waive or rewrite any earlier failed gate or artifact guard.",
+  "packet_generator_sha256": "31479b475043649bb56286412dd77a86cad5f6c6d180696c1f688f83188310d7",
+  "schema": 1,
+  "source_inventory": {
+    "bytes_modes_and_file_set_rechecked": true,
+    "entry_count": 7225,
+    "sha256": "29cc69133de48e98d979838668a88be4f84deb91c573935d18833295caac42d8"
+  },
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.198,
+      "exit_code": 0,
+      "label": "fmt",
+      "literal_summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "8c7b1a1a6c50c2c341adb9928cfb2b6eec69283c5312193c030ca99bc11d5927",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 1.028,
+      "exit_code": 0,
+      "label": "clippy",
+      "literal_summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "248e9664a379f9cf15b6892ab69e8128941f0cc016e8755716b992c0d312c33f",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 2.3,
+      "exit_code": 0,
+      "label": "compile",
+      "literal_summaries": [],
+      "log_sha256": "63d70675e83e39a447cbccab1e3d857b50789b77f8dc332ef0d8ab59e7ea0519",
+      "receipt_sha256": "694da08356eaa4aab32441a86f2207bee993f1a3c557b9652df3819565f34c36",
+      "relay_lines": [],
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 8.377,
+      "exit_code": 0,
+      "label": "full",
+      "literal_summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s",
+          "measured": 0,
+          "passed": 8
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+          "measured": 0,
+          "passed": 3
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.88s",
+          "measured": 0,
+          "passed": 1
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s",
+          "measured": 0,
+          "passed": 1
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+          "measured": 0,
+          "passed": 13
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "log_sha256": "0f9be370ccc8bd953cafe837ded7ab2303a61860604ee44212ebe57a6a68981e",
+      "receipt_sha256": "9535c47649f141538813428a8d9c6c2ede4d86edcd233f38ed7f8f7708df1b3b",
+      "relay_lines": [
+        "relay_signals: ok"
+      ],
+      "source_unchanged": true
+    }
+  ]
+}

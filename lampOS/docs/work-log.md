@@ -1,3 +1,15 @@
+Ready for lamp-voice: no; #3542 and #3528 current native checks pending, #3510 activation HOLD.
+
+## Current checkpoint: 2026-10-26 12:11 +07, memory fixtures published and IPC carried
+
+[#3542](https://github.com/autonomous-ai/lampOS/pull/3542) offers `69c0f26e9` on latest `cced42943`. The two memory admission fixtures and private child helper change tests only. [Committed evidence](https://github.com/autonomous-ai/lampOS/blob/69c0f26e9754648a38ab5dcb511951d67951e0cc/lampOS/docs/verification/voice-memory-no-wait-20261026/README.md) retains all original controls, the parser failure and its read-only reconciliation, and the remaining-only queued-wait continuation. Current fmt, strict all-target Voice Clippy and full Voice **4,085/0/21** pass, with two focused cases separately **2/0**; 7,221 source entries and fourteen actual/preserved executable hashes remain unchanged. The old stalled assertions fail **0/2**, revised paused cases pass **2/0**, actual blocking admission fails its overflow assertion **0/1**, and queued completion waiting fails its parent watchdog **0/1**. Both fresh restorations pass **2/0**. No failed controller is relabelled successful. Original native checks and team reads now follow on the PR.
+
+[#3528](https://github.com/autonomous-ai/lampOS/pull/3528) is carried to `d8dc4cca8` on cced. One equal patch and all seven authored blobs/modes are preserved. [Current host gate](verification/ipc-log-no-wait-20261026/current-cced/README.md) passes fmt, strict IPC Clippy, compilation, **26 ordinary tests + one doctest + relay signal success**, with 7,225 source entries and eight actual executable hashes unchanged. No preserved-copy claim is made for this gate. The prior a8 native failure remains failed and Tests retains its separate Reader sentinel repair; #3527's landing alone is not a waiver. The current carry starts its own original native qualification.
+
+Own-keys is locally carried as `85b9bcdd7`, seven equal patches and all 38 authored blobs/modes preserved on cced. Its fresh fmt/strict selected-crate Clippy and affected Voice/Skills/Voice-eval gate are running in the sole compiler slot. Compilation and tests use the same combined package selection, retaining the earlier final artifact-guard failure separately. No current result is inferred yet; activation HOLD is unchanged. No device, provider, key, release or local ARM64 action ran.
+
+---
+
 Ready for lamp-voice: no; #3533 delivered, #3528 native failure and #3510 activation HOLD retained.
 
 ## Current checkpoint: 2026-10-26 11:58 +07, model fixture delivered and own-keys original native pass
