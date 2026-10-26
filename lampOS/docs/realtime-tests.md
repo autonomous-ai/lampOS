@@ -1743,3 +1743,23 @@ publication endpoints, then joins the worker and removes the bus root. Publicati
 and the post-join check retain two-second host bounds; the outer test runner
 must still bound an actually stuck join. It needs no uninterrupted half-second
 of host-scheduled safe samples. No physical motion or latency is measured.
+
+### Body-push fixture publication cadence (26 October 2026)
+
+The two second-route body-push scenarios publish the first held push at once,
+then refresh `body/hand` every 100 ms of scenario time. This follows the topic's
+promised cadence; normal production Body uses every fourth 20 ms step (80 ms).
+The fixture previously rewrote the Latest bus file on every 2 ms scenario pump
+step. A counter-only negative on 2747c72a7 observed 4,582 publications and
+failed the new bounded-count assertion after successful scripted mute/cleanup.
+This demonstrates excessive fixture work, not a proven cause of every earlier
+host-watchdog failure. Full and isolated watchdog failures keep their original
+source and outcome in the verification record.
+
+The two existing cases each retain their unpushed control. They still require
+scripted PhysicalMute, Stop/exit observation for every child, no forced shutdown,
+correct search/picture cancellation and no unauthorized speaker output. Pushed
+runs require 2–111 real publications across eleven logical seconds; unpushed
+runs require zero. The 24-second host watchdog, cleanup deadlines, topic freshness
+and `since_us` semantics are unchanged. This is test scheduling only, with no
+runtime, acoustic-latency or physical-hand acceptance claim.

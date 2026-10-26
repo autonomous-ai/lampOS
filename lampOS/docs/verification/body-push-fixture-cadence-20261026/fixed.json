@@ -1,0 +1,71 @@
+{
+  "base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+  "source_count": 7160,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "09657b7a0699de4c8ffbcfbb0becee4c765754a02cbef858335a2385812d893f",
+  "patch_sha256": "95e666a537bbabaf668e7371f919589cc93b386a00abed77d831ba95a002d63c",
+  "changed_source_sha256": {
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs": "da7a38a5c444ce20a780fb97d9b87dd9e2c4bdb807c2f5c7a444c89833a1c5e7",
+    "lampOS/docs/realtime-tests.md": "8df1c4e0b53e22a2f47ca9dadb8113330bf2a5c9ac4967ed5380d35db289ae44"
+  },
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T00:38:24Z",
+      "finished": "2026-10-26T00:38:36Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-voice --all-targets -- -D warnings",
+      "started": "2026-10-26T00:38:36Z",
+      "finished": "2026-10-26T00:40:27Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-body-push": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice --lib coordinator::tests::second_route::a_push_ -- --test-threads=1 --nocapture",
+      "started": "2026-10-26T00:40:27Z",
+      "finished": "2026-10-26T00:42:31Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-hand-reader": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice --lib search_pushed:: -- --test-threads=1",
+      "started": "2026-10-26T00:42:31Z",
+      "finished": "2026-10-26T00:42:32Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "publication_counts_in_run_order": [
+    97,
+    0,
+    92,
+    0
+  ],
+  "executable_sha256": "cc73123e19b75057d14093a1825203f84d94b29bfa01c5b35a9ddf180f558d14",
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-body-push": "a31b8553403ad8345d394c2d12fdc1f099f4eadf87113e6e4a3a349c8987b9ed",
+    "test-hand-reader": "bc173c9e425c347b9efaae6dec8326407bef9c780b58e85f16afc58839087046"
+  },
+  "limits": "Native x86_64 Mac focused test-only fixture qualification. Two tests contain four real coordinator runs. The earlier reminder full-suite failure stays failed; this does not establish acoustic or motor behavior."
+}
