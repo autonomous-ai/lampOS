@@ -1,3 +1,15 @@
+Ready for lamp-voice: #3568 ready; #3510 activation HOLD; independent #3570 read complete.
+
+## Current checkpoint: 2026-10-26 17:19 +07, Setup lifecycle independent controls
+
+[Independent #3570 review](verification/setup-completed-second-review-20261026/README.md) passes **18/0/0** on exact `9531e2289`/`690dff041`: two manager parser cases and sixteen lifecycle cases. Formatting and strict Update all-target Clippy pass; all 7,238 source entries and ten actual/preserved executable pairs remain unchanged. The current `ef08682c4`/`aa7cf9029` carry has the identical complete lampOS tree and patch. Source read finds no P1/P2; this is not a full Update suite or real-systemd/device run.
+
+The separate reviewer full-round lock failure remains a failure with unproven cause; these focused cases do not override it. Recovery and reset rechecks are snapshot checks, not an atomic reset lock. No runtime count is relabeled after the carry.
+
+#3510 current Clippy and general CI pass; original ARM64 remains under audit. #3568 remains ready/current while its second reader finishes the independent gate. Next independent review is #3574's test-only install watchdog scope repair: full install target at 16 threads, all original assertions and refusal limits retained, no retry. No device or release action ran.
+
+---
+
 Ready for lamp-voice: #3568 ready; #3510 current software CI pending and activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 17:08 +07, own-keys carry published

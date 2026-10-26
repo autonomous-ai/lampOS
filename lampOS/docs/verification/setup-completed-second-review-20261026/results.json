@@ -1,0 +1,105 @@
+{
+  "completion": {
+    "actual_and_preserved_artifacts": 10,
+    "artifacts_unchanged": true,
+    "base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+    "complete": true,
+    "head": "9531e2289fab2226fe932503ba5f924019a853d3",
+    "passed": 18,
+    "source_entries": 7238,
+    "source_unchanged": true
+  },
+  "controller_sha256": "a259e4af6794a9e8f31d366be9d22965279d665763dad946eb1078aa5a798914",
+  "identity": {
+    "base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+    "controller_sha256": "a259e4af6794a9e8f31d366be9d22965279d665763dad946eb1078aa5a798914",
+    "head": "9531e2289fab2226fe932503ba5f924019a853d3",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 103644884992,
+      "elapsed_seconds": 79.192,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "da40a1d8f391e1e2cdd8017e330c3b9a241eadad063f30932d043dbbdb642acb",
+      "source_entries": 7238,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "setup_lifecycle",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 103410229248,
+      "elapsed_seconds": 106.523,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "2663cb5948aecfbc47dadff14a87534cc0de8a7cd39128fbe0d7fbc06bb42b81",
+      "source_entries": 7238,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 103646121984,
+      "elapsed_seconds": 6.037,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7238,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "setup_lifecycle",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "disk_free_before": 101953765376,
+      "elapsed_seconds": 9.608,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "8e38b0237c3dc5d29e5ad0b18d5146424511cd2546e6def3d92baf40400c8902",
+      "source_entries": 7238,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_entries": 7238,
+  "source_inventory_sha256": "d27f024cf253fa028eb87f7b242e5108973e1cc87dd61b7393fb27a3b98ec991"
+}

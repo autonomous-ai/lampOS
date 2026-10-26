@@ -1,0 +1,84 @@
+{
+  "cases": [
+    "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown",
+    "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins",
+    "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+    "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+    "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+    "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+    "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+    "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+    "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+    "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+    "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+    "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+    "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+    "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+    "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+    "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+    "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+    "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch"
+  ],
+  "literal_summaries": [
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 101 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s",
+    "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 167 filtered out; finished in 3.93s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out"
+  ],
+  "passed": 18,
+  "scope": "Two parser and sixteen lifecycle cases; no full Update or round suite.",
+  "cargo_headers": [
+    "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+    "Running unittests src/main.rs (<target>/debug/deps/lamp_update-93805432291f4475)",
+    "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+    "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+    "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+    "Running tests/release_pair.rs (<target>/debug/deps/release_pair-587942a3dc3808c8)",
+    "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+    "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-7a8efcc313003c4d)",
+    "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-9807238ddc4f9970)"
+  ],
+  "running_artifact_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "sha256": "97636cfeee1faadb386891197a97d040411328d05678e1e3f07e116419466f75"
+    },
+    {
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_update-93805432291f4475)",
+      "sha256": "e8250082fdac6f91069f4b21b706856a67d16683444f211dc0e4577ce64b455e"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "sha256": "17ff13c3020d8866abb219ca3b0487b8b9f4141670f16e229e03775007982590"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "sha256": "3d6e2fcfef8b5fe5071b957323150fafbf542e44f5a8d8c91231271c765cd9bf"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "sha256": "85cb78a985ea84630cc5b0003de6c5e14b37a5d3a6d3fe456b4f81378bad1bbf"
+    },
+    {
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-587942a3dc3808c8)",
+      "sha256": "1061aef448239902c6e85fc73b4bcd0273c25c8ffbcdda67f9d5339d13a6918d"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "sha256": "016eda20b68714059d9891faeac06f13ad7f66d453319a08d586f4faf1fcd362"
+    },
+    {
+      "header": "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-7a8efcc313003c4d)",
+      "sha256": "1f6d53c6e962224255c6dd610a3defabc1663df9b4c431e5e664dc4d51d8cec1"
+    },
+    {
+      "header": "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-9807238ddc4f9970)",
+      "sha256": "7b2662b8094a72b393d7c4ad80a46df014b53fb8c47b5900175d4a1177fbfc07"
+    }
+  ]
+}

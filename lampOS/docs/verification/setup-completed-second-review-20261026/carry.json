@@ -1,0 +1,13 @@
+{
+  "executed_head": "9531e2289fab2226fe932503ba5f924019a853d3",
+  "current_public_head": "ef08682c45dded9faba3ee52a5bf8e11681f3154",
+  "current_public_base": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "executed_lampOS_tree": "cf1446bf8c3a8d1d10e13939b6a4190a5859b4dd",
+  "current_lampOS_tree": "cf1446bf8c3a8d1d10e13939b6a4190a5859b4dd",
+  "whole_lampOS_tree_equal": true,
+  "whole_repository_changed_paths": [
+    "scripts/imager/build-orangepi-v2.sh"
+  ],
+  "range_diff": "1:  9531e2289f = 1:  ef08682c45 lampOS: preserve completed Setup across update and recovery",
+  "note": "Separate read-only carry comparison after frozen runtime closure. Runtime remains attributed to 953/690; no later-head test invocation."
+}
