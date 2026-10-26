@@ -71,6 +71,24 @@ fn observation(message: String) {
     let _ = std::io::stderr().write_all(format!("{message}\n").as_bytes());
 }
 
+struct Observations {
+    startup: Duration,
+    calls: Vec<(usize, Duration, String)>,
+}
+
+impl Drop for Observations {
+    fn drop(&mut self) {
+        // Logging must not delay the first call or space later calls out.
+        // On a failure, the panic supplies the current call's error context.
+        observation(format!("spawn to tools.json observed: {:?}", self.startup));
+        for (ordinal, elapsed, response) in &self.calls {
+            observation(format!(
+                "call {ordinal}/10 elapsed={elapsed:?}; response={response:?}"
+            ));
+        }
+    }
+}
+
 #[test]
 fn a_tool_call_is_answered_while_the_program_listens_on_three_topics() {
     // Short: a socket's whole path has to fit in 103 bytes.
@@ -118,7 +136,10 @@ fn a_tool_call_is_answered_while_the_program_listens_on_three_topics() {
     }
     // Observed registry visibility, not an acknowledgement of loop readiness.
     let startup = spawn_started.elapsed();
-    observation(format!("spawn to tools.json observed: {startup:?}"));
+    let mut observations = Observations {
+        startup,
+        calls: Vec::with_capacity(10),
+    };
     let mut took = Vec::new();
     for ordinal in 1..=10 {
         // A moment apart, as calls come.
@@ -155,13 +176,11 @@ fn a_tool_call_is_answered_while_the_program_listens_on_three_topics() {
             });
         let elapsed = started.elapsed();
         took.push(elapsed);
-        observation(format!(
-            "call {ordinal}/10 elapsed={elapsed:?}; response={line:?}"
-        ));
         assert!(
             line.contains("Say hello."),
             "call {ordinal}/10 elapsed={elapsed:?}; startup={startup:?}; response={line:?}"
         );
+        observations.calls.push((ordinal, elapsed, line));
     }
     let mut sorted = took.clone();
     sorted.sort();
