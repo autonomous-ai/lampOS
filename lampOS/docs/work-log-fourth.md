@@ -1,3 +1,11 @@
+## 2026-10-26 18:40 — Current native hand-control qualification recorded
+
+Ready for lamp-voice: no
+
+#3544 c97dae333 has original ARM64 40313558049 and Linux Clippy 40313558088 green. [Current native receipt](verification/hand-pump-receipts-20261026/native-c97.json) binds preview 7717325e7, ordered ba950/head parents and the exact b5fe21b13 tree: 7,503 unique passes, zero failures/leaks/timeouts/selected unrun, 53 summary-only skips. All 84 hand/startup controls pass once; separately docs 4, process 13 and relay pass. Reviewer-two reports no new source P1/P2 but retains the privacy/runtime HOLD, including the failed isolated old-head control. No failure cause or waiver is inferred.
+
+Diagnostic draft #3577 is open at 2cc71e720 with Second and Reviewer-two reading it. Linux Clippy 40315208876 passes; ARM64 40315208865 remains pending at this snapshot. Its parent dependency and 275/0/0 Mac integration result stay explicit. Common's e8bf3c5a2 source is staged in the canonical checkout for its fresh local-dependency gate; preparation verifies cache-clean scope and retained failure artifacts before execution. No lamp or activation claim.
+
 ## 2026-10-26 18:26 — Diagnostic acknowledgement increment published
 
 Ready for lamp-voice: no

@@ -1,0 +1,118 @@
+{
+  "audit_time_utc": "2026-10-26T11:40:10.938245+00:00",
+  "runs": {
+    "40313558049": {
+      "headSha": "c97dae33396a45657641c719794d162ca2d9c581",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40313558049"
+    },
+    "40313558088": {
+      "headSha": "c97dae33396a45657641c719794d162ca2d9c581",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40313558088"
+    }
+  },
+  "qualification": {
+    "submitted_head": "c97dae33396a45657641c719794d162ca2d9c581",
+    "preview": "7717325e7773a7489e43800e26a2bbf5d0f44425",
+    "preview_parents": [
+      "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+      "c97dae33396a45657641c719794d162ca2d9c581"
+    ],
+    "preview_tree": "b5fe21b13217b1690ae24576574e0a9a82da979a",
+    "nextest": {
+      "raw_terminal_lines": 7537,
+      "unique_PASS": 7503,
+      "FAIL": 0,
+      "LEAK": 0,
+      "TIMEOUT": 0,
+      "unrun_selected": 0,
+      "duplicate_success_display_lines": 34,
+      "skipped_summary_only": 53,
+      "skip_limit": "No per-skip identity/status listing; do not relabel53 as independently established ignored cases."
+    },
+    "hand_module": 64,
+    "transport_module": 15,
+    "speaker_lapse_linux_only": 5,
+    "combined_hand_startup": 84,
+    "four_required_hand_cases": [
+      [
+        "PASS",
+        "   0.029s",
+        "3901",
+        "7503",
+        "lamp-voice",
+        "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain"
+      ],
+      [
+        "PASS",
+        "   2.033s",
+        "1260",
+        "7503",
+        "lamp-voice",
+        "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+      ],
+      [
+        "PASS",
+        "   0.044s",
+        "3939",
+        "7503",
+        "lamp-voice",
+        "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives"
+      ],
+      [
+        "PASS",
+        "   0.005s",
+        "3928",
+        "7503",
+        "lamp-voice",
+        "hand_controls::tests::the_head_touch_fixture_joins_its_worker_before_a_failed_check_returns"
+      ]
+    ],
+    "separate_docs": {
+      "targets": 46,
+      "PASS": 4,
+      "FAIL": 0,
+      "ignored": 0,
+      "named_cases": [
+        "test crates/bus/src/lib.rs - (line 14) - compile ... ok",
+        "test crates/bus/src/lib.rs - (line 34) - compile ... ok",
+        "test crates/ipc/src/lib.rs - (line 12) ... ok",
+        "test crates/msgs/src/lib.rs - (line 24) - compile ... ok"
+      ]
+    },
+    "separate_process": {
+      "PASS": 13,
+      "FAIL": 0,
+      "cases": [
+        "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2010 ms)",
+        "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+        "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+        "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+        "test missing_model_is_final_and_never_restarted ... ok (163 ms)",
+        "test missing_executable_fails_at_once ... ok (2 ms)",
+        "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+        "test startup_failures_are_final ... ok (411 ms)",
+        "test serving_failures_are_replaced_within_budget ... ok (513 ms)",
+        "test protocol_violations_are_replaced ... ok (177 ms)",
+        "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+        "test close_during_inference_never_waits ... ok (233 ms)",
+        "test sustained_requests_stay_bounded ... ok (691 ms)"
+      ]
+    },
+    "separate_relay": "relay_signals: ok; one custom-harness terminal"
+  },
+  "raw_log_sha256": {
+    "40313558049-raw.log": "ac3274b11aa95f669eb5d11b33d19c097dd993efbaaa33748bb03298f424bdfc",
+    "40313558088-api.json": "a9fbf55addb42ca1321e7e222aa1ac9f30c9a5ebe7d7129483daf19bd8bc543e",
+    "40313558088-raw.log": "84bed5d7e17442f8fe3910352a1849c16aa599fd9dc9e44bf4ebad063193b89a",
+    "40313558049-api.json": "6316f16dd9379349607d65c79f264fa1add997246a050343628b60b0f5c81413"
+  },
+  "limits": [
+    "Privacy/runtime HOLD remains; no failure cause inferred.",
+    "Compact receipt; complete logs remain in the private audit packet.",
+    "Reported skips lack individual ignored/filter identities."
+  ]
+}
