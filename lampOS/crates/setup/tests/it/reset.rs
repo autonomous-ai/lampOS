@@ -97,6 +97,10 @@ fn lamp(root: &Root) -> Plan {
 /// nothing can be read. `writes_on_stop`: a part, `lamp-voice.service`,
 /// writes this file as it stops, as systemd 252 runs it: before a stop that
 /// names it returns, else after it (here, at the next command, the reboot).
+/// `starters` and `writers`: what `systemctl list-units` lists of
+/// `reset::STARTERS` and of `reset::WRITERS` (`writers_after` from the
+/// second listing on). `writer`: the unit that writes `writes_on_stop`,
+/// `lamp-voice.service` without it.
 #[derive(Default)]
 struct Fake {
     calls: Rc<RefCell<Vec<String>>>,
@@ -104,6 +108,11 @@ struct Fake {
     parts: String,
     parts_after: Option<String>,
     lampos_reads: usize,
+    starters: String,
+    writers: String,
+    writers_after: Option<String>,
+    writer_reads: usize,
+    writer: Option<String>,
     states: Option<String>,
     fail_read: bool,
     fail_stop: bool,
@@ -124,7 +133,8 @@ impl Effects for Fake {
         if argv[1] == "stop"
             && let Some(file) = self.writes_on_stop.take()
         {
-            if argv.iter().any(|unit| unit == "lamp-voice.service") {
+            let writer = self.writer.as_deref().unwrap_or("lamp-voice.service");
+            if argv.iter().any(|unit| unit == writer) {
                 fs::write(file, b"{\"steps\":\"the factory's\"}").unwrap();
             } else {
                 self.pending = Some(file);
@@ -137,6 +147,16 @@ impl Effects for Fake {
         self.argvs.borrow_mut().push(argv.to_vec());
         if self.fail_read {
             return Err(io::Error::other("refused"));
+        }
+        if argv[1] == "list-units" {
+            if argv.iter().any(|unit| unit == "lamp-skills-manage.socket") {
+                return Ok(self.starters.clone());
+            }
+            self.writer_reads += 1;
+            return Ok(match &self.writers_after {
+                Some(after) if self.writer_reads > 1 => after.clone(),
+                _ => self.writers.clone(),
+            });
         }
         if argv[3] == "ActiveState" {
             return Ok(self
@@ -201,7 +221,16 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
     );
     assert_eq!(
         *fake.calls.borrow(),
-        ["sync", "show", "stop", "sync", "sync", "reboot"]
+        [
+            "sync",
+            "list-units",
+            "show",
+            "list-units",
+            "stop",
+            "sync",
+            "sync",
+            "reboot"
+        ]
     );
 }
 
@@ -223,7 +252,30 @@ fn a_reset_waits_for_every_part_of_the_target_before_wiping() {
     wiped(&root);
     let argvs = fake.argvs.borrow();
     assert_eq!(
-        argvs[2],
+        argvs[1],
+        [
+            "/bin/systemctl",
+            "show",
+            "-p",
+            "ConsistsOf",
+            "--value",
+            "lampos.target"
+        ]
+        .map(String::from)
+    );
+    assert_eq!(
+        argvs[3],
+        [
+            "/bin/systemctl",
+            "stop",
+            "lampos.target",
+            "lamp-voice.service",
+            "lamp-memory.service"
+        ]
+        .map(String::from)
+    );
+    assert_eq!(
+        argvs[4],
         [
             "/bin/systemctl",
             "show",
@@ -236,30 +288,70 @@ fn a_reset_waits_for_every_part_of_the_target_before_wiping() {
         .map(String::from),
         "each part is read stopped"
     );
-    assert_eq!(argvs[3].last().map(String::as_str), Some("lampos.target"));
+    assert_eq!(argvs[5].last().map(String::as_str), Some("lampos.target"));
+}
+
+/// Reviewer-three's P2 on #3579 (the reviewer-lead's and Second's too):
+/// setup serving in its 600 s after setup, an accepted helper's instance and
+/// the skills' manager's write wiped paths, and none is part of
+/// `lampos.target`. What starts them is stopped first, so none starts after
+/// they are listed; then they are stopped with the target's parts and read
+/// stopped. A helper that writes as it stops has written before the wipe.
+#[test]
+fn a_reset_stops_the_writers_outside_the_target_after_what_starts_them() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        parts: "lamp-voice.service".into(),
+        starters: "lamp-skills-manage.socket loaded active listening Skills\nlamp-setup-change.socket loaded inactive dead Change\n".into(),
+        writers: "lamp-setup.service loaded active running Setup\nlamp-setup-change@3-1-0.service loaded active running Change\n".into(),
+        writer: Some("lamp-setup-change@3-1-0.service".into()),
+        writes_on_stop: Some(root.path("memory/display-name")),
+        ..Fake::default()
+    };
+    reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    let argvs = fake.argvs.borrow();
+    let at = |verb: &str, word: &str| {
+        argvs
+            .iter()
+            .position(|argv| argv[1] == verb && argv.iter().any(|w| w == word))
+            .unwrap()
+    };
+    assert_eq!(argvs[0][6..], reset::STARTERS.map(String::from));
     assert_eq!(
-        argvs[..2],
+        argvs[1],
         [
-            [
-                "/bin/systemctl",
-                "show",
-                "-p",
-                "ConsistsOf",
-                "--value",
-                "lampos.target"
-            ]
-            .map(String::from)
-            .to_vec(),
-            [
-                "/bin/systemctl",
-                "stop",
-                "lampos.target",
-                "lamp-voice.service",
-                "lamp-memory.service"
-            ]
-            .map(String::from)
-            .to_vec(),
+            "/bin/systemctl",
+            "stop",
+            "lamp-skills-manage.socket",
+            "lamp-setup-change.socket"
         ]
+        .map(String::from),
+        "what starts a writer is stopped first"
+    );
+    assert!(at("list-units", "lamp-setup.service") > 1);
+    assert_eq!(
+        argvs[at("stop", "lampos.target")][2..],
+        [
+            "lampos.target",
+            "lamp-voice.service",
+            "lamp-setup.service",
+            "lamp-setup-change@3-1-0.service"
+        ]
+        .map(String::from)
+    );
+    assert_eq!(
+        argvs[at("show", "ActiveState")][5..],
+        [
+            "lamp-skills-manage.socket",
+            "lamp-setup-change.socket",
+            "lamp-voice.service",
+            "lamp-setup.service",
+            "lamp-setup-change@3-1-0.service"
+        ]
+        .map(String::from),
+        "the starters and the writers are read stopped"
     );
 }
 
@@ -275,7 +367,7 @@ fn parts_that_cannot_be_read_reboot_without_wiping() {
     };
     let steps = reset::reset(&plan, &mut fake).unwrap();
     assert_eq!(steps, [Step::Journal, Step::MarkerRemoved, Step::Rebooting]);
-    assert_eq!(*fake.calls.borrow(), ["sync", "show", "reboot"]);
+    assert_eq!(*fake.calls.borrow(), ["sync", "list-units", "reboot"]);
     assert!(root.path("setup/reset.json").exists());
     assert!(root.path("people.json").exists());
     reset::resume(&plan, &mut Fake::default()).unwrap();
@@ -302,6 +394,14 @@ fn a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup() {
         Fake {
             parts: "lamp-voice.service".into(),
             parts_after: Some("lamp-voice.service lamp-late.service".into()),
+            ..Fake::default()
+        },
+        Fake {
+            writers: "lamp-setup.service loaded active running Setup\n".into(),
+            writers_after: Some(
+                "lamp-setup.service loaded inactive dead Setup\nlamp-setup-keys@1-2-0.service loaded active running Keys\n"
+                    .into(),
+            ),
             ..Fake::default()
         },
     ] {
@@ -366,7 +466,10 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     };
     let steps = reset::reset(&plan, &mut fake).unwrap();
     assert_eq!(steps, [Step::Journal, Step::MarkerRemoved, Step::Rebooting]);
-    assert_eq!(*fake.calls.borrow(), ["sync", "show", "stop", "reboot"]);
+    assert_eq!(
+        *fake.calls.borrow(),
+        ["sync", "list-units", "show", "list-units", "stop", "reboot"]
+    );
     // No marker, so the keeper starts only setup; the data is still there.
     assert!(!root.path("setup/done").exists());
     assert!(root.path("setup/reset.json").exists());

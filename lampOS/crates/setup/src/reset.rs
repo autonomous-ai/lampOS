@@ -406,8 +406,11 @@ pub fn wipe(path: &Path) -> io::Result<()> {
 /// part must read stopped (`inactive`, or `failed` once ended by force), and
 /// the parts read again must be the same, none joined during the stop
 /// (Third's checks): otherwise it is a stop that failed, and nothing is
-/// wiped. A stop that is not `systemctl stop` (`lamp-keeper stop lamp`) is
-/// the plan's as it is.
+/// wiped. A stop of `lampos.target` also stops the product's writers of
+/// wiped paths that are not part of it ([`WRITERS`]), what starts them
+/// first ([`STARTERS`]), so that none starts after they are listed, and
+/// checks them the same way. A stop that is not `systemctl stop`
+/// (`lamp-keeper stop lamp`) is the plan's as it is.
 pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<()> {
     let systemctl = stop
         .first()
@@ -415,10 +418,35 @@ pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<
     if !systemctl || stop.get(1).map(String::as_str) != Some("stop") {
         return effects.run(stop);
     }
-    let parts = parts_of(stop, effects)?;
+    let product = stop[2..].iter().any(|unit| unit == "lampos.target");
+    // Only loaded units are named: a stop that names a unit systemd does
+    // not have fails (systemd 252), and one it does not have is not running.
+    let starters = if product {
+        loaded(&stop[0], &STARTERS, effects)?
+    } else {
+        Vec::new()
+    };
+    if !starters.is_empty() {
+        let mut argv = vec![stop[0].clone(), "stop".into()];
+        argv.extend(starters.iter().cloned());
+        effects.run(&argv)?;
+    }
+    let writers = |effects: &mut _| -> io::Result<Vec<String>> {
+        let mut parts = parts_of(stop, effects)?;
+        if product {
+            for writer in loaded(&stop[0], &WRITERS, effects)? {
+                if !stop[2..].contains(&writer) && !parts.contains(&writer) {
+                    parts.push(writer);
+                }
+            }
+        }
+        Ok(parts)
+    };
+    let parts = writers(effects)?;
     let mut argv = stop.to_vec();
     argv.extend(parts.iter().cloned());
     effects.run(&argv)?;
+    let parts: Vec<String> = starters.into_iter().chain(parts).collect();
     if parts.is_empty() {
         return Ok(());
     }
@@ -451,7 +479,7 @@ pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<
                 .join(", ")
         )));
     }
-    if let Some(joined) = parts_of(stop, effects)?
+    if let Some(joined) = writers(effects)?
         .into_iter()
         .find(|part| !parts.contains(part))
     {
@@ -460,6 +488,63 @@ pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<
         )));
     }
     Ok(())
+}
+
+/// What starts a writer of wiped paths outside `lampos.target` on a product
+/// lamp: stopped before the writers are listed, so none starts after
+/// (Second on #3579). `lamp-skills-manage.socket` is the sockets target's,
+/// and `lamp-records.timer` the timers'.
+pub const STARTERS: [&str; 5] = [
+    "lamp-skills-manage.socket",
+    "lamp-setup-change.socket",
+    "lamp-setup-keys.socket",
+    "lamp-setup-wifi.socket",
+    "lamp-records.timer",
+];
+
+/// Writers of paths the product plan wipes that are not part of
+/// `lampos.target` (reviewer-three's P2 on #3579, the reviewer-lead's and
+/// Second's): setup serving for 600 s after setup (the setup files and the
+/// credential), its recovery, the change, keys and Wi-Fi helpers' accepted
+/// instances (the setup files, `/etc/lampOS/voice/own`, the Wi-Fi), the
+/// skills' manager's instances (`/var/lib/lampos-skills-state`), the
+/// records' check (`/var/lib/lampOS/voice/sessions`), and the updater and
+/// its apply (the skills' state, `/var/lib/lampOS`; the reboot after the
+/// reset would end them all the same). Patterns name only loaded units, and
+/// none matches `lamp-setup-wipe.service`, the reset's own unit.
+pub const WRITERS: [&str; 9] = [
+    "lamp-setup.service",
+    "lamp-setup-recover.service",
+    "lamp-setup-change@*.service",
+    "lamp-setup-keys@*.service",
+    "lamp-setup-wifi@*.service",
+    "lamp-skills-manage@*.service",
+    "lamp-records.service",
+    "lamp-update.service",
+    "lamp-update-apply.service",
+];
+
+/// The loaded units among `units` (names or patterns), as `systemctl
+/// list-units --all` lists them, first word of each line.
+fn loaded(systemctl: &str, units: &[&str], effects: &mut impl Effects) -> io::Result<Vec<String>> {
+    let mut argv: Vec<String> = [
+        systemctl,
+        "list-units",
+        "--all",
+        "--plain",
+        "--no-legend",
+        "--full",
+    ]
+    .map(str::to_owned)
+    .into();
+    argv.extend(units.iter().map(|unit| (*unit).to_owned()));
+    Ok(effects
+        .read(&argv)?
+        .lines()
+        .filter_map(|line| line.split_whitespace().find(|word| *word != "\u{25cf}"))
+        .filter(|unit| !unit.starts_with('-'))
+        .map(str::to_owned)
+        .collect())
 }
 
 /// The units that are part of each target a `systemctl stop` names:
