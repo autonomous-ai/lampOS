@@ -276,6 +276,13 @@ Environment=LAMP_MEMORY_OBSERVE=on
 Environment=LAMP_MEMORY_EVENTS=on
 Environment=LAMP_MEMORY_THREADS=on
 Environment=LAMP_MEMORY_FORGET_ALL=on
+# What the room kept, and the earlier exchanges a turn is given, were said by whoever was in the room then, never
+# necessarily the one asking: on lamp-4ace on 26 Oct (lamp-voice 2a8273ef2's product unit, played), a fresh
+# session's "how do I take my coffee?", after a room's "I take my coffee black" kept by nobody, was answered as the
+# asker's own in 3 of 3 rounds without it ("Black, no sugar, that's how you've had it", "no sugar" from desk talk)
+# and in none of 2 with it ("nobody's told me how you take it"); a played name in a new session was never given back
+# either way (names.sh) (#2176).
+Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present

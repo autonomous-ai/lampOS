@@ -1853,9 +1853,15 @@ then use that person's scope:
   pins the bytes).
 
 - **The room's isn't the asker's** (#2176, the "Dylan" case,
-  `LAMP_MEMORY_ROOM_NOT_ASKER=on`, with the Days client only; off unless
-  set; both voice routes, since each opens its sessions through
-  `remember::told_for_session`). On lamp-4ace a played "my name is Dylan",
+  `LAMP_MEMORY_ROOM_NOT_ASKER=on`, with the Days client only; on in the
+  product since 26 Oct; both voice routes, since each opens its sessions
+  through `remember::told_for_session`). On lamp-4ace on 26 Oct (lamp-voice
+  `2a8273ef2`'s product unit, played lines, no face), a fresh session's "how
+  do I take my coffee?", after a room's "I take my coffee black" that
+  nobody's memory kept, was answered as the asker's own in 3 of 3 rounds
+  without it ("Black, no sugar — that's how you've had it", the "no sugar"
+  from colleagues' talk) and in none of 2 with it ("nobody's told me how you
+  take it"); `names.sh` gave no room name back as the asker's either way. On lamp-4ace a played "my name is Dylan",
   with no face known, was kept as the room's. Every later session's note
   carried it under the rule "The speaker is unknown: never say 'you told
   me'", and the model called the one asking "Dylan". With the switch:
