@@ -41,7 +41,7 @@ use lamp_gemini::{Tool, ToolCall};
 use lamp_local_time::LocalTime;
 use serde_json::{Value, json};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeSet, HashMap, VecDeque},
     io::{self, Read, Write},
     os::unix::net::UnixStream,
     path::{Path, PathBuf},
@@ -2414,6 +2414,16 @@ fn run_for_guarded(
         }
         None => legacy_exchange(socket, &request, deadline, lease),
     };
+    // The legacy memory's forget: lost (it may have been done) or done,
+    // its answer stays out of the thread too ([`forgetting_reply`]).
+    if call.name == FORGET
+        && let Some(request) = asked_in
+        && answer
+            .as_ref()
+            .is_none_or(|answer| answer["ok"] == true && answer["removed"].as_u64() != Some(0))
+    {
+        mark_forgetting_reply(request);
+    }
     let Some(answer) = answer else {
         return (gone(), false);
     };
@@ -3942,6 +3952,59 @@ pub fn days_from_environment() -> bool {
 static DAYS_MODE: OnceLock<bool> = OnceLock::new();
 static DAYS: OnceLock<Option<DaysClient>> = OnceLock::new();
 static FORGET_THREAD: AtomicBool = AtomicBool::new(false);
+/// The requests whose forget was done ([`forgetting_reply`]): at most
+/// [`FORGOTTEN_REPLIES`], the oldest let go first.
+static FORGOTTEN_REPLY_REQUESTS: OnceLock<Mutex<BTreeSet<u64>>> = OnceLock::new();
+/// How many requests [`FORGOTTEN_REPLY_REQUESTS`] holds: a turn that is
+/// retired may never say it is over, and request ids only grow.
+const FORGOTTEN_REPLIES: usize = 64;
+
+fn forgotten_reply_requests() -> std::sync::MutexGuard<'static, BTreeSet<u64>> {
+    FORGOTTEN_REPLY_REQUESTS
+        .get_or_init(|| Mutex::new(BTreeSet::new()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Whether a memory step's `answer` may have removed something. Only a
+/// success counting 0 removed, or an older memory's `unknown_op` (refused
+/// before anything ran), is no. A count above zero, no count, no answer
+/// (it may have committed before the answer was lost), or any other error
+/// (a `storage` error can come after the erase committed, Reviewer-two,
+/// 03:18 on #3609) may have.
+fn may_have_removed(answer: Option<&Value>) -> bool {
+    answer.is_none_or(|answer| match answer["ok"] == true {
+        true => answer["removed"].as_u64() != Some(0),
+        false => answer["error"] != "unknown_op",
+    })
+}
+
+/// `request`'s forget was done: its answer stays out of the thread.
+fn mark_forgetting_reply(request: u64) {
+    let mut requests = forgotten_reply_requests();
+    requests.insert(request);
+    while requests.len() > FORGOTTEN_REPLIES {
+        requests.pop_first();
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn mark_forgetting_reply_for_test(request: u64) {
+    mark_forgetting_reply(request);
+}
+
+/// Whether `request` is the answer to a forget that was done. It is said,
+/// but never put in the thread the next turn is given: it may name what
+/// was forgotten (lamp-06c1, 26 Oct: a forgotten peanut allergy was said
+/// again from the lamp's own "I've forgotten your peanut allergy").
+pub(crate) fn forgetting_reply(request: u64) -> bool {
+    forgotten_reply_requests().contains(&request)
+}
+
+/// `request`'s turn is over: whether it was a [`forgetting_reply`].
+pub(crate) fn finished_forgetting_reply(request: u64) -> bool {
+    forgotten_reply_requests().remove(&request)
+}
 
 /// The session-note call site already owns the recap lock. Complete any
 /// invalidation that could not take that lock during a bounded tool call.
@@ -5995,7 +6058,19 @@ impl DaysClient {
         let Some(left) = deadline.checked_sub(started.elapsed()) else {
             return (gone(), false);
         };
-        self.run_at_guarded(call, left, (now, zone), person, (lease, request))
+        let result = self.run_at_guarded(call, left, (now, zone), person, (lease, request));
+        // A forget's answer may name what went ([`forgetting_reply`]): kept
+        // out of the thread unless it surely removed nothing
+        // (`"forgotten":false`). A store that forgot, then a step after it
+        // that failed (their rules, Reviewer-two's P2 on #3609), or an
+        // answer lost, may have.
+        if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING)
+            && let Some(request) = request
+            && result.0["forgotten"] != false
+        {
+            mark_forgetting_reply(request);
+        }
+        result
     }
 
     #[cfg(test)]
@@ -6380,11 +6455,20 @@ impl DaysClient {
             // memory in a scope of their own (#813).
             if call.name == FORGET_EVERYTHING && crate::rules::on() {
                 let rules = json!({"op":"forget_all","person":crate::rules::scope(person)});
-                if deadline
+                let answer = deadline
                     .checked_sub(started.elapsed())
-                    .and_then(|left| bounded_exchange_scoped(&self.socket, &rules, left, lease))
-                    .is_none_or(|answer| answer["ok"] != true)
+                    .and_then(|left| bounded_exchange_scoped(&self.socket, &rules, left, lease));
+                // Their rules removed something though their memory held
+                // nothing: the answer still may name it ([`forgetting_reply`],
+                // Reviewer-two's HOLD on #3609, 02:13).
+                if let Some(request) = asked_in
+                    && answer
+                        .as_ref()
+                        .is_some_and(|answer| may_have_removed(Some(answer)))
                 {
+                    mark_forgetting_reply(request);
+                }
+                if answer.is_none_or(|answer| answer["ok"] != true) {
                     // Their memory is already forgotten: journalling stops.
                     if told["forgotten"] == true {
                         self.stop(Stopped::Forgotten);
@@ -6405,6 +6489,13 @@ impl DaysClient {
                     .checked_sub(started.elapsed())
                     .and_then(|left| bounded_exchange_scoped(&self.socket, &said, left, lease));
                 eprintln!("lamp-voice provider: {}", forget_said_told(answer.as_ref()));
+                // The room's lines may have named what went, though their
+                // own memory held nothing (Reviewer-two, 02:45 on #3609).
+                if let Some(request) = asked_in
+                    && may_have_removed(answer.as_ref())
+                {
+                    mark_forgetting_reply(request);
+                }
             }
             // And the household's yes to music and laughter, and to how a
             // face seems: "a forget or the reset wipes it" (the lead on
@@ -15461,6 +15552,209 @@ mod tests {
             read
         });
         (socket, served)
+    }
+
+    /// Reviewer-two's P2 and reviewer-three's P3 on #3609: through the
+    /// memory's socket, a forget everything the store did is marked
+    /// ([`forgetting_reply`]) even when their rules' forget after it fails
+    /// and the call answers nothing; its reply, a canary, never reaches the
+    /// thread, and the mark goes with the turn. One the store did with
+    /// nothing after it is marked; one that surely removed nothing is not.
+    #[test]
+    fn a_forget_the_store_did_keeps_its_reply_out_of_the_thread() {
+        const PERSON: &str = "p-be9688998f085098";
+        let forget = |name: &str, answer: fn(&Value) -> Value, requests: usize, request: u64| {
+            let (socket, served) = memory(name, requests, answer);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_all.store(true, Ordering::Release);
+            let told = client.run_in(
+                &call(FORGET_EVERYTHING, json!({})),
+                Duration::from_secs(2),
+                Some(PERSON),
+                request,
+            );
+            let served = served.join().unwrap();
+            std::fs::remove_file(&socket).unwrap();
+            (told, served)
+        };
+        // Done, then their rules' forget fails: nothing is answered.
+        crate::rules::set_on_for_test(true);
+        let request = u64::MAX - 3609;
+        let (told, served) = forget(
+            "forget-rules-fail",
+            |line| {
+                if line["person"]
+                    .as_str()
+                    .is_some_and(|person| person.starts_with("r-"))
+                {
+                    json!({"ok":false,"error":"storage","message":"x"})
+                } else {
+                    json!({"ok":true,"removed":3})
+                }
+            },
+            2,
+            request,
+        );
+        crate::rules::set_on_for_test(false);
+        assert_eq!(told, (gone(), false));
+        assert_eq!(served.len(), 2, "{served:?}");
+        assert!(forgetting_reply(request));
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        let before = std::mem::take(&mut *thread);
+        drop(thread);
+        crate::second_provider::worker::keep(
+            &crate::provider_worker::ProviderOutput::Transcript {
+                request: Some(request),
+                text: "Done, canary-3609 is forgotten.".into(),
+                finished: true,
+            },
+            None,
+        );
+        let recent = crate::thread::THREAD.lock().unwrap().recent_for(
+            None,
+            Instant::now(),
+            Duration::from_secs(60),
+            8,
+        );
+        assert!(!format!("{recent:?}").contains("canary-3609"), "{recent:?}");
+        crate::second_provider::worker::keep(
+            &crate::provider_worker::ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            },
+            None,
+        );
+        assert!(!forgetting_reply(request));
+        *crate::thread::THREAD.lock().unwrap() = before;
+        // Done, with nothing after it: marked.
+        let (told, _) = forget(
+            "forget-done",
+            |_| json!({"ok":true,"removed":3}),
+            1,
+            request - 1,
+        );
+        assert_eq!(told.0["forgotten"], true, "{told:?}");
+        assert!(finished_forgetting_reply(request - 1));
+        // Nothing kept of them, so nothing removed: not marked.
+        let (told, _) = forget(
+            "forget-nothing",
+            |_| json!({"ok":true,"removed":0}),
+            1,
+            request - 2,
+        );
+        assert_eq!(told.0["forgotten"], false, "{told:?}");
+        assert!(!finished_forgetting_reply(request - 2));
+        // Reviewer-two, 02:13, with their rules: nothing in their memory
+        // but rules removed is marked; nothing in either is not.
+        crate::rules::set_on_for_test(true);
+        let (told, served) = forget(
+            "forget-rules-only",
+            |line| {
+                let rules = line["person"]
+                    .as_str()
+                    .is_some_and(|person| person.starts_with("r-"));
+                json!({"ok":true,"removed":if rules {2} else {0}})
+            },
+            2,
+            request - 3,
+        );
+        assert_eq!(served.len(), 2, "{served:?}");
+        assert!(finished_forgetting_reply(request - 3), "{told:?}");
+        let (told, served) = forget(
+            "forget-neither",
+            |_| json!({"ok":true,"removed":0}),
+            2,
+            request - 4,
+        );
+        crate::rules::set_on_for_test(false);
+        assert_eq!(served.len(), 2, "{served:?}");
+        assert!(!finished_forgetting_reply(request - 4), "{told:?}");
+        // Reviewer-two, 02:45, with `LAMP_MEMORY_ROOM_SPEAKER`: nothing in
+        // their memory, but the room's lines they said removed, or that
+        // answer lost, is marked; nothing anywhere, or the room's step
+        // refused, is not.
+        let room = |name: &str, answer: fn(&Value) -> Value, requests: usize, request: u64| {
+            let (socket, served) = memory(name, requests, answer);
+            let client = DaysClient::new(socket.clone()).unwrap();
+            client.forget_all.store(true, Ordering::Release);
+            client
+                .hand_ons
+                .room_speaker
+                .on
+                .store(true, Ordering::Release);
+            let told = client.run_in(
+                &call(FORGET_EVERYTHING, json!({})),
+                Duration::from_secs(2),
+                Some(PERSON),
+                request,
+            );
+            let served = served.join().unwrap();
+            std::fs::remove_file(&socket).unwrap();
+            assert_eq!(told.0["forgotten"], false, "{name} {told:?}");
+            (served, finished_forgetting_reply(request))
+        };
+        let (served, marked) = room(
+            "forget-room-said",
+            |line| json!({"ok":true,"removed":if line["op"] == "forget_said" {2} else {0}}),
+            2,
+            request - 5,
+        );
+        assert_eq!(served.len(), 2, "{served:?}");
+        assert!(marked, "the room's lines removed");
+        // One request served: the room's step finds no memory, its answer
+        // lost.
+        let (_, marked) = room(
+            "forget-room-lost",
+            |_| json!({"ok":true,"removed":0}),
+            1,
+            request - 6,
+        );
+        assert!(marked, "the room's answer lost");
+        let (_, marked) = room(
+            "forget-room-none",
+            |_| json!({"ok":true,"removed":0}),
+            2,
+            request - 7,
+        );
+        assert!(!marked, "nothing anywhere");
+        let (_, marked) = room(
+            "forget-room-refused",
+            |line| {
+                if line["op"] == "forget_said" {
+                    json!({"ok":false,"error":"unknown_op","message":"the memory operation is unknown"})
+                } else {
+                    json!({"ok":true,"removed":0})
+                }
+            },
+            2,
+            request - 8,
+        );
+        assert!(!marked, "the room's step refused, nothing done");
+        // A storage error after the room's erase: marked.
+        let (_, marked) = room(
+            "forget-room-storage",
+            |line| {
+                if line["op"] == "forget_said" {
+                    json!({"ok":false,"error":"storage","message":"x"})
+                } else {
+                    json!({"ok":true,"removed":0})
+                }
+            },
+            2,
+            request - 9,
+        );
+        assert!(marked, "a storage error may come after the commit");
+        assert!(
+            may_have_removed(Some(&json!({"ok":true}))),
+            "no count is no zero"
+        );
+        assert!(!may_have_removed(Some(&json!({"ok":true,"removed":0}))));
+        assert!(!may_have_removed(Some(
+            &json!({"ok":false,"error":"unknown_op"})
+        )));
+        assert!(may_have_removed(Some(
+            &json!({"ok":false,"error":"storage"})
+        )));
     }
 
     /// #813 is off unless set: without the rules switch the model is told

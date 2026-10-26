@@ -9610,6 +9610,11 @@ fn keep_scoped(
             text,
             ..
         } => {
+            // A done forget's answer may name what went: said, but never
+            // the thread's ([`crate::remember::forgetting_reply`]).
+            if crate::remember::forgetting_reply(*request) {
+                return;
+            }
             // Sentences come trimmed, those after the first with a space
             // before; the thread joins its pieces as given. The empty last
             // piece says the words are over and adds none.
@@ -9643,9 +9648,17 @@ fn keep_scoped(
                 }
                 None => crate::remember::finished(*request),
             }
+            if crate::remember::finished_forgetting_reply(*request) {
+                eprintln!(
+                    "lamp-voice second: request {request}: a done forget's answer was left out of the thread"
+                );
+            }
             save(file);
         }
-        ProviderOutput::TurnFailed { .. } => save(file),
+        ProviderOutput::TurnFailed { request, .. } => {
+            let _ = crate::remember::finished_forgetting_reply(*request);
+            save(file);
+        }
         _ => {}
     }
 }
@@ -16479,6 +16492,47 @@ mod tests {
         assert_eq!(held.release(), None, "the older one went");
         super::keep_scoped(&end(903), None, None, None);
         assert_eq!(held.release(), None, "off: nothing held");
+    }
+
+    /// lamp-06c1, 26 Oct: the answer to a done forget is kept out of the
+    /// thread, and its mark goes with the turn.
+    #[test]
+    fn a_forget_confirmation_cannot_reenter_the_next_turns_history() {
+        let request = u64::MAX - 704;
+        let mut thread = crate::thread::THREAD.lock().unwrap();
+        let before = std::mem::take(&mut *thread);
+        thread.forget();
+        drop(thread);
+        crate::remember::mark_forgetting_reply_for_test(request);
+        assert!(crate::remember::forgetting_reply(request));
+        super::keep_scoped(
+            &ProviderOutput::Transcript {
+                request: Some(request),
+                text: "I forgot the peanut allergy.".into(),
+                finished: true,
+            },
+            None,
+            None,
+            None,
+        );
+        assert!(
+            crate::thread::THREAD
+                .lock()
+                .unwrap()
+                .recent_for(None, Instant::now(), Duration::from_secs(60), 8)
+                .is_empty()
+        );
+        super::keep_scoped(
+            &ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            },
+            None,
+            None,
+            None,
+        );
+        assert!(!crate::remember::forgetting_reply(request));
+        *crate::thread::THREAD.lock().unwrap() = before;
     }
 
     /// #2137's redesign, step 5: the second worker's own path, not only
