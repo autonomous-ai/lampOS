@@ -1,0 +1,17 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/setup.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree; prior full closure retained. No cold-target claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_complete_sha256": "8ed7adb13e9c5498cb546619c7fe5f34e8c4ad78f172be15d6547431af575a5f",
+  "previous_head": "9784e3e26407b63584930c1303d60b722c3ddb7c",
+  "previous_source_inventory_sha256": "1771d546ba7af56504a730e6a6fd88d576c8640c7b23541c683c48ab02d7a906",
+  "source_worktree": "<source>",
+  "target": "<target>"
+}

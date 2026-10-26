@@ -1,0 +1,92 @@
+--- a/lampOS/crates/setup/src/reset/query.rs
++++ b/lampOS/crates/setup/src/reset/query.rs
+@@ -26,25 +26,20 @@
+     reaped: bool,
+ }
+ 
+-impl OwnedChild {
+-    fn stop_group(&mut self) {
+-        if self.reaped {
+-            return;
+-        }
+-        // An unreaped leader retains the process-group identity. Never signal
+-        // that identity after reaping: its PID could then belong to another job.
+-        let group = rustix::process::Pid::from_child(&self.child);
+-        let _ = rustix::process::kill_process_group(group, rustix::process::Signal::KILL);
+-        let _ = self.child.kill();
+-    }
+-}
+-
+ impl Drop for OwnedChild {
+     fn drop(&mut self) {
+         if self.reaped {
+             return;
+         }
+-        self.stop_group();
++        // An unreaped leader retains the process-group identity. Never signal
++        // that identity after reaping: its PID could then belong to another job.
++        if let Some(group) = i32::try_from(self.child.id())
++            .ok()
++            .and_then(rustix::process::Pid::from_raw)
++        {
++            let _ = rustix::process::kill_process_group(group, rustix::process::Signal::KILL);
++        }
++        let _ = self.child.kill();
+         let _ = self.child.wait();
+     }
+ }
+@@ -99,48 +94,13 @@
+         };
+         // A descendant may hold the pipe after the leader exits. Retain the
+         // unreaped leader until EOF so timeout cleanup still owns its group.
+-        if eof {
+-            // Observe exit without consuming the leader. A failed leader may
+-            // leave descendants that closed stdout; its group must be stopped
+-            // before reaping releases the identity, just as on timeout.
+-            let exited = match rustix::process::waitid(
+-                rustix::process::WaitId::Pid(rustix::process::Pid::from_child(&owned.child)),
+-                rustix::process::WaitIdOptions::EXITED
+-                    | rustix::process::WaitIdOptions::NOHANG
+-                    | rustix::process::WaitIdOptions::NOWAIT,
+-            ) {
+-                Ok(exited) => exited,
+-                Err(rustix::io::Errno::INTR) => continue,
+-                Err(error @ rustix::io::Errno::CHILD) => {
+-                    // An external reaper or inherited SIGCHLD disposition
+-                    // removed our proof of ownership. Never signal that PID.
+-                    owned.reaped = true;
+-                    return Err(error.into());
+-                }
+-                Err(error) => return Err(error.into()),
++        if eof && let Some(status) = owned.child.try_wait()? {
++            owned.reaped = true;
++            return if status.success() {
++                Ok(bytes)
++            } else {
++                Err(io::Error::other(format!("reset query ended with {status}")))
+             };
+-            if let Some(exited) = exited {
+-                if exited.exit_status() != Some(0) {
+-                    owned.stop_group();
+-                }
+-                let status = match owned.child.wait() {
+-                    Ok(status) => {
+-                        owned.reaped = true;
+-                        status
+-                    }
+-                    Err(error) => {
+-                        if error.raw_os_error() == Some(rustix::io::Errno::CHILD.raw_os_error()) {
+-                            owned.reaped = true;
+-                        }
+-                        return Err(error);
+-                    }
+-                };
+-                return if status.success() {
+-                    Ok(bytes)
+-                } else {
+-                    Err(io::Error::other(format!("reset query ended with {status}")))
+-                };
+-            }
+         }
+         std::thread::sleep(Duration::from_millis(5));
+     }

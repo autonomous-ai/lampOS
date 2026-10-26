@@ -1,0 +1,10 @@
+{
+  "direct_setup_consumers": [
+    "lamp-cloud dev-dependency"
+  ],
+  "note": "Eight controls are counted within the full current suite, never added again. Prior draft/focused/negative runs remain separate source identities.",
+  "packages": [
+    "lamp-setup",
+    "lamp-cloud"
+  ]
+}

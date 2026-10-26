@@ -1,0 +1,17 @@
+{
+  "archive_sha256": "914de0a04e0596f8c842576b064579cad97e4bafd11944a743cbca26282a742a",
+  "mutant_patch_sha256": "6b02193ca6d17b7fde4a5472083f3eb4fb9062c062abd3cbac63c2060d22f665",
+  "original_head": "220251c703aedf6babb148439d6fabe9602edbda",
+  "selection": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-setup",
+    "--lib",
+    "reset::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes"
+  ],
+  "target_absent_and_atomically_empty_before_compile": true
+}

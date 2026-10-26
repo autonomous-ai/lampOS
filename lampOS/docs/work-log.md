@@ -1,3 +1,15 @@
+Current status: #3631 cleanup repair passed host gates; new original native and peer qualification follows.
+
+## Current checkpoint: 2026-10-27 06:37 +07, failed-leader regression discriminates
+
+[Exact repaired 220251/b234 gate](verification/reset-query-bounds-20261026/p2-220/README.md): fmt, strict Setup/Cloud Clippy and full matching tests pass: Setup **193/0/1**, Cloud **196/0/4**, total **389/0/5**, all eight query controls once. Two zero doc-test summaries are separate. Runtime 21.694 s. Verified-owned target reuse closed the previous boundary before compilation; source 7,239 and ten executables, 63 local outputs and 445 depfiles pass actual/preserved guards. No retry or implementation-suite failure.
+
+[Old-prefix negative control](verification/reset-query-bounds-20261026/p2-old-prefix/README.md) compiled successfully and ran only the new regression with production prefix restored from 9784: **0 passed / 1 failed / 0 ignored / 23 filtered**, Cargo 101, specifically the escaped-marker assertion after status-7 and ready checks. Runtime command 2.738 s. Original 220251 source/head stayed unchanged. The child waits for a release written only after the caller observes failure; the bounded observation is not a scheduler-independent timing guarantee. No signal targets a reaped group.
+
+The repair peeks with waitid/NOWAIT, stops a failed group before collecting the leader, and retires unprovable identity if either observation or wait reports ECHILD. Successful completion's documented limits remain. The prior 9784 native green and R3 read are historical; R2's P2 stays held until the repaired source receives fresh original native and peer qualification. PR remains draft. No device or release action.
+
+---
+
 Current status: #3631 is held for a confirmed failed-leader cleanup P2; repair is validating.
 
 ## Current checkpoint: 2026-10-27 06:34 +07, original native proof and new P2 kept separate

@@ -1,0 +1,25 @@
+{
+  "cleanup_actions": [],
+  "cleanup_errors": [],
+  "cleanup_seconds": 15,
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-setup",
+    "--lib",
+    "reset::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "deadline_seconds": 120,
+  "elapsed_seconds": 2.738,
+  "error": null,
+  "exit_code": 101,
+  "log_sha256": "f6a758e9e7c48102c1b6e9eacd34cb58271d3ee20e65d7acc4f9258fced717cb",
+  "source_unchanged": true
+}

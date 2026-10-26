@@ -1,0 +1,9 @@
+{
+  "case": "reset::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+  "failure": "failed query left its closed-output descendant running",
+  "observed_once": true,
+  "original_source_unchanged": true,
+  "raw_runtime_log_sha256": "f6a758e9e7c48102c1b6e9eacd34cb58271d3ee20e65d7acc4f9258fced717cb",
+  "reason": "Only production query prefix restored from 9784; new regression tests unchanged. Failed leader was reaped before closed-output descendant cleanup; escaped marker observed after prior status/ready assertions passed.",
+  "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 1.55s"
+}
