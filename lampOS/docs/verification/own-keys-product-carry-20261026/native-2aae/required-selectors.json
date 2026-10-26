@@ -1,0 +1,291 @@
+{
+  "declaration_paths": {
+    "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again": [
+      "lampOS/crates/update/tests/install.rs"
+    ],
+    "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay": [
+      "lampOS/crates/update/tests/round.rs"
+    ],
+    "body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone": [
+      "lampOS/crates/body/src/body/tests.rs"
+    ],
+    "body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window": [
+      "lampOS/crates/body/src/body/tests.rs"
+    ],
+    "body::tests::with_own_ranges_a_home_outside_them_is_refused": [
+      "lampOS/crates/body/src/body/tests.rs"
+    ],
+    "body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold": [
+      "lampOS/crates/body/src/body/tests.rs"
+    ],
+    "body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start": [
+      "lampOS/crates/body/src/body/tests.rs"
+    ],
+    "body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before": [
+      "lampOS/crates/body/src/body/tests.rs"
+    ],
+    "body::tests::without_own_ranges_the_servos_limits_change_nothing": [
+      "lampOS/crates/body/src/body/tests.rs"
+    ],
+    "days_protocol::tests::every_opt_in_request_shape_in_the_document_parses": [
+      "lampOS/crates/memory/src/days_protocol.rs"
+    ],
+    "install::tests::retired_drop_in_matcher_preserves_a_directory": [
+      "lampOS/crates/update/src/install.rs"
+    ],
+    "install::tests::retired_drop_in_matcher_preserves_a_fifo": [
+      "lampOS/crates/update/src/install.rs"
+    ],
+    "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading": [
+      "lampOS/crates/update/tests/install.rs"
+    ],
+    "install_keeps_an_own_keys_off_drop_in_without_reloading": [
+      "lampOS/crates/update/tests/install.rs"
+    ],
+    "install_keeps_an_own_keys_symlink_to_the_exact_template": [
+      "lampOS/crates/update/tests/install.rs"
+    ],
+    "install_preflight_refuses_a_directory_at_the_retired_own_keys_path": [
+      "lampOS/crates/update/tests/install.rs"
+    ],
+    "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest": [
+      "lampOS/crates/update/tests/install.rs"
+    ],
+    "package::tests::the_askers_cgroups_are_their_product_units_slices": [
+      "lampOS/crates/skills/src/package.rs"
+    ],
+    "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else": [
+      "lampOS/crates/voice/src/process.rs"
+    ],
+    "process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in": [
+      "lampOS/crates/voice/src/process.rs"
+    ],
+    "protocol::tests::every_default_request_written_in_the_document_is_read_and_done": [
+      "lampOS/crates/memory/src/protocol.rs"
+    ],
+    "remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs": [
+      "lampOS/crates/voice/src/remember.rs"
+    ],
+    "remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s": [
+      "lampOS/crates/voice/src/remember.rs"
+    ],
+    "remember::tests::without_the_switch_the_note_is_byte_identical": [
+      "lampOS/crates/voice/src/remember.rs"
+    ],
+    "reset::a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup": [
+      "lampOS/crates/setup/tests/it/reset.rs"
+    ],
+    "reset::a_reset_stops_the_writers_outside_the_target_after_what_starts_them": [
+      "lampOS/crates/setup/tests/it/reset.rs"
+    ],
+    "reset::a_reset_waits_for_every_part_of_the_target_before_wiping": [
+      "lampOS/crates/setup/tests/it/reset.rs"
+    ],
+    "reset::a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile": [
+      "lampOS/crates/setup/tests/it/reset.rs"
+    ],
+    "reset::only_a_systemctl_stop_of_a_target_names_its_parts": [
+      "lampOS/crates/setup/tests/it/reset.rs"
+    ],
+    "reset::parts_that_cannot_be_read_reboot_without_wiping": [
+      "lampOS/crates/setup/tests/it/reset.rs"
+    ],
+    "reset::the_updaters_way_back_restarts_nothing_after_the_barrier": [
+      "lampOS/crates/setup/tests/it/reset.rs"
+    ],
+    "second_config::tests::the_company_relay_reaches_deepseek_through_itself": [
+      "lampOS/crates/voice/src/second_config.rs"
+    ],
+    "second_config::tests::the_product_unit_loads_the_own_keys_folder_the_names_here_read": [
+      "lampOS/crates/voice/src/second_config.rs"
+    ],
+    "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown": [
+      "lampOS/crates/update/src/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins": [
+      "lampOS/crates/update/src/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch": [
+      "lampOS/crates/update/tests/round/setup_lifecycle.rs"
+    ],
+    "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped": [
+      "lampOS/crates/voice/tests/it/speaker_lapse_worker.rs"
+    ],
+    "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up": [
+      "lampOS/crates/voice/tests/it/speaker_lapse_worker.rs"
+    ],
+    "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker": [
+      "lampOS/crates/voice/tests/it/speaker_lapse_worker.rs"
+    ],
+    "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going": [
+      "lampOS/crates/voice/tests/it/speaker_lapse_worker.rs"
+    ],
+    "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation": [
+      "lampOS/crates/voice/tests/it/speaker_lapse_worker.rs"
+    ],
+    "switches::every_switch_says_how_it_is_counted": [
+      "lampOS/crates/voice-eval/tests/it/switches.rs"
+    ],
+    "switches::the_counts_by_table_and_in_all": [
+      "lampOS/crates/voice-eval/tests/it/switches.rs"
+    ],
+    "the_product_takes_a_persons_own_keys": [
+      "lampOS/crates/update/tests/install.rs"
+    ],
+    "touch_runtime::controls_runs_at_real_time_priority_above_the_voice": [
+      "lampOS/crates/controls/tests/it/touch_runtime.rs"
+    ],
+    "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time": [
+      "lampOS/crates/voice/src/transport.rs"
+    ],
+    "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup": [
+      "lampOS/crates/voice/src/transport.rs"
+    ],
+    "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance": [
+      "lampOS/crates/voice/src/transport.rs"
+    ],
+    "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input": [
+      "lampOS/crates/voice/src/transport.rs"
+    ],
+    "wifi_change::the_product_voice_loads_its_recorded_lines_from_the_fixed_folder": [
+      "lampOS/crates/setup/tests/it/wifi_change.rs"
+    ]
+  },
+  "head": "2aae46323701bf5b66c7627c88c9abaa6378a612",
+  "names": [
+    "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again",
+    "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+    "body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone",
+    "body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window",
+    "body::tests::with_own_ranges_a_home_outside_them_is_refused",
+    "body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold",
+    "body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start",
+    "body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before",
+    "body::tests::without_own_ranges_the_servos_limits_change_nothing",
+    "days_protocol::tests::every_opt_in_request_shape_in_the_document_parses",
+    "install::tests::retired_drop_in_matcher_preserves_a_directory",
+    "install::tests::retired_drop_in_matcher_preserves_a_fifo",
+    "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+    "install_keeps_an_own_keys_off_drop_in_without_reloading",
+    "install_keeps_an_own_keys_symlink_to_the_exact_template",
+    "install_preflight_refuses_a_directory_at_the_retired_own_keys_path",
+    "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest",
+    "package::tests::the_askers_cgroups_are_their_product_units_slices",
+    "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else",
+    "process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+    "protocol::tests::every_default_request_written_in_the_document_is_read_and_done",
+    "remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs",
+    "remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s",
+    "remember::tests::without_the_switch_the_note_is_byte_identical",
+    "reset::a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup",
+    "reset::a_reset_stops_the_writers_outside_the_target_after_what_starts_them",
+    "reset::a_reset_waits_for_every_part_of_the_target_before_wiping",
+    "reset::a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile",
+    "reset::only_a_systemctl_stop_of_a_target_names_its_parts",
+    "reset::parts_that_cannot_be_read_reboot_without_wiping",
+    "reset::the_updaters_way_back_restarts_nothing_after_the_barrier",
+    "second_config::tests::the_company_relay_reaches_deepseek_through_itself",
+    "second_config::tests::the_product_unit_loads_the_own_keys_folder_the_names_here_read",
+    "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+    "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+    "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+    "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+    "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+    "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+    "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+    "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+    "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+    "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+    "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+    "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+    "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown",
+    "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins",
+    "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+    "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+    "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+    "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+    "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped",
+    "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up",
+    "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker",
+    "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going",
+    "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation",
+    "switches::every_switch_says_how_it_is_counted",
+    "switches::the_counts_by_table_and_in_all",
+    "the_product_takes_a_persons_own_keys",
+    "touch_runtime::controls_runs_at_real_time_priority_above_the_voice",
+    "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time",
+    "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup",
+    "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance",
+    "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input",
+    "wifi_change::the_product_voice_loads_its_recorded_lines_from_the_fixed_folder"
+  ],
+  "source_bindings": {
+    "lampOS/crates/body/src/body/tests.rs": "20eb884138dae7f0c21e4972c94bf4d4a5343e70d42ae0e1943793865953b715",
+    "lampOS/crates/controls/tests/it/touch_runtime.rs": "02617e37f69014fcc18bc035f14ca221d5f705865a8d14c18b080545919a2457",
+    "lampOS/crates/memory/src/days_protocol.rs": "4eaf5175520c9e45497e10e42c69a1bcfb28db3303918284eae9ff3a56c18ae2",
+    "lampOS/crates/memory/src/protocol.rs": "0d598eaac2db69b86b27631621bb7be83f0072efef2eb7ffbf5c87c6bd46db40",
+    "lampOS/crates/setup/tests/it/reset.rs": "3994633df2683e4b1a82bd6aeebd22b3c4a21eb3513b2299b02234a2f8cc9743",
+    "lampOS/crates/setup/tests/it/wifi_change.rs": "6561e9dd87944fa6e280597a46d30687415834b07e7bceb5854cc35959c5b14f",
+    "lampOS/crates/skills/src/package.rs": "7bda72a112a2e2db258f5e8f130e82072f4f93a158fc75e6e4d45ee708cd8c4e",
+    "lampOS/crates/update/src/install.rs": "1794da24137f416e62d68d2a9943d3f2909553db812fbc5401e1649ad757db3c",
+    "lampOS/crates/update/src/setup_lifecycle.rs": "18413379a3c803ca245ceb0f01630851c0b10052a5de238d26a25bc1222b6b3e",
+    "lampOS/crates/update/tests/install.rs": "47199d48dedda9dd122e8c2498ce21cb2dea589f95e0dd64790ce4a37c31c3b9",
+    "lampOS/crates/update/tests/round.rs": "f6d16870e7d7f0da9ab4d995d2af8f92af89a0cf19d1fdeff8b65ccafe62c2f3",
+    "lampOS/crates/update/tests/round/setup_lifecycle.rs": "73a24b6d78c7e3ee9a2b3ca9f30e62d330b0f4d499817968e5415046b2d7da7b",
+    "lampOS/crates/voice-eval/tests/it/switches.rs": "98c5a0378e40db9fd5a157909029989ddd53ff6a39391d8d87fc1b96bdbd9035",
+    "lampOS/crates/voice/src/process.rs": "363498beaca46e906766960a1cd7c1342ca8823240ca3c4417eda18d92743eab",
+    "lampOS/crates/voice/src/remember.rs": "3a262a4d63d4fae50241db8c553181ec7c9fb45363a2017afc898697f7197664",
+    "lampOS/crates/voice/src/second_config.rs": "74132d5bde138174f9eb51408789f56966e9dd57eeab34b24087efcab0feb29f",
+    "lampOS/crates/voice/src/transport.rs": "1841fe337f3140999634a31506bc026d2cc9e23f170edf1941bd770dcd1c759a",
+    "lampOS/crates/voice/tests/it/speaker_lapse_worker.rs": "7e0883707346ea38b926a9d0f2cef7be823d55a23a7ee3b0a1aeedd5b907da4b"
+  },
+  "switch_cases": [
+    "every_switch_says_how_it_is_counted",
+    "the_counts_by_table_and_in_all"
+  ]
+}

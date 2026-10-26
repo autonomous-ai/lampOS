@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 original 2aae CI qualified; latest-base test-only carry active; activation HOLD.
+
+## Current checkpoint: 2026-10-26 23:20 +07, original current CI audit closed
+
+[2aae original native/general proof](verification/own-keys-product-carry-20261026/native-2aae/README.md): ARM64 40350476633, Linux Clippy 40350476693 and general CI 40350461484 all pass on attempt 1. Actual native preview 174c5e7f3 has exact 7d/2aae parents and equals the authored tree. Workspace PR-profile census **11,408 unique passes / zero failures, leaks, timeouts or selected unrun / 106 skips**, all 65 exact source-bound required controls once; 35 echoes excluded. Separate process 13, relay 1, docs 4 across 46 summaries and helper 25 remain separate. General's four actual jobs check out 2aae directly and pass; 14 CTS skips stay skipped. HTTP 503/TLS collection errors are retained; no workflow rerun.
+
+R3's current independent 17/0 and R2's source/native no-new-P1/P2 reads remain attributed to their producers; both preserve activation acceptance HOLD. Main advanced to 521dcb006 with only Skills call_wait test observations. The next carry validates that changed integration case and compiler scope once, preserving every earlier result's actual head and artifact identity. No full unrelated suite repetition, device, provider, key, signing or release action. The reset command-budget audit is recorded below; no competing follow-up is claimed.
+
+---
+
 Ready for lamp-voice: current own-keys original ARM pending; reset read-command follow-up assessed.
 
 ## Current checkpoint: 2026-10-26 23:17 +07, reset command-budget audit

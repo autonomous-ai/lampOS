@@ -1,0 +1,457 @@
+[
+  {
+    "binary": "lamp-body",
+    "name": "body::tests::own_ranges_check_every_pose_and_leave_a_full_turn_alone",
+    "ordinal": 625,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-body",
+    "name": "body::tests::with_own_ranges_a_head_goal_outside_them_ends_the_run_on_the_window",
+    "ordinal": 678,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-body",
+    "name": "body::tests::with_own_ranges_a_home_outside_them_is_refused",
+    "ordinal": 679,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-body",
+    "name": "body::tests::with_own_ranges_a_joint_resting_near_its_stop_still_takes_hold",
+    "ordinal": 680,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-body",
+    "name": "body::tests::with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start",
+    "ordinal": 681,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-body",
+    "name": "body::tests::with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before",
+    "ordinal": 682,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-body",
+    "name": "body::tests::without_own_ranges_the_servos_limits_change_nothing",
+    "ordinal": 686,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-controls::it",
+    "name": "touch_runtime::controls_runs_at_real_time_priority_above_the_voice",
+    "ordinal": 1904,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-memory",
+    "name": "days_protocol::tests::every_opt_in_request_shape_in_the_document_parses",
+    "ordinal": 3236,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-memory",
+    "name": "protocol::tests::every_default_request_written_in_the_document_is_read_and_done",
+    "ordinal": 3271,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "reset::a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup",
+    "ordinal": 4917,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "reset::a_reset_stops_the_writers_outside_the_target_after_what_starts_them",
+    "ordinal": 4920,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "reset::a_reset_waits_for_every_part_of_the_target_before_wiping",
+    "ordinal": 4924,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "reset::a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile",
+    "ordinal": 4925,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "reset::only_a_systemctl_stop_of_a_target_names_its_parts",
+    "ordinal": 4932,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "reset::parts_that_cannot_be_read_reboot_without_wiping",
+    "ordinal": 4934,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "reset::the_updaters_way_back_restarts_nothing_after_the_barrier",
+    "ordinal": 4941,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-setup::it",
+    "name": "wifi_change::the_product_voice_loads_its_recorded_lines_from_the_fixed_folder",
+    "ordinal": 5029,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-skills",
+    "name": "package::tests::the_askers_cgroups_are_their_product_units_slices",
+    "ordinal": 5091,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_directory",
+    "ordinal": 6257,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_fifo",
+    "ordinal": 6258,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update",
+    "name": "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown",
+    "ordinal": 6302,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update",
+    "name": "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins",
+    "ordinal": 6303,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again",
+    "ordinal": 6348,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+    "ordinal": 6393,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_off_drop_in_without_reloading",
+    "ordinal": 6396,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_symlink_to_the_exact_template",
+    "ordinal": 6397,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_preflight_refuses_a_directory_at_the_retired_own_keys_path",
+    "ordinal": 6398,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest",
+    "ordinal": 6407,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "the_product_takes_a_persons_own_keys",
+    "ordinal": 6429,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+    "ordinal": 6509,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+    "ordinal": 6607,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+    "ordinal": 6608,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+    "ordinal": 6609,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+    "ordinal": 6610,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+    "ordinal": 6611,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+    "ordinal": 6612,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+    "ordinal": 6613,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+    "ordinal": 6614,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+    "ordinal": 6615,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+    "ordinal": 6616,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+    "ordinal": 6617,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+    "ordinal": 6618,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+    "ordinal": 6619,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+    "ordinal": 6620,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+    "ordinal": 6621,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-update::round",
+    "name": "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+    "ordinal": 6622,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else",
+    "ordinal": 8250,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+    "ordinal": 8308,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs",
+    "ordinal": 8842,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s",
+    "ordinal": 8844,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "remember::tests::without_the_switch_the_note_is_byte_identical",
+    "ordinal": 8857,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "second_config::tests::the_company_relay_reaches_deepseek_through_itself",
+    "ordinal": 9219,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "second_config::tests::the_product_unit_loads_the_own_keys_folder_the_names_here_read",
+    "ordinal": 9222,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time",
+    "ordinal": 10379,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup",
+    "ordinal": 10380,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance",
+    "ordinal": 10381,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input",
+    "ordinal": 10384,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped",
+    "ordinal": 10747,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up",
+    "ordinal": 10748,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker",
+    "ordinal": 10749,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going",
+    "ordinal": 10750,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation",
+    "ordinal": 10751,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice-eval::it",
+    "name": "switches::every_switch_says_how_it_is_counted",
+    "ordinal": 11386,
+    "status": "PASS",
+    "total": 11408
+  },
+  {
+    "binary": "lamp-voice-eval::it",
+    "name": "switches::the_counts_by_table_and_in_all",
+    "ordinal": 11387,
+    "status": "PASS",
+    "total": 11408
+  }
+]

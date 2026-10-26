@@ -1,0 +1,42 @@
+{
+  "watch_errors": [
+    {
+      "at": "2026-10-26T15:51:59.326625+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T15:57:11.589715+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T16:02:24.824301+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T16:07:35.992385+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T16:13:21.016038+00:00",
+      "name": "arm64",
+      "error": "TimeoutExpired: Command '['gh', 'api', 'repos/autonomous-ai/lampOS/actions/runs/40350476633/attempts/1']' timed out after 45 seconds"
+    }
+  ],
+  "collection_errors": [
+    {
+      "at": "2026-10-26T15:38:50.252270+00:00",
+      "operation": "GET original general job121668793156 logs",
+      "result": "HTTP503; collector exit1; no CI rerun",
+      "next": "Retry read-only collection after native watcher wait"
+    },
+    {
+      "operation": "Scheduled ARM stage GET",
+      "result": "TLS handshake timeout; one-shot collector exit1; no current stage inferred"
+    }
+  ],
+  "resolution": "Original terminal metadata and logs later collected successfully by read-only retrieval; no workflow rerun, cancellation or new test execution."
+}
