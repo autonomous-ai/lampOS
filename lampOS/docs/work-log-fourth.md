@@ -6,6 +6,16 @@ Main advanced to d5dc2e87f with actual Voice attention/worker changes. #3544 ret
 
 The diagnostic fixture completed combined Voice 4,086/0/21 with no leaks/timeouts; its changed case passed once in 0.690 s, docs had zero cases, and source/witness/process closure verified. The earlier capacity stop and exact incremental recovery remain recorded. Its two-file task was committed independently, then carried equally as 9b758a4a7 on a08abe33e. It is not yet published or current-source qualified. Common composition against the newly landed name handling is under source review while the compiler remains with the parent carry. No lamp or activation occurred.
 
+## 2026-10-26 13:51 — Current carries and retained partial gate
+
+Ready for lamp-voice: no
+
+Common's own branch now carries cleanly onto 9e5d3b9c6 as dded736ef2 with six repairs staged, tree 56c743199a. Main's Name behavior and activation remain; the source-only carry has no runtime credit. Onboarding's eleven-path preparation is also current, tree ce0da87373, preserving its paired socket control as UNRUN and all physical enrollment holds. Dependent child compositions are being checked against current Common.
+
+The current hand-pump gate completed its fresh library compile, both exact bounded cases, formatting and strict workspace/all-target Clippy, then stopped before build at 4,692,295,680 free bytes, below the unchanged 5 GiB reserve. Actual exit 125 and closed processes are retained. Recovery removed only 45 inventoried incremental-cache children; it verified 8,611,332,096 free bytes, unchanged source/index, sixteen failure witnesses and the executed driver. The continuation runs only the unrun build, discovery, full Voice remainder and docs on frozen a08abe33e/d5dc. No completed cases or gates are replayed or relabelled.
+
+Reviewer-two's independent old-head Voice result remains 4,085/1/21, with the unchanged privacy lease-reader failure held for Tests' investigation. The third reader's first touch-arrival failure also remains recorded. The hand-pump title now accurately says requested idle waits; no elapsed-sleep guarantee is claimed. The newer Main delta changes only addons.md; source-equivalent reuse requires actual input/executable evidence after the frozen gate closes, with fresh offered-head native checks. No lamp work occurred.
+
 ## 2026-10-26 13:04 — Hand-pump repair ready with native gates
 
 Ready for lamp-voice: yes (#3544)
