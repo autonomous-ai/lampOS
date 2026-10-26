@@ -647,14 +647,19 @@ person-scoped memory and private context apart (`LAMP_PERSON_SCOPE_SEEN`,
 
 - **A known person's own topics:** a message that names a known person's
   memory id (`person`, `p-` and 16 hex digits, as `memory/rules`,
-  `memory/forgot` and `skills/ask` carry it), and a heard, said or chat
-  line (`voice/heard`, `voice/said`, `voice/turn`, `chat/*`) whose speaker
-  the voice proved, as #3064 binds private context, along with that
-  person's name on `humans/*`. These go only with that person's own yes,
-  said by them at the lamp. The computer owner's yes covers their own.
-- **The room's:** everything else, including a line whose speaker the lamp
-  couldn't prove and a face it doesn't know, goes on the computer's yes,
-  like any room line.
+  `memory/forgot` and `skills/ask` carry it), a heard or chat-in line
+  (`voice/heard`, `voice/turn`, `chat/in`) whose speaker the voice proved,
+  as #3064 binds private context, the lamp's said or chat-out line
+  (`voice/said`, `chat/out`) answering such a turn, and that person's name
+  on `humans/*`. These go only with that person's own yes, said by them at
+  the lamp. The computer owner's yes covers their own.
+- **The room's:** only a message with no person mark at all goes on the
+  computer's yes, like any room line: a line whose speaker the lamp
+  couldn't prove, and the lamp's answer to it, or a face it doesn't know.
+- **Closed by default.** A message marked as some known person's that the
+  service can't match to a memory id is withheld, as is a topic the service
+  wasn't built knowing (a new topic, or a person field where it doesn't
+  look), until the service is taught that topic's scope.
 - **Withheld, not rewritten.** A known person's message without their yes
   isn't forwarded. The service journals the topic and `no_yes_for_person`,
   never the words. A lamp that knows only its owner forwards everything.
@@ -672,9 +677,11 @@ is at most 4,096 bytes, and the link takes about one batch a second):
   10 ms blocks cannot cross the link. What was said reaches the computer as
   `voice/heard`. A recording on request is a later piece, the Harness
   team's to carry.
-- **A message over 4,096 bytes** (a long turn, a memory read) is sent in
-  parts, with the same envelope a long say uses (below, "Long says, in
-  parts"), and the add-on reassembles it. Nothing is rewritten to fit.
+- **A message over 4,096 bytes** (a long turn, a memory read) is
+  withheld, and the service journals its topic, size and `too_big`, never
+  its words. Nothing is rewritten or cut to fit. Sending such a message in
+  parts is open (below): `addon.publish` keeps one value a topic, so parts
+  would need topics of their own, and that is Harness's contract to change.
 
 ### What it may propose
 
@@ -714,25 +721,38 @@ tier's whole say is longer:
   first part, the whole say is dropped as `incomplete`; nothing is said
   from part of it. One say is gathered at a time for each computer. A
   second `id` while one is open is dropped as `busy`.
-- **One decision.** The complete say becomes one `AddonProposal` from
-  `own-<computer>`, and the judge decides once for all of it. `holdsMs` is
+- **One decision, on a reference.** The service keeps the complete say's
+  words itself. It writes one `AddonProposal` from `own-<computer>` with no
+  `note`, so `AddonProposal::check` and `ADDON_NOTE_BYTES` stay as they
+  are, and `params.long = {id, bytes, parts}`, a reference the judge reads
+  as metadata only. The judge decides once for all of it. `holdsMs` is
   counted from the last part. It counts as one say in the trusted tier's
   rates, whatever its length, and the decision goes back once, with the
-  `id`.
+  `id`. Only on `kept` does the service hand the words, by the reference,
+  to the say service's trusted long-say request. Any other decision, or a
+  decision not made within `holdsMs`, lets the words go, never journaled.
 - **Speaking it.** The voice says it in turns of at most 1,024 bytes, one
   `MAX_NOTE_BYTES` note each, made of whole parts in order. A part is never
   cut. The computer should end each part at the end of a sentence, so each
-  turn ends at a natural point. Between turns the voice waits the same
-  pause task news waits for (`PAUSE_US`, 1 s). If someone speaks, or says
-  "stop" (`stop/heard`), the rest is dropped, and the decision gets
-  `stopped` with the last part said, so the computer knows what was heard.
+  turn ends at a natural point. Between turns the voice waits as task news
+  does after its own words: `AFTER_LAMP_US`, 3 s with nobody starting. If
+  someone speaks, or says "stop" (`stop/heard`), the rest is dropped.
+- **Receipts, not proof.** The computer gets one receipt per turn, with
+  the last part `n` it covered: `handed` when the turn went to the voice,
+  then `spoken` or `said nothing` as the journal has it today, and
+  `dropped` for each turn never handed after a stop. A quoted turn can
+  still be paraphrased or partly left unsaid, so a receipt says what was
+  handed over and how the turn ended, never which words were heard.
 - **Only for the trusted tier.** A partner's say stays one proposal of at
   most 300 bytes. The service drops a `params.part` from any other
   computer as `not_for_partner`.
-- **Code.** The constants above stay as they are for proposals. The new
-  pieces are `params.part` in `crates/msgs` (a schema change, landed with
-  its readers), the service's gathering, and a say-service request for a
-  trusted say of up to 4,096 bytes from the trusted tier only.
+- **Code.** The constants above stay as they are for proposals, partners'
+  included. The new pieces are `params.part` and `params.long` in
+  `crates/msgs` (a schema change, landed with its readers), the service's
+  gathering and held words, the judge accepting the trusted service's
+  source (`crates/addons/src/runtime.rs` takes `skills` only today), and a
+  say-service request for a trusted say of up to 4,096 bytes, by reference,
+  from that service only.
 - **Open:** whether Harness's own `addon.proposal` `note` has a limit
   below 300 bytes. That limit is Harness's, not the lamp's, and isn't
   stated in this file. If it is lower, a part's `note` is at most that
@@ -767,6 +787,9 @@ tier's whole say is longer:
   id, shown in the app.
 - The service's name, its switch and its census entries in
   [switches.md](switches.md), once it is built.
+- Messages over 4,096 bytes toward the computer: withheld as `too_big`
+  for now. Sending them in parts needs Harness to take parts as their own
+  topics or as a stream, and bounds of their own.
 
 ## Not decided
 
