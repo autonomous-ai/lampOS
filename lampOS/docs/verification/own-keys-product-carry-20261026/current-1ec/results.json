@@ -1,0 +1,98 @@
+{
+  "base": "1ec33957c78e6dc39bd7ca0b3b8f7c74543f6b35",
+  "complete_marker_sha256": "dc0d8399253dcd2e8e40448f303d41c288ba6955d151e11b520c105654f0cbd1",
+  "current_update_artifact_guard": {
+    "actual_and_preserved_rechecked": true,
+    "bindings_reference": "current 883 proof: update-executables.json",
+    "bindings_sha256": "705734818e58473d13a42418c5b2ad6b73d9e8f7e62342e140fd6ac6c32ec159",
+    "count": 3,
+    "raw_manifest_sha256": "00d403cc0c0f50f2e7e9fedf66f09e5b2e5ec7725ad4d45afcc5b946548afe44",
+    "test_execution_repeated": false
+  },
+  "earlier_nine_crate_execution": {
+    "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+    "failed": 0,
+    "head": "b2c75ba618dd15e97dfaa133c81320b6d8095777",
+    "ignored": 44,
+    "passed": 6708,
+    "relabelled_to_current": false
+  },
+  "head": "e9535de6d359308be0d8f62f92bb24aafa858831",
+  "limits": "Current formatting, strict nine-crate Clippy and source/artifact guard evidence only. No test rerun, native CI, activation, provider, device, installation, release or physical latency acceptance.",
+  "prior_883_execution": {
+    "README_sha256": "e78aacc4236997cd730ebf07041032c8d0696ea1bb37fa274e763f69c1874e15",
+    "base": "88335bfbef7a964ff5918b0dec06892dc9a4ea4d",
+    "factory_stand_ins": {
+      "failed": 0,
+      "passed": 86
+    },
+    "head": "46b5c220d72baf9a2b737cc93102fa73d6fe05a6",
+    "relabelled_to_current": false,
+    "results_sha256": "7ddeb525c8d7ff9fd92ddf9390908de1709d25a6a055875e3e55111b40e4d94b",
+    "update_targets": {
+      "failed": 0,
+      "ignored": 2,
+      "passed": 230
+    }
+  },
+  "schema": 1,
+  "source_bytes_modes_and_file_set_rechecked": true,
+  "source_entries": 7258,
+  "source_inventory_sha256": "2a0ea378ba93be9a104595c73626bebc340a87da4e8e418a9b82e9d49e27c5ee",
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.413,
+      "exit_code": 0,
+      "label": "fmt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "a8bf7c4d343624a1d96dd46ddbdb62be49f27a06c3bc1d3e74398134623fa081",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 70.637,
+      "exit_code": 0,
+      "label": "clippy",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "31fff6713c531c3c56ddc75e1ea8bb9b2a1c705e67dd127aaaf1ab2e8105f877",
+      "source_unchanged": true
+    }
+  ]
+}

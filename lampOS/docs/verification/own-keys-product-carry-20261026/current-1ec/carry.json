@@ -1,0 +1,18 @@
+{
+  "current_base": "1ec33957c78e6dc39bd7ca0b3b8f7c74543f6b35",
+  "current_head": "e9535de6d359308be0d8f62f92bb24aafa858831",
+  "old_base": "88335bfbef7a964ff5918b0dec06892dc9a4ea4d",
+  "old_head": "46b5c220d72baf9a2b737cc93102fa73d6fe05a6",
+  "only_changed_entry": {
+    "after": "100644 blob 9fcd4c3639397e1f43a28e9580afd34a1ab4140f",
+    "before": "100644 blob 6e704abbd46d3d033ffa11827fa5c8e210894ef8",
+    "path": "lampOS/docs/addons.md"
+  },
+  "range_diff": "1:  63630532bb = 1:  ce35170c37 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  1e53de741c = 2:  8ee5425af0 lampOS: preserve customized own-keys drop-ins\n3:  1e59afb1fd = 3:  5ac83c3a55 lampOS: record current own-keys carry qualification\n4:  517881aafa = 4:  886e0a600b lampOS: clarify own-keys activation and per-unit overrides\n5:  e6f025cbeb = 5:  8b3e39b37d lampOS: record own-keys qualification on the d21 base\n6:  83293965b0 = 6:  fcbfed415b lampOS: retain own-keys scheduling and product-reader checks\n7:  46b5c220d7 = 7:  e9535de6d3 lampOS: qualify own-keys carry with current product units\n",
+  "raw_carry_receipt_sha256": "be404e415718a8b3ce16e8d9f933ce013e06b2e3d450bc8bd2f372ff9ab2cf4d",
+  "repository_entry_count": 10690,
+  "same_path_set": true,
+  "scope": "The only complete-repository change is addons.md. The factory scripts and embedded install.md inputs validated on the 883 carry are unchanged in this carry.",
+  "seven_equal_patches": true,
+  "unchanged_blob_mode_entries": 10689
+}
