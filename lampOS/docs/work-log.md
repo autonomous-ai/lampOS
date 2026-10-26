@@ -1,3 +1,15 @@
+Ready for lamp-voice: yes (#3542 and #3528); #3510 remains activation HOLD despite qualified current gates.
+
+## Current checkpoint: 2026-10-26 12:49 +07, own-keys current native qualification complete
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) `85b9bcdd7` on cced has [original native qualification](verification/own-keys-product-carry-20261026/native-85b/README.md): ARM64 **40274511942** passes **11,367 unique cases / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**, with all nine own-keys cases and both census readers once, including the Linux-only FIFO matcher; 35 identical echoes are excluded. Separate process **13/0**, doctests **4/0** across 46 summaries, relay success and helper **25/0** pass. Linux Clippy **40274511935** passes. Both original jobs checked preview `61c94290b`, whose exact cced/85b parents and complete tree match the authored head. No rerun occurred. This is separate from the now-passed current host gate **5,230/0/30** with all 27 executable guards, and does not erase the prior aca guard failure or peer install failures.
+
+Reviewer-three cleared the current seven equal patches; Reviewer-two's current packet/installer read is active. The PR stays draft: #2094 and explicit current-lamp acceptance remain activation prerequisites. No provider/key or lamp was used.
+
+#3542 and #3528 are offered ready, with current native gates and independent reads clear; their exact heads remain 69c and d8dc on cced. The independent sentinel review #3543 is published; Tests and Reviewer-two separately report its native qualification and readiness. Second's own execution remains four supported Mac cases only. The train's absent-check handling is First's lane. No unowned local code task was found in the remaining music/night rows; physical acceptance remains with the assigned lamp holders. A bounded Queue/PR watcher continues, with no device, release or local ARM64 action.
+
+---
+
 Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 12:38 +07, independent Reader sentinel review complete
