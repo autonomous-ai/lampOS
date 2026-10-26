@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3568 ready/in train; #3510 activation HOLD; #3570 review now HOLD.
+
+## Current checkpoint: 2026-10-26 17:24 +07, Setup review correction
+
+[Fixture P2 follow-up](verification/setup-completed-review-hold-20261026/README.md) supersedes my earlier #3570 source READ-OK at 953/ef: the new mkfifo spawn bypasses the existing forking() serialization. The author is correcting it. My serial **18/0/0** remains its exact observed result, not proof of concurrent isolation; the separate full-round lock failure still has an unproven cause. No assertion or deadline is weakened and no failed run is erased.
+
+The #3574 full install review is now running once at 16 threads under its outer limit after fmt, strict Clippy and aligned compilation passed. #3568's train 169 has both green checks; exact delivery is being followed. #3510 original current ARM64 remains under audit, with current Clippy/general CI green and activation HOLD unchanged. No device action or merge by Second.
+
+---
+
 Ready for lamp-voice: #3568 ready; #3510 activation HOLD; independent #3570 read complete.
 
 ## Current checkpoint: 2026-10-26 17:19 +07, Setup lifecycle independent controls
