@@ -218,10 +218,16 @@ which V1's calibration wrote on its lamps), says them in its report
 - a head or base goal must then be inside its joint's own range less 20
   counts either side (`OWN_RANGE_MARGIN`), or the run ends on `Stop::Window`
   as for an arm goal;
+- a hold where a head or base joint already is (taking hold of it, the
+  write-back after, telling it to stop pushing) is checked against the
+  servo's own range itself, not that window: holding is not motion, so a
+  roll resting at 2,410 under a stored 2,413 still takes hold, and is not
+  clamped, which would move it
+  (`with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start`);
 - a `--home`, a pitch window or a `--stand` pitch, roll or yaw outside that
   same window, or a `--folded-arm` or `--stand` shoulder or elbow outside
   the servo's own range, is refused at start, writing nothing (a folded arm
-  may rest on its stop: lamp-52e6's shoulder folds at 2,053, its limit
+  may rest on its stop: lamp-52e6's shoulder folds at 2,050, its limit
   2,047, so the arm is checked against the range itself and its goals keep
   their own window);
 - a joint that stores the whole turn, 0 to 4,095 (lamp-52e6's elbow), was
