@@ -1,5 +1,27 @@
 # Tests work log
 
+## 2026-10-26 11:53 — Reader merged; carrier harness failure retained
+
+Ready for lamp-voice: yes (#3527 merged in train 156)
+
+The reviewed Reader head merged into cced42943. Its separate sentinel-root
+follow-up is committed on tests/1806-reader-sentinel-root and rebased onto
+that base; current qualification is pending. Every sentinel assertion remains
+unchanged. The earlier native preparation failure is not explained away.
+
+Ready for lamp-voice: no (#3466)
+
+The retained f9e1b9a67/1c Mac gate completed 126 updater unit tests (two
+ignored), ten carrier cases and 34 head-touch cases with no failures. Promotion
+compiled successfully, then the evidence controller rejected its standalone
+Cargo package ID before running it. This is a failed gate, not a full pass.
+The corrected controller will bind actual metadata IDs on the current-base
+carry. Installed GOOD/BAD rehearsal still needs an assigned lamp and owner.
+
+The Skills journal fixture is also carried onto cced42943 for its next gate.
+Fourth retains the hand-pump repair. Tests is reading the revised reminder
+fixture on #3525. No device action or archive deletion occurred.
+
 ## 2026-10-26 10:26 — Reader ready with both current readers
 
 Ready for lamp-voice: yes (#3527)
