@@ -1293,6 +1293,13 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   units, drop-ins, known Body calibration and pins when read by this check,
   including the settings helper's projection and verification. It is not
   a deadline for regular-file storage or a new live-touch wait.
+  The install tests keep the four refusal cases in owned children with a
+  15-second setup bound and a 5-second post-ready bound, including FIFO
+  reads without a writer. The five regular/symlink/missing/null-mask cases
+  run full fresh installs with the ordinary suite bound and retain their
+  file-preservation and head-pins migration assertions. Their old 30-second
+  whole-install watchdog also counted durable binary, link and unit writes;
+  it was not a preflight-liveness measurement. Product durability is unchanged.
   For a head-pins write, candidate units and links are placed after the
   journal but before apply, so the helper reads the units being installed.
   No service is restarted until the resulting pins match those units.
