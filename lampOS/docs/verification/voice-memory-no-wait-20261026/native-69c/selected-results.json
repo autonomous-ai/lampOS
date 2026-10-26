@@ -1,0 +1,16 @@
+[
+  {
+    "binary": "lamp-voice",
+    "name": "remember::tests::a_held_background_write_cannot_block_or_grow_the_foreground_queue",
+    "ordinal": 8650,
+    "status": "PASS",
+    "total": 11357
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "remember::tests::the_days_writer_submits_after_idle_without_waiting_for_a_model",
+    "ordinal": 8755,
+    "status": "PASS",
+    "total": 11357
+  }
+]

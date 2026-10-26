@@ -1,3 +1,17 @@
+Ready for lamp-voice: yes (#3542); #3528 current native pending, #3510 activation HOLD.
+
+## Current checkpoint: 2026-10-26 12:27 +07, memory original native qualification complete
+
+[#3542](https://github.com/autonomous-ai/lampOS/pull/3542) `69c0f26e9` contains latest cced. [Original native evidence](verification/voice-memory-no-wait-20261026/native-69c/README.md): ARM64 **40272878802** passes **11,357 unique cases / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**, with each changed Memory fixture once and 35 identical display echoes excluded. Separate process **13/0**, doctests **4/0**, relay success and helper **25/0** pass. Linux Clippy **40272878805** passes. Actual preview `462df0e73` has exact cced/69c parents and the authored complete tree. No rerun occurred.
+
+Reviewer-three's independent Memory tests pass **222/0/1**. Reviewer-two and Reviewer-lead find no P1/P2 in source/proof reads; Reviewer-two's independent full Voice gate remains separate and pending. Fourth verifies clean source composition with Common, without making an execution claim. The PR is offered ready on its completed author/native gates and clear reads.
+
+[Control scope correction](verification/voice-memory-no-wait-20261026/native-69c/control-scope.md): the cumulative queued-to-zero mutant proves watchdog detection of a stuck foreground loop, **not** a discriminating real completion wait. Actual completion uses `done < queued`; no healthy-peer completion-counter control was run. This supersedes earlier shorthand about background completion. The separate actual blocking-send/overflow control remains valid. Host stopwatch removal intentionally supplies ordering and functional assertions, not a general foreground latency bound; Group B checks remain unchanged. All original failed receipts and the exact recorded mutation remain.
+
+IPC's current original ARM64 is still pending, with current Linux Clippy and Third's independent full IPC gate green. Own-keys' current combined affected-crate run continues. No provider, key, physical lamp, release or local ARM64 action ran.
+
+---
+
 Ready for lamp-voice: no; #3542 and #3528 current native checks pending, #3510 activation HOLD.
 
 ## Current checkpoint: 2026-10-26 12:11 +07, memory fixtures published and IPC carried
