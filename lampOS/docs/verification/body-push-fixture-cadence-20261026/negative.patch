@@ -1,0 +1,114 @@
+diff --git a/lampOS/crates/voice/src/coordinator/tests/second_route.rs b/lampOS/crates/voice/src/coordinator/tests/second_route.rs
+index c10884767..921532195 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/second_route.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/second_route.rs
+@@ -326,6 +326,8 @@ struct Seen {
+     installs: Vec<(Option<u64>, bool, bool)>,
+     phases: Vec<RingPhase>,
+     stopped: Vec<&'static str>,
++    /// Actual body/hand publications, including the held push refreshes.
++    hand_publishes: usize,
+ }
+ 
+ struct Run {
+@@ -373,11 +375,12 @@ impl Run {
+             .map(|e| e["kind"].as_str().unwrap_or("?"))
+             .collect();
+         format!(
+-            "result {:?}\nkinds {:?}\nphases {:?}\ninstalls {:?}",
++            "result {:?}\nkinds {:?}\nphases {:?}\ninstalls {:?}\nhand publications {}",
+             self.result.as_ref().map_err(|e| e.to_string()),
+             dedup(&kinds),
+             dedup(&self.seen.phases),
+             dedup(&self.seen.installs),
++            self.seen.hand_publishes,
+         )
+     }
+     /// What every run keeps: it ended by the scripted mute, every child saw
+@@ -514,6 +517,8 @@ struct Peers {
+     murmur_at: Option<u64>,
+     /// The capture frame the push began at (`Script::push`).
+     pushed_at: Option<u64>,
++    /// Last body/hand publication on this run's scenario clock.
++    last_hand_publish_us: Option<u64>,
+     /// A look's answer held for `Script::answer_after_push`: its peer and
+     /// what it says.
+     held_answer: Option<(usize, Vec<ProviderOutput>)>,
+@@ -616,18 +621,23 @@ impl Peers {
+         {
+             self.peers[index].queued.extend(answer);
+         }
+-        // Held pushed, the body says so again and again, as it does every
+-        // 100 ms: one push, from when it began.
++        // Say the first push immediately, then refresh at the topic's
++        // promised 100 ms cadence. Every publication writes the latest file;
++        // a 2 ms scenario step is not a new body observation.
++        let hand_at_us = monotonic_us();
+         TEST_BODY_HAND.with(|slot| {
+-            if let Some((true, body)) = slot.borrow_mut().as_mut() {
++            if let Some((true, body)) = slot.borrow_mut().as_mut()
++            {
+                 body.publish_json(
+-                    monotonic_us(),
++                    hand_at_us,
+                     &lamp_msgs::Hand {
+                         pushed: true,
+                         since_us: 1,
+                     },
+                 )
+                 .unwrap();
++                self.last_hand_publish_us = Some(hand_at_us);
++                self.seen.lock().unwrap().hand_publishes += 1;
+             }
+         });
+         if let (Some(after), Some(at)) = (self.script.hand_stop, self.murmur_at)
+@@ -1686,6 +1696,7 @@ fn run(script: Script) -> Run {
+         look_turns: 0,
+         murmur_at: None,
+         pushed_at: None,
++        last_hand_publish_us: None,
+         held_answer: None,
+         hand,
+     };
+@@ -2522,6 +2533,12 @@ fn a_push_mid_search_drops_its_looks_picture() {
+     let _one = super::pilot_faults::one_session();
+     let run = pushed_search(Some(When::Accepted(1)));
+     run.assert_clean();
++    // Eleven logical seconds allow at most 111 publications, with refreshes.
++    assert!(
++        (2..=111).contains(&run.seen.hand_publishes),
++        "{}",
++        run.summary()
++    );
+     assert!(look_turns(&run).is_empty(), "{}", run.summary());
+     assert!(run.events("look_full_still").is_empty());
+     let dropped: Vec<_> = run
+@@ -2553,6 +2570,7 @@ fn a_push_mid_search_drops_its_looks_picture() {
+ 
+     let unpushed = pushed_search(None);
+     unpushed.assert_clean();
++    assert_eq!(unpushed.seen.hand_publishes, 0);
+     assert_eq!(look_turns(&unpushed).len(), 1, "{}", unpushed.summary());
+     assert_eq!(look_notes(&unpushed).len(), 1);
+     assert!(unpushed.events("search_pushed").is_empty());
+@@ -2570,6 +2588,12 @@ fn a_push_once_the_looks_picture_went_cuts_its_answer() {
+     let answers = &[LookAnswer::Next, LookAnswer::Next];
+     let run = pushed_search_answering(Some(When::LookTurns(1)), answers, Some(30));
+     run.assert_clean();
++    // Eleven logical seconds allow at most 111 publications, with refreshes.
++    assert!(
++        (2..=111).contains(&run.seen.hand_publishes),
++        "{}",
++        run.summary()
++    );
+     let looks = look_turns(&run);
+     assert_eq!(looks.len(), 1, "{}", run.summary());
+     let look = looks[0];
+@@ -2600,6 +2624,7 @@ fn a_push_once_the_looks_picture_went_cuts_its_answer() {
+ 
+     let unpushed = pushed_search_answering(None, answers, None);
+     unpushed.assert_clean();
++    assert_eq!(unpushed.seen.hand_publishes, 0);
+     assert!(look_turns(&unpushed).len() >= 2, "{}", unpushed.summary());
+ }
+ 

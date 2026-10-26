@@ -1,0 +1,18 @@
+{
+  "base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+  "source_count": 7160,
+  "all_source_hashes_unchanged": true,
+  "patch_sha256": "d442366d3c7aa661260594a613ae0dacd3cb397fc1c3e70f4e98216cd5a51f57",
+  "fixture_counter_values": [
+    4582,
+    4582
+  ],
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "failure": "bounded publication-count assertion after assert_clean succeeded",
+  "duration_seconds": 1.86,
+  "executable_sha256": "98081d5555c1c387b70ab3bafafdd04a9cfb7fd64832e026ccaf58c6bd65db98",
+  "log_sha256": "2c3fea7412457ad203962084a1cdef9eb43ada4558a2b0a37aed1d979afe7b02",
+  "limits": "Original per-step fixture writes with diagnostic counter; test-only code changed, production unchanged. This reproduces excessive publication, not the earlier intermittent watchdog cause."
+}
