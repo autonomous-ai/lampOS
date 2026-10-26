@@ -1,0 +1,49 @@
+{
+  "head": "e962960977c4e61acb58a727f36eb2bd98cc83d7",
+  "before": {
+    "lampOS/deploy/factory/steps.sh": "f1622c500555379d4f774a09b13ac92e1e5c7da09e3912a61f4880c2222ffab2",
+    "lampOS/deploy/factory/steps-test.sh": "84026a3e34c8402118b8e34c6ced247ebe42a70c515f570d90fb59e99f86d4eb",
+    "lampOS/docs/install.md": "4ea1723ffd3aafc7bd9f98527b81a5acfd2f38099c1c54b24833061761f43eba"
+  },
+  "after": {
+    "lampOS/deploy/factory/steps.sh": "f1622c500555379d4f774a09b13ac92e1e5c7da09e3912a61f4880c2222ffab2",
+    "lampOS/deploy/factory/steps-test.sh": "84026a3e34c8402118b8e34c6ced247ebe42a70c515f570d90fb59e99f86d4eb",
+    "lampOS/docs/install.md": "4ea1723ffd3aafc7bd9f98527b81a5acfd2f38099c1c54b24833061761f43eba"
+  },
+  "receipts": [
+    {
+      "label": "syntax",
+      "command": [
+        "bash",
+        "-n",
+        "lampOS/deploy/factory/steps.sh",
+        "lampOS/deploy/factory/steps-test.sh"
+      ],
+      "exit": 0,
+      "seconds": 0.00632912501168903,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "origin/lamp-voice...HEAD"
+      ],
+      "exit": 0,
+      "seconds": 0.024038333009229973,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "factory",
+      "command": [
+        "bash",
+        "lampOS/deploy/factory/steps-test.sh"
+      ],
+      "exit": 0,
+      "seconds": 104.88230633399507,
+      "sha256": "728190c9294561aaa040960f837c578c202d8b196b5c3eb85254fe5600b0fce9"
+    }
+  ]
+}

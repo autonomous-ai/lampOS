@@ -1,5 +1,15 @@
 Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
 
+## Current checkpoint: 2026-10-26 13:08 +07, factory resume review complete
+
+[Independent #3546 review](verification/factory-resume-second-review-20261026/README.md) at `e96296097` finds no P1/P2. Both shell syntax checks, diff check and isolated factory stand-ins pass **86/0**, with all three source hashes unchanged. Resume refusal exits before downstream step-4 work; missing-keeper compatibility and cleanup remain unchanged. No device or physical result is claimed.
+
+Memory and IPC are included in train #3547, whose ARM64 and Clippy qualification is running. Own-keys stays draft pending activation acceptance. Continue Queue and review findings while the train qualifies.
+
+---
+
+Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
+
 ## Current checkpoint: 2026-10-26 12:57 +07, independent hand-pump review complete
 
 [Independent #3544 review](verification/hand-pump-second-review-20261026/README.md) at `55eb90cf4` finds no P1/P2. Exact-head Mac fmt, strict all-target Voice Clippy, compilation and the two changed fixtures pass **2/0/0** under owned thirty-second process watchdogs. All source and actual/preserved library executable hashes remain unchanged. This is not the author's full Voice or private fault-control execution.
