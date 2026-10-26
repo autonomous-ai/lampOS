@@ -1,0 +1,97 @@
+{
+  "head": "a08abe33ee7be9898c54cea6d4818c03214a5389",
+  "tree": "a83d52840bdde641af0d9a0538fbc1b8708e67d9",
+  "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+  "scope": "Completed d5 source epoch; not current carry or device qualification",
+  "controller_terminal_exit": 0,
+  "outer_native_exit_observed": null,
+  "outer_native_output_limitation": "Final native output lost at compaction; no outer native exit is asserted. Controller/child receipts and fresh independent closure audit are retained.",
+  "stages": [
+    {
+      "stage": "fixed-lib-compile",
+      "exit": 0,
+      "seconds": 251.2216215679946
+    },
+    {
+      "stage": "fixed-case-0",
+      "exit": 0,
+      "seconds": 6.015124097990338
+    },
+    {
+      "stage": "fixed-case-1",
+      "exit": 0,
+      "seconds": 0.40793752699391916
+    },
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "seconds": 12.879456282011233
+    },
+    {
+      "stage": "clippy",
+      "exit": 0,
+      "seconds": 229.23929990798933
+    },
+    {
+      "stage": "workspace-build",
+      "exit": 0,
+      "seconds": 300.1741045830131
+    },
+    {
+      "stage": "full-list",
+      "exit": 0,
+      "seconds": 111.05701187401428
+    },
+    {
+      "stage": "full-run",
+      "exit": 0,
+      "seconds": 1382.8927882789867
+    },
+    {
+      "stage": "voice-docs",
+      "exit": 0,
+      "seconds": 3.440442555991467
+    }
+  ],
+  "Voice": {
+    "direct_exact_passed": 2,
+    "remaining_passed": 4088,
+    "combined_passed": 4090,
+    "failed": 0,
+    "ignored": 21,
+    "leaks": 0,
+    "timeouts": 0,
+    "selected_accounted_once": true
+  },
+  "docs": {
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0
+  },
+  "capacity_stop_retained": {
+    "outer_exit": 125,
+    "before": "workspace-build",
+    "free_bytes": 4692295680,
+    "reserve_bytes": 5368709120
+  },
+  "recovery": {
+    "exact_incremental_children_removed": 45,
+    "release_free_bytes": 8611332096,
+    "source_and_witnesses_unchanged": true
+  },
+  "fresh_release_audit": {
+    "source_and_index_unchanged": true,
+    "protected_witnesses": 16,
+    "drivers": 6,
+    "owned_stage_groups_closed": 9
+  },
+  "receipt_sha256": {
+    "actual-native-release.json": "ccea04f36a696350c196af268e0b0645bef6135081926d34a9ecf46bcf234664",
+    "terminal.json": "ac54dd70bb8c65642e7334992d4c292082acb7d992c71560d72f0910a19dca56",
+    "observed-case-reconciliation.json": "5151d52559fe0b8b0be05783294604f19970d1c86e0680a39a406a209bbf85b2",
+    "voice-target-ledger.json": "b4b96b110d4d15448fa745c855beb3fc789965bcc47f23524c6027e6afe65db0",
+    "full-run.stdout": "e077d4da8d55228664e30b3298f09c333c62e69096fd832fb99d4351d5db2f6e",
+    "full-run.stderr": "0552b6ef28b4ff23c2d1e90f308c8cd6d39b3d2d0b8e31ab139903f56e387592"
+  },
+  "review_hold": "Earlier independent privacy lease-reader failure remains open with Tests; the separate current once-only pass is not a waiver."
+}

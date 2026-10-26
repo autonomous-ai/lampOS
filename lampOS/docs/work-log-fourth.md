@@ -6,6 +6,14 @@ Main advanced to d5dc2e87f with actual Voice attention/worker changes. #3544 ret
 
 The diagnostic fixture completed combined Voice 4,086/0/21 with no leaks/timeouts; its changed case passed once in 0.690 s, docs had zero cases, and source/witness/process closure verified. The earlier capacity stop and exact incremental recovery remain recorded. Its two-file task was committed independently, then carried equally as 9b758a4a7 on a08abe33e. It is not yet published or current-source qualified. Common composition against the newly landed name handling is under source review while the compiler remains with the parent carry. No lamp or activation occurred.
 
+## 2026-10-26 14:36 — Full Voice completed; current carry qualifying
+
+Ready for lamp-voice: no
+
+The completed d5 source epoch a08abe33e passed combined Voice 4,090/0/21, zero leaks/timeouts: two exact watchdog cases and 4,088 disjoint nextest cases. Workspace checks and zero-case docs completed. [Compact receipt](verification/hand-pump-receipts-20261026/current-d5.json) retains the earlier capacity exit, recovery, exact stage times and the final outer-tool-output limitation. Controller/child receipts record zero; a fresh independent audit verified unchanged source/index, sixteen witnesses, six drivers and all nine owned stage groups closed. No lost outer native exit is invented.
+
+Hand-pump now carries as 95e6b5ab9 on Main 1ec33957c, with all three authored blobs unchanged and only the commit wording corrected to requested waits. Diagnostic carries equally as separate 758a9a0b3; Common follows them as 4e9c49bfd with its six repairs staged, all current Common gates UNRUN. The current parent gate owns source/target after audited incremental cleanup; fresh workspace and Update-target checks plus conditional Voice equivalence are running before push. The independent privacy-fixture HOLD and all physical acceptance holds remain. #3553's reviewed documentation fix is delivered as current Main 1ec33957c.
+
 ## 2026-10-26 14:23 — Independent documentation read and factory inputs
 
 Ready for lamp-voice: no
