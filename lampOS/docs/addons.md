@@ -127,6 +127,9 @@ told whether the person is known, nor who.
 lamp's memory. An add-on that wants more asks the person, like any
 permission, through a later change to this list, not through its own
 manifest.
+This list is for add-ons on the lamp and for partners' remote add-ons. The
+person's own computer is a separate, trusted tier that reads everything
+(below, "The person's own computer: everything").
 
 ## `addon/proposal`
 
@@ -384,6 +387,9 @@ the computer as a whole, per add-on once Harness proves which add-on is
 asking; memory and context reads come later, with the same yes.
 `AGENTS.md` keeps Harness out of this release, and the transport is the
 Harness team's (below, "Remote add-ons").
+The person's own computer is not a partner: it reads the whole bus, not
+the summaries, after one yes (below, "The person's own computer:
+everything").
 
 ## Remote add-ons (design; code after the 70 shipping rows)
 
@@ -588,6 +594,106 @@ does not claim more than that:
   builder's call.
 - How the person says the yes for a computer, sees it, and withdraws it
   (the app, or by voice).
+- The service's name, its switch and its census entries in
+  [switches.md](switches.md), once it is built.
+
+## The person's own computer: everything (devin-0-P2, the owner, 26 Oct)
+
+Proposed as `devin-0-P2` on 2026-10-26, from the owner's decision that day:
+**an add-on running on the person's own computer, through their own
+Harness, is trusted, and the lamp sends it everything.** The summaries-only
+allowlist above was made for partners' add-ons, third-party logic that
+should not hear the room. Nothing in this file had treated the person's own
+agents differently, and summaries were too little for what the owner wants
+them to do: hear "what did I miss in the team channel?" in a conversation,
+fetch it on the computer, and have the lamp say it back.
+**Design only.** Like "Remote add-ons", the code comes after the 70
+shipping rows, off by default, unless the owner says it is for this
+release, and it rides the same route (the lamp's own Harness daemon,
+[openharness#1654](https://github.com/autonomous-ai/openharness/issues/1654)).
+
+### Two tiers of remote add-on
+
+| | Partner (above) | The person's own computer (this) |
+|---|---|---|
+| Who | any agent or service on any computer | one computer signed in to the same Harness account as the lamp, which the person names in the app as their own |
+| Reads | the six summary topics (`ADDON_TOPICS`) | every topic on the bus, raw media by reference (below) |
+| Yes | one yes for the computer | one yes for "my computer: everything", separate from the partner yes, said in its own words |
+| Writes | `light` and `say` proposals, through the judge | the same proposals, through the judge, with the trusted tier's rates (below) |
+| Stamp | `remote-<computer>` | `own-<computer>`, the same 12 hex digits |
+
+Trust is for reading, not for acting unjudged. The lamp is still one
+living thing with one voice: a trusted computer's proposals go through the
+judge, which only decides *when* (never over the person, never while the
+lamp is private, asleep or paused) and keeps the person's own light first.
+It never decides *what*, so no reason list or note rules are applied to
+this tier beyond the bus's own checks.
+
+### What it reads
+
+Every topic `lamp-msgs` names, as the lamp's own parts publish it, including
+those never on the partner allowlist: what was heard and said
+(`voice/heard`, `voice/said`, `voice/turn`), chat (`chat/in`, `chat/out`),
+who is there (`humans/*`, `room/*`, `attention/*`), memory events
+(`memory/*`), the schedule (`schedule/due`), tasks (`tasks/status`),
+messages (`messages/out`), skills (`skills/events`), the Policy's
+decisions (`policy/decisions`), health and the rest. The service forwards
+each message unchanged, with its topic, header time and source.
+
+Raw media does not fit Harness's add-on contract (`addon.publish`: a value
+is at most 4,096 bytes, and the link takes about one batch a second):
+
+- **Camera:** `camera/image` says where the newest picture is, and that
+  reference is forwarded. The picture itself is fetched on request, one at
+  a time, through a read the service answers, never streamed.
+- **Microphones:** `mic1/audio` and `mic2/audio` are not forwarded, since
+  10 ms blocks cannot cross the link. What was said reaches the computer as
+  `voice/heard`. A recording on request is a later piece, the Harness
+  team's to carry.
+- **A message over 4,096 bytes** (a long turn, a memory read) is cut into
+  numbered parts the service reassembles on the other side, or, if Harness
+  will not take that, journaled and dropped as `too_big`; nothing is
+  rewritten to fit.
+
+### What it may propose
+
+The same `addon/proposal` contract, stamped `own-<computer>` by the
+service, never taken from the computer's words:
+
+- `light` and `say`, as for a partner. A `say`'s `note` is the trusted
+  computer's own words, at most 300 bytes on one line, said by the voice
+  quoted, without functions and kept out of memory (part 2c's route).
+- **Rates, to be measured on a lamp:** one kept say a minute and 20 an
+  hour for that computer, at most one waiting for a decision; its says do
+  not count within the partners' 4 an hour. After a drop, 30 s before the
+  next is kept.
+
+### What stays the same
+
+- **Off** unless the service's switch is set, and nothing published
+  without the yes. Without the yes for "everything", the computer is a
+  partner and reads only the summaries.
+- **The privacy switch** stops the stream at once, on the lamp: nothing is
+  forwarded while it is closed, and the computer is told only that it is
+  closed.
+- **A light shows** while the stream is on, so a guest at the desk can see
+  that what they say is reaching a computer (the colour is the first
+  builder's call).
+- **Forgetting reaches the computer:** "forget that" and "forget
+  everything" are forwarded as the `memory/forgot` the lamp publishes, and
+  an add-on on the trusted computer must honour it; the lamp cannot erase
+  what the computer has already kept, and the consent words say so.
+- **Withdrawing the yes** is as "Withdrawing the yes" above: at once on the
+  lamp, acknowledged toward the computer.
+
+### Open for the trusted tier
+
+- How the person names their own computer in the app, and the consent
+  words for "everything", which must say that guests' words leave the lamp
+  too.
+- Whether Harness can prove the computer is on the person's own account
+  (openharness#1654, question 3); until it can, the yes names one machine
+  id, shown in the app.
 - The service's name, its switch and its census entries in
   [switches.md](switches.md), once it is built.
 
