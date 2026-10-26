@@ -1,3 +1,11 @@
+## 2026-10-27 02:01 — current worker carry pushed after complete gate
+
+Ready for lamp-voice: no (#3604 current original native/read carries pending)
+
+Pushed 47e3bcb97/0961 with both patches unchanged from be8. Current fmt, strict Skills Clippy, workspace build and test compilation pass; actual current full Skills command passes 525/0/9, all three controls once, only two deliberate unwind hooks. Source/six actual and preserved hashes remain stable, group absent before cleanup. All six binaries match be8, but the current command was run again. [Current host proof](verification/skills-actions-mock-20261026/current-47e-host.json). Previous be8 original native and restricted host failure remain distinct. New original current native checks and both current read carries are required before readiness.
+
+Corrected one wording error in the earlier reminder independent audit: custom Update summaries contain measured/filtered fields and omit the standard finished-in suffix. Counts stay 7,479/0/52, raw 7,480 including nested Memory; original private audit remains immutable. [Corrected derived copy](verification/reminder-pending-present-20261026/current-06c-independent-audit.json). Active reminder094/bdc2 source remains frozen in its full twelve-consumer command, without a current-base or runtime-success claim. No device action.
+
 ## 2026-10-27 01:50 — worker be8 original native pass
 
 Ready for lamp-voice: no (#3604 newer-base qualification pending)

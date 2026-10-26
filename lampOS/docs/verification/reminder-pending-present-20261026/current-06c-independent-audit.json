@@ -3565,8 +3565,12 @@
     "Cargo success is not panic-free stderr: one detached Skills Actions mock panicked; #3604 is separate and absent from this tested head.",
     "The Memory unknown-field should_panic test records existing #1505 compatibility debt, not a compatibility fix.",
     "Raw7480 includes one nested Memory invocation; use7479 nonoverlapping top-level passes.",
-    "All52 ignored cases are retained, including two custom Update harness cases whose summaries omit measured/filtered fields.",
+    "All 52 ignored cases are retained, including two custom Update harness cases whose summaries omit the standard finished-in suffix; their measured/filtered fields are present.",
     "Host fixture/consumer evidence only: no physical lamp, provider, audible, or end-to-end latency proof.",
     "Capturing47 product children does not prove each executed; process-group absence excludes deliberately escaped sessions."
-  ]
+  ],
+  "wording_erratum": {
+    "previous_public_copy_sha256": "19a0407a5943db6368f787f7f5802da3d9bf52204d03e5bf01c1111a20aff8a2",
+    "scope": "Only the description of two custom summary suffixes is corrected. All counts, source identities, controls and runtime evidence remain unchanged. Original private audit remains preserved."
+  }
 }

@@ -1,0 +1,144 @@
+{
+  "head": "47e3bcb9769fcf79daa9da5bab42c721af8ce7e9",
+  "base": "0961e12d9d02c2327d9601c2ec125f4f2599a631",
+  "aggregate": [
+    525,
+    0,
+    9
+  ],
+  "per_target_library_binary_it_release_requested_docs": [
+    [
+      158,
+      0,
+      0
+    ],
+    [
+      20,
+      0,
+      0
+    ],
+    [
+      314,
+      0,
+      1
+    ],
+    [
+      2,
+      0,
+      8
+    ],
+    [
+      31,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "terminal": {
+    "head": "47e3bcb9769fcf79daa9da5bab42c721af8ce7e9",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 2400,
+    "timed_out": false,
+    "elapsed_seconds": 355.057064112,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "process_group_absent_before_cleanup": true,
+    "forced_cleanup": false,
+    "pid": 72487,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "137a493d98eb708ef347a97e629a08c3cb7fef090550e220f1d8af68d0be08fc"
+  },
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "expected_unwind_hooks": 2,
+  "unexpected_panic_hooks": 0,
+  "authored_patches": "two carried unchanged; no new source finding",
+  "limits": "Actual 47e/0961 full command; all six binaries match be8, and the test gate ran again on this head. Previous be8 pass, restricted Unix bind failure and first 3bc 523/1/9 retain their actual sources. No device, product latency or full 3 s action completion claim.",
+  "controls_once": {
+    "skills::the_one_action_reply_reports_an_ack_write_error": 1,
+    "skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request": 1,
+    "skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way": 1
+  },
+  "actual_artifacts": {
+    "requested_audio-019db324b83a9807": {
+      "path": "./.claude/worktrees/third-reset-onboarding-target/debug/deps/requested_audio-019db324b83a9807",
+      "sha256": "affe1df3a5d7e7969b2505f76b173a8b5eabb5df6152645dd833295503eeb2da",
+      "fresh": false,
+      "target_name": "requested_audio",
+      "target_kind": [
+        "test"
+      ]
+    },
+    "lamp_skills-a718b2a0214b6903": {
+      "path": "./.claude/worktrees/third-reset-onboarding-target/debug/deps/lamp_skills-a718b2a0214b6903",
+      "sha256": "c94c5baa8cc4b958f3edb347f07809c19dc8b41771d18bdfd0bf7e2bcbae8dfc",
+      "fresh": false,
+      "target_name": "lamp-skills",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    "it-46363ab9699809b5": {
+      "path": "./.claude/worktrees/third-reset-onboarding-target/debug/deps/it-46363ab9699809b5",
+      "sha256": "e200489509339504d4aef11faf685e4f8ea936506d69a1517acdd2ff95c2621c",
+      "fresh": false,
+      "target_name": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    "release_pair-88349d4c2302e5ab": {
+      "path": "./.claude/worktrees/third-reset-onboarding-target/debug/deps/release_pair-88349d4c2302e5ab",
+      "sha256": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+      "fresh": false,
+      "target_name": "release_pair",
+      "target_kind": [
+        "test"
+      ]
+    },
+    "lamp_skills-c6f44302f3b2c78f": {
+      "path": "./.claude/worktrees/third-reset-onboarding-target/debug/deps/lamp_skills-c6f44302f3b2c78f",
+      "sha256": "d0dc250b7c34b83796dd190e4a3678ca86af7354f96d29481bea0bc254001148",
+      "fresh": false,
+      "target_name": "lamp_skills",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    "lamp-skills": {
+      "path": "./.claude/worktrees/third-reset-onboarding-target/debug/lamp-skills",
+      "sha256": "68d165e33d1566f388bbfc48428842a40e8281800cfcacae89ca4110f879f307",
+      "scope": "actual child"
+    }
+  },
+  "artifact_comparison_to_actual_be8_run": {
+    "requested_audio-019db324b83a9807": true,
+    "lamp_skills-a718b2a0214b6903": true,
+    "it-46363ab9699809b5": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-c6f44302f3b2c78f": true,
+    "lamp-skills": true
+  }
+}
