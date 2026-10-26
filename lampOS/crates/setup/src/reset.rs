@@ -39,6 +39,9 @@ const WIFI_COPIES: [&str; 3] = [
     "conf.lamp-setup-tmp",
 ];
 
+/// The extension setup's staging copy of a file takes (`serve::stage`).
+const STAGED: &str = "lamp-setup-tmp";
+
 /// Whether Wi-Fi may put an old network back (`lamp-setup wifi-restore`, at
 /// boot and after a change helper's stop): never while a reset is
 /// journalled, so a reset's wipe of the Wi-Fi cannot be undone from the
@@ -523,13 +526,20 @@ pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<
 /// What starts a writer of wiped paths outside `lampos.target` on a product
 /// lamp: stopped before the writers are listed, so none starts after
 /// (Second on #3579). `lamp-skills-manage.socket` is the sockets target's,
-/// and `lamp-records.timer` the timers'.
-pub const STARTERS: [&str; 5] = [
+/// and `lamp-records.timer` the timers'. The updater's way back, its timer
+/// and a worker already running, can restart `lamp-update.service` for a
+/// pending self-switch (Reviewer-two's P2 on #3579), and the keeper's
+/// restart socket restarts parts: each is stopped here, before the barrier,
+/// so nothing restarts a writer after it.
+pub const STARTERS: [&str; 8] = [
     "lamp-skills-manage.socket",
     "lamp-setup-change.socket",
     "lamp-setup-keys.socket",
     "lamp-setup-wifi.socket",
     "lamp-records.timer",
+    "lamp-update-back.timer",
+    "lamp-update-back.service",
+    "lamp-keeper-restart.socket",
 ];
 
 /// Writers of paths the product plan wipes that are not part of
@@ -540,9 +550,10 @@ pub const STARTERS: [&str; 5] = [
 /// skills' manager's instances (`/var/lib/lampos-skills-state`), the
 /// records' check (`/var/lib/lampOS/voice/sessions`), and the updater and
 /// its apply (the skills' state, `/var/lib/lampOS`; the reboot after the
-/// reset would end them all the same). Patterns name only loaded units, and
-/// none matches `lamp-setup-wipe.service`, the reset's own unit.
-pub const WRITERS: [&str; 9] = [
+/// reset would end them all the same), and the boot's Wi-Fi restore (the
+/// Wi-Fi file; Third on #3579). Patterns name only loaded units, and none
+/// matches `lamp-setup-wipe.service`, the reset's own unit.
+pub const WRITERS: [&str; 10] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
@@ -552,10 +563,13 @@ pub const WRITERS: [&str; 9] = [
     "lamp-records.service",
     "lamp-update.service",
     "lamp-update-apply.service",
+    "lamp-setup-wifi-restore.service",
 ];
 
 /// The loaded units among `units` (names or patterns), as `systemctl
-/// list-units --all` lists them, first word of each line.
+/// list-units --all` lists them: the first word of each line whose LOAD
+/// column says `loaded`, never a `not-found` or masked stub, which a stop
+/// would refuse (the reviewer-lead's P3 on #3579).
 fn loaded(systemctl: &str, units: &[&str], effects: &mut impl Effects) -> io::Result<Vec<String>> {
     let mut argv: Vec<String> = [
         systemctl,
@@ -571,9 +585,13 @@ fn loaded(systemctl: &str, units: &[&str], effects: &mut impl Effects) -> io::Re
     Ok(effects
         .read(&argv)?
         .lines()
-        .filter_map(|line| line.split_whitespace().find(|word| *word != "\u{25cf}"))
-        .filter(|unit| !unit.starts_with('-'))
-        .map(str::to_owned)
+        .filter_map(|line| {
+            let mut words = line
+                .split_whitespace()
+                .skip_while(|word| *word == "\u{25cf}");
+            let unit = words.next()?;
+            (words.next() == Some("loaded") && !unit.starts_with('-')).then(|| unit.to_owned())
+        })
         .collect())
 }
 
@@ -680,6 +698,9 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
                 wipe(&path.with_extension(copy))?;
             }
         }
+        // Setup's staging copy of a file it writes (`serve::stage`), left
+        // beside it by a write cut mid-way (the reviewer-lead's P3 on #3579).
+        wipe(&path.with_extension(STAGED))?;
         wipe(path)?;
         steps.push(Step::Wiped(path.clone()));
     }
