@@ -46,6 +46,31 @@ fn common(word: &str) -> bool {
     COMMON.iter().any(|known| text(known) == word)
 }
 
+/// A fact's distinctive words, in [`text`]'s form, each once: three
+/// characters or more, none of [`COMMON`], a final `s` off, and
+/// "allergic", "allergy" and "allergies" one word (lamp-06c1, 26 Oct:
+/// "forget my peanut allergy" against a kept "allergic to peanuts"). No
+/// sixteen-word limit. Only for which rows carry a forgotten fact
+/// (`days::selective_descendants`): a lexical hint, not proof of use.
+pub(crate) fn content_words(value: &str) -> Vec<String> {
+    let normalized = text(value);
+    let mut words = Vec::new();
+    for word in normalized.split(|character: char| !character.is_alphanumeric()) {
+        if word.chars().count() < 3 || common(word) {
+            continue;
+        }
+        let word = if matches!(word, "allergic" | "allergy" | "allergies") {
+            "allerg"
+        } else {
+            word.strip_suffix('s').unwrap_or(word)
+        };
+        if !words.iter().any(|known| known == word) {
+            words.push(word.to_owned());
+        }
+    }
+    words
+}
+
 /// [`query`], or with `skip_common` the same OR without [`COMMON`] words,
 /// the first sixteen of the rest: a question of only those searches
 /// nothing.

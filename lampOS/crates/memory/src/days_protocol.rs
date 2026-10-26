@@ -82,6 +82,10 @@ enum Extra {
         #[serde(default)]
         person: Who,
         id: u64,
+        /// The selective rule ([`Days::forget_linked`]). Absent, a forget is
+        /// as before it, so an older voice's forget is unchanged.
+        #[serde(default)]
+        selective: bool,
     },
     SessionOpen {
         #[serde(default)]
@@ -452,8 +456,12 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 )?,
             })
         }
-        Extra::Forget { person, id } => {
-            json!({"ok":true,"removed":store.forget(&one(person)?,id)?})
+        Extra::Forget {
+            person,
+            id,
+            selective,
+        } => {
+            json!({"ok":true,"removed":store.forget_linked(&one(person)?,id,selective)?})
         }
         Extra::SessionOpen {
             person,
@@ -699,6 +707,47 @@ mod tests {
         assert_eq!(found["ok"], true, "{found}");
         assert_eq!(found["entries"][0]["id"], kept["id"]);
         assert_eq!(found["entries"][0]["on"], "2026-10-17");
+    }
+
+    /// #3613 on the wire: `forget` with `selective:true` takes an unlinked
+    /// copy of the fact; without the field (an older voice) it stays, as
+    /// before.
+    #[test]
+    fn forget_is_selective_only_when_the_request_says_so() {
+        for selective in [false, true] {
+            let (_scratch, mut store) = Scratch::new(&format!("forget-selective-{selective}"));
+            let person = "p-0123456789abcdef";
+            let send = |store: &mut Days, request: Value| -> Value {
+                serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line)
+                    .unwrap()
+            };
+            let kept = send(
+                &mut store,
+                json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"My favourite colour is teal"}),
+            );
+            let copy = send(
+                &mut store,
+                json!({"op":"append","person":person,"at_unix_ms":NOW+1,"heard":"my favourite colour is teal","said":"Noted"}),
+            );
+            let mut forget = json!({"op":"forget","person":person,"id":kept["id"]});
+            if selective {
+                forget["selective"] = json!(true);
+            }
+            let forgotten = send(&mut store, forget);
+            assert_eq!(forgotten["ok"], true, "{forgotten}");
+            assert_eq!(
+                forgotten["removed"],
+                if selective { 2 } else { 1 },
+                "{forgotten}"
+            );
+            assert_eq!(
+                store
+                    .record(&Person::new(person).unwrap(), copy["id"].as_u64().unwrap())
+                    .unwrap()
+                    .is_none(),
+                selective
+            );
+        }
     }
 
     /// `memory/forgot` (#2467's follow-up): only a `forget_all` that was

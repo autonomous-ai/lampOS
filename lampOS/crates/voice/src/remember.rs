@@ -714,6 +714,22 @@ fn send_with_speaker(
     again
 }
 
+/// Sends a `forget` by `send`. One with `selective` that the memory refuses
+/// as `bad_request` (an older memory, whose requests are strict, #3166's
+/// rule for a part one build apart) is sent again once without it, and
+/// forgets as that memory always did. Any other line is sent as it is.
+fn send_with_selective(mut line: Value, send: impl Fn(&Value) -> Option<Value>) -> Option<Value> {
+    let answer = send(&line);
+    let refused = answer
+        .as_ref()
+        .is_some_and(|answer| answer["ok"] == false && answer["error"] == "bad_request");
+    if !refused || line.as_object_mut()?.remove("selective").is_none() {
+        return answer;
+    }
+    eprintln!("lamp-voice provider: an older memory refused a selective forget; sent as before");
+    send(&line)
+}
+
 /// The journal's line for `forget_said`'s answer after a person's forget
 /// everything (#2849): counts only, never a line.
 fn forget_said_told(answer: Option<&Value>) -> String {
@@ -1820,7 +1836,11 @@ fn about_same(one: &str, other: &str) -> bool {
         (word.chars().count() > 4 && word.ends_with("ies"))
             .then(|| format!("{}y", &word[..word.len() - 3]))
     };
-    one == other
+    // "Forget my peanut allergy" names a kept "allergic to peanuts"
+    // (lamp-06c1, 26 Oct), as the store's forget groups them.
+    (matches!(one, "allergic" | "allergy" | "allergies")
+        && matches!(other, "allergic" | "allergy" | "allergies"))
+        || one == other
         || about_stem(one) == about_stem(other)
         || ies(one).is_some_and(|one| one == other)
         || ies(other).is_some_and(|other| other == one)
@@ -5862,6 +5882,14 @@ impl DaysClient {
                 true,
             );
         };
+        // A forget by the store's selective rule, unless an exchange is
+        // linked only to what its turn used (`LAMP_MEMORY_LINK_USED`): then
+        // all that derives goes, as before (#3613). An older memory refuses
+        // the field, and the forget goes again without it
+        // ([`send_with_selective`]).
+        if request["op"] == "forget" && !self.link_used.load(Ordering::Acquire) {
+            request["selective"] = json!(true);
+        }
         if call.name == RECALL && self.recall_v2.load(Ordering::Acquire) {
             recall_v2_request(&mut request, call, now, zone);
         }
@@ -6019,8 +6047,10 @@ impl DaysClient {
                 &self.hand_ons.room_speaker,
                 for_person(request, person),
                 |line| {
-                    let left = deadline.checked_sub(started.elapsed())?;
-                    bounded_exchange_scoped(&self.socket, line, left, lease)
+                    send_with_selective(line.clone(), |line| {
+                        let left = deadline.checked_sub(started.elapsed())?;
+                        bounded_exchange_scoped(&self.socket, line, left, lease)
+                    })
                 },
             );
             let Some(answer) = answer else {
@@ -6389,9 +6419,16 @@ impl DaysClient {
         let mut count = 0usize;
         let mut lapsed = false;
         for id in matching {
-            let forget = for_person(json!({"op":"forget","id":id}), scope);
+            let mut forget = for_person(json!({"op":"forget","id":id}), scope);
+            if !self.link_used.load(Ordering::Acquire) {
+                forget["selective"] = json!(true);
+            }
             let removed = left()
-                .and_then(|left| bounded_exchange_scoped(&self.socket, &forget, left, lease))
+                .and_then(|_| {
+                    send_with_selective(forget, |line| {
+                        bounded_exchange_scoped(&self.socket, line, left()?, lease)
+                    })
+                })
                 .and_then(|answer| answer["removed"].as_u64().filter(|_| answer["ok"] == true));
             match removed {
                 Some(0) => {}
@@ -8994,7 +9031,7 @@ mod tests {
         let read = served.join().unwrap();
         assert_eq!(read.len(), 2, "{read:?}");
         assert_eq!(read[0]["op"], "search");
-        assert_eq!(read[1], json!({"op":"forget","id":8}));
+        assert_eq!(read[1], json!({"op":"forget","id":8,"selective":true}));
         assert!(read.iter().all(|line| line["op"] != "forget_all"));
         drop(client);
         std::fs::remove_file(&socket).unwrap();
@@ -9548,8 +9585,8 @@ mod tests {
             read,
             [
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
-                json!({"op":"forget","id":1}),
-                json!({"op":"forget","id":2}),
+                json!({"op":"forget","id":1,"selective":true}),
+                json!({"op":"forget","id":2,"selective":true}),
             ]
         );
         let context = client.context.lock().unwrap();
@@ -9690,7 +9727,7 @@ mod tests {
         );
         assert_eq!(
             served.join().unwrap()[1],
-            json!({"op":"forget","id":1,"person":MINH})
+            json!({"op":"forget","id":1,"person":MINH,"selective":true})
         );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
@@ -9750,7 +9787,7 @@ mod tests {
             );
             assert_eq!(
                 served.join().unwrap()[1],
-                json!({"op":"forget","id":forgotten,"person":MINH}),
+                json!({"op":"forget","id":forgotten,"person":MINH,"selective":true}),
                 "{line}"
             );
             drop(client);
@@ -9826,7 +9863,7 @@ mod tests {
             served.join().unwrap(),
             [
                 json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true,"person":MINH}),
-                json!({"op":"forget","id":1,"person":MINH}),
+                json!({"op":"forget","id":1,"person":MINH,"selective":true}),
             ]
         );
         drop(client);
@@ -9891,7 +9928,10 @@ mod tests {
         );
         assert_eq!(told["count"], 1, "{told}");
         assert_eq!(told["left"], 2, "{told}");
-        assert_eq!(served.join().unwrap()[1], json!({"op":"forget","id":2}));
+        assert_eq!(
+            served.join().unwrap()[1],
+            json!({"op":"forget","id":2,"selective":true})
+        );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
 
@@ -9953,7 +9993,7 @@ mod tests {
         assert!(!told.to_string().contains("red"), "{told}");
         assert_eq!(
             served.join().unwrap()[1],
-            json!({"op":"forget","id":1,"person":MINH})
+            json!({"op":"forget","id":1,"person":MINH,"selective":true})
         );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
@@ -10030,7 +10070,10 @@ mod tests {
             told["note"].as_str().unwrap().contains("before I knew"),
             "{told}"
         );
-        assert_eq!(served.join().unwrap()[2], json!({"op":"forget","id":5}));
+        assert_eq!(
+            served.join().unwrap()[2],
+            json!({"op":"forget","id":5,"selective":true})
+        );
         drop(client);
         std::fs::remove_file(&socket).unwrap();
     }
@@ -11095,7 +11138,10 @@ mod tests {
         let read = served.join().unwrap();
         // #3113's probe first: an older memory refuses its listing.
         assert_eq!(read[0], probe());
-        assert_eq!(read[1], json!({"op":"forget","id":12,"person":ASKED_OF}));
+        assert_eq!(
+            read[1],
+            json!({"op":"forget","id":12,"person":ASKED_OF,"selective":true})
+        );
         assert_eq!(
             read[2],
             json!({"op":"forget_last","kind":"kept","person":ASKED_OF})
@@ -11149,7 +11195,7 @@ mod tests {
     fn a_refused_forget_of_the_follow_up_is_retried_by_id_never_forget_last() {
         static KEPT: Mutex<Vec<u64>> = Mutex::new(Vec::new());
         static FIRST: Mutex<Option<(&str, Value)>> = Mutex::new(None);
-        let forget_once = json!({"op":"forget","id":12,"person":ASKED_OF});
+        let forget_once = json!({"op":"forget","id":12,"person":ASKED_OF,"selective":true});
         // Refused by the store, answered but not understood (lost: it may
         // have committed), or the probe refused by an older memory.
         for (name, op, first, sent) in [
@@ -11248,7 +11294,10 @@ mod tests {
         );
         let read = served.join().unwrap();
         assert_eq!(read[0], probe());
-        assert_eq!(read[1], json!({"op":"forget","id":12,"person":ASKED_OF}));
+        assert_eq!(
+            read[1],
+            json!({"op":"forget","id":12,"person":ASKED_OF,"selective":true})
+        );
         assert_eq!(
             read[2],
             json!({"op":"forget_last","kind":"kept","person":OTHER})
@@ -17970,7 +18019,7 @@ mod tests {
             let forgotten = if index == 0 { 5 } else { 6 };
             assert_eq!(
                 read[1],
-                json!({"op":"forget","id":forgotten,"person":MAI}),
+                json!({"op":"forget","id":forgotten,"person":MAI,"selective":true}),
                 "{said}"
             );
             assert!(read.iter().all(|line| line["op"] != "forget_last"));
@@ -18136,6 +18185,8 @@ mod tests {
             ("key", "keys"),
             ("glass", "glasses"),
             ("story", "stories"),
+            ("allergy", "allergic"),
+            ("allergies", "allergic"),
             ("address", "address"),
         ] {
             assert!(about_same(one, other), "{one} {other}");
@@ -18194,12 +18245,49 @@ mod tests {
         let (told, _) = client.run_at(&named, FIRST_READ, NOW, Some(&EAST), Some(MAI));
         assert_eq!(told["count"], 1, "{told}");
         let read = served.join().unwrap();
-        assert_eq!(read[1], json!({"op":"forget","id":5,"person":MAI}));
+        assert_eq!(
+            read[1],
+            json!({"op":"forget","id":5,"person":MAI,"selective":true})
+        );
         // A forgetting lets the held lines go.
         thread.forget();
         assert_eq!(thread.heard_for(7, now), None);
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// #3613, one build apart: a newer memory takes `selective` in one
+    /// request; an older one refuses it (`bad_request`) and the forget goes
+    /// once more without it; a line with no `selective` is never sent twice.
+    #[test]
+    fn a_selective_forget_falls_back_for_an_older_memory() {
+        let line = json!({"op":"forget","id":4,"selective":true});
+        for older in [false, true] {
+            let sent = std::cell::RefCell::new(Vec::new());
+            let answer = send_with_selective(line.clone(), |line| {
+                sent.borrow_mut().push(line.clone());
+                Some(if older && line.get("selective").is_some() {
+                    json!({"ok":false,"error":"bad_request","message":"invalid fields for this operation"})
+                } else {
+                    json!({"ok":true,"removed":1})
+                })
+            });
+            assert_eq!(answer, Some(json!({"ok":true,"removed":1})));
+            let want = if older {
+                vec![line.clone(), json!({"op":"forget","id":4})]
+            } else {
+                vec![line.clone()]
+            };
+            assert_eq!(sent.into_inner(), want, "older {older}");
+        }
+        let plain = json!({"op":"forget","id":4});
+        let sent = std::cell::Cell::new(0);
+        let answer = send_with_selective(plain, |_| {
+            sent.set(sent.get() + 1);
+            Some(json!({"ok":false,"error":"bad_request"}))
+        });
+        assert_eq!(answer.unwrap()["error"], "bad_request");
+        assert_eq!(sent.get(), 1);
     }
 
     /// An older Days lamp-memory (the first builder's hold on #3127: a part

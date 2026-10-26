@@ -177,8 +177,38 @@ one answered but not told (a rule or memory the store forgot then still stops
 journalling). Only an answer that never came stays uncertain, until such a
 fresh session. Forget also invalidates the local recap;
 this code cannot retract words already delivered to a cloud provider.
-Conservative links may delete more derived exchanges than exact citations
-would. Exchanges that use remember/forget still stay out of the journal.
+A targeted forget of a kept fact or observation removes its versions, its
+evidence exchanges and, by the fact's distinctive words
+(`search::content_words`: case and Vietnamese `đ` folded, short and common
+words left out, a final English plural `s` optional, `allergy`,
+`allergies` and `allergic` one word), every exchange or observation linked
+to it through old `sources` that carries one of them, of any scope, and
+every one of the person's own, linked or not, that carries all of one version's words or its whole text (a
+copy of the fact). A row only shown the fact stays: on lamp-06c1 (26 Oct)
+one forgotten peanut allergy took 75 linked exchanges, 73 with no allergy
+word, because every turn's session was shown it. Now it takes the evidence,
+"avoid peanuts because of your allergy" and an unlinked "I'm allergic to
+peanuts", and leaves the weather turns. The first builder's condition
+(#3504): a copy left behind is the failure that matters, so a linked row
+goes on a single shared word, a few unrelated ones with it. An unlinked
+row needs every word, or "favourite colour is violet" would take every
+"favourite" the person said. A fact with no distinctive word takes the old
+broad walk, plus its literal copies (whole words; a text under three
+characters, such as "B2", only as a whole field, so "B22" and "Seat B2 is
+free" stay). The walk goes on
+through linked rows that stay, so a wordless turn in between does not stop
+it; and a copy matches one version's own words, so a copy of the newer
+"violet" goes without the older "teal" (Reviewer-two, 03:15). The voice
+asks for this rule with `selective:true` unless `LAMP_MEMORY_LINK_USED=on`,
+whose links say what was used: then, as before, everything linked goes.
+This is a lexical rule, not proof that every paraphrase is
+gone: old links do not tell use from exposure, so "avoid those" may stay,
+and a mixed evidence exchange goes whole. `forget_all` and `forget_person`
+still remove the whole scope, and every forget invalidates session notes
+and queued writes as before. Exchanges that use remember/forget still stay
+out of the journal. Test:
+`days::tests::targeted_forget_keeps_unrelated_exchanges_shown_the_fact`. In
+Vietnamese: [memory-days_vi.md](vi/memory-days_vi.md).
 
 With `LAMP_MEMORY_LINK_USED=on` (#2176 finding 14; off unless set) an
 exchange is linked only to the sources its own turn used, of those its turn's
@@ -212,7 +242,8 @@ the thing was first used, that shares no key word with it and calls
 nothing that gives it; and after a session that presents no resumption, one
 that speaks of it only in other words, with no call of its own that gives
 it. With the switch off, every exchange
-is linked to everything the session was shown, so those went with a forget.
+is linked to everything the session was shown. The targeted forget above
+filters these old links by words; it cannot identify every indirect use.
 
 When journalling stops (a forget among them), the words held for each
 source, what each turn's calls gave and what was carried are dropped, so
@@ -573,7 +604,7 @@ message. A refusal leaves the connection usable.
 | `search {query, day?, day_from?, day_to?, recall_v2?, limit?, max_bytes?, history?}` | `{ok:true, entries:[Record...]}` in relevance order. Searches raw records, kept items and current observations; `history` defaults false. `day` restricts to journal exchanges on that local day; `day_from` with `day_to` (#2176) to those from the one through the other, both ends counted. Defaults: 8 results, 4,096 text bytes; maxima 50 and 16,384. Empty or tokenless queries return no records. `recall_v2` (default false): common words are left out of the query first (below), and a day or span also returns kept items kept on those days. A kept item or observation with an `event_days` row also carries optional `on:"YYYY-MM-DD"`, the day the event is about; older readers ignore it. With `history:true` (#2510), a replaced version also carries `until_unix_ms`: the `at_unix_ms` of the version that replaced it, through `replacements`; a current one, and every record without `history`, carries no such field. A record's own `at_unix_ms` is when it began to hold (the voice's `since`). |
 | `recall {…, day_from?, day_to?, recall_v2?}` | The legacy `recall` (memory.md), with #2176's fields. With any of them it is parsed as a new operation (unknown fields refused); without them it is the legacy request, answered as before. Same span and `recall_v2` rules as `search`; no query lists the span's exchanges, newest first, and with `recall_v2` the kept items kept on those days too. |
 | `append_linked {at_unix_ms, heard?, said?, source_ids, rule_ids?}` | `{ok:true,id}`. Like append, with at most 64 distinct existing source IDs in the same person's store. Sources can be raw records, kept facts or observations. `rule_ids` (#813), at most 64, are kept entries of the person's own rules scope (`r-<hex>` beside `p-<hex>`, `r-everyone` beside `everyone`); forgetting one removes this exchange. |
-| `forget {id}` | `{ok:true,removed:N}` after transitive deletion and verification; missing ID gives zero. |
+| `forget {id, selective?}` | `{ok:true,removed:N}` after transitive deletion and verification; missing ID gives zero. With `selective:true`, a kept thing or observation takes the targeted rule below; without it (an older voice, or the voice with `LAMP_MEMORY_LINK_USED=on`, where a link says the turn used the fact), everything linked to it goes, as before. An older memory refuses the field as `bad_request`, and the voice sends the forget again once without it (`remember::send_with_selective`). |
 | `remember {at_unix_ms, text, source_ids?, once?}` | The legacy request, with two optional fields: `source_ids` (#1693) and `once` (#2176, default false). Without `once`, as before: `{ok:true,id}`. With `once:true`, when an active kept thing of the same person has the same text after normalisation, `{ok:true,id,existing:true}` with its id, and no entry is written: no row, no last use; the answer reports no write. An existing match gains the new conversation's source links (`source_ids`, checked as a new remember's are), so forgetting it removes both. Otherwise a new kept thing, `{ok:true,id}`. Normalisation: NFC, lower case, trimmed, inner white space collapsed to one space, and punctuation at the end dropped. Another person's text, or a forgotten or replaced one, is not the same. |
 | `remember {…, on}` | #1693, the voice's `LAMP_MEMORY_EVENTS`: the day the kept thing is about, `YYYY-MM-DD`. Kept in `event_days` for the new kept entry, in its transaction, when it is a real day from the local day of `at_unix_ms` to 60 days after it (`EVENT_WITHIN_DAYS`, the observation's check); any other `on` is dropped and the thing kept undated, the answer unchanged. With `once` and a match found (`existing:true`), the found one gains the day when it has none, and takes it when it is later than its own (a weekly "dentist on Friday" said again for next Friday); then its `follow_ups` row is deleted, so the new day is followed up once in turn. An earlier or the same day changes nothing. The source links and the day commit in one transaction. With `replaces`, the new version has its own `on` (or none) and the replaced one's day is deleted. The legacy store ignores it. |
 | `remember {…, replaces, shown}` | #2510, the voice's `LAMP_MEMORY_REPLACES`: a correction. `replaces` is a kept id of the same person's; `shown` the ids the asking session was shown (the note, recall or search, a hit, or one it kept). Accepted only when `replaces` is in `shown`, is this person's, is kind `kept`, is active, and is not newer than `at_unix_ms`: then, in one transaction, the new kept thing, `replacements(newer, older)` and the old one `active=0`, and `{ok:true,id,replaced:<old id>}`. Refused, nothing is written: `{ok:false,error:"refused",reason,message}`, logged `refused error=refused reason=<code>`, the codes checked in this order: `not_shown`, `unknown` (not this person's, or no such id), `not_kept`, `inactive` (already replaced), `not_older`. `once` is not applied to a correction: it is always its new version. A replaced kept thing is history: `kept` and `session_open` leave it out, `search` returns it only with `history:true`, and `forget` of either version removes both (`versions`); it no longer uses one of the 200 kept slots (`full` counts active kept things only, as an adopt's room does). The legacy store ignores both fields. |
