@@ -1,0 +1,54 @@
+{
+  "head": "b26bd73a26f71f9f3af53e1c1a904fcd96f538ba",
+  "base": "978cb0e983c095b03dfeca01a06ebadd50691edd",
+  "aggregate": [
+    525,
+    0,
+    9
+  ],
+  "terminal": {
+    "head": "b26bd73a26f71f9f3af53e1c1a904fcd96f538ba",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 2400,
+    "timed_out": false,
+    "elapsed_seconds": 281.098464797,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "process_group_absent_before_cleanup": true,
+    "forced_cleanup": false,
+    "pid": 86327,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "0f12ece13e60d3d8afa9583e2957e1d65f395ef556756877e6c9f05d92a51164"
+  },
+  "compiler_gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "changed_artifacts": {
+    "requested_audio-019db324b83a9807": false,
+    "it-46363ab9699809b5": false,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-a718b2a0214b6903": false,
+    "lamp_skills-c6f44302f3b2c78f": false,
+    "lamp-skills": false
+  },
+  "expected_unwind_hooks": 2,
+  "unexpected_panic_hooks": 0,
+  "limits": "Actualb26/978 passing run, not latest-base readiness after the subsequent memory correction. Earlier failures remain preserved; no device or product latency claim."
+}

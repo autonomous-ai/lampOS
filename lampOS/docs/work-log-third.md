@@ -1,3 +1,11 @@
+## 2026-10-27 01:17 — worker current memory-base carry pushed
+
+Ready for lamp-voice: no (#3604 current native/read carries pending)
+
+Pushed 92f03b6bc/e588 after fresh fmt/strict Skills Clippy/workspace build/test compilation and full 525/0/9; only the two deliberate unwind hooks observed. Source and all six actual/preserved hashes stayed stable, group absent before cleanup. [Current pass](verification/skills-actions-mock-20261026/current-92f0-host.json). Previous b26/978 also passed 525/0/9 at its actual source, preserved [here](verification/skills-actions-mock-20261026/current-b26b-host.json). Both memory-base deltas changed five executables, so neither is a relabeled old pass. Both authored patches remain unchanged.
+
+The offered old 7b5/008 native/read marks remain at that source; new original current gates and read carries are required. Initial 3bc 523/1/9 stays failed. Reminder 06c/008 twelve-package source remains frozen in its active whole-consumer run; no pass or new carry claimed yet. No device change.
+
 ## 2026-10-27 00:32 — scoped worker original native green
 
 Ready for lamp-voice: no (#3604 independent reads pending)

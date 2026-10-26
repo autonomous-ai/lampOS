@@ -1,0 +1,87 @@
+{
+  "head": "92f03b6bc28d78684d45049ea3f80cf8a77d3c73",
+  "base": "e5889ebb53e9222762d76ac463ec7ca4718174fa",
+  "aggregate": [
+    525,
+    0,
+    9
+  ],
+  "per_target_library_binary_it_release_requested_docs": [
+    [
+      158,
+      0,
+      0
+    ],
+    [
+      20,
+      0,
+      0
+    ],
+    [
+      314,
+      0,
+      1
+    ],
+    [
+      2,
+      0,
+      8
+    ],
+    [
+      31,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "terminal": {
+    "head": "92f03b6bc28d78684d45049ea3f80cf8a77d3c73",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 2400,
+    "timed_out": false,
+    "elapsed_seconds": 243.113494316,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "process_group_absent_before_cleanup": true,
+    "forced_cleanup": false,
+    "pid": 23097,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "c7411cda7bd590abea1b6879c83e827c17136a341dfc25f43f2652302102976d"
+  },
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "artifact_comparison_to_actual_b26_run": {
+    "lamp_skills-a718b2a0214b6903": false,
+    "requested_audio-019db324b83a9807": false,
+    "it-46363ab9699809b5": false,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-c6f44302f3b2c78f": false,
+    "lamp-skills": false
+  },
+  "expected_unwind_hooks": 2,
+  "unexpected_panic_hooks": 0,
+  "authored_patches": "two carried unchanged; no new source finding",
+  "limits": "Fresh actual92f/e588 full command after five binaries changed. Previous7b5/008 andb26/978 passes andfirst3bc523/1/9 remain separately attributed; no device/product latency/full3scompletion claim."
+}
