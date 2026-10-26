@@ -1,0 +1,25 @@
+{
+  "pr": 3528,
+  "audited_head": "f0c7072be3582eda1d1ca6bf7464031b3e2b0434",
+  "audited_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "findings_p1_p2": [],
+  "qualification": "Limited source and committed-proof-packet consistency review only; no compiler/test/native-gate acceptance.",
+  "production_prefix_bytes": 14968,
+  "production_prefix_sha256": "dd0486198f0e178510bed0d2c8a95549f9c0b8b1e5b5a819e06464522aa7398e",
+  "production_prefix_equal_to_base": true,
+  "candidate_patch_sha256": "e6f0e0891a7f70db3d305f3d5831944b24d7d471aeaea32154461781b52d4455",
+  "packet_hashes_and_input_hashes_match": true,
+  "verified_source_boundaries": [
+    "Linux Way::Own uses separately reopened O_NONBLOCK pipe descriptor; Way::Sent uses MSG_DONTWAIT; forced Polled pipe remains.",
+    "Pipe and socket each reach AGAIN before waits_when_full can start the first reader.",
+    "Exact selected child runs only threads, no descendant process; Probe kills and waits its owned direct child on watchdog unwind.",
+    "Parent requires child exit success, named-case ok line and one-pass summary; zero-test selection cannot satisfy named-case witness.",
+    "Original production Polled other-writer race remains documented and unmodified."
+  ],
+  "limitations": [
+    "Child watchdog includes startup and the entire selected test; it is not a per-write deadline or proof of reaching a particular write.",
+    "Inherited shared-descriptor helper retains its 100 ms thread-status observation and later successful full-write join; no new syscall-entry barrier is added.",
+    "Private mutant source, control binaries, raw logs and controllers are not in the public packet. Claimed 400 ms and oversized blocking-write observations are consistent with packet/source, not independently replayed or verified from private bytes.",
+    "No latest-base carry, Linux ARM64, device, physical latency or persisted-journal delivery claim."
+  ]
+}

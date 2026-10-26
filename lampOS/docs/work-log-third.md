@@ -7,6 +7,33 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 09:43 — Current native gates and independent IPC read
+
+#3523 **04253d6df** on **0c1f6437e** passes original ARM64 **40258980142**:
+**11,352 unique PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped; all nine
+controls once. Linux Clippy **40258980167** passes. Reviewer-three closes
+the retirement P2; reviewer-two's independent repaired-head read is running.
+[Receipt](verification/reminder-interruption-retry-20261026/native-40258980142.json).
+
+#3512 **1c0f99559** passes original ARM64 **40259060397**:
+**11,345 unique PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped; both controls
+once. Linux Clippy **40259060388** passes. Both PRs' actual preview parents
+and offered-tree equality are verified. Each has a separate Turn-wire
+**13/0** result, not added to the nextest count.
+[Receipt](verification/privacy-read-error-20261026/native-40259060397.json).
+
+Independent #3528 reader run at **6e177dee0** passes native Mac formatting,
+strict IPC all-target Clippy and full IPC: **26 ordinary tests, one doctest**
+and the successful separate relay signal harness. Seven authored blobs equal
+the previously source-read offer. Source hashes and actual executables are
+preserved. No P1/P2 found; no independent private fault-mutant, Linux or device
+execution claimed. [Reader gate](verification/ipc-no-wait-reader-20261026/current-6e177.json).
+
+#3525's initial change-trigger implementation passes full Skills **535/0/9**
+with all fourteen controls once; its additional malformed-selected-predicate
+finding is still being corrected before publication. Update crossings remain
+separate from those Engine and runner checks.
+
 ## 2026-10-26 09:38 — Current privacy and interruption review corrections
 
 #3512 is pushed at **1c0f99559** on **0c1f6437e**. The carry retains both

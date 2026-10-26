@@ -1,0 +1,65 @@
+{
+  "head": "6e177dee0c40557fe7ceedc9b414734c26add031",
+  "base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "source_count": 7197,
+  "all_source_hashes_unchanged": true,
+  "authored_blobs_equal_previous": {
+    "lampOS/crates/ipc/src/log_relay.rs": true,
+    "lampOS/docs/logging.md": true,
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/README.md": true,
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/SHA256SUMS": true,
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/inputs.sha256": true,
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/results.json": true,
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/selected-results.txt": true
+  },
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T02:40:53Z",
+      "finished": "2026-10-26T02:41:05Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-ipc --all-targets -- -D warnings",
+      "started": "2026-10-26T02:41:05Z",
+      "finished": "2026-10-26T02:41:07Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-ipc": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-ipc -- --test-threads=1",
+      "started": "2026-10-26T02:41:07Z",
+      "finished": "2026-10-26T02:41:19Z",
+      "exit": 0,
+      "harnesses": 7,
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "executable_sha256": {
+    "lamp_ipc-f7e01a8b45e798ea": "fdb2e0d377dc531eb7145443d275c32a9390adf555ec41639f1a164cac3e0de3",
+    "lamp_ipc_probe-a4fa19d4f11a8e03": "2f3643231663ab0359058da95d14abef27e61e35f68f7147a0afc9a17640817e",
+    "probe-5602551a1e7983cd": "8f0b4efc514a7e032f89a643e49e26ed8d52c2ff804c8a0d32067bed658344fd",
+    "relay_exit-50a4563d08f23701": "de3335057883734913d0c9b19980c2207586abf8147b84345d6eca3c907da04b",
+    "relay_shared-8dea96e2df291f3b": "148ba155fdda2d0de0fda102d18790e358d40d429c64dc7625cf3826f3f19726",
+    "relay_signals-1272adbb7659759c": "2109399e6584459b14394c2ceed144d6a730794d6d78caa9d03f136a92ab21d1",
+    "sockets-4c10cc03aee9c3da": "2474faafa6b2432970ac9f1b4519bb09cc0b1fea11508f28f55eca7c0c688877"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-ipc": "853b02a720b1871f952b7ba7e25b9b65207abccd8c963a8d3b332047f80fdaae"
+  },
+  "limits": "Native x86_64 macOS reader execution. 26 ordinary tests plus one doctest and successful relay signal harness. No independent Linux, private fault mutant, device or physical latency execution."
+}
