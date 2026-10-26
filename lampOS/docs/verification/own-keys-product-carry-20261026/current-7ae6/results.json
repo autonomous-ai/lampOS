@@ -1,0 +1,83 @@
+{
+  "complete": {
+    "actual_and_preserved_artifacts": 3,
+    "artifacts_unchanged": true,
+    "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+    "complete": true,
+    "head": "7ae6afbd9f9cef3610362e3310792401833f6d91",
+    "ignored": 2,
+    "passed": 230,
+    "source_entries": 7258,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+    "controller_sha256": "6bced7168ad738f9a7aa5fa2d80e4e959ed91082faaeb566ee521f861592a50a",
+    "head": "7ae6afbd9f9cef3610362e3310792401833f6d91",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--test",
+        "install",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 90396594176,
+      "elapsed_seconds": 45.705,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "307b46f10e19a797913d0337eb9eda8a3ee345b59c7f53e85e45a7fa40da4cc3",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "factory": {
+      "command": [
+        "bash",
+        "deploy/factory/steps-test.sh"
+      ],
+      "disk_free_before": 90409205760,
+      "elapsed_seconds": 132.533,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "097e15730a9f732432ea8dc79e6d4fbe72eea11b855dd65058aa312a723b9c2d",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--test",
+        "install",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 89798651904,
+      "elapsed_seconds": 128.822,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "81d5ffb497985638a83140098a8092f49ee8e65aacfd0dabf3462901552fbbb3",
+      "source_entries": 7258,
+      "source_unchanged": true
+    }
+  },
+  "scope": "Current full Update library and install integration at sixteen threads; strict Update Clippy. Previous exclusive Voice remains d378/6663.",
+  "source_inventory_sha256": "23d6798dfe61f7184c8c74de06019b235363b082feeab4b59fefb15c67ce5859"
+}

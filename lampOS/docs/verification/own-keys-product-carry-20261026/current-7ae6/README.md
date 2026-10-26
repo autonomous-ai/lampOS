@@ -1,0 +1,9 @@
+# Own-keys factory carry qualification
+
+Current head 7ae6afbd9f9cef3610362e3310792401833f6d91 on 2a8273ef2ec59a17c6d7669a9942223dd6824eac. Seven patches remain equal. Thirty-seven authored blobs/modes are unchanged; docs/install.md inherits exactly the upstream factory text. Whole-repository delta is steps.sh, steps-test.sh and install.md only. Completed 20bc source and artifact boundary was preserved before rebase.
+
+The first attempt passed fmt, strict Update all-target Clippy and separate bash syntax checks for both scripts. A scope correction intentionally interrupted its running factory suite: exit -15, 21 partial success rows, source unchanged. Those rows and receipt remain in preparation-attribution.json and are not added to the fresh complete factory execution. No Rust compilation/test had begun. The continuation reuses the source-bound completed stages and runs factory from the beginning, then matching Update --lib --test install compile/runtime selections at sixteen threads. This is not a no-rerun claim across factory attempts; it is an explicitly retained interruption and fresh complete execution.
+
+Real embedded readers are Update library install.rs reading steps.sh, and install integration reading docs/install.md. Both must rebuild with compiler fresh=false. ci_paths.rs contains include_str text inside a raw-string scanner fixture; it does not embed install.md and is not selected for runtime.
+
+The owned exclusive target is reused after captured prior closure. Exhaustive source comparisons confirm the three-file delta. New actual/preserved executables, local libraries/build-script outputs and depfiles are guarded. Literal counts and required control census remain separate from older Update 230/0/2 on 20bc/ba950 and Voice 4093/0/21 on d378/6663. Native ARM64, activation and physical factory/device acceptance remain separate. This factory suite uses host stand-ins.

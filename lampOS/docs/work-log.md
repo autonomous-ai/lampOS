@@ -1,3 +1,15 @@
+Ready for lamp-voice: #3510 current carry locally qualified; publication pending.
+
+## Current checkpoint: 2026-10-26 19:32 +07, own-keys factory-base carry qualified locally, push pending
+
+[Current 7ae6/2a827 evidence](verification/own-keys-product-carry-20261026/current-7ae6/README.md) retains seven equal patches and the exact inherited factory script/documentation delta. Formatting, strict Update all-target Clippy and both separately run shell syntax checks pass. Complete factory stand-in suite **97/0**; aligned full Update library **122/0/2** and install **108/0/0** at 16 threads, all 17 required controls once. Both actual embedded-reader targets rebuilt. Final guards cover 7,258 source entries, three executable pairs, 52 local compiler outputs and 765 depfiles.
+
+The initial factory execution was intentionally interrupted during a selection correction after 21 partial success rows; its exit -15 and rows remain retained and are not summed. The complete factory execution started afresh. Earlier Voice and native runs remain attributed to their exact preceding heads. Current carry 7ae6 is now pushed; original ARM64 40323315453 and Linux Clippy 40323315473 are pending. The first push attempt was not executed because automatic approval review could not complete due its usage allowance; no unsafe determination or bypass is inferred. A later attempt through the same approval route succeeded after the continuation.
+
+#3510 stays draft for #2094, accepted-helper reset quiescence through First's #3579, and explicit current-lamp acceptance. #3583 is closed as duplicate. The software result does not clear those holds. No device, real key, provider, signing or release action ran.
+
+---
+
 Ready for lamp-voice: #1812 remains open on real-key installed release and attended Body acceptance.
 
 ## Current checkpoint: 2026-10-26 18:52 +07, installed carrier evidence independently read

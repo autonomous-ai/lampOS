@@ -1,0 +1,11 @@
+{
+  "it_scope": "ci_paths include_str text is a raw-string scanner fixture, not a third embedded reader; it is not selected because the scanner fixture is unaffected.",
+  "reader_paths": [
+    "crates/update/src/install.rs includes deploy/factory/steps.sh",
+    "crates/update/tests/install.rs includes docs/install.md"
+  ],
+  "rebuilt": [
+    "lamp_update library test",
+    "install integration"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+  "before_after_entries": {
+    "lampOS/deploy/factory/steps-test.sh": [
+      "100755 blob 6c8a122a60764057ca997757f93fd1a65f08f08a",
+      "100755 blob ba98e9d0e0cc4031858cfaa0fb3dd7093237a74a"
+    ],
+    "lampOS/deploy/factory/steps.sh": [
+      "100755 blob 27a86892df7084afc80b06a3d5f1d9e8a5f5d2c4",
+      "100755 blob 2db7a26f70ee0ab2304bd27a2e7841abd14cb875"
+    ],
+    "lampOS/docs/install.md": [
+      "100644 blob f96f60f8f83eae120f99702e05ebd1becde88509",
+      "100644 blob 94bb33c152d95108f6a771f8f2bd9c60188cd89b"
+    ]
+  },
+  "head": "7ae6afbd9f9cef3610362e3310792401833f6d91",
+  "old_base": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+  "old_head": "20bc7d626e7b53d4ea7e7e3a2b5018c93973c7f9",
+  "range_diff": "1:  ebf9e7439a = 1:  b6ae01b219 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  6cf82e9cf6 = 2:  fd6233ef7f lampOS: preserve customized own-keys drop-ins\n3:  3b0e520138 = 3:  8a73662900 lampOS: record current own-keys carry qualification\n4:  83d4617b34 = 4:  ca74229fa9 lampOS: clarify own-keys activation and per-unit overrides\n5:  fcdb70b1a7 = 5:  8835be7069 lampOS: record own-keys qualification on the d21 base\n6:  92036b6cf0 = 6:  6eb81c91f2 lampOS: retain own-keys scheduling and product-reader checks\n7:  20bc7d626e = 7:  7ae6afbd9f lampOS: qualify own-keys carry with current product units",
+  "repository_entries": 10690,
+  "seven_equal_patches": true,
+  "shared_install_doc_inherits_exact_upstream_patch": true,
+  "unchanged_authored_files": 37,
+  "whole_repository_changed_paths": [
+    "lampOS/deploy/factory/steps-test.sh",
+    "lampOS/deploy/factory/steps.sh",
+    "lampOS/docs/install.md"
+  ]
+}

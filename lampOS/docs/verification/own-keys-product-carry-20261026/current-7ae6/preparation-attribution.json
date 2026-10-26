@@ -1,0 +1,125 @@
+{
+  "completed_stages": [
+    {
+      "receipt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "disk_free_before": 90422165504,
+        "elapsed_seconds": 6.412,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_entries": 7258,
+        "source_unchanged": true
+      },
+      "receipt_sha256": "07a61a9b7a7cd134bda05dc67a544d28163b52438aec657d47a8c522cc05859a",
+      "stage": "fmt"
+    },
+    {
+      "receipt": {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--message-format=short",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "disk_free_before": 90427736064,
+        "elapsed_seconds": 17.172,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "6928692c976eafcd6e29cea25e95b4a1ac64f330889ecdccf8a869f61cac6a81",
+        "source_entries": 7258,
+        "source_unchanged": true
+      },
+      "receipt_sha256": "01b033372b08e46a9c7c03a7092cc97e76505e09985029b58df09728cd647aec",
+      "stage": "clippy"
+    },
+    {
+      "receipt": {
+        "command": [
+          "bash",
+          "-n",
+          "deploy/factory/steps.sh"
+        ],
+        "disk_free_before": 90429845504,
+        "elapsed_seconds": 0.719,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_entries": 7258,
+        "source_unchanged": true
+      },
+      "receipt_sha256": "dd8e7501748a5e22d28c914f6b803a5de3a160973070392a7be14b9e4198e05f",
+      "stage": "steps-syntax"
+    },
+    {
+      "receipt": {
+        "command": [
+          "bash",
+          "-n",
+          "deploy/factory/steps-test.sh"
+        ],
+        "disk_free_before": 90429796352,
+        "elapsed_seconds": 0.722,
+        "error": null,
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_entries": 7258,
+        "source_unchanged": true
+      },
+      "receipt_sha256": "20a33cfa72999b62ae552401a0dd63fea6127aa1428fabf775b5fee3a05877ed",
+      "stage": "steps-test-syntax"
+    }
+  ],
+  "interrupted_factory": {
+    "command": [
+      "bash",
+      "deploy/factory/steps-test.sh"
+    ],
+    "disk_free_before": 90429779968,
+    "elapsed_seconds": 58.261,
+    "error": "",
+    "exit_code": -15,
+    "log_sha256": "e0cb85d5f8f856ab574f76b6c5561ac29abffedbafe9396dc8a76e287a19fd9b",
+    "source_entries": 7258,
+    "source_unchanged": true
+  },
+  "partial_factory_rows": [
+    "ok: a dry run passes all four",
+    "ok: a dry run writes no lamp.env",
+    "ok: a dry run places no key",
+    "ok: a dry run reads the body at rest only, into /tmp",
+    "ok: a dry run never runs the self-test",
+    "ok: GPIO pads, dry: says how it would find them and reads nothing",
+    "ok: a written run without a yes stops before the arm moves",
+    "ok: a written run passes all four",
+    "ok: the arm stands at 30% then 100%",
+    "ok: on a private socket, with nothing else that moves on its own, and let go at the stop",
+    "ok: the stands wake a sagged head home first (lamp-a63e, #2396)",
+    "ok: each stand is told listening on its own socket, and eased back",
+    "ok: lamp.env holds this arm's stand",
+    "ok: a written run places the key",
+    "ok: a written run runs the self-test after its yes",
+    "ok: a whole run starts lamp-body after step 1 and stands it for the self-test",
+    "ok: a lamp-body that does not come up fails step 4 and says why",
+    "ok: unset, dry: all four pass, and step 4 says it waits for setup",
+    "ok: unset, written: steps 1 to 3 done, step 4 refuses and says to set the lamp up",
+    "ok: unset, written --to 3: steps 1 to 3 done",
+    "ok: a part not checked (exit 3) counts as done"
+  ],
+  "prior_boundary_sha256": "5fb25b50b1542b1b06a12c0f6a1675ca6374258e4d22317af058899c95bbae27",
+  "scope": "Factory intentionally interrupted for reader-scope correction; partial rows are not added to fresh complete execution. Rust compilation/tests had not started. Completed stages retain first-attempt attribution."
+}
