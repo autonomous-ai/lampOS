@@ -1,5 +1,29 @@
 # Tests work log
 
+## 2026-10-26 10:26 — Reader ready with both current readers
+
+Ready for lamp-voice: yes (#3527)
+
+[Current Reader evidence](verification/tests-reader-ready-1c-20261026/) binds
+9abfa0c4e/1c to ARM64 7,483 passes, zero failures/leaks/timeouts, 53 skips and
+an equal preview tree. Both Linux checks and both current-head reads pass.
+The PR is ready for the train. Current Mac compile-only gates and all retained
+source/executable guards pass. No historical failed run is waived.
+
+The separate unscoped sentinel failure is preserved. Its narrow two-file
+follow-up is prepared on the Reader head with all assertions unchanged, but
+current qualification is unrun. Skills and Ready-speaking current-source gates
+and controls are prepared for the next compiler slot.
+
+Ready for lamp-voice: no (#3466 installed rehearsal)
+
+Carrier current-base fmt/strict checks/build and 126 updater unit tests plus
+ten carrier cases pass; two unit tests are ignored. Its head-reader gate is
+still running. A one-second owned-process sample found install file/directory
+sync work, not evidence of a fixture lock deadlock. The original failed compile
+remains retained. No archive deletion or device action occurred. Fourth owns
+the idle-pump finding; Tests has no competing authored patch.
+
 ## 2026-10-26 09:58 — Reader native green; latest-base gates finish
 
 Ready for lamp-voice: no (#3527 current-base native; #3466 rehearsal)
