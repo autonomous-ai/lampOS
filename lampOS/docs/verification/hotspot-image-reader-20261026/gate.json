@@ -1,0 +1,74 @@
+{
+  "head": "d7e2aac57dc19817b8fec3f040e2bab6e001d300",
+  "source_sha256": "c196a89c1dce9ce4017bf46452d4605948afcc8d83572a992bbd23fa9c58807f",
+  "unchanged": true,
+  "rows": [
+    {
+      "command": [
+        "bash",
+        "-n",
+        "scripts/imager/build-orangepi-v2.sh"
+      ],
+      "exit": 0,
+      "seconds": 0.0055539608001708984,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/imager/tests/test_lampos_envelope.sh"
+      ],
+      "exit": 0,
+      "seconds": 3.9712679386138916,
+      "log_sha256": "b9c5c0f419591fb7c3004baccc147301c9ca7f5cb488871d2c79905c34098ac3"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/imager/tests/test_lampos_image_bootstrap.sh"
+      ],
+      "exit": 0,
+      "seconds": 6.610651254653931,
+      "log_sha256": "b4f950c29cd17181eda9c81872096887e46f4b5e0c7a8a43bff2df6811f7ff26"
+    },
+    {
+      "command": [
+        "sh",
+        "scripts/imager/tests/test_v2_image_output.sh"
+      ],
+      "exit": 0,
+      "seconds": 0.6199307441711426,
+      "log_sha256": "8dfb0c2b69112068eb92bac0d3a295abf356bfa4f35f65eda81560714bfc59a2"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/imager/tests/test_v2_image_inputs.sh"
+      ],
+      "exit": 0,
+      "seconds": 0.405811071395874,
+      "log_sha256": "5cf45f949102cb09ae58b7757e8dc2f7734ee067dbfb3b0d60c560345c4833a9"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "pytest",
+        "scripts/imager/tests",
+        "-q"
+      ],
+      "exit": 1,
+      "seconds": 0.037734270095825195,
+      "log_sha256": "0aa08e03a59c16f7ee3bf80d7f0a7aa9f22f24fb89f3eac5d724d883be3a4491"
+    }
+  ],
+  "pytest_followup": {
+    "command": "/Users/d/miniconda/bin/python3.12 -m pytest scripts/imager/tests -q",
+    "exit": 0,
+    "passed": 30,
+    "skipped": 1,
+    "skip": "Linux-only real ext4 integration",
+    "log_sha256": "0be683c6beddb66e30ccb86a7fcebf4184ecebcd6ab1dcc10bc1047e307b7e4e"
+  },
+  "limits": "Original system Python missing pytest retained; no image build, root, mount, radio or device execution. Shell bootstrap uses local stand-ins."
+}

@@ -1,0 +1,17 @@
+{
+  "source_head": "d7e2aac57",
+  "block_sha256": "98f516caf8537baaa80e4520a2837ff546ad90d457bee50e9d7f056a39577e5a",
+  "adaptation": "Only output path replaced with owned temporary file; actual production conditional and heredocs executed. No chroot, root, radio or image build.",
+  "rows": [
+    {
+      "band": "2.4",
+      "exit": 0,
+      "config": "interface=wlan0\ndriver=nl80211\nssid=lamp-xxxx\nhw_mode=g\nchannel=6\nieee80211n=1\nwmm_enabled=1\nauth_algs=1\nignore_broadcast_ssid=0\n"
+    },
+    {
+      "band": "5",
+      "exit": 0,
+      "config": "interface=wlan0\ndriver=nl80211\nssid=lamp-xxxx\nhw_mode=a\nchannel=36\ncountry_code=US\nieee80211n=1\nieee80211ac=1\nwmm_enabled=1\nauth_algs=1\nignore_broadcast_ssid=0\n"
+    }
+  ]
+}

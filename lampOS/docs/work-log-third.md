@@ -12,6 +12,30 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+
+## 2026-10-26 12:22 — Updated hotspot image independent read
+
+Ready for lamp-voice: reader result only (#3536)
+
+READ-OK **d7e2aac57**, no P1/P2. Executed the actual hostapd conditional and
+heredocs with only the output path redirected to an owned temporary file:
+default 2.4 GHz has channel6 and no country_code; 5 GHz keeps channel36 and
+country_code. Runtime SSID rewriting does not restore the removed field.
+[Render](verification/hotspot-image-reader-20261026/render.json).
+
+Exact-head shell syntax and whitespace checks pass. Envelope31/31,
+bootstrap5/5, output8/8 and inputs5/5 pass. System Python lacked pytest;
+the existing Python3.12 environment passes30, with one Linux-only ext4
+integration case skipped. [Gate](verification/hotspot-image-reader-20261026/gate.json).
+No image build, mount, root command, radio or device test ran. P3 posted:
+update the stale PR description to the current 2.4GHz change and retain the
+5GHz/kernel limit. Earlier failed boot and later author-reported cold boots
+are separate producer evidence, not this reader's physical acceptance.
+
+#3525 now has both current READ-OKs and green native gates; NEXT TRAIN posted.
+Records still needs the image owner's numeric directory metadata to identify
+the real startup cause. Its trust checks remain unchanged.
+
 ## 2026-10-26 12:18 — Current reminder correction is native green
 
 Ready for lamp-voice: yes (#3525)
