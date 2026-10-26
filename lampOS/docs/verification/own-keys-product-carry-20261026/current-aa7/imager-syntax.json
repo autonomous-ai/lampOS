@@ -1,0 +1,17 @@
+{
+  "command": [
+    "bash",
+    "-n",
+    "scripts/imager/build-orangepi-v2.sh"
+  ],
+  "elapsed_seconds": 0.004,
+  "exit_code": 0,
+  "scope": "Shell syntax only; no image build, chroot or installation performed.",
+  "script_input": {
+    "mode": 493,
+    "sha256": "f5352787379d422e409c93880e194b4622d76bba0059bcff6a09c50f329d7afb"
+  },
+  "script_unchanged": true,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,325 @@
+{
+  "artifact_count": 66,
+  "artifact_manifest_sha256": "4667e2bd60ded24f6b5859eeb0ac294a1905e3fa1d5cf8bc6b641fe03a8b631a",
+  "complete_marker_sha256": "ab4de76499d386b6872652548969bfbd77982c0e6be448ce2b2ce48cee292261",
+  "factory_stand_ins": {
+    "failed": 0,
+    "passed": 94,
+    "separate_scope": true
+  },
+  "identity": {
+    "base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+    "clippy_packages": [
+      "lamp-update",
+      "lamp-voice",
+      "lamp-selftest",
+      "lamp-setup",
+      "lamp-cloud",
+      "lamp-health",
+      "lamp-controls",
+      "lamp-skills",
+      "lamp-voice-eval"
+    ],
+    "controller_sha256": "bfaaf7f6caf243ffdd4b6823958591bdaec185689e8c9d6b369bb2ced315677a",
+    "head": "ff17b8c4e57dccf6fa3fe16e8f83ab2b68e66474",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183",
+    "scope": "Current full Voice plus its five direct Cargo metadata consumers. Factory scripts and embedded Update inputs changed. No rerun of unchanged Selftest, Setup, Health or Controls test suites; no local full workspace, ARM64, provider or device gate.",
+    "tested_packages": [
+      "lamp-voice",
+      "lamp-skills",
+      "lamp-voice-eval",
+      "lamp-cloud",
+      "lamp-memory",
+      "lamp-update"
+    ]
+  },
+  "limits": "Host only; no native ARM64, provider/key, device, installation, activation or physical latency acceptance.",
+  "metadata_reader_scope": {
+    "embedded_inputs": [
+      {
+        "path": "deploy/factory/steps.sh",
+        "reader": "crates/update/src/install.rs",
+        "target": "lamp-update library tests"
+      },
+      {
+        "path": "docs/install.md",
+        "reader": "crates/update/tests/install.rs",
+        "target": "lamp-update install integration"
+      }
+    ],
+    "false_match": "The include_str text in tests/it/ci_paths.rs is a raw-string fixture, not a third reader.",
+    "metadata_sha256": "050b1d2bb516b9b27b3aee90c7b11820e5c05f3775d2062752e9094cf96d2337",
+    "selected_complete_test_crates": [
+      "lamp-voice",
+      "lamp-skills",
+      "lamp-voice-eval",
+      "lamp-cloud",
+      "lamp-memory",
+      "lamp-update"
+    ],
+    "voice_direct_consumers": [
+      {
+        "kind": "dev",
+        "manifest_path": "<source>/lampOS/crates/update/Cargo.toml",
+        "package": "lamp-update",
+        "target": null
+      },
+      {
+        "kind": null,
+        "manifest_path": "<source>/lampOS/crates/skills/Cargo.toml",
+        "package": "lamp-skills",
+        "target": null
+      },
+      {
+        "kind": null,
+        "manifest_path": "<source>/lampOS/crates/voice-eval/Cargo.toml",
+        "package": "lamp-voice-eval",
+        "target": null
+      },
+      {
+        "kind": "dev",
+        "manifest_path": "<source>/lampOS/crates/memory/Cargo.toml",
+        "package": "lamp-memory",
+        "target": null
+      },
+      {
+        "kind": "dev",
+        "manifest_path": "<source>/lampOS/crates/cloud/Cargo.toml",
+        "package": "lamp-cloud",
+        "target": null
+      }
+    ]
+  },
+  "prior_failures": "Earlier 1c884 final artifact-guard failure, independent install failures and historical packet-parser reconciliations retain their original scope. No current pass erases them.",
+  "schema": 1,
+  "selection": {
+    "compile_command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-voice-eval",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-update",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exclusion": "No per-package follow-up Cargo test invocation changes the selected feature graph.",
+    "packages": [
+      "lamp-voice",
+      "lamp-skills",
+      "lamp-voice-eval",
+      "lamp-cloud",
+      "lamp-memory",
+      "lamp-update"
+    ],
+    "runtime_command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-voice-eval",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-update",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ],
+    "same_package_feature_target_selection": true
+  },
+  "source_bytes_modes_file_set_and_artifacts_rechecked": true,
+  "source_entries": 7258,
+  "source_inventory_sha256": "dec3646e80da604625f0b8d4e80cb6ea61f289457c55665f5578c96bf4381e6a",
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--no-deps",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1"
+      ],
+      "elapsed_seconds": 0.367,
+      "exit_code": 0,
+      "label": "metadata",
+      "log_sha256": "050b1d2bb516b9b27b3aee90c7b11820e5c05f3775d2062752e9094cf96d2337",
+      "receipt_sha256": "8a648114e29c740436f9e469aca97daedc991ae274d27437318aa69825a40674",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.039,
+      "exit_code": 0,
+      "label": "fmt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "893d9282793ea76ed39a8595da1ba48e3e97254c79a19b8605d18edd9cb87903",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 69.646,
+      "exit_code": 0,
+      "label": "clippy",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "ddd9b6ad834bd3c40cc2dbfedc3c0bf2aba73caee0616596fe62ede04c072eea",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "bash",
+        "-n",
+        "deploy/factory/steps.sh",
+        "deploy/factory/steps-test.sh"
+      ],
+      "elapsed_seconds": 0.346,
+      "exit_code": 0,
+      "label": "shell-syntax",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "9d4f4687a46223c281d6877105ab3dd5a857827fa0bec5901d49ce44b0a8d35f",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "bash",
+        "deploy/factory/steps-test.sh"
+      ],
+      "elapsed_seconds": 130.224,
+      "exit_code": 0,
+      "label": "factory",
+      "log_sha256": "3b780cf7d224ec9c985520e592c3e19a70fd8395e078a54c222ef21071ac7a96",
+      "receipt_sha256": "bad6b5102f246afe5568ebea7c9302844016aa5b6d77d13ca42626bd489b454d",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-update",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 206.197,
+      "exit_code": 0,
+      "label": "compile",
+      "log_sha256": "4e76ae0c65980bf363615399a064de61af72c68ee9a3df93fc43e9075c0fd6c2",
+      "receipt_sha256": "339475112cd349be81611c028f20abcef8d5bc08ec8d550ca98d0b38e668816c",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-update",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 1583.093,
+      "exit_code": 0,
+      "label": "full-six",
+      "log_sha256": "8b1ada98da25b80bb235738bd203bc574b66b6c76fbc1c7e3b600d2fffd7f6d3",
+      "receipt_sha256": "3a99368a2d56f9dd452c98207f97c5954e9f0f43da9e523b308533337739ce6f",
+      "source_unchanged": true
+    },
+    {
+      "command": [
+        "bash",
+        "-n",
+        "deploy/factory/steps-test.sh"
+      ],
+      "exit_code": 0,
+      "label": "separate-steps-test-syntax",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "00805a8b493362f075d5dc955acc6f37a5bdfadce368ad27a47262679a56af85",
+      "source_unchanged": true
+    }
+  ],
+  "syntax_scope": "The original bash -n steps.sh steps-test.sh parsed steps.sh only. The retained standalone steps-test.sh supplement passed; both scripts are now separately covered. Original receipt/controller unchanged."
+}

@@ -1,0 +1,1587 @@
+{
+  "count_scope": "One terminal outer result per Cargo-executed target. The room fixture child is separate and excluded from totals. Doctests and factory stand-ins remain separately stated; this is not a nextest ordinal census.",
+  "doctests": {
+    "header_association_limit": "Aggregate only; interleaved stdout/stderr headers are not assigned as individual crate evidence.",
+    "literal_rows": [
+      {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 7126,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 7132,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 7138,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 7144,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 7150,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 7156,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      }
+    ],
+    "totals": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    }
+  },
+  "nested_children_excluded": [
+    {
+      "child_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 689,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "parent_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 693,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+        "measured": 0,
+        "passed": 1
+      },
+      "reason": "voice_observe_room.rs reexecutes its exact case with inherited child output. Only the final outer driver summary is aggregated.",
+      "target": "voice_observe_room"
+    }
+  ],
+  "outer_target_totals": {
+    "failed": 0,
+    "ignored": 48,
+    "passed": 6175
+  },
+  "per_package_outer_test_targets": {
+    "lamp-cloud": {
+      "failed": 0,
+      "ignored": 4,
+      "passed": 196,
+      "targets": 4
+    },
+    "lamp-memory": {
+      "failed": 0,
+      "ignored": 8,
+      "passed": 330,
+      "targets": 21
+    },
+    "lamp-skills": {
+      "failed": 0,
+      "ignored": 9,
+      "passed": 522,
+      "targets": 5
+    },
+    "lamp-update": {
+      "failed": 0,
+      "ignored": 6,
+      "passed": 415,
+      "targets": 9
+    },
+    "lamp-voice": {
+      "failed": 0,
+      "ignored": 21,
+      "passed": 4089,
+      "targets": 6
+    },
+    "lamp-voice-eval": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 623,
+      "targets": 3
+    }
+  },
+  "schema": 1,
+  "target_sections": [
+    {
+      "executable_sha256": "f319ce521b65e1591038fca88baa1b6f021ff6110b590a77fab7545c187db1ca",
+      "header_line": 2,
+      "kind": [
+        "lib"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 2,
+        "line": 174,
+        "literal": "test result: ok. 166 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 35.42s",
+        "measured": 0,
+        "passed": 166
+      },
+      "package": "lamp-cloud",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "line": 174,
+          "literal": "test result: ok. 166 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 35.42s",
+          "measured": 0,
+          "passed": 166
+        }
+      ],
+      "target": "lamp_cloud",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "8450c630fe1689843a24104afa988db9cd73a1da314d9c2c0658d2009ff42cb1",
+      "header_line": 176,
+      "kind": [
+        "bin"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 180,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-cloud",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 180,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "lamp-cloud",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "1f59895d6714701e5b8005ac6af2b9280136bb1f7cbdae6cc1befcda69e9415c",
+      "header_line": 182,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 216,
+        "literal": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.66s",
+        "measured": 0,
+        "passed": 30
+      },
+      "package": "lamp-cloud",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 216,
+          "literal": "test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.66s",
+          "measured": 0,
+          "passed": 30
+        }
+      ],
+      "target": "it",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "7d8c0a052fba811776453ee56d12ea050fd55853843ae099694f3c02abecc0d6",
+      "header_line": 218,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 2,
+        "line": 224,
+        "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-cloud",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "line": 224,
+          "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "release_pair",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "b87b5df5dba649444bc14285a864aba0d38dd3df89560ef2f7daf07ecf8a338d",
+      "header_line": 226,
+      "kind": [
+        "lib"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 1,
+        "line": 327,
+        "literal": "test result: ok. 96 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.42s",
+        "measured": 0,
+        "passed": 96
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "line": 327,
+          "literal": "test result: ok. 96 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.42s",
+          "measured": 0,
+          "passed": 96
+        }
+      ],
+      "target": "lamp_memory",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "30783f3aa61406a7ebee370edced3278f360c4bebdba8046d56da9661346d373",
+      "header_line": 329,
+      "kind": [
+        "bin"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 345,
+        "literal": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "measured": 0,
+        "passed": 8
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 345,
+          "literal": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+          "measured": 0,
+          "passed": 8
+        }
+      ],
+      "target": "lamp-memory",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "28b95c7772e6c089c825b22a8970f635a8acdfbe8dd19bcd2019ad1702db74c2",
+      "header_line": 347,
+      "kind": [
+        "bin"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 359,
+        "literal": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 8
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 359,
+          "literal": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 8
+        }
+      ],
+      "target": "lamp-memory-eval",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "c1f7113a5d661e695bf3c919c276b137789a12d9af38c67b5b468c4abeaaf410",
+      "header_line": 361,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 368,
+        "literal": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s",
+        "measured": 0,
+        "passed": 3
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 368,
+          "literal": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s",
+          "measured": 0,
+          "passed": 3
+        }
+      ],
+      "target": "forget_person",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "5ab668e04f06d53b99dd34d6e047d7fb2fc291df62167c9acc9a6d3f33706524",
+      "header_line": 370,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 378,
+        "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s",
+        "measured": 0,
+        "passed": 4
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 378,
+          "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s",
+          "measured": 0,
+          "passed": 4
+        }
+      ],
+      "target": "forget_shared_exchange",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "2b7e39e91f339f37b3f46d61d0836fc6e94911ca44fa56030429427ab676bd99",
+      "header_line": 380,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 385,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 385,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "forgot",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "7ab707760e531bc6c5eda2a5b0fbe0a7b430a9f98a1def55cfca973755023eb1",
+      "header_line": 387,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 414,
+        "literal": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+        "measured": 0,
+        "passed": 23
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 414,
+          "literal": "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+          "measured": 0,
+          "passed": 23
+        }
+      ],
+      "target": "health_control",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "b0146ba7cffc6dcc8f68921943ae947739cc4e25013cc827383db9260833d135",
+      "header_line": 416,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 5,
+        "line": 592,
+        "literal": "test result: ok. 167 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 86.01s",
+        "measured": 0,
+        "passed": 167
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 5,
+          "line": 592,
+          "literal": "test result: ok. 167 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 86.01s",
+          "measured": 0,
+          "passed": 167
+        }
+      ],
+      "target": "it",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "0e9ec69ee7f3097df2a7d955f771e424bd6507b626db552e16df9574413051b9",
+      "header_line": 594,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 599,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 599,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "paraphrase_fixture",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "5850b674ff3f8ad1454a0d99b123f9d7bc08cbc5a20d7591cee6c3f54fc99dc5",
+      "header_line": 601,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 2,
+        "line": 607,
+        "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "line": 607,
+          "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "release_pair",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "ba333e1d0ac9c94e74d81806b3f8bfefc1761a0a1ea1f025c208d80fcb6ff914",
+      "header_line": 609,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 614,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 614,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "voice_early_words",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "7c5a1463674f97c85a64f295d6481fda51cbf1af7a40eecb4e232bf35e1082eb",
+      "header_line": 616,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 621,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 621,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "voice_follows_face",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "94602c7b180e0b15e7f8c9915d42ad5e82490ed5c30c3e43ae512b0f7b7d4111",
+      "header_line": 623,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 632,
+        "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.71s",
+        "measured": 0,
+        "passed": 5
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 632,
+          "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.71s",
+          "measured": 0,
+          "passed": 5
+        }
+      ],
+      "target": "voice_forget",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "eb4130d8d9855889e685448c30faa7f65dacda71b45b78bd4e3180c42a9a40dd",
+      "header_line": 634,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 640,
+        "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s",
+        "measured": 0,
+        "passed": 2
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 640,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s",
+          "measured": 0,
+          "passed": 2
+        }
+      ],
+      "target": "voice_forget_about",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "39e1e18be0bcf57e9f910fd053e40e4a5608d4ca41852c5c0996ad231c1bf856",
+      "header_line": 642,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 648,
+        "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s",
+        "measured": 0,
+        "passed": 2
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 648,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.26s",
+          "measured": 0,
+          "passed": 2
+        }
+      ],
+      "target": "voice_forget_named",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "29ecd202acbe200d323fafe228f5638c147757d9a9e8805ea3177b3799dbe917",
+      "header_line": 650,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 656,
+        "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s",
+        "measured": 0,
+        "passed": 2
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 656,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s",
+          "measured": 0,
+          "passed": 2
+        }
+      ],
+      "target": "voice_link_used",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "a28a30353b1f3e509fbaab312f95747b7d32dff6976d55a1593f137af39d55a9",
+      "header_line": 658,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 663,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 663,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "voice_observe",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "49b3168880f52f889b82efd2da98bd4ed2b692204bf190c4aad7472d6e15099d",
+      "header_line": 665,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 670,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 670,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "voice_observe_forget",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "fa9a1f7e83bb2aece661ed35ad7643eb134a0da739010dd186a33cecdf454633",
+      "header_line": 672,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 677,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 677,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "voice_observe_named_forget",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "f461b092c018972000677f4e93a19d77c91c28f56f4af838409efa34d3e011ff",
+      "header_line": 679,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 693,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 689,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+          "measured": 0,
+          "passed": 1
+        },
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 693,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "voice_observe_room",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "0756d7a239fa6a94ef8868cb81b15a226ffe5095da125bf54b1a5020c7faed20",
+      "header_line": 695,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 701,
+        "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s",
+        "measured": 0,
+        "passed": 2
+      },
+      "package": "lamp-memory",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 701,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s",
+          "measured": 0,
+          "passed": 2
+        }
+      ],
+      "target": "voice_since_until",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "780826bcd1ea33b637012772c7b6f7bc4873f47969f8c9404985733e19ed8383",
+      "header_line": 703,
+      "kind": [
+        "lib"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 864,
+        "literal": "test result: ok. 157 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.32s",
+        "measured": 0,
+        "passed": 157
+      },
+      "package": "lamp-skills",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 864,
+          "literal": "test result: ok. 157 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.32s",
+          "measured": 0,
+          "passed": 157
+        }
+      ],
+      "target": "lamp_skills",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "8179a36682afe7b46c35727c6ab3c3a1cd0980a764b8ff087dbb6d88047e6d7f",
+      "header_line": 866,
+      "kind": [
+        "bin"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 890,
+        "literal": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.48s",
+        "measured": 0,
+        "passed": 20
+      },
+      "package": "lamp-skills",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 890,
+          "literal": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.48s",
+          "measured": 0,
+          "passed": 20
+        }
+      ],
+      "target": "lamp-skills",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "35b9754847389719497eebebf9ac4c28990b24b55c8e2c781967811f47737bb6",
+      "header_line": 892,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 1,
+        "line": 1807,
+        "literal": "test result: ok. 312 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 174.06s",
+        "measured": 0,
+        "passed": 312
+      },
+      "package": "lamp-skills",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "line": 1807,
+          "literal": "test result: ok. 312 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 174.06s",
+          "measured": 0,
+          "passed": 312
+        }
+      ],
+      "target": "it",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "37c73c784df27cb1e2507b0b59073bddd11b96a5c9a1dab09915a03a74f5fbba",
+      "header_line": 1809,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 8,
+        "line": 1823,
+        "literal": "test result: ok. 2 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+        "measured": 0,
+        "passed": 2
+      },
+      "package": "lamp-skills",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 8,
+          "line": 1823,
+          "literal": "test result: ok. 2 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+          "measured": 0,
+          "passed": 2
+        }
+      ],
+      "target": "release_pair",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "0f53d50da6024926c8571d5e57add17b4d67f22646f16029fd549fafa9edcb99",
+      "header_line": 1825,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 1860,
+        "literal": "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.75s",
+        "measured": 0,
+        "passed": 31
+      },
+      "package": "lamp-skills",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 1860,
+          "literal": "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.75s",
+          "measured": 0,
+          "passed": 31
+        }
+      ],
+      "target": "requested_audio",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "40b34fc8ac56fbb90436e1cf98bc2430522d268411b2b6f102c2c52784ba7138",
+      "header_line": 1862,
+      "kind": [
+        "lib"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 2,
+        "line": 1990,
+        "literal": "test result: ok. 122 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.74s",
+        "measured": 0,
+        "passed": 122
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "line": 1990,
+          "literal": "test result: ok. 122 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 3.74s",
+          "measured": 0,
+          "passed": 122
+        }
+      ],
+      "target": "lamp_update",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "73eb1c9c6521702768e29b6957c7f555e0d37c5b571bf9b9524ed2ab25c64285",
+      "header_line": 1992,
+      "kind": [
+        "bin"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 1996,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 1996,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "lamp-update",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "b31f5433a69d06547edbee0db149e02f1a7918d96b209db1c7e554586e521eb6",
+      "header_line": 1998,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 2007,
+        "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+        "measured": 0,
+        "passed": 5
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 2007,
+          "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+          "measured": 0,
+          "passed": 5
+        }
+      ],
+      "target": "functions",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "dab8f07ba536990717b607ce568884fd5b1c33146f0270e62153c6623c3eb59b",
+      "header_line": 2009,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 2121,
+        "literal": "test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 171.70s",
+        "measured": 0,
+        "passed": 108
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 2121,
+          "literal": "test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 171.70s",
+          "measured": 0,
+          "passed": 108
+        }
+      ],
+      "target": "install",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "e03e23568b718a1c80e6c7679a3f505f713ada512f407cfd46c918ff03e14133",
+      "header_line": 2123,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 2140,
+        "literal": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s",
+        "measured": 0,
+        "passed": 13
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 2140,
+          "literal": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s",
+          "measured": 0,
+          "passed": 13
+        }
+      ],
+      "target": "it",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "1f8824dfdd9544d7514428d038dc353070253432b6832f4fe66fbcadc03f8352",
+      "header_line": 2142,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 2,
+        "line": 2148,
+        "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 2,
+          "line": 2148,
+          "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "release_pair",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "186a1cf0e8ef2c2458beca25962de78526a0e6b8ffe57ce55bfa30c23c45545d",
+      "header_line": 2150,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 2321,
+        "literal": "test result: ok. 167 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 387.80s",
+        "measured": 0,
+        "passed": 167
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 2321,
+          "literal": "test result: ok. 167 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 387.80s",
+          "measured": 0,
+          "passed": 167
+        }
+      ],
+      "target": "round",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "675b50176c40dd7f2fdfb7efd7d1c1e8f34cc80fb1f1804e7da528941575caf8",
+      "header_line": 2323,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 1,
+        "line": 2327,
+        "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "line": 2327,
+          "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "self-cli-exec",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "f8e50e4ea347a2fd291bb4c75a3e18a6eca05caaf55b7256f889a2b621bf1577",
+      "header_line": 2328,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 1,
+        "line": 2332,
+        "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-update",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 1,
+          "line": 2332,
+          "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "self-process-cuts",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "b7bc1eec1a7cfd25280e2665da636c9bebeb7e872eb98eaae5bca31278b7de41",
+      "header_line": 2333,
+      "kind": [
+        "lib"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 15,
+        "line": 6155,
+        "literal": "test result: ok. 3803 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 540.94s",
+        "measured": 0,
+        "passed": 3803
+      },
+      "package": "lamp-voice",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 15,
+          "line": 6155,
+          "literal": "test result: ok. 3803 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 540.94s",
+          "measured": 0,
+          "passed": 3803
+        }
+      ],
+      "target": "lamp_voice",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "6de03da8b28801d17ac6ccb28b41aeca6622046bf0c8b40d0e1d3fb04be867b9",
+      "header_line": 6157,
+      "kind": [
+        "bin"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 6162,
+        "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 1
+      },
+      "package": "lamp-voice",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 6162,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 1
+        }
+      ],
+      "target": "lamp-voice",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "5604a85b9d8a1b4b6ad76a8ffbac992cc68d774e6409dbbf8ac9d5b44ea6cee5",
+      "header_line": 6164,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 6443,
+        "literal": "test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.82s",
+        "measured": 0,
+        "passed": 275
+      },
+      "package": "lamp-voice",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 6443,
+          "literal": "test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.82s",
+          "measured": 0,
+          "passed": 275
+        }
+      ],
+      "target": "it",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "5d4fb60b0e093bb4059741aa1e91ae99bd6473f28c7f612f391662b3df9c8336",
+      "header_line": 6445,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 6,
+        "line": 6455,
+        "literal": "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 0
+      },
+      "package": "lamp-voice",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 6,
+          "line": 6455,
+          "literal": "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 0
+        }
+      ],
+      "target": "release_pair",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "13d3c6b00e706784a6739ccf4fadfd46237b4e45778be665f90c3cb2b5afb1fd",
+      "header_line": 6457,
+      "kind": [
+        "example"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 6465,
+        "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "measured": 0,
+        "passed": 4
+      },
+      "package": "lamp-voice",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 6465,
+          "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "measured": 0,
+          "passed": 4
+        }
+      ],
+      "target": "render_line_second",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "e62a9cbfd6fe5a48ce9b849abe57afa4021af2a2417240b84b72fe8fe9effe88",
+      "header_line": 6467,
+      "kind": [
+        "example"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 6477,
+        "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+        "measured": 0,
+        "passed": 6
+      },
+      "package": "lamp-voice",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 6477,
+          "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s",
+          "measured": 0,
+          "passed": 6
+        }
+      ],
+      "target": "stop_words_stt_replay",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "e8340b1edeb2ce6e6fa05e9234b35bda60a923df959508ecf6e4377976bfaccc",
+      "header_line": 6479,
+      "kind": [
+        "lib"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 6863,
+        "literal": "test result: ok. 378 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.52s",
+        "measured": 0,
+        "passed": 378
+      },
+      "package": "lamp-voice-eval",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 6863,
+          "literal": "test result: ok. 378 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.52s",
+          "measured": 0,
+          "passed": 378
+        }
+      ],
+      "target": "lamp_voice_eval",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "a43957ed5102828478cf53fc58021527627e0b80feebf8aec958cf1ea70e01c6",
+      "header_line": 6865,
+      "kind": [
+        "bin"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 6876,
+        "literal": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.72s",
+        "measured": 0,
+        "passed": 7
+      },
+      "package": "lamp-voice-eval",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 6876,
+          "literal": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.72s",
+          "measured": 0,
+          "passed": 7
+        }
+      ],
+      "target": "lamp-voice-eval",
+      "type": "test-target"
+    },
+    {
+      "executable_sha256": "6844c5033b98d0c8a6fdb17336c8cc432034284811e10c4037c6d081c5840b63",
+      "header_line": 6878,
+      "kind": [
+        "test"
+      ],
+      "outer_summary": {
+        "failed": 0,
+        "filtered_out": 0,
+        "ignored": 0,
+        "line": 7120,
+        "literal": "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 66.84s",
+        "measured": 0,
+        "passed": 238
+      },
+      "package": "lamp-voice-eval",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered_out": 0,
+          "ignored": 0,
+          "line": 7120,
+          "literal": "test result: ok. 238 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 66.84s",
+          "measured": 0,
+          "passed": 238
+        }
+      ],
+      "target": "it",
+      "type": "test-target"
+    }
+  ]
+}

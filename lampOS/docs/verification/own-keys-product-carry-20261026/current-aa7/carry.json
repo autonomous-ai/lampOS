@@ -1,0 +1,22 @@
+{
+  "actual_and_preserved_artifacts_rechecked": 66,
+  "after_entry": "100755 blob d6ccfede35dafe146ff6d9ad1a256f563c7d51db",
+  "all_38_authored_blobs_modes_unchanged": true,
+  "artifact_manifest_sha256": "4667e2bd60ded24f6b5859eeb0ac294a1905e3fa1d5cf8bc6b641fe03a8b631a",
+  "base": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "before_entry": "100755 blob a5fcf935166f281e13a548cb96eeaf0c5dbc757b",
+  "clean": true,
+  "head": "f378095a90aa5b4183bb90e499c6cc7853fd546e",
+  "lampOS_source_bytes_modes_file_set_identical": true,
+  "lampOS_source_entries": 7258,
+  "old_base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+  "old_head": "ff17b8c4e57dccf6fa3fe16e8f83ab2b68e66474",
+  "only_changed_path": "scripts/imager/build-orangepi-v2.sh",
+  "qualification": "Current imager script syntax and unchanged lampOS source/executable inputs only. Native CI still required on the current offered head.",
+  "range_diff": "1:  52d608e070 = 1:  fc5d33bf4f lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  0271c56326 = 2:  0ea795460c lampOS: preserve customized own-keys drop-ins\n3:  a01838b077 = 3:  d686d8c871 lampOS: record current own-keys carry qualification\n4:  4700675289 = 4:  223c09682c lampOS: clarify own-keys activation and per-unit overrides\n5:  3fe24a7648 = 5:  961a5a5515 lampOS: record own-keys qualification on the d21 base\n6:  3067b92e5c = 6:  cfd0f03e32 lampOS: retain own-keys scheduling and product-reader checks\n7:  ff17b8c4e5 = 7:  f378095a90 lampOS: qualify own-keys carry with current product units\n",
+  "repository_entries": 10690,
+  "same_path_set": true,
+  "seven_equal_patches": true,
+  "source_inventory_sha256": "dec3646e80da604625f0b8d4e80cb6ea61f289457c55665f5578c96bf4381e6a",
+  "test_execution_scope": "6175/0/48 outer target tests and factory94/0 remain ff17/690. One Memory room child pass excluded; six doctest summaries0/0/0 separate. No runtime rerun for imager-only carry."
+}

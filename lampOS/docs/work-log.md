@@ -1,3 +1,15 @@
+Ready for lamp-voice: #3568 ready; #3510 current software CI pending and activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 17:08 +07, own-keys carry published
+
+#3510 is `f378095a9` on `aa7cf9029`, seven equal carried patches and all 38 authored files unchanged. [Executed ff17/690 gate](verification/own-keys-product-carry-20261026/current-690/README.md): **6,175 outer passes / 0 failures / 48 ignored**, excluding one nested Memory child pass; factory **94/0** separately. Cloud 196/0/4, Memory 330/0/8, Skills 522/0/9, Update 415/0/6, Voice 4,089/0/21, Voice-eval 623/0/0. Formatting, strict nine-crate Clippy and both separately qualified shell syntax checks pass. All 66 actual/preserved artifacts and 7,258 source entries pass final guards.
+
+[Image-only aa7 carry](verification/own-keys-product-carry-20261026/current-aa7/README.md) changes only the inherited image script, whose syntax passes; all lampOS source and executable bindings remain unchanged. No runtime count is relabeled as execution after the carry. Exact ff17 execution source is published on `second/own-keys-executed-690-20261026`. [Historical PR evidence](verification/own-keys-product-carry-20261026/pre-f378-description/README.md) preserves prior failures and qualifications.
+
+Original current native gates are next. This software gate does not resolve #2094 or the explicit current-lamp acceptance prerequisite: activation HOLD and draft status remain. No provider, real key, systemd install, device or release mutation ran.
+
+---
+
 Ready for lamp-voice: yes (#3568); #3510 software carry being published, activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 17:05 +07, current startup CI verified
