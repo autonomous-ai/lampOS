@@ -2018,6 +2018,12 @@ then use that person's scope:
     A text from the app is always the room's, so its personal `remember`
     gets the same note: to have it kept, the person says it again at the
     lamp, known.
+  - **The observation pass never keeps the lamp's own words** (finding M
+    on #3504): `OBSERVE_PROMPT` says `heard` is the person's and `said`
+    the lamp's, and never to propose what only the lamp said; the store
+    keeps a proposal only if its words are in what was heard of a cited
+    exchange (`tidy::said_by_the_person`, [memory-days.md](memory-days.md)).
+    Test: `it::days::an_observation_never_rests_only_on_the_lamps_own_words`.
   - **The observation pass** (`LAMP_MEMORY_OBSERVE`) drops the proposals
     the detector marks before `tidy_apply`; the rest go as before.
   - **The journal** says, with no words: "a remember about a person was not

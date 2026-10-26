@@ -423,7 +423,7 @@ fn a_bad_second_proposal_leaves_the_whole_batch_unwritten_and_the_job_retryable(
     let job = store.conversation_end(&room, "ended", &[source]).unwrap();
     let invalid = Output {
         observations: vec![
-            proposal("First proposed observation", &[source], None),
+            proposal("First proposed coffee observation", &[source], None),
             proposal("Second proposed observation", &[999], None),
         ],
     };
@@ -433,10 +433,79 @@ fn a_bad_second_proposal_leaves_the_whole_batch_unwritten_and_the_job_retryable(
         .tidy_apply(
             &room,
             &job.job,
-            &output("Valid observation", &[source], None),
+            &output("Valid coffee observation", &[source], None),
         )
         .unwrap();
     assert_eq!(ids, [source + 1]);
+}
+
+/// Finding M on #3504 (lamp-4ace and lamp-06c1, 27 Oct): what only the
+/// lamp said is never kept as theirs. "How do I take my coffee?" answered
+/// "Green tea's more my sort of thing" keeps no "prefers green tea"; the
+/// same proposal from their own "I like green tea" is kept; and in one
+/// batch only the one resting on their words is.
+#[test]
+fn an_observation_never_rests_only_on_the_lamps_own_words() {
+    let scratch = Scratch::new("lamp-words");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let lamp_only = store
+        .append(
+            &room,
+            NOW,
+            "How do I take my coffee?",
+            "Green tea's more my sort of thing",
+            &[],
+        )
+        .unwrap();
+    let job = store.conversation_end(&room, "lamp", &[lamp_only]).unwrap();
+    let kept = store
+        .tidy_apply(
+            &room,
+            &job.job,
+            &output("Prefers green tea", &[lamp_only], None),
+        )
+        .unwrap();
+    assert!(kept.is_empty(), "{kept:?}");
+    assert!(
+        found(&mut store, &room, "green")
+            .iter()
+            .all(|id| *id == lamp_only)
+    );
+    let theirs = store
+        .append(&room, NOW, "I like green tea", "Nice", &[])
+        .unwrap();
+    let job = store.conversation_end(&room, "theirs", &[theirs]).unwrap();
+    let kept = store
+        .tidy_apply(
+            &room,
+            &job.job,
+            &output("Prefers green tea", &[theirs], None),
+        )
+        .unwrap();
+    assert_eq!(kept.len(), 1);
+    let both = store
+        .append(&room, NOW, "My bike is red", "I prefer jazz myself", &[])
+        .unwrap();
+    let job = store.conversation_end(&room, "both", &[both]).unwrap();
+    let kept = store
+        .tidy_apply(
+            &room,
+            &job.job,
+            &Output {
+                observations: vec![
+                    proposal("Their bike is red", &[both], None),
+                    proposal("Likes jazz", &[both], None),
+                ],
+            },
+        )
+        .unwrap();
+    assert_eq!(kept.len(), 1);
+    assert!(
+        found(&mut store, &room, "jazz")
+            .iter()
+            .all(|id| *id == both)
+    );
 }
 
 #[test]
@@ -466,8 +535,12 @@ fn supersession_changed_after_preparation_rolls_back_an_earlier_proposal_in_the_
         .unwrap();
     let invalid = Output {
         observations: vec![
-            proposal("Partial mutation must disappear", &[correction], None),
-            proposal("Obsolete replacement", &[correction], Some(old)),
+            proposal(
+                "Partial coffee mutation must disappear",
+                &[correction],
+                None,
+            ),
+            proposal("Obsolete coffee replacement", &[correction], Some(old)),
         ],
     };
     assert!(store.tidy_apply(&room, &delayed.job, &invalid).is_err());
@@ -477,7 +550,7 @@ fn supersession_changed_after_preparation_rolls_back_an_earlier_proposal_in_the_
         .tidy_apply(
             &room,
             &delayed.job,
-            &output("Another supported fact", &[correction], None),
+            &output("Another supported coffee fact", &[correction], None),
         )
         .unwrap();
     assert_eq!(retry, [committed[0] + 1]);
@@ -1206,7 +1279,7 @@ fn a_sqlite_failure_on_the_second_proposal_rolls_back_the_first_and_its_index() 
     let room = Person::everyone();
     let mut store = scratch.open(30, NOW);
     let source = store
-        .append(&room, NOW, "Coffee black", "Noted", &[])
+        .append(&room, NOW, "Coffee black, abort second", "Noted", &[])
         .unwrap();
     let job = store.conversation_end(&room, "pending", &[source]).unwrap();
     drop(store);
@@ -1214,7 +1287,7 @@ fn a_sqlite_failure_on_the_second_proposal_rolls_back_the_first_and_its_index() 
     let mut store = scratch.open(30, NOW);
     let proposals = Output {
         observations: vec![
-            proposal("First phantom observation", &[source], None),
+            proposal("First phantom coffee observation", &[source], None),
             proposal("abort-second", &[source], None),
         ],
     };
@@ -2291,7 +2364,7 @@ fn a_past_event_day_keeps_the_observation_and_its_batch() {
         .append(
             &minh,
             MONDAY,
-            "My exam was yesterday, it went badly. My sister's wedding is on Saturday",
+            "My exam was yesterday, it went badly. My sister's wedding is on Saturday. I take my coffee black",
             "Oh no, sorry",
             &[],
         )

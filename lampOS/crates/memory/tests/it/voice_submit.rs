@@ -182,7 +182,7 @@ fn selected_previous_ids_must_be_distinct_current_observations() {
             &prepare.job,
             &Output {
                 observations: vec![Proposal {
-                    text: "A synthetic preference.".into(),
+                    text: "A synthetic fixture preference.".into(),
                     category: Category::Preference,
                     source_ids: vec![source],
                     supersedes: None,
@@ -218,7 +218,7 @@ fn selected_previous_ids_must_be_distinct_current_observations() {
             &prepare.job,
             &Output {
                 observations: vec![Proposal {
-                    text: "The corrected synthetic preference.".into(),
+                    text: "The synthetic preference, a correction.".into(),
                     category: Category::Preference,
                     source_ids: vec![correction],
                     supersedes: Some(observed),
