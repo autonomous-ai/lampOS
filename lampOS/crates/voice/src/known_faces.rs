@@ -1199,6 +1199,22 @@ pub fn run_for(
     person: Option<&str>,
     line: Option<&crate::speaking_faces::LineSeen>,
 ) -> (Value, bool) {
+    run_for_fenced(socket, call, switches, person, line, &|| true)
+}
+
+/// [`run_for`], sending to the eyes only while `fence` holds, read right
+/// before the request is sent: a forget made on someone's authority sends
+/// nothing once that authority is gone (Fourth's P2 on #3564: a line
+/// narrowed to the room, or revoked, between the scope's check and the
+/// send). Refused there, nothing is sent and the eyes are not asked.
+pub fn run_for_fenced(
+    socket: &Path,
+    call: &ToolCall,
+    switches: FaceSwitches,
+    person: Option<&str>,
+    line: Option<&crate::speaking_faces::LineSeen>,
+    fence: &dyn Fn() -> bool,
+) -> (Value, bool) {
     if switches.remember_speaker && call.name == REMEMBER {
         return (json!({"error": crate::remember_speaker::NOT_SEEN}), true);
     }
@@ -1239,7 +1255,7 @@ pub fn run_for(
     } else {
         Said::default()
     };
-    run_switched(socket, call, switches, &said)
+    run_switched(socket, call, switches, &said, fence)
 }
 
 /// Enrollment under the caller's revocable authority. The switch-off
@@ -1323,6 +1339,10 @@ pub fn run_scoped(
 /// What the model is told when "forget my face" names no face of the person
 /// whose line it is, or, on a room's line, no face seen saying it
 /// ([`forget_name`]): nothing is sent.
+/// What the model is told when a face request's authority went before it
+/// was sent ([`run_for_fenced`]): nothing was done.
+pub const AUTHORITY_GONE: &str =
+    "That was not done: I could no longer be sure it was theirs to ask, so nothing was sent.";
 pub const NOT_THEIRS: &str = "I can only forget the face of the person asking, while I can see them at the lamp. They should look at me and ask again.";
 
 /// The name "forget my face" asks the eyes to forget, on a line whose
@@ -1385,6 +1405,7 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
             remember_speaker: false,
         },
         said,
+        &|| true,
     )
 }
 
@@ -1393,6 +1414,7 @@ fn run_switched(
     call: &ToolCall,
     switches: FaceSwitches,
     said: &Said,
+    fence: &dyn Fn() -> bool,
 ) -> (Value, bool) {
     let checked = switches.checked;
     let Some(name) = call
@@ -1436,6 +1458,12 @@ fn run_switched(
         FORGET => json!({"forget": name}),
         _ => return (crate::tools::unavailable(), false),
     };
+    if !fence() {
+        eprintln!(
+            "lamp-voice: a face request's authority was gone before it was sent; nothing was sent"
+        );
+        return (json!({"error": AUTHORITY_GONE}), true);
+    }
     match crate::tools::exchange(socket, &line, DEADLINE) {
         Some(answer) => (told_asking(&answer, switches.visits), true),
         None => (
