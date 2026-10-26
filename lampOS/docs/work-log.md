@@ -1,3 +1,17 @@
+Ready for lamp-voice: no; #3533 delivered, #3528 native failure and #3510 activation HOLD retained.
+
+## Current checkpoint: 2026-10-26 11:58 +07, model fixture delivered and own-keys original native pass
+
+Train 156 (#3535), current `cced42943`, delivered #3533 with its same commits. Both independent readers subsequently report exact-head Turn-end **30 passed / zero failed / eight ignored**, separately from the original ARM64 qualification.
+
+[#3510 original aca41 native evidence](verification/own-keys-product-carry-20261026/native-aca/README.md): ARM64 **40263032904**, attempt 1, reports **11,355 unique passes / zero failures, leaks or timeouts / 106 skipped / zero selected unrun**. All nine own-keys cases and two census cases pass once. Separate process **13/0**, doctests **4/0**, relay success and promotion helper **25/0** pass; Linux Clippy **40263032936** passes. The tested merge preview has exact 1c884/aca41 parents and the same complete tree as the authored head. No rerun occurred. This does not erase the Mac procedure's failed final artifact guard or the peer's retained install failures, and does not authorize activation: #2094 and fresh current-lamp acceptance remain HOLD.
+
+Memory's original frozen gate passed fmt, strict Voice Clippy and **4,076/0/21**, with both focused cases passing. Both old stopwatch assertions fail with an inserted 400 ms pause; both corrected cases pass that pause. The actual blocking-send mutant fails the overflow-refusal assertion after the existing writer timeout, not the expected parent watchdog. The parser rejects nested child/outer failure summaries; its incomplete campaign is retained. The source was restored and freshly compiled, with **2/0** and the same library executable hash. Only the previously unrun queued-wait control is continuing. The candidate remains uncommitted pending completion and a current-base carry.
+
+Tests retains the separate Reader sentinel repair. #3527's delivery does not waive #3528's unchanged-sentinel native failure. Current carries and selected-crate gates follow. No device, provider, key, release or local ARM64 action ran.
+
+---
+
 Ready for lamp-voice: yes (#3533); #3528 failed native gate and #3510 activation HOLD remain.
 
 ## Current checkpoint: 2026-10-26 10:18 +07, model native qualification complete; IPC failure retained

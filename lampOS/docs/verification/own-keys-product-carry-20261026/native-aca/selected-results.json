@@ -1,0 +1,79 @@
+[
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_directory",
+    "ordinal": 6243,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update",
+    "name": "install::tests::retired_drop_in_matcher_preserves_a_fifo",
+    "ordinal": 6244,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again",
+    "ordinal": 6332,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+    "ordinal": 6376,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_off_drop_in_without_reloading",
+    "ordinal": 6377,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_keeps_an_own_keys_symlink_to_the_exact_template",
+    "ordinal": 6380,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_preflight_refuses_a_directory_at_the_retired_own_keys_path",
+    "ordinal": 6381,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest",
+    "ordinal": 6388,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-update::install",
+    "name": "the_product_takes_a_persons_own_keys",
+    "ordinal": 6412,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-voice-eval::it",
+    "name": "switches::every_switch_says_how_it_is_counted",
+    "ordinal": 11333,
+    "status": "PASS",
+    "total": 11355
+  },
+  {
+    "binary": "lamp-voice-eval::it",
+    "name": "switches::the_counts_by_table_and_in_all",
+    "ordinal": 11334,
+    "status": "PASS",
+    "total": 11355
+  }
+]
