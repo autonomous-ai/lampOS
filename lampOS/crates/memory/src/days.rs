@@ -906,6 +906,20 @@ impl Days {
         tx.commit()?;
         Ok(records)
     }
+
+    /// The event day attached to this person's record, if one was kept.
+    /// Search replies may include it so Voice can distinguish a coming
+    /// event from one that already happened; older readers ignore the field.
+    pub fn event_day(&self, person: &Person, id: u64) -> Result<Option<String>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT d.day FROM event_days d JOIN entries e ON e.rid=d.rid WHERE e.person=?1 AND e.id=?2 ORDER BY d.day LIMIT 1",
+                params![person.as_str(), id],
+                |row| row.get(0),
+            )
+            .optional()?)
+    }
     fn find(
         &self,
         person: &Person,
