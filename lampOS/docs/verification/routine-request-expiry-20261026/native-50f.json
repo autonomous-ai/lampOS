@@ -1,0 +1,96 @@
+{
+  "pr": 3598,
+  "offered_head": "50fdff861018eb82e4c2145d958dc139cd7dedbc",
+  "offered_base": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "arm64_run": 40357170947,
+  "linux_clippy_run": 40357170841,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "eea604a95398421477b258758c3ea83a7733d14d",
+      "preview_parents": [
+        "521dcb006848a5bc99b11513828233ef65a4883c",
+        "50fdff861018eb82e4c2145d958dc139cd7dedbc"
+      ],
+      "preview_tree": "8a02b6db6bd6e52225ef809c8c39924ed92d6395",
+      "offered_tree": "8a02b6db6bd6e52225ef809c8c39924ed92d6395",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "eea604a95398421477b258758c3ea83a7733d14d",
+      "preview_parents": [
+        "521dcb006848a5bc99b11513828233ef65a4883c",
+        "50fdff861018eb82e4c2145d958dc139cd7dedbc"
+      ],
+      "preview_tree": "8a02b6db6bd6e52225ef809c8c39924ed92d6395",
+      "offered_tree": "8a02b6db6bd6e52225ef809c8c39924ed92d6395",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 7534,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 53,
+  "unique_terminal_cases": 7534,
+  "repeated_equal_rows": 34,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    7534
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline": 1,
+    "lamp-skills routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended": 1,
+    "lamp-skills routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline": 1,
+    "lamp-skills routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window": 1
+  },
+  "terminal_findings": [],
+  "all_pass_audit": true,
+  "qualified": true,
+  "limits": "Original50f/521d native only. Host actual50f integration312/0/1 plus retained actualdd8e/7d211/0/8 with other5binaries equal; separate unrelated passing-case BrokenPipe observation retained. Historicalcbde7534/0/53 and1adc1/0 are separate, no historical cause clearance. No readiness/posts/device claims.",
+  "separate_harnesses": {
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0,
+      "case_counts": {
+        "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+        "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+        "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+        "verdict_carries_identity_and_one_request_at_a_time": 1,
+        "missing_model_is_final_and_never_restarted": 1,
+        "missing_executable_fails_at_once": 1,
+        "spawn_returns_while_worker_startup_is_held": 1,
+        "startup_failures_are_final": 1,
+        "serving_failures_are_replaced_within_budget": 1,
+        "protocol_violations_are_replaced": 1,
+        "cancelled_answers_are_never_delivered": 1,
+        "close_during_inference_never_waits": 1,
+        "sustained_requests_stay_bounded": 1
+      }
+    },
+    "docs": {
+      "passed": 4,
+      "failed": 0
+    },
+    "relay_signals": true,
+    "export": true,
+    "artifact_uploaded": true
+  },
+  "selection": {
+    "selected_tests": 7534,
+    "selected_binaries": 70,
+    "skipped_tests": 53,
+    "skipped_binaries": 114
+  },
+  "native_timing_observations": {
+    "probe_rows": 0,
+    "limit": "No native timing values claimed absent actual emitted probe rows."
+  },
+  "raw_log_sha256": {
+    "linux-clippy": "be441826db2982207dbceca75b419d966c7d0b6f606b84ce4a6b619a49886a33",
+    "arm64": "66efc9772f74b1fb70cb1df91a1425bdcfa2c96480f1986ae78df7ad2213d031"
+  }
+}

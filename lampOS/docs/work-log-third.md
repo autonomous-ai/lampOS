@@ -1,3 +1,11 @@
+## 2026-10-26 23:36 — mock control failure preserved; Routine ready
+
+Ready for lamp-voice: no (mock worker); yes (#3598 qualification complete)
+
+Mock 3bc/521 first full exits 101 at one new ACK-error control: InvalidInput errno22 fails its BrokenPipe/Reset assertion. Original repeat fixture and two-phase unwind control pass. Only unrun targets completed: aggregate 523/1/9, all source/six executable hashes stable, groups absent before cleanup, no timeout or forced cleanup. [Failure packet](verification/skills-actions-mock-20261026/first-3bc8-failure.json). Host mechanism probe separates late timeout-optionEINVAL from realwriteEPIPE; original failed stage remains unproved. Corrected code will use nonblocking ACK and an actualwrite witness, with no error-class widening.
+
+Routine 50f/521 has two current peer reads and all original checks green: ARM40357170947/Linux40357170841,7,534/0/53,all4controls once. Author closure/readiness is being posted after direct live-base check. [Native receipt](verification/routine-request-expiry-20261026/native-50f.json). No device or historical-failure waiver.
+
 ## 2026-10-26 23:15 — Routine carry integration qualifies on delivered observations
 
 Ready for lamp-voice: no (#3598)

@@ -1,0 +1,158 @@
+{
+  "head": "3bc82ec95b8d0dba27c38512d1a2e007fb055265",
+  "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "aggregate": [
+    523,
+    1,
+    9
+  ],
+  "first_full_summaries": [
+    [
+      157,
+      0,
+      0
+    ],
+    [
+      20,
+      0,
+      0
+    ],
+    [
+      313,
+      1,
+      1
+    ]
+  ],
+  "only_unrun_targets": {
+    "release_pair": [
+      2,
+      0,
+      8
+    ],
+    "requested_audio": [
+      31,
+      0,
+      0
+    ],
+    "docs": [
+      0,
+      0,
+      0
+    ]
+  },
+  "failure": {
+    "case": "skills::the_one_action_reply_reports_an_ack_write_error",
+    "location": "skills.rs:3207",
+    "observed": "Invalid argument (os error22) at the expected-error-kind assertion",
+    "limit": "Bare io::Error in original helper does not attribute timeout-option setup versus actualwrite. No old-stage causal claim."
+  },
+  "positive_controls": {
+    "original_repeat_case": "PASS once, exactRPC+completeACKjoined",
+    "unwind_case": "PASS once, two deliberately caughtpanic hooks forbeforeconnect/partialrequest; explicitcancellationandjoin required"
+  },
+  "terminals": {
+    "runtime": {
+      "head": "3bc82ec95b8d0dba27c38512d1a2e007fb055265",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "returncode": 101,
+      "signal": null,
+      "deadline_seconds": 2400,
+      "timed_out": false,
+      "elapsed_seconds": 227.929019401,
+      "driver_reaped": true,
+      "process_group_absent": true,
+      "process_group_absent_before_cleanup": true,
+      "forced_cleanup": false,
+      "pid": 71919,
+      "source_unchanged": true,
+      "six_actual_and_preserved_executables_unchanged": true,
+      "log_sha256": "3ebaa16a463059c78e8b6e385e89107c157746cd102b5f72bc00f49cdf33a449"
+    },
+    "unrun": {
+      "head": "3bc82ec95b8d0dba27c38512d1a2e007fb055265",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "release_pair",
+        "--test",
+        "requested_audio",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "returncode": 0,
+      "signal": null,
+      "deadline_seconds": 120,
+      "timed_out": false,
+      "elapsed_seconds": 10.171076269999999,
+      "driver_reaped": true,
+      "process_group_absent": true,
+      "process_group_absent_before_cleanup": true,
+      "forced_cleanup": false,
+      "pid": 79151,
+      "source_unchanged": true,
+      "six_actual_and_preserved_executables_unchanged": true,
+      "log_sha256": "99f0e67191c774c537e6f32f6b1fd5e5e007cdb6d88d2bc201c295e02cd80763"
+    },
+    "docs": {
+      "head": "3bc82ec95b8d0dba27c38512d1a2e007fb055265",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--doc",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "returncode": 0,
+      "signal": null,
+      "deadline_seconds": 120,
+      "timed_out": false,
+      "elapsed_seconds": 1.07763659,
+      "driver_reaped": true,
+      "process_group_absent": true,
+      "process_group_absent_before_cleanup": true,
+      "forced_cleanup": false,
+      "pid": 82902,
+      "source_unchanged": true,
+      "six_actual_and_preserved_executables_unchanged": true,
+      "log_sha256": "d35aa34e0a3f4745a7fb38cc05459ed3d8f9a21f86e5c57b7af38dcef79788b9"
+    }
+  },
+  "standalone_host_probe": {
+    "runtime": "Rust1.96 host UnixStream::pair, peerclosed first",
+    "set_write_timeout_20ms": {
+      "kind": "InvalidInput",
+      "errno": 22
+    },
+    "write_all": {
+      "kind": "BrokenPipe",
+      "errno": 32
+    },
+    "source_sha256": "19d5f71f4ea0948ffedc7107ffe944f191162fb4a681ff39d4ccf142aa403e73",
+    "limit": "Independent OS mechanism probe, not a rerun of the failed integration case."
+  },
+  "next": "Keep negative control strict, make ACK nonblocking before read witness, preserve2sabsolute deadline and add typedactual-write-failure witness. Restore originalworker-beforechild order forfixturefidelity (no provedprematurereadiness; emptycatalogomitted). Newsource qualificationrequired; failed3bcunpublished."
+}
