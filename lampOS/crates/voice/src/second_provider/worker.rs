@@ -6404,9 +6404,13 @@ impl Heeding {
     /// back may come only now, after the one between was judged
     /// (reviewer-two's P2 on `2110d04a9`).
     fn keep_the_name_in_its_line(&self, request: u64, said: (u64, u64), signs: &mut Signs) {
-        if !self.name_stays || signs.continues_from.is_some() {
+        if !self.name_stays {
             return;
         }
+        // A line going on from another keeps that one's hearings, its own
+        // utterance's, but not an older line's (the reviewer-lead's P3 on
+        // `db3bc2d59`).
+        let from = signs.continues_from;
         let all = signs.names.len();
         let mut theirs = Vec::new();
         signs.names.retain(|(at, _)| {
@@ -6419,6 +6423,7 @@ impl Heeding {
                 .rev()
                 .find(|(before, (began, ended), call)| {
                     *before != request
+                        && Some(*before) != from
                         && !call
                         && *at > began.saturating_add(crate::attention::NAME_AT_THE_START_US)
                         && *at <= *ended
@@ -16746,6 +16751,32 @@ mod tests {
                 signs(vec![(12_900_000, 0.999)]),
             );
             assert_eq!(third.is_some(), stays, "the third line, stays {stays}");
+        }
+        // The reviewer-lead's P3 on `db3bc2d59`: the third line going on from
+        // the second (cut by the lamp) still leaves out the first line's
+        // hearing; off, it is played on it.
+        for stays in [false, true] {
+            let mut heeding = room_name_heeding(true);
+            if stays {
+                heeding.keeping_the_name_in_its_line();
+            }
+            heeding.heed_signs(
+                1,
+                (10_000_000, 13_000_000),
+                "I think the oven is still on, by the way.",
+                signs(Vec::new()),
+            );
+            heeding.heed_signs(2, (13_100_000, 13_600_000), "Yes, and", signs(Vec::new()));
+            let going_on = heeding.heed_signs(
+                3,
+                (13_700_000, 14_800_000),
+                "Yes, and what time is it?",
+                super::Signs {
+                    continues_from: Some(2),
+                    ..signs(vec![(12_900_000, 0.999)])
+                },
+            );
+            assert_eq!(going_on.is_some(), stays, "going on, stays {stays}");
         }
     }
 
