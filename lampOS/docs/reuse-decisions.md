@@ -1,5 +1,28 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Bound the initial direct capture-ready handshake (2026-10-26)
+
+V1's `hal/drivers/voice/aec.py` `prepare_playback` retains the output rate
+without emitting playback/reference events; `configure` completes reference
+preparation if the microphone opens later. Either device may open first.
+Keep that startup tolerance and preparation-before-play intent, not V1's
+shared globals, callbacks or in-process FIFO ownership. V1 has no equivalent
+of this cross-process reference envelope's 100 ms initial-age refusal.
+
+Reuse V2's existing one-second initial worker-control allowance only for
+the speaker's first in-order `CapturePrepared`. Do not drop that one-shot
+handshake, accept stale prime acknowledgements, widen PCM freshness or
+bypass the restart guard. Playback still needs fresh authority, matching
+privacy and the prime barrier. No queue, retry, wait or dependency is added:
+the receive path remains nonblocking. The target is to consume the reported
+143402 us startup message on the next speaker-loop pass (nominal 2 ms
+tick), with zero added waiting; this is not a measured startup or acoustic-latency result.
+The one-second bound is the base startup allowance; the existing receiver-stall
+allowance remains, so it is not an unconditional wall-age cap. Exact one-second
+expiry on a clean first look, boot, sequence, future stamps and later-message
+behavior are checked on explicit clocks; Linux null-device evidence is limited to
+real-loop consumption. V1 source was inspected, not run on a lamp.
+
 ## Refuse nonregular local head-pair inputs without waiting (2026-10-26)
 
 V1's `scripts/provision/apply-overrides.py` checks that top-level override
