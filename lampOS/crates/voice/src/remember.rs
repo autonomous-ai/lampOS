@@ -1453,8 +1453,11 @@ fn recall_tool(second: bool) -> Tool {
     });
     if second {
         description.push_str(
-            " For a span of days, such as last week or the past few days, give days_ago_from and days_ago_to \
-             instead of days_ago: last week is 7 to 1. A span is at most 14 days.",
+            // Short, so recall stays within 1,024 bytes with `history` too
+            // (Reviewer-two's size P2 on #3625 and #3629).
+            " For a span of days, give days_ago_from and days_ago_to instead of days_ago: last week is 7 \
+             to 1, at most 14 days. A span gives only a few results: if it says partial, never claim \
+             the other days had nothing.",
         );
         parameters["properties"]["days_ago_from"] = json!({"type": "integer", "description": "The span's oldest day, in days ago: 7 for a week ago."});
         parameters["properties"]["days_ago_to"] = json!({"type": "integer", "description": "The span's newest day, in days ago: 1 for yesterday, 0 for today."});
@@ -6175,6 +6178,15 @@ impl DaysClient {
         {
             request["history"] = json!(true);
         }
+        if call.name == RECALL {
+            eprintln!(
+                "lamp-voice provider: recall shape query={} day={} span={} history={}",
+                request["query"].is_string(),
+                request["day"].is_string(),
+                request["day_from"].is_string() && request["day_to"].is_string(),
+                request["history"] == true
+            );
+        }
         // Kept with the conversation it came up in, this person's own, so
         // "forget that" removes those exchanges too (#1693). Never waited
         // for: a writer busy at this moment leaves it kept as before.
@@ -6868,12 +6880,17 @@ impl DaysClient {
         let history = dated && request["history"] == true;
         let Some(person) = person else {
             let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
-            let (told, ids) = days_answer(&answer, now, zone, dated.then_some(false))?;
+            let partial = bounded_span(request, &answer, None);
+            let (mut told, ids) = days_answer(&answer, now, zone, dated.then_some(false))?;
+            if partial {
+                mark_partial_span(&mut told);
+            }
             return Some((told, ids.into_iter().map(|id| (None, id)).collect()));
         };
         let (theirs, room) = recall_both(request, person, deadline, |line, left| {
             bounded_exchange_scoped(&self.socket, line, left, lease)
         })?;
+        let partial = bounded_span(request, &theirs, Some(room.as_ref()));
         let (theirs, their_ids) = days_answer(&theirs, now, zone, dated.then_some(history))?;
         let mut found = theirs["found"].as_array()?.clone();
         for item in &mut found {
@@ -6903,6 +6920,9 @@ impl DaysClient {
         let mut told = json!({"found":found,"untrusted":true,"scope":BOTH_SCOPE});
         if ids.is_empty() {
             told["note"] = json!("Nothing about that in what I remember.");
+        }
+        if partial {
+            mark_partial_span(&mut told);
         }
         Some((told, ids))
     }
@@ -7727,6 +7747,38 @@ fn found_words(item: &Value) -> Vec<String> {
     .filter_map(|field| item[*field].as_str())
     .collect();
     content_words(&text.join(" "))
+}
+
+/// Whether a span recall gave less than those days hold: from the
+/// store's own `more` (#3627: one past the count or the bytes left out),
+/// theirs or the room's; for an older memory, with no `more`, when their
+/// entries and the room's together fill [`RECALL_ENTRIES`]. A room's part
+/// never asked, as theirs filled the count or the bytes, is partial too.
+fn bounded_span(request: &Value, theirs: &Value, room: Option<Option<&Value>>) -> bool {
+    if !(request["day_from"].is_string() && request["day_to"].is_string()) {
+        return false;
+    }
+    let count = |answer: &Value| answer["entries"].as_array().map_or(0, Vec::len);
+    let more = |answer: &Value| answer["more"].as_bool();
+    match room {
+        // The room's own recall, nobody known.
+        None => more(theirs).unwrap_or(count(theirs) >= RECALL_ENTRIES as usize),
+        // Theirs used the whole budget: the room's was never asked.
+        Some(None) => theirs["ok"] == true,
+        Some(Some(room)) => match (more(theirs), more(room)) {
+            (Some(theirs), Some(room)) => theirs || room,
+            _ => count(theirs) + count(room) >= RECALL_ENTRIES as usize,
+        },
+    }
+}
+
+/// What a span's recall that filled its bound tells the model: `partial`,
+/// and never to claim the rest of the span is empty (lamp-06c1, 26 Oct).
+fn mark_partial_span(told: &mut Value) {
+    told["partial"] = json!(true);
+    told["note"] = json!(
+        "These are only the first few results in the requested days. Other earlier entries may exist. Do not claim the rest of the span is empty; ask for a narrower topic or day to continue."
+    );
 }
 
 /// A Days answer told to the model, with its source ids. With
@@ -13182,6 +13234,68 @@ mod tests {
                 .0["found"],
             json!([])
         );
+    }
+
+    /// Reviewer-two's size P2 (#3625, #3629): the span text added, recall
+    /// stays a valid function with and without its second version, and with
+    /// `LAMP_MEMORY_REPLACES` alone; with both, it fits once #3625's and
+    /// #3629's shorter texts are in.
+    #[test]
+    fn recall_with_a_span_is_a_valid_function() {
+        for (second, replaces) in [(false, false), (true, false), (false, true)] {
+            let mut tools = vec![recall_tool(second)];
+            if replaces {
+                tools = replaces_described(tools);
+            }
+            assert!(
+                tools[0].validate().is_ok(),
+                "second {second} replaces {replaces}: {} bytes",
+                tools[0].description.len()
+            );
+        }
+        assert!(recall_tool(true).description.contains("partial"));
+    }
+
+    /// lamp-06c1, 26 Oct (F39/F55): a span's recall that fills its bound
+    /// is told as partial, so the model never says the rest was empty.
+    #[test]
+    fn a_full_span_result_cannot_be_reported_as_complete() {
+        let request = json!({"day_from":"2026-10-19","day_to":"2026-10-26"});
+        let six = json!({"ok":true,"entries":[1,2,3,4,5,6]});
+        let three = json!({"ok":true,"entries":[1,2,3]});
+        // An older memory, with no `more`: by the count.
+        assert!(bounded_span(&request, &six, None));
+        assert!(!bounded_span(&json!({}), &six, None));
+        assert!(!bounded_span(&request, &three, None));
+        assert!(bounded_span(&request, &three, Some(Some(&three))), "3 + 3");
+        // The reviewer-lead's P2 on #3627: a known person's 3 and the
+        // room's 3, the room with more; the bytes ending an answer early.
+        let more = json!({"ok":true,"entries":[1,2,3],"more":true});
+        let done = json!({"ok":true,"entries":[1,2,3],"more":false});
+        assert!(bounded_span(&request, &done, Some(Some(&more))));
+        assert!(bounded_span(
+            &request,
+            &json!({"ok":true,"entries":[1,2],"more":true}),
+            None
+        ));
+        assert!(
+            !bounded_span(&request, &done, Some(Some(&done))),
+            "exactly all of it"
+        );
+        assert!(
+            !bounded_span(
+                &request,
+                &json!({"ok":true,"entries":[1,2,3,4,5,6],"more":false}),
+                None
+            ),
+            "six, and nothing more"
+        );
+        // The room's never asked, theirs having filled the budget.
+        assert!(bounded_span(&request, &six, Some(None)));
+        let mut told = json!({"found":[{"source_id":1}]});
+        mark_partial_span(&mut told);
+        assert_eq!(told["partial"], true);
+        assert!(told["note"].as_str().unwrap().contains("Do not claim"));
     }
 
     /// lamp-06c1, 26 Oct (P06): a found event day says whether it is
