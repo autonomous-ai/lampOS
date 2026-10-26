@@ -3025,6 +3025,10 @@ enum ActionReplyStage {
     Listening,
     PartialRequest,
     RequestRead,
+    AckWriteFailed {
+        kind: io::ErrorKind,
+        raw_os_error: Option<i32>,
+    },
 }
 
 /// Witnesses for the two lifecycle controls, unused by the tool-call cohort.
@@ -3041,6 +3045,8 @@ fn one_action_reply(
     cancelled: &AtomicBool,
     watch: Option<ActionReplyWatch>,
 ) -> io::Result<Option<serde_json::Value>> {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+
     const SLICE: Duration = Duration::from_millis(20);
     const ACK: &[u8] = b"{\"ok\":true,\"result\":{}}\n";
     let remaining = |deadline: Instant| {
@@ -3121,6 +3127,9 @@ fn one_action_reply(
     }
     let request = serde_json::from_slice(&line)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    // Configure before the control may close the peer. The ACK's absolute
+    // budget is enforced around nonblocking writes and bounded POLLOUT waits.
+    stream.set_nonblocking(true)?;
     record(ActionReplyStage::RequestRead)?;
     if let Some(release) = watch.as_ref().and_then(|watch| watch.release_ack.as_ref()) {
         loop {
@@ -3139,18 +3148,27 @@ fn one_action_reply(
         if cancelled.load(Ordering::SeqCst) {
             return Ok(None);
         }
-        stream.set_write_timeout(Some(remaining(exchange_by)?.min(SLICE)))?;
+        remaining(exchange_by)?;
         match stream.write(&ACK[written..]) {
             Ok(0) => return Err(io::Error::new(io::ErrorKind::WriteZero, "Actions mock ACK")),
             Ok(n) => written += n,
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    io::ErrorKind::Interrupted
-                        | io::ErrorKind::WouldBlock
-                        | io::ErrorKind::TimedOut
-                ) => {}
-            Err(error) => return Err(error),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                let timeout = Timespec::try_from(remaining(exchange_by)?.min(SLICE))
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))?;
+                let mut ready = [PollFd::new(&stream, PollFlags::OUT)];
+                match poll(&mut ready, Some(&timeout)) {
+                    Ok(_) | Err(rustix::io::Errno::INTR) => {}
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            Err(error) => {
+                record(ActionReplyStage::AckWriteFailed {
+                    kind: error.kind(),
+                    raw_os_error: error.raw_os_error(),
+                })?;
+                return Err(error);
+            }
         }
         remaining(exchange_by)?;
     }
@@ -3166,7 +3184,7 @@ fn the_one_action_reply_reports_an_ack_write_error() {
     let socket = dir.path().join("actions.sock");
     let listener = UnixListener::bind(&socket).unwrap();
     let cancelled = Arc::new(AtomicBool::new(false));
-    let (stages, observed) = mpsc::sync_channel(3);
+    let (stages, observed) = mpsc::sync_channel(4);
     let (release, release_ack) = mpsc::sync_channel(1);
     std::thread::scope(|scope| {
         let _cancel = CancelActionReply(Arc::clone(&cancelled));
@@ -3204,6 +3222,15 @@ fn the_one_action_reply_reports_an_ack_write_error() {
         drop(caller);
         release.send(()).unwrap();
         let error = worker.join().expect("Actions worker panicked").unwrap_err();
+        assert_eq!(
+            observed
+                .try_recv()
+                .expect("no actual ACK write failure witnessed"),
+            ActionReplyStage::AckWriteFailed {
+                kind: error.kind(),
+                raw_os_error: error.raw_os_error(),
+            }
+        );
         assert!(
             matches!(
                 error.kind(),
@@ -3224,7 +3251,7 @@ fn the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_requ
         let socket = dir.path().join("actions.sock");
         let listener = UnixListener::bind(&socket).unwrap();
         let cancelled = Arc::new(AtomicBool::new(false));
-        let (stages, observed) = mpsc::sync_channel(3);
+        let (stages, observed) = mpsc::sync_channel(4);
         let (finished, outcome) = mpsc::sync_channel(1);
         // Kept outside the unwinding scope: EOF must not stand in for cancel.
         let mut caller = None;
@@ -3296,26 +3323,27 @@ fn a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way() {
         .unwrap();
     let actions = UnixListener::bind(root.join("actions.sock")).unwrap();
     let tools = root.join("tools");
-    let _running = Running(
-        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
-            .args([
-                "--dir".as_ref(),
-                root.join("skills").as_os_str(),
-                "--bus-root".as_ref(),
-                root.join("bus").as_os_str(),
-                "--actions-socket".as_ref(),
-                root.join("actions.sock").as_os_str(),
-                "--tools-dir".as_ref(),
-                tools.as_os_str(),
-            ])
-            .spawn()
-            .unwrap(),
-    );
     // This child outlives the scope's worker, even if an assertion unwinds.
+    let mut running: Option<Running> = None;
     let cancelled = Arc::new(AtomicBool::new(false));
     std::thread::scope(|scope| {
         let _cancel = CancelActionReply(Arc::clone(&cancelled));
         let worker = scope.spawn(move || one_action_reply(actions, &cancelled, None));
+        running = Some(Running(
+            Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+                .args([
+                    "--dir".as_ref(),
+                    root.join("skills").as_os_str(),
+                    "--bus-root".as_ref(),
+                    root.join("bus").as_os_str(),
+                    "--actions-socket".as_ref(),
+                    root.join("actions.sock").as_os_str(),
+                    "--tools-dir".as_ref(),
+                    tools.as_os_str(),
+                ])
+                .spawn()
+                .unwrap(),
+        ));
         skill_with(
             &root.join("skills"),
             "glow",
@@ -3362,6 +3390,7 @@ fn a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way() {
             serde_json::json!({"op":"call", "name":"light_colour", "args":{"colour":"white"}})
         );
     });
+    drop(running);
 }
 
 /// A repeat call while the run's light is still on holds its pose again,
