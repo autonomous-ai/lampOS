@@ -13,6 +13,18 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 14:24 — Reminder current-base native qualification
+
+Ready for lamp-voice: no (#3525, final train disposition requested)
+
+**fe488d108/88335bfbe** original ARM64 **40283900288** and Linux
+**40283900241** pass. Native census: 11,381 unique passes, zero failures,
+leaks or timeouts, 106 skipped; all 21 authored controls once. Both execute
+preview **3e4d4e304**, exact parents and offered tree **246ddbb35**.
+Turn-wire 13/0 stays separate. [Receipt](verification/reminder-pending-present-20261026/native-40283900288.json).
+Reviewer-three READ-OK and Reviewer-two source clearance are current;
+final train disposition requested. No device acceptance or renamed old run.
+
 ## 2026-10-26 14:07 — Reminder carried onto delivered factory base
 
 Ready for lamp-voice: no (#3525)
