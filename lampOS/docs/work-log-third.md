@@ -7,6 +7,34 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+
+## 2026-10-26 12:01 — Reminder trigger native result and current carry
+
+Ready for lamp-voice: no (#3525)
+
+Original **08ea15585** on **1c884f16c** passed ARM64 **40264264354**:
+**11,365 unique PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped; all twenty-one
+controls passed once. Linux Clippy **40264264447** passed. Both actual preview
+parents and offered-tree equality are verified; process harness **13/0** stays
+separate. [Receipt](verification/reminder-pending-present-20261026/native-40264264354.json).
+Reviewer-three cleared held-work churn; Tests cleared fixture ordering, both
+on 08ea. Reviewer-two is reading that head. Physical replay remains First's.
+
+The current carry **7c9da509f** is on **cced42943**. Both independent reminder
+reuse sections are retained; only inherited schedule and reuse prose change
+whole blobs. Skills code, rules, recordings and historical receipts are byte
+identical. New Mac fmt and strict Skills Clippy pass. The first focused run
+was sandbox-denied on two Unix socket binds (16 passes, two failures); it is
+retained separately. The permitted run passes all eighteen focused controls
+and two parser controls; workspace build and full Skills continue. This is
+not yet a current-head green claim. No ARM64 link or lamp access on the Mac.
+
+#3523 landed through train 155 at **706d9bb4d**. Its train/landing audit is
+being recorded separately. Independent docs-only #3540 **1340e9817** review
+passes source/evidence and arithmetic checks: 70 build rows average
+93.828571%, sixteen quality rows 67.5%, two excluded mood rows 58.5%.
+No physical or payload execution is attributed to that documentation read.
+
 ## 2026-10-26 10:19 — Current interruption correction offered
 
 Ready for lamp-voice: yes (#3523)
