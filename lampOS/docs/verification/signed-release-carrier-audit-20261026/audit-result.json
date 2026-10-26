@@ -1,0 +1,62 @@
+{
+  "evidence_commit": "976c891a98ef0999f2873b273029157f884323e1",
+  "source_files": {
+    "README.md": {
+      "git_blob": "db5508f037674a2786fa37a1259da3c5cee054df",
+      "sha256": "aea43c7b86491fc06f4b2248dc7737f06e22d10dc17e22aa760d492bd83de523",
+      "bytes": 3293
+    },
+    "audit.json": {
+      "git_blob": "ac80ec7211cb5ad917b3c640cfc9d500d08296e1",
+      "sha256": "3281fdaeb3303f609e14dde3aa16d2a1c9ab18d9d4639ebaeeb21de777b7d6b3",
+      "bytes": 4525
+    },
+    "cleanup.json": {
+      "git_blob": "1739521d793c9d844a02854a61624c1c8539e704",
+      "sha256": "fbf8659ef67b2498c788b5e45fa08232b0f67b834fd795d8069d66ee13b0ee4b",
+      "bytes": 526
+    },
+    "events.jsonl": {
+      "git_blob": "eccff011f6b9e2d2e22deff048e4323aec7dbec7",
+      "sha256": "ed910498f358361c71e6f4f261109c34de44ef611705eb3f08331dc45fc0e42b",
+      "bytes": 3368
+    }
+  },
+  "original_packet_has_sha256_manifest": false,
+  "git_blob_hashes_verified": true,
+  "events_count": 16,
+  "timestamps_strictly_ordered": true,
+  "observation_state_totals_reconcile": true,
+  "native_candidate_parent": [
+    "806418f838293cd6524d62f344c615b09aa288dd"
+  ],
+  "native_preview_parents": [
+    "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+    "c7006af27eef606e811be4ccf0b91e1f72f3aca2"
+  ],
+  "native_preview_tree_equals_authored": false,
+  "native_run_metadata": {
+    "arm": {
+      "id": 40309937640,
+      "head_sha": "c7006af27eef606e811be4ccf0b91e1f72f3aca2",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "conclusion": "success"
+    },
+    "clippy": {
+      "id": 40309937656,
+      "head_sha": "c7006af27eef606e811be4ccf0b91e1f72f3aca2",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "conclusion": "success"
+    }
+  },
+  "timing_seconds": {
+    "new_updater_switch_to_confirmation": 1.733644,
+    "good_switch_to_healthy": 60.683386,
+    "bad_switch_to_fault": 0.315268,
+    "bad_fault_to_rollback_start": 0.10686,
+    "bad_rollback_start_to_previous_healthy": 60.834575
+  },
+  "scope": "Independent public-record consistency audit; device run and private receipts are operator-supplied, not independently executed or inspected."
+}

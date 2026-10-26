@@ -1,3 +1,15 @@
+Ready for lamp-voice: #1812 remains open on real-key installed release and attended Body acceptance.
+
+## Current checkpoint: 2026-10-26 18:52 +07, installed carrier evidence independently read
+
+[Consistency/identity audit](verification/signed-release-carrier-audit-20261026/README.md) of Tests' public 976c891a9 packet supports operator-reported meaningful GOOD unit installation, real Voice argument rejection, automatic BAD fallback and restoration. Public file hashes, 16 ordered events and observation totals agree. No independent device execution, private full-unit comparison or private archive verification is claimed.
+
+The trial uses disposable fingerprint 128b4400c8db38bb, not production 54213f8d3aa2f241. Therefore it adds published-HTTPS test-channel and automatic recovery evidence without closing #1812's real-key installed-release requirement. No explicit attended Body/arm witness appears. Restored updater and Voice hashes match real-signed 6963; restored unit f646f086 is the original lamp configuration, not byte-identical to stock release unit 2a533f91. The initial no-state message is not treated as persistent bus loss. No new lamp, key, provider or release action ran.
+
+Review follow-ups: #3570's scoped mkfifo source finding closes on 2b5f9d966 without relabeling old runtime. #3579 is the designated reset dependency; helper and activation-socket coverage remain held. #3577 authored increment has independent READ-OK and 18/0/0. #3510 remains current/software-green, draft pending reset-helper quiescence and acceptance.
+
+---
+
 Ready for lamp-voice: #3577 authored increment READ-OK; parent holds stay separate.
 
 ## Current checkpoint: 2026-10-26 18:41 +07, independent diagnostic fixture review

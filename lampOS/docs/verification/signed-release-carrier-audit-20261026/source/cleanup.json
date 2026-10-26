@@ -1,0 +1,15 @@
+{
+  "good_release_deleted": true,
+  "good_tag_deleted": true,
+  "bad_release_deleted": true,
+  "bad_tag_deleted": true,
+  "delete_commands_exit": 0,
+  "private_signing_key_deleted": true,
+  "lamp_runtime_trust_override_and_trial_build_removed": true,
+  "temporary_export_directory_removed": true,
+  "root_authentication_timestamp_cleared": true,
+  "production_stable_release_untouched": true,
+  "original_private_backup_retained_on_lamp": true,
+  "off_lamp_private_archive_export_performed": false,
+  "lease_released": true
+}
