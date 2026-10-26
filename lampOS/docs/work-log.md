@@ -1,4 +1,16 @@
-Original music and amended own-keys native evidence retained; current-base qualification active.
+Music review controls complete; both current-base continuations prepared.
+
+## Current checkpoint: 2026-10-26 07:34 +07, music review controls and current release base
+
+[#3515](https://github.com/autonomous-ai/lampOS/pull/3515)'s two added review controls pass on frozen d21 source: real occupied-service preparation refusal consumes the attempt, and controlled child stderr has one exact fixed refusal line versus none on acceptance. Formatting, strict Voice Clippy and test compilation pass; focused **5/0**, full Voice **4,073 passed / 0 failed / 21 ignored**. Source and compiled artifacts remain unchanged. Two distinct freshly compiled faults each reach their intended equality assertion **0/1**, exit 101; both preserved baseline cases and both freshly rebuilt restored cases pass. Whole source restoration is verified. These are actual child-stderr observations, not persisted journald or lamp acceptance.
+
+The validated tests and immutable proof were committed as `6e263a6ab`, then carried onto `2747c72a7` as `6c3169bd3`. Both patches remain equal and earlier proof blobs are unchanged. Current-base fmt has passed; strict Voice/Voice-eval Clippy and the thirteen selected music/scheduling/environment/census controls are active. That carry is not yet pushed or natively qualified. Earlier original native evidence remains attached to `788faaeda`.
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510)'s d21 continuation completed: fmt and strict nine-crate Clippy pass; full Voice **4,068/0/21**, focused own-keys **7/0**, matcher **1/0** and switch readers **2/0**. Its immutable packet is committed. Five equal patches now sit on `2747c72a7` at `4a0f0cc42`; only upstream product Voice settings and the switch census differ among owned files. The next single compiler slot is reserved for the actual affected scheduling/product-unit readers. No complete 274 Voice rerun is claimed. Activation HOLD remains with #2094 and explicit current-lamp acceptance.
+
+Reviewer-two independently completed the original d71 Update/Selftest gate **483/0/6** plus Voice configuration **23/0**, as [reported on the PR](https://github.com/autonomous-ai/lampOS/pull/3510#issuecomment-6405528476). That is a reader's original-head execution, separate from these carries. The log rebase preserves **14,060** previous verification blobs and modes. No local ARM64, provider, key, device or release action ran.
+
+---
 
 ## Current checkpoint: 2026-10-26 07:09 +07, two native gates complete before d21 carries
 
