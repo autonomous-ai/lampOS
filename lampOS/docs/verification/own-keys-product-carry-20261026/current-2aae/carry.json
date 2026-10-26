@@ -1,0 +1,23 @@
+{
+  "old_head": "87a094d38e4efb8d9d4660e2e963850777184ba7",
+  "old_base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+  "head": "2aae46323701bf5b66c7627c88c9abaa6378a612",
+  "base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "seven_equal_patches": true,
+  "range_diff": "1:  dfc471dfa4 = 1:  8f9655ef44 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  d9dd2c13b6 = 2:  34ac221833 lampOS: preserve customized own-keys drop-ins\n3:  362d6537d2 = 3:  9d2c3a261e lampOS: record current own-keys carry qualification\n4:  125553f672 = 4:  acd56d2cfd lampOS: clarify own-keys activation and per-unit overrides\n5:  f0686a3e24 = 5:  3c278b39a1 lampOS: record own-keys qualification on the d21 base\n6:  4dc635dd4f = 6:  4abd03c191 lampOS: retain own-keys scheduling and product-reader checks\n7:  87a094d38e = 7:  2aae463237 lampOS: qualify own-keys carry with current product units",
+  "all_38_authored_blobs_modes_identical": true,
+  "lampOS_tree_before": "59c5aa9ade4a350880f292d0c31fcee25e0e2a51",
+  "lampOS_tree_after": "59c5aa9ade4a350880f292d0c31fcee25e0e2a51",
+  "lampOS_source_inventory_entries": 7260,
+  "all_lampOS_bytes_modes_paths_identical": true,
+  "whole_repository_changed_paths": [
+    "robots/lamp/hardware/test/README.md",
+    "robots/lamp/hardware/test/tools/factory-lamp.sh",
+    "robots/lamp/hardware/test/tools/factory-voice-test.py",
+    "robots/lamp/hardware/test/tools/factory-voice.py",
+    "robots/lamp/hardware/test/tools/head-nudge.py",
+    "robots/lamp/hardware/test/tools/make-prompts.sh"
+  ],
+  "clean": true,
+  "qualification": "252/0/2 runtime remains 87a094/2d18. No Rust compile/runtime, hardware test, Python hardware test or motion executed for this outside-only carry."
+}

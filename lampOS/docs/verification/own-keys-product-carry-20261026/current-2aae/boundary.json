@@ -1,0 +1,76 @@
+{
+  "head": "87a094d38e4efb8d9d4660e2e963850777184ba7",
+  "complete_sha256": "9e5b85700355e15224fa355182906d69528a8a168fe974e7d99b7b460e1310c0",
+  "source_inventory_sha256": "a21dc7d91cce56f8c6a7d602ba863f3f6a47a5da3f93663f69c3253b5a282855",
+  "source_entries": 7260,
+  "all_scope_preserved_outputs_verified": true,
+  "last_scope_actual_outputs_verified": true,
+  "scope_counts": {
+    "update-lib-install": {
+      "local-outputs.json": 52,
+      "depfiles.json": 989
+    },
+    "update-functions": {
+      "local-outputs.json": 51,
+      "depfiles.json": 990
+    },
+    "update-round": {
+      "local-outputs.json": 51,
+      "depfiles.json": 991
+    },
+    "controls-unit": {
+      "local-outputs.json": 10,
+      "depfiles.json": 1017
+    },
+    "setup-unit": {
+      "local-outputs.json": 18,
+      "depfiles.json": 1043
+    },
+    "skills-unit": {
+      "local-outputs.json": 46,
+      "depfiles.json": 1044
+    },
+    "voice-relay": {
+      "local-outputs.json": 50,
+      "depfiles.json": 1044
+    },
+    "voice-ownkeys": {
+      "local-outputs.json": 50,
+      "depfiles.json": 1044
+    },
+    "voice-room": {
+      "local-outputs.json": 50,
+      "depfiles.json": 1044
+    },
+    "voice-person": {
+      "local-outputs.json": 50,
+      "depfiles.json": 1044
+    },
+    "voice-off": {
+      "local-outputs.json": 50,
+      "depfiles.json": 1044
+    },
+    "voice-forwarding": {
+      "local-outputs.json": 50,
+      "depfiles.json": 1044
+    },
+    "voice-started-worker": {
+      "local-outputs.json": 50,
+      "depfiles.json": 1044
+    },
+    "memory-opt-in": {
+      "local-outputs.json": 42,
+      "depfiles.json": 1045
+    },
+    "memory-default": {
+      "local-outputs.json": 42,
+      "depfiles.json": 1045
+    },
+    "voice-eval-switches": {
+      "local-outputs.json": 63,
+      "depfiles.json": 1045
+    }
+  },
+  "evidence_ref": "refs/second-evidence/ownkeys-87a094-qualified-20261026",
+  "note": "Earlier scopes actual paths closed before next compilation; not falsely rechecked against overwritten outputs."
+}

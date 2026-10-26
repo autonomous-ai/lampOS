@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 current head pushed; original CI pending and activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 22:33 +07, final outside-only carry published
+
+#3510 is now **2aae463237** on **7d0017f08**. [Carry proof](verification/own-keys-product-carry-20261026/current-2aae/README.md) verifies all seven patches, 38 authored files/modes, the entire lampOS tree and all 7,260 reached source entries unchanged from executed 87a094/2d18. The six inherited files are only hardware tools outside lampOS. Preserved per-scope outputs and latest actual bindings are rechecked; no compilation, runtime or hardware action was repeated. Exact executed source is public on `second/ownkeys-executed-2d18-20261026`.
+
+The preceding actual product-reader execution stays **252/0/2** on 87a094, with fmt/strict eleven-crate Clippy; earlier full Body/Setup/Update/Cloud **1,430/0/11** plus switches 2 stays 87af/e672. The new head's original CI is pending. The missing memory-switch install assertion has not landed in this base; it is tracked on its replacement train, without a fabricated pass. Reset delivery is in the branch; #2094 and explicit current-lamp own-keys activation acceptance still hold draft status. No device, provider, signing or release action by Second.
+
+---
+
 Ready for lamp-voice: #3510 targeted product-reader scope passed; final current-base carry before push.
 
 ## Current checkpoint: 2026-10-26 22:32 +07, product memory reader qualification complete
