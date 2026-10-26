@@ -91,15 +91,20 @@ fn lamp(root: &Root) -> Plan {
 }
 
 /// The lamp's effects. `parts`: what `systemctl show -p ConsistsOf` prints
-/// of the target; `fail_read`: it cannot be read. `writes_on_stop`: a part,
-/// `lamp-voice.service`, writes this file as it stops, as systemd 252 runs
-/// it: before a stop that names it returns, else after it (here, at the
-/// next command, the reboot).
+/// of `lampos.target` (`parts_after` from its second read on), and
+/// `lamp-sub.target` is made of `lamp-sub-a.service`; `states`: what
+/// `ActiveState` prints, each part `inactive` without it; `fail_read`:
+/// nothing can be read. `writes_on_stop`: a part, `lamp-voice.service`,
+/// writes this file as it stops, as systemd 252 runs it: before a stop that
+/// names it returns, else after it (here, at the next command, the reboot).
 #[derive(Default)]
 struct Fake {
     calls: Rc<RefCell<Vec<String>>>,
     argvs: Rc<RefCell<Vec<Vec<String>>>>,
     parts: String,
+    parts_after: Option<String>,
+    lampos_reads: usize,
+    states: Option<String>,
     fail_read: bool,
     fail_stop: bool,
     fail_reboot: bool,
@@ -133,7 +138,23 @@ impl Effects for Fake {
         if self.fail_read {
             return Err(io::Error::other("refused"));
         }
-        Ok(self.parts.clone())
+        if argv[3] == "ActiveState" {
+            return Ok(self
+                .states
+                .clone()
+                .unwrap_or_else(|| argv[5..].iter().map(|_| "inactive\n\n").collect()));
+        }
+        Ok(match argv.last().map(String::as_str) {
+            Some("lampos.target") => {
+                self.lampos_reads += 1;
+                match &self.parts_after {
+                    Some(after) if self.lampos_reads > 1 => after.clone(),
+                    _ => self.parts.clone(),
+                }
+            }
+            Some("lamp-sub.target") => "lamp-sub-a.service\n".into(),
+            _ => String::new(),
+        })
     }
     fn sync(&mut self) {
         self.calls.borrow_mut().push("sync".into());
@@ -202,6 +223,21 @@ fn a_reset_waits_for_every_part_of_the_target_before_wiping() {
     wiped(&root);
     let argvs = fake.argvs.borrow();
     assert_eq!(
+        argvs[2],
+        [
+            "/bin/systemctl",
+            "show",
+            "-p",
+            "ActiveState",
+            "--value",
+            "lamp-voice.service",
+            "lamp-memory.service"
+        ]
+        .map(String::from),
+        "each part is read stopped"
+    );
+    assert_eq!(argvs[3].last().map(String::as_str), Some("lampos.target"));
+    assert_eq!(
         argvs[..2],
         [
             [
@@ -246,31 +282,75 @@ fn parts_that_cannot_be_read_reboot_without_wiping() {
     wiped(&root);
 }
 
+/// A part still running after the stop (Third's check on #1711), or one
+/// that became part of the lamp during it: as a stop that fails, nothing is
+/// wiped and the lamp reboots into setup, which finishes the wipe at its
+/// start. So does a state missing from what systemd printed.
+#[test]
+fn a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup() {
+    for fake in [
+        Fake {
+            parts: "lamp-voice.service lamp-memory.service".into(),
+            states: Some("inactive\n\ndeactivating\n".into()),
+            ..Fake::default()
+        },
+        Fake {
+            parts: "lamp-voice.service lamp-memory.service".into(),
+            states: Some("inactive\n".into()),
+            ..Fake::default()
+        },
+        Fake {
+            parts: "lamp-voice.service".into(),
+            parts_after: Some("lamp-voice.service lamp-late.service".into()),
+            ..Fake::default()
+        },
+    ] {
+        let root = Root::new();
+        let plan = lamp(&root);
+        let mut fake = fake;
+        let steps = reset::reset(&plan, &mut fake).unwrap();
+        assert_eq!(steps, [Step::Journal, Step::MarkerRemoved, Step::Rebooting]);
+        assert_eq!(
+            fake.calls.borrow().last().map(String::as_str),
+            Some("reboot")
+        );
+        assert!(root.path("setup/reset.json").exists());
+        assert!(root.path("people.json").exists());
+        reset::resume(&plan, &mut Fake::default()).unwrap();
+        wiped(&root);
+    }
+}
+
 /// The keeper's stop is not systemd's: it is run as the plan has it, and no
 /// parts are asked for. A unit already named, or a printed word that reads
-/// as an option, is not added.
+/// as an option, is not added; a part that is a target brings its own.
 #[test]
 fn only_a_systemctl_stop_of_a_target_names_its_parts() {
     let mut fake = Fake::default();
     let keeper: Vec<String> = ["/usr/bin/lamp-keeper", "stop", "lamp"]
         .map(String::from)
         .into();
-    assert_eq!(reset::waited_stop(&keeper, &mut fake).unwrap(), keeper);
-    assert!(fake.calls.borrow().is_empty());
+    reset::stop_and_wait(&keeper, &mut fake).unwrap();
+    assert_eq!(*fake.argvs.borrow(), [keeper]);
     let mut fake = Fake {
-        parts: "lampos.target --now lamp-voice.service".into(),
+        parts: "lampos.target --now lamp-voice.service lamp-sub.target".into(),
         ..Fake::default()
     };
     let product: Vec<String> = ["/usr/bin/systemctl", "stop", "lampos.target"]
         .map(String::from)
         .into();
+    reset::stop_and_wait(&product, &mut fake).unwrap();
+    let argvs = fake.argvs.borrow();
+    let stop = argvs.iter().find(|argv| argv[1] == "stop").unwrap();
     assert_eq!(
-        reset::waited_stop(&product, &mut fake).unwrap(),
+        *stop,
         [
             "/usr/bin/systemctl",
             "stop",
             "lampos.target",
-            "lamp-voice.service"
+            "lamp-voice.service",
+            "lamp-sub.target",
+            "lamp-sub-a.service"
         ]
         .map(String::from)
     );
