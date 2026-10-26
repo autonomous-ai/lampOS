@@ -218,7 +218,7 @@ written for the lamp's name at least once in its records).
 
 **On the second route only** (#1973, the first builder at 22:38), more
 words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
-"Land", "Line", "Palin", "Palan", "Louvre", `attention::STAND_ALONE_INS`) are never
+"Land", "Line", "Palin", "Palan", "Louvre", "Lampy", `attention::STAND_ALONE_INS`) are never
 taken for someone else's name, and call the lamp only standing alone, set
 off as a name is. Its worker's rule counts them
 (`Attention::count_stand_alone_ins`, `called_by_name_on`). Deepgram writes
@@ -241,6 +241,10 @@ lamp-name heard none of those five, so the near rule
 ([second-voice.md](second-voice.md), a first word like the name heard near)
 could not take it. "We went to the
 Louvre in May" is no call.
+
+"Lampy" joined them on 26 Oct: on build 6999 on lamp-4ace (14:1x, a played
+line in a loud office), "Lamp, what did I just ask you?" came back as "Lampy,
+…" and was held as said to someone it calls by name.
 
 Of the three rounds with no answer heard, the rule held one. In one the
 service sent the words of an answer ("Four. Easy one.") and no sound, the
