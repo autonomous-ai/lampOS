@@ -110,6 +110,18 @@ on:
         description: 'Full run: every test including the realtime group, four runners, one test at a time (the nightly run)'
         type: boolean
         default: false
+      trial_switch:
+        description: 'Trial only (devops007/studio-route-e2e, never merged): stands in for vars.LAMPOS_STUDIO'
+        type: string
+        default: ''
+      trial_beat:
+        description: 'Trial only: stands in for vars.LAMPOS_STUDIO_BEAT'
+        type: string
+        default: ''
+      trial_runner:
+        description: 'Trial only: runs-on JSON for the ARM64 job, e.g. a label no runner has, to leave it queued'
+        type: string
+        default: ''
       promote_sequence:
         description: 'Promote an already published lamp-voice sequence to the stable feed; no product rebuild or signing (leave empty for a build)'
         type: string
@@ -161,8 +173,8 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          LAMPOS_STUDIO: ${{ vars.LAMPOS_STUDIO }}
-          LAMPOS_STUDIO_BEAT: ${{ vars.LAMPOS_STUDIO_BEAT }}
+          LAMPOS_STUDIO: ${{ inputs.trial_switch || vars.LAMPOS_STUDIO }}
+          LAMPOS_STUDIO_BEAT: ${{ inputs.trial_beat || vars.LAMPOS_STUDIO_BEAT }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           FULL: ${{ inputs.full }}
@@ -171,7 +183,7 @@ jobs:
       # A Studio job the Studio left queued or running too long is cancelled
       # and its run started again, so its own route job sends it here.
       - name: rescue stuck Studio runs
-        if: vars.LAMPOS_STUDIO == 'shadow' || vars.LAMPOS_STUDIO == 'canary' || vars.LAMPOS_STUDIO == 'on'
+        if: contains(fromJSON('["shadow","canary","on"]'), inputs.trial_switch || vars.LAMPOS_STUDIO)
         continue-on-error: true
         timeout-minutes: 2
         env:
@@ -183,7 +195,7 @@ jobs:
     # Also when route was skipped (not asked) or failed: then GitHub-hosted.
     if: ${{ !cancelled() && !inputs.promote_sequence }}
     name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
-    runs-on: ${{ fromJSON(needs.route.outputs.runner || '"ubuntu-22.04-arm"') }}
+    runs-on: ${{ fromJSON(inputs.trial_runner || needs.route.outputs.runner || '"ubuntu-22.04-arm"') }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
