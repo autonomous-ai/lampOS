@@ -1,3 +1,9 @@
+## 2026-10-26 22:13 — original 08a native green, next base carry
+
+Ready for lamp-voice: no (#3591)
+
+Original ARM 40344298113 and Linux Clippy 40344298168 both pass on 08a7185c0/e672: 7,533 unique passes, zero failures/leaks/timeouts, 53 skips, changed case once; 34 identical final rows deduplicated, complete ordinal census. Preview ordered parents and fulltree equal offered head. Separate docs 4/0, process 13/0, relay/export/upload pass. No native observation timing rows; host metrics remain separate. [Receipt](verification/skills-call-observations-20261026/native-08a.json). Both peer source/base reads passed, but train 176 advanced the base to 2d18e296c before readiness, so the author HOLD remains while the unchanged carry is qualified again. Routine controlled probe is committed locally as c584f7674, frozen under its first fresh-target compiler gate; Tests explicitly handed over at 22:05 with no competing run.
+
 ## 2026-10-26 21:57 — taken: controlled Routine transport-expiry probe
 
 Ready for lamp-voice: no

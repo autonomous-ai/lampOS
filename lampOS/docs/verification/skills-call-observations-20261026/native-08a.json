@@ -1,0 +1,99 @@
+{
+  "pr": 3591,
+  "offered_head": "08a7185c0ca646a025c5d61d89b4202ee07183f6",
+  "offered_base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+  "arm64_run": 40344298113,
+  "linux_clippy_run": 40344298168,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "d700e46cad58ee4d426a634c82ea8dece5cee83f",
+      "preview_parents": [
+        "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+        "08a7185c0ca646a025c5d61d89b4202ee07183f6"
+      ],
+      "preview_tree": "bb4e5f2ffe915fda65960753c56adaf017796800",
+      "offered_tree": "bb4e5f2ffe915fda65960753c56adaf017796800",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "d700e46cad58ee4d426a634c82ea8dece5cee83f",
+      "preview_parents": [
+        "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+        "08a7185c0ca646a025c5d61d89b4202ee07183f6"
+      ],
+      "preview_tree": "bb4e5f2ffe915fda65960753c56adaf017796800",
+      "offered_tree": "bb4e5f2ffe915fda65960753c56adaf017796800",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 7533,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 53,
+  "unique_terminal_cases": 7533,
+  "repeated_equal_rows": 34,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    7533
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics": 1
+  },
+  "terminal_findings": [],
+  "all_pass_audit": true,
+  "qualified": true,
+  "limits": "Exact original 08a/e672 native only. Host focused1/0 remains separate. Prior author HOLD, current independent reads and author closure are outside this audit; no readiness or posting actions.",
+  "separate_harnesses": {
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0,
+      "case_counts": {
+        "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+        "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+        "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+        "verdict_carries_identity_and_one_request_at_a_time": 1,
+        "missing_model_is_final_and_never_restarted": 1,
+        "missing_executable_fails_at_once": 1,
+        "spawn_returns_while_worker_startup_is_held": 1,
+        "startup_failures_are_final": 1,
+        "serving_failures_are_replaced_within_budget": 1,
+        "protocol_violations_are_replaced": 1,
+        "cancelled_answers_are_never_delivered": 1,
+        "close_during_inference_never_waits": 1,
+        "sustained_requests_stay_bounded": 1
+      }
+    },
+    "docs": {
+      "passed": 4,
+      "failed": 0
+    },
+    "relay_signals": true,
+    "export": true,
+    "artifact_uploaded": true
+  },
+  "selection": {
+    "selected_tests": 7533,
+    "selected_binaries": 70,
+    "skipped_tests": 53,
+    "skipped_binaries": 114
+  },
+  "timing_rows": {
+    "available_in_native_log": false,
+    "matching_lines": 0,
+    "limit": "Passing nextest case recorded once but no call ordinal/catalog/median observations emitted in retained native log; host focused1/0 timing rows remain separate, not native measurements."
+  },
+  "host_scope": {
+    "focused_pass": 1,
+    "failed": 0,
+    "separate_from_native": true
+  },
+  "raw_log_sha256": {
+    "linux-clippy": "5d681c11624e71dce1cf55ef6df1f7cdfa8f78af6b9d488cff49fb50704a6eed",
+    "arm64": "b916394e43cdd540d9f6d8102bec62157e121d302519cb7d5957bd9b0e926a18"
+  }
+}
