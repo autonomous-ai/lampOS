@@ -54,7 +54,7 @@
     }
   },
   "fresh_flags": "Actual compiler JSON retained; cached carry is not claimed as a clean rebuild.",
-  "runtime_input_audit": "Focused integration case creates four synthetic skills in a fresh /tmp directory, runs the same saved Skills child against private bus/actions/mood/tools paths. It reads none of the changed product unit/memory/switch docs. Actual integration driver and child are byte-identical. One unused main-test binary changed; no runtime credit claimed for it.",
+  "runtime_input_audit": "Focused integration case creates four synthetic skills in a fresh /tmp directory, runs the same saved Skills child against private bus/actions/mood/tools paths. It reads none of the changed product unit/memory/switch docs. Actual integration driver and child are byte-identical. One unused library-test binary changed; no runtime credit claimed for it.",
   "retained_actual_host_result": {
     "head": "08a7185c0ca646a025c5d61d89b4202ee07183f6",
     "base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
@@ -70,5 +70,6 @@
     "reused_by_byte_and_input_audit": true,
     "rerun_on_current_head": false
   },
-  "limits": "Current original ARM64/Linux gates and peer carry reads pending. No historical #3525 waiver, device or production latency claim."
+  "limits": "Current original ARM64/Linux gates and peer carry reads pending. No historical #3525 waiver, device or production latency claim.",
+  "artifact_role_erratum": "Earlier packet called the unused c6f executable main-test; compilerJSONkindlib proves library-test. No hash or actual-execution claim changed."
 }

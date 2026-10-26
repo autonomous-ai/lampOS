@@ -1,8 +1,10 @@
-## 2026-10-26 22:35 — diagnostic883 native green; hardware-base carry
+## 2026-10-26 22:39 — diagnostic current carry and metadata correction
 
 Ready for lamp-voice: no (#3591)
 
-Original883/2d18 ARM40347745344 and Linux40347745326 pass:7,533unique/0bad/53skips, completeordinals, changedcaseonce,34identicalduplicatesdeduplicated. Previewparents/fulltree match; separate docs4/0/process13/0/relay/export/upload pass; no native timing rows. [Receipt](verification/skills-call-observations-20261026/native-883.json). Pushed unchangeda1a905ef6 on7d0017f08 after all current compiler stages pass; entirelampOSsource and allsixsavedbinaryhashes identicalto883. [Carry](verification/skills-call-observations-20261026/current-7d00-carry.json). Actualfocused1/0 remains08a/e672, not relabeled. Currentnative/read carries and authorfindingclosure remain required.
+Original 883/2d18 ARM 40347745344 and Linux 40347745326 pass: 7,533 unique passes, zero failures/leaks/timeouts, 53 skips; complete ordinals and changed case once. Preview parents/tree match. Current a1a905ef6/7d carries both equal patches, the entire identical lampOS source and all six artifact hashes; current compiler gates pass. Original current ARM 40350669035/Linux 40350668992 and two peer carries remain required. Author HOLD remains.
+
+Compiler JSON corrects one artifact label: c6f is the unused library-test executable, not the main-test target as the earlier packet said. Actual integration driver and Skills child, their hashes, and the retained 08a/e672 1/0 are unchanged. [Role correction](verification/skills-call-observations-20261026/artifact-role-correction.json). No new runtime or historical-failure clearance.
 
 ## 2026-10-26 22:32 — controlled-probe base label corrected
 

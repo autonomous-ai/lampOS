@@ -1,0 +1,38 @@
+{
+  "correction": "The changed unused c6f test executable was previously called main-test. Compiler JSON identifies it as the library-test target. The actual executed it integration driver and Skills child remain the same; no result, hash or runtime reuse claim changes.",
+  "artifact_roles": {
+    "it-46363ab9699809b5": {
+      "target": "it",
+      "kind": [
+        "test"
+      ]
+    },
+    "lamp_skills-a718b2a0214b6903": {
+      "target": "lamp-skills",
+      "kind": [
+        "bin"
+      ]
+    },
+    "release_pair-88349d4c2302e5ab": {
+      "target": "release_pair",
+      "kind": [
+        "test"
+      ]
+    },
+    "requested_audio-019db324b83a9807": {
+      "target": "requested_audio",
+      "kind": [
+        "test"
+      ]
+    },
+    "lamp_skills-c6f44302f3b2c78f": {
+      "target": "lamp_skills",
+      "kind": [
+        "lib"
+      ]
+    }
+  },
+  "compiler_json_sha256": "7b9fb782d921920b1fb2de96502656679100681759aab0ffbb6bd4c5d3e26924",
+  "source": "Original883/2d18 test-compile compiler-artifact records; retained raw log.",
+  "limits": "Retrospective metadata-role correction, no new execution."
+}
