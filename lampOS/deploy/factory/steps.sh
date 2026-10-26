@@ -9,7 +9,9 @@
 #      only while lamp-controls runs with LAMP_CONTROLS_STRIP=on
 #   3. the update key's public half: /etc/lampOS/update/key.pub; optionally
 #      the separate Store key: /etc/lampOS/skills/store-key.pub (never enables Store)
-#   4. the self-test: lamp-selftest --occasion factory, the lamp first stood
+#   4. the self-test, on a lamp set up from the app (it refuses on one that is
+#      not; the 5 s reset after it makes the lamp unset again for packing):
+#      lamp-selftest --occasion factory, the lamp first stood
 #      up by its running lamp-body ("listening" on its mood socket) so
 #      that head_move is checked whether or not the voice is up (#2232),
 #      with lamp-expression stopped for the run and started again after;
@@ -577,7 +579,27 @@ stand_for_head() {
   HEAD_STOOD=1
 }
 
+# The self-test reads each part from its running owner (selftest.md): the
+# microphones and the ring from lamp-voice, the room's from lamp-ears, the
+# camera from lamp-eyes, the pads from lamp-controls, the servos from
+# lamp-body, the air from lamp-air. On a product lamp every one of them waits
+# for setup's marker, so on a lamp not set up the body never starts (lamp-52e6
+# with the V2 image on 2026-10-26: step 4 timed out on its mood socket, the
+# unit skipped for that condition) and every part would be not_checked, exit
+# 3, which counts as done: a pass that checked nothing. So step 4 runs on a
+# lamp set up from the app (--from 4), and the 5 s reset makes it unset again
+# before it is packed; the reset keeps what steps 1 to 3 wrote (lamp.env, the
+# pins file, /etc/lampOS/update) and the self-test's own record.
+SETUP_DONE=$ROOT/var/lib/lampos-setup/done
 step_selftest() {
+  if [[ ! -e $SETUP_DONE ]]; then
+    if [[ $WRITE != 1 ]]; then
+      say "the lamp is not set up: a written step 4 refuses until it is (set it up from the app, run --from 4, then hold the button 5 s, the reset, before packing)"
+      return 0
+    fi
+    fail "the lamp is not set up, so its parts are not running and the self-test would check nothing: set it up from the app, run this again with --from 4, then hold the button 5 s (the reset) before packing"
+    return 1
+  fi
   if [[ $WRITE != 1 ]]; then
     say "would run: $SELFTEST_BIN --occasion factory (dry; it stands the lamp up for head_move, asks for a touch, moves the head a little and lights the ring)"
     return 0
