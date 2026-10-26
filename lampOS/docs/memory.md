@@ -1205,12 +1205,17 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     words `when` uses (the lamp's local days, never a date). Recall takes
     `history` (a boolean): its description tells the model to give it only
     when the person asks about their own past ("what did I use to like?",
-    "what colour did I say before?") and never to bring up what they used
-    to say itself. The voice sends `history:true` to the store's `search`
-    only for someone known, in their own scope while the request's lease
-    still holds them (`history_allowed`); never for the room's, nor the
-    room's part of a known person's recall, nor a line narrowed to the
-    room. Then a replaced version is found too, with
+    "what colour did I say before?") or how something kept for everyone
+    here was before it changed ("where was the key before?"), and never to
+    bring up what they used to say itself. The voice sends `history:true`
+    to the store's `search` for the scope the recall reads while the
+    request's lease still holds it (`history_allowed`): someone known's
+    own, or the room's own on a room's line (finding L on #3504:
+    lamp-06c1, 27 Oct, after "the key is in the red box now, not the blue
+    box", "where was it before?" got "I don't remember"; the room's
+    corrections are heard by anyone in it already). Never the room's part
+    of a known person's recall; a known person's line narrowed to the room
+    is the room's, and gets the room's history only, never the person's. Then a replaced version is found too, with
     `"until":"until 3 days ago"` from the store's `until_unix_ms`
     ([the rule](memory-days.md#request-contract)). Not asked, a replaced
     version is never told, and the session note and the per-turn hits never
@@ -1252,7 +1257,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     since and until: `remember::tests::recall_tells_since_and_until_in_words_and_history_only_when_asked`,
     `remember::tests::history_is_asked_only_for_the_persons_own_scope_with_the_switch`
     and `tests/voice_since_until.rs` (the real store: violet, then green by
-    `replaces`; the room's scope never gives history).
+    `replaces`; the room's own recall gives its history, a known person's
+    never the room's: `the_rooms_scope_gives_its_own_history_only_to_its_own_recall`).
 
 - **Forgetting what a thing was about** (#2176, `LAMP_MEMORY_FORGET_ABOUT=on`,
   with the Days client only; off unless set; both voice routes).

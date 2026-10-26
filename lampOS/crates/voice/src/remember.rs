@@ -1427,14 +1427,15 @@ fn replaces_described(mut tools: Vec<Tool>) -> Vec<Tool> {
     // about their own past; each kept thing found says since when.
     for tool in tools.iter_mut().filter(|tool| tool.name == RECALL) {
         tool.description.push_str(
-            " A kept thing found says since when it has been so. Give history true only when the person \
-             asks about their own past, what they used to like or said before (\"what did I use to like?\", \
-             \"what colour did I say before?\"): then what they changed is found too, each with until when \
-             it was so, such as 'you used to like violet, until 3 days ago'. Never otherwise, and never \
-             bring up what they used to say yourself.",
+            // Short, so recall stays within 1,024 bytes under every switch
+            // (Reviewer-two's P2 on #3629).
+            " A kept thing found says since when. Give history true only when they ask what they used \
+             to like or say (\"what did I use to like?\") or how something kept for everyone was before \
+             (\"where was the key before?\"): what changed is found too, with until when ('violet, until \
+             3 days ago'). Never bring it up yourself.",
         );
         if let Some(parameters) = tool.parameters.as_mut() {
-            parameters["properties"]["history"] = json!({"type": "boolean", "description": "Only true when the person asks what they themselves used to like or say before; leave out otherwise."});
+            parameters["properties"]["history"] = json!({"type": "boolean", "description": "Only true when the person asks what they themselves used to like or say before, or how something kept for everyone here was before it changed; leave out otherwise."});
         }
     }
     tools
@@ -2129,12 +2130,18 @@ fn scope_current(lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
     lease.is_none_or(crate::memory_scope::ScopeLease::is_current)
 }
 
-/// Whether a recall may ask for a person's history (#2510 take #4): only
-/// for someone known, whose own scope the request's lease, when there is
-/// one, still holds; never the room's, a narrowed or a revoked line.
+/// Whether a recall may ask for history (#2510 take #4): for the scope it
+/// reads, someone known's own or the room's, while the request's lease,
+/// when there is one, still holds that scope. A line narrowed from a
+/// person to the room is then the room's, and gets the room's history
+/// only, never the person's; a revoked one gets none (Reviewer-two's P3 on
+/// #3629). The room's history is
+/// the room's own corrections ("the key is in the red box now, not the
+/// blue box"), heard by anyone in it already (finding L on #3504:
+/// lamp-06c1, 27 Oct, "where was the key before?" in the room's scope was
+/// never searched for history).
 fn history_allowed(person: Option<&str>, lease: Option<&crate::memory_scope::ScopeLease>) -> bool {
-    person.is_some()
-        && lease.is_none_or(|lease| lease.scope().is_some_and(|scope| scope.person() == person))
+    lease.is_none_or(|lease| lease.scope().is_some_and(|scope| scope.person() == person))
 }
 
 /// Uses only the admitted request's immutable scope. Revoked is never room.
@@ -6737,8 +6744,9 @@ impl DaysClient {
         let dated = self.replaces.load(Ordering::Acquire);
         let history = dated && request["history"] == true;
         let Some(person) = person else {
+            // The room's own history, when asked for (`history_allowed`).
             let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
-            let (told, ids) = days_answer(&answer, now, zone, dated.then_some(false))?;
+            let (told, ids) = days_answer(&answer, now, zone, dated.then_some(history))?;
             return Some((told, ids.into_iter().map(|id| (None, id)).collect()));
         };
         let (theirs, room) = recall_both(request, person, deadline, |line, left| {
@@ -17829,7 +17837,7 @@ mod tests {
             assert!(
                 on[1]
                     .description
-                    .contains("only when the person asks about their own past")
+                    .contains("only when they ask what they used to like or say")
             );
             assert!(on[0].parameters.as_ref().unwrap()["properties"]["replaces"].is_object());
             assert!(on[0].description.starts_with(&off[0].description));
@@ -17924,10 +17932,12 @@ mod tests {
         let off = recall(history.clone(), Some(MAI));
         assert!(off["found"][0].get("since").is_none(), "{off}");
         client.replaces.store(true, Ordering::Release);
-        // The room's: never history.
+        // The room's own, asked for: its history too (finding L on #3504).
         let room = recall(history.clone(), None);
-        assert_eq!(room["found"].as_array().unwrap().len(), 1, "{room}");
-        assert_eq!(room["found"][0]["since"], "since today");
+        let found = room["found"].as_array().unwrap();
+        assert_eq!(found.len(), 2, "{room}");
+        assert_eq!(found[0]["since"], "since today");
+        assert_eq!(found[1]["until"], "until today");
         // Their own: history, only theirs.
         let theirs = recall(history, Some(MAI));
         let found = theirs["found"].as_array().unwrap();
@@ -17943,7 +17953,8 @@ mod tests {
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
         assert!(read[0].get("history").is_none() && read[1].get("history").is_none());
-        assert!(read[2].get("history").is_none(), "{:?}", read[2]);
+        assert_eq!(read[2]["history"], true, "{:?}", read[2]);
+        assert!(read[2].get("person").is_none(), "{:?}", read[2]);
         assert_eq!(read[3]["history"], true);
         assert_eq!(read[3]["person"], MAI);
         assert!(read[4].get("history").is_none() && read[4].get("person").is_none());
@@ -17962,10 +17973,36 @@ mod tests {
         let person = lease.scope().unwrap().person().map(str::to_owned);
         assert!(history_allowed(person.as_deref(), Some(&lease)));
         assert!(history_allowed(person.as_deref(), None));
-        assert!(!history_allowed(None, None));
+        assert!(history_allowed(None, None), "the room's own");
         assert!(!history_allowed(Some("p-fedcba9876543210"), Some(&lease)));
         lease.narrow_to_room();
         assert!(!history_allowed(person.as_deref(), Some(&lease)));
+        // Narrowed, the line is the room's: its caller reads the room's
+        // scope (`run_scoped`, the current snapshot), whose history it gets.
+        let room = lease.scope().unwrap().person().map(str::to_owned);
+        assert_eq!(room, None);
+        assert!(history_allowed(room.as_deref(), Some(&lease)));
+    }
+
+    /// Reviewer-two's P2 on #3629: `recall` stays a valid function, its
+    /// description within 1,024 bytes, with and without its second version
+    /// and `LAMP_MEMORY_REPLACES`, the room's history sentence included.
+    #[test]
+    fn recall_is_a_valid_function_under_every_switch_with_room_history() {
+        for second in [false, true] {
+            for replaces in [false, true] {
+                let mut tools = vec![recall_tool(second)];
+                if replaces {
+                    tools = replaces_described(tools);
+                    assert!(tools[0].description.contains("where was the key before?"));
+                }
+                assert!(
+                    tools[0].validate().is_ok(),
+                    "second {second} replaces {replaces}: {} bytes",
+                    tools[0].description.len()
+                );
+            }
+        }
     }
 
     /// #2510 take #4 (the reviewer-lead's P3 on #2605): `history` reaches
