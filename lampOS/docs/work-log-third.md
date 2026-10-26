@@ -7,6 +7,26 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 09:10 — Preflight and search fixture delivered in train 153
+
+#3513 and #3520 are closed as carried by train **153 (#3529)**, landed at
+**0c1f6437e**. The original offered heads were **48a0bc66c** and
+**1fa9ae1b9**; unpublished local carries d494/610 were not used. Their
+authored blobs match the train composition. Original train ARM64
+**40255994955** and Linux Clippy **40255994925** pass: **11,343 unique
+PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped. All ten preflight and nine
+fixture controls pass once. Separate Turn-end-wire is **13/0** outside
+the nextest count. Both actual previews have exact 41233/train-head parents;
+landing tree **038dd6224** equals the tested tree.
+[Native receipt](verification/train153-third-20261026/native-40255994955.json)
+and [landing proof](verification/train153-third-20261026/landing.json).
+
+#3512 still needs its current-input carry gate. The retirement correction
+has passed current-41233 formatting, strict Clippy, focused **110/0/2**
+and workspace build; full Voice/Schedule is running on its frozen source.
+The trigger correction is being made separately and remains draft. No
+physical acceptance or successful reminder round is inferred from the train.
+
 ## 2026-10-26 08:55 — Both reminder review findings retained; current-base repair gates
 
 Ready for lamp-voice: no (#3523 and #3525 remain draft).

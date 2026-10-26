@@ -1,0 +1,122 @@
+{
+  "pr": 3529,
+  "train": 153,
+  "offered_head": "37af2e19941fec1742130ba4ce26a1df451b64d6",
+  "offered_base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "arm64_run": 40255994955,
+  "linux_clippy_run": 40255994925,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "80c919ebb60ec68a2ccce05474c7a328725e7406",
+      "preview_parents": [
+        "41233c1b6954abc812186d7014a7adb19422e29e",
+        "37af2e19941fec1742130ba4ce26a1df451b64d6"
+      ],
+      "preview_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+      "offered_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "80c919ebb60ec68a2ccce05474c7a328725e7406",
+      "preview_parents": [
+        "41233c1b6954abc812186d7014a7adb19422e29e",
+        "37af2e19941fec1742130ba4ce26a1df451b64d6"
+      ],
+      "preview_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+      "offered_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11343,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11343,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11343
+  ],
+  "own_control_pass_counts": {
+    "lamp-update::install head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::directory_drop_in_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::regular_benign_drop_in_is_preserved": 1,
+    "lamp-update::install head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved": 1,
+    "lamp-update::install head_touch_preflight_files::missing_local_files_keep_install_compatibility": 1,
+    "lamp-update::install head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility": 1,
+    "lamp-update::install head_touch_preflight_files::dev_null_drop_in_mask_is_preserved": 1,
+    "lamp-update head_touch::tests::null_masks_do_not_admit_other_character_devices": 1,
+    "lamp-voice coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture": 1,
+    "lamp-voice coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer": 1,
+    "lamp-voice search_pushed::tests::a_push_mid_search_holds_its_looks_in_the_lamps_turns_for_thirty_seconds": 1,
+    "lamp-voice search_pushed::tests::the_next_request_is_told_once_and_its_words_may_look_again": 1,
+    "lamp-voice search_pushed::tests::a_push_with_no_search_going_on_changes_nothing": 1,
+    "lamp-voice search_pushed::tests::a_walked_search_goes_on_with_its_turns_past_two_minutes": 1,
+    "lamp-voice search_pushed::tests::use_skill_holds_only_the_searchs_own_skill": 1,
+    "lamp-voice search_pushed::tests::each_fresh_push_is_taken_once": 1,
+    "lamp-voice search_pushed::tests::the_reader_takes_a_push_from_the_bus": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T02:03:27.4017813Z      Summary [ 214.228s] 11343 tests run: 11343 passed, 106 skipped",
+  "all_pass_audit": true,
+  "offered_member_source_blobs": {
+    "3520": {
+      "head": "1fa9ae1b9288b9d4080fbef79723aa4ad6970486",
+      "blobs": {
+        "lampOS/crates/voice/src/coordinator/tests/second_route.rs": "58e9c8856d2f04e5ecd1744f5df7bffba4b08ee7"
+      }
+    },
+    "3513": {
+      "head": "48a0bc66c01c6dab114260bf3f90adafe753f96b",
+      "blobs": {
+        "lampOS/crates/update/src/head_touch.rs": "efe26186bf3e3d5f36ed233f95de8dcd6664571d",
+        "lampOS/crates/update/tests/install.rs": "0696366ca5af93ed18fa54d8d5adb3be58156469"
+      }
+    }
+  },
+  "turn_wire_custom_harness": {
+    "passed": 13,
+    "failed": 0,
+    "control_pass_counts": {
+      "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+      "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+      "verdict_carries_identity_and_one_request_at_a_time": 1,
+      "missing_model_is_final_and_never_restarted": 1,
+      "missing_executable_fails_at_once": 1,
+      "spawn_returns_while_worker_startup_is_held": 1,
+      "startup_failures_are_final": 1,
+      "serving_failures_are_replaced_within_budget": 1,
+      "protocol_violations_are_replaced": 1,
+      "cancelled_answers_are_never_delivered": 1,
+      "close_during_inference_never_waits": 1,
+      "sustained_requests_stay_bounded": 1
+    },
+    "summary": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T02:03:42.4576814Z test result: 13 passed; 0 failed"
+    ],
+    "counts_separate_from_nextest": true,
+    "qualified": true
+  },
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "linux-clippy-40255994925.log",
+      "bytes": 88266,
+      "sha256": "8dc81a52139ab34ba82f13a5084846f524dac958dd99565721228dd0eeb9f452"
+    },
+    "arm64": {
+      "path": "arm64-40255994955.log",
+      "bytes": 2725730,
+      "sha256": "5f4d31e6aaaf68b26d7534a6d1b0612d53174bf819d89eaf3e4a602686dcbf69"
+    }
+  },
+  "qualified": true,
+  "limits": "Original train153 event only. Uses offered members 1fa9ae1b9 and 48a0bc66c, not unpublished local rebases. Custom Turn-wire 13 is outside nextest totals. No local tests, retries, device or latency claim."
+}

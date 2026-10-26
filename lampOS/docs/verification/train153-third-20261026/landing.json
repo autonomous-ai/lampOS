@@ -1,0 +1,9 @@
+{
+  "pr": 3529,
+  "train_head": "37af2e19941fec1742130ba4ce26a1df451b64d6",
+  "qualified_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+  "merged_at": "2026-10-26T02:04:07Z",
+  "landing_commit": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "landing_tree": "038dd6224095e0cb646a99f5757c042d394fdcf8",
+  "tree_equals_qualified_train": true
+}
