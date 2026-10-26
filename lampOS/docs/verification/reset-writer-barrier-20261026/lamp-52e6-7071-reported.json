@@ -1,0 +1,22 @@
+{
+  "sequence": 7071,
+  "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+  "device": "lamp-52e6",
+  "reported_window": "2026-10-26 20:10\u201320:28 local",
+  "evidence_comment": "https://github.com/autonomous-ai/lampOS/issues/1711#issuecomment-6417187304",
+  "acceptance_comment": "https://github.com/autonomous-ai/lampOS/issues/1711#issuecomment-6417212651",
+  "setup_binary_sha256": "ad7d520467cd69190d3b8dc1fcf9bcd04c1761354a81038b7c36b5dae586c0d5",
+  "reported_results": {
+    "installer_switch": "7071; every part well; product-unit override used for dev-named52e6",
+    "factory_state_before": "Old onboarding Done/Failed outcomes and memory-days.sqlite3 present",
+    "reset_path": "Factory steps.sh step4 fromaa9; all23 parts finished before reset",
+    "journal": "journal, marker_removed, stopped,44wipepaths,journal_removed,rebooting",
+    "after_reboot": "Onboarding and memory folders empty",
+    "customer_setup": "Page API request, home network joined about15s, Voice and target active",
+    "fresh_progress": "Only privacy:not_available; factory outcomes gone",
+    "onboarding_definition": "Loaded",
+    "first_face_walk": "Not observed; nobody at lamp; final tester check tomorrow"
+  },
+  "disposition": "First accepted erasure/fresh setup and confirmed7071 for morning promotion/image. First-face onboarding remains explicitly pending.",
+  "limits": "Third read the public device-owner report and First acceptance; Third did not install, run a reset, SSH or observe the lamp. No stable promotion claimed."
+}
