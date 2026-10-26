@@ -7,6 +7,35 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:55 — Both reminder review findings retained; current-base repair gates
+
+Ready for lamp-voice: no (#3523 and #3525 remain draft).
+
+#3523's original **61a4e1774** native gate remains green, but reviewer-three's
+fully-retired replay P2 is confirmed by a fresh **0/1** live regression on
+that exact production. The original binary, patch and source hashes are kept.
+The correction holds any qualified own-retirement cursor without Ack, even
+if another generation later remains unfinished; no-audio and unretired-only
+interruptions still retry. Two controls and the conservative manual cases
+are added. Full Voice/Schedule qualification is now running on the latest
+**41233c1b6** base with the separate fixture dependency.
+
+#3525's original **f5339bb75** ARM64 **40254474369** passes **11,329
+unique PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped, with all five requested
+controls once; Linux **40254474454** passes and exact preview/tree identity
+is audited. [Original receipt](verification/reminder-pending-present-20261026/native-40254474369.json).
+It does not waive either source finding. The explicit-release fixture fix
+passes full Skills **526/0/9** plus fmt, strict Clippy and workspace build on
+its frozen original base. The separate held-item heartbeat churn is being
+repaired with opt-in selected-value/eligibility change triggering; unchanged
+held work must create one chance over sixty heartbeats, not sixty.
+
+The previously ready privacy, preflight and fixture patches rebase equal
+onto 41233 locally. Their old c5 native results and reads remain under those
+actual heads. Fresh carry gates are queued; no new carry has been pushed
+without its gate. Third's independent #3524 READ-OK remains on ecaed2484.
+The requested #3528 IPC read follows the active review corrections.
+
 ## 2026-10-26 08:37 — Current reads complete; interruption repair native green
 
 Ready for lamp-voice: yes (#3512, #3513, #3520).

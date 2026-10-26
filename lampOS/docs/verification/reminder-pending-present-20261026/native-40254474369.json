@@ -1,0 +1,72 @@
+{
+  "pr": 3525,
+  "offered_head": "f5339bb75a9f2ed7d41d766cdfb13583c678eee6",
+  "offered_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "arm64_run": 40254474369,
+  "linux_clippy_run": 40254474454,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "fa8d698d1a8b1b35880608da64e221fbf2708cf5",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "f5339bb75a9f2ed7d41d766cdfb13583c678eee6"
+      ],
+      "preview_tree": "e79db522c5a15cf85dc8bcb2b8cb60cb2fc6abf8",
+      "offered_tree": "e79db522c5a15cf85dc8bcb2b8cb60cb2fc6abf8",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "fa8d698d1a8b1b35880608da64e221fbf2708cf5",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "f5339bb75a9f2ed7d41d766cdfb13583c678eee6"
+      ],
+      "preview_tree": "e79db522c5a15cf85dc8bcb2b8cb60cb2fc6abf8",
+      "offered_tree": "e79db522c5a15cf85dc8bcb2b8cb60cb2fc6abf8",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11329,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11329,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11329
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "lamp-skills::it skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "lamp-skills::it skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "lamp-skills::it skills::every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T01:44:30.7693533Z      Summary [ 223.756s] 11329 tests run: 11329 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "linux-clippy-40254474454.log",
+      "bytes": 86734,
+      "sha256": "7953b2153bfd71f3a481b2146e8edca510213923d65f067ea869cfa71172bfbf"
+    },
+    "arm64": {
+      "path": "arm64-40254474369.log",
+      "bytes": 2723080,
+      "sha256": "e37f3425b1d15294e8a5434ba340bea41cfca17f0d98dae4a022829d149dd6db"
+    }
+  },
+  "controls_source": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/fixed/sealed.json",
+    "sha256": "a464f7e56c2b2aae1dc9d22d2bfdc368ccb1e72ed35091287f38ec4053e57471"
+  },
+  "qualified": true,
+  "limits": "Original f5339bb75 reminder-pending run only. Separate from the interruption-retry fix and earlier 756/c5 carries. No local tests, workflow retries, device, provider or physical-latency claims."
+}
