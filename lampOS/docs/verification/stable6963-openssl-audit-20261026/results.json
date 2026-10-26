@@ -1,0 +1,111 @@
+{
+  "scope": "Independent offline packet and public-key cryptographic audit; no updater execution",
+  "packet_files": 29,
+  "manifest_entries": 28,
+  "committed_bytes_equal": true,
+  "all_receipt_and_output_hashes_match": true,
+  "negative_differences_exact": true,
+  "openssl": "OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)",
+  "cases": [
+    {
+      "case": "trusted-positive",
+      "changed_envelope_fields": [],
+      "openssl_exit": 0,
+      "stdout": "Signature Verified Successfully\n",
+      "stderr": "",
+      "input_sha256": {
+        "payload": "b59a790dda310398ca9c0fda27500134f1556dfed7eba0901f253c9a8355f52f",
+        "signature": "44c4455ef83100fe0ec37b37875dcf596aff41478bb874d240957ac2b9af275d",
+        "key.der": "7f820dbe26f834978565e7c7c16203a63e9c6a213b3b9697f0723b9ae9df09f3"
+      },
+      "public_key_file": "trusted-public-key.pub"
+    },
+    {
+      "case": "wrong-key",
+      "changed_envelope_fields": [],
+      "openssl_exit": 1,
+      "stdout": "Signature Verification Failure\n",
+      "stderr": "806176F501000000:error:030000EA:digital envelope routines:EVP_DigestVerify:provider signature failure:crypto/evp/m_sigver.c:785:ED25519 digest_verify:\n",
+      "input_sha256": {
+        "payload": "b59a790dda310398ca9c0fda27500134f1556dfed7eba0901f253c9a8355f52f",
+        "signature": "44c4455ef83100fe0ec37b37875dcf596aff41478bb874d240957ac2b9af275d",
+        "key.der": "06e3fd8fda29bb60ab59557de61edb0aecdb231134be30e75b455f8e1b792fa9"
+      },
+      "public_key_file": "wrong-public-key.pub"
+    },
+    {
+      "case": "forged-key-label",
+      "changed_envelope_fields": [
+        "key"
+      ],
+      "openssl_exit": 1,
+      "stdout": "Signature Verification Failure\n",
+      "stderr": "806176F501000000:error:030000EA:digital envelope routines:EVP_DigestVerify:provider signature failure:crypto/evp/m_sigver.c:785:ED25519 digest_verify:\n",
+      "input_sha256": {
+        "payload": "b59a790dda310398ca9c0fda27500134f1556dfed7eba0901f253c9a8355f52f",
+        "signature": "44c4455ef83100fe0ec37b37875dcf596aff41478bb874d240957ac2b9af275d",
+        "key.der": "06e3fd8fda29bb60ab59557de61edb0aecdb231134be30e75b455f8e1b792fa9"
+      },
+      "public_key_file": "wrong-public-key.pub"
+    },
+    {
+      "case": "changed-payload",
+      "changed_envelope_fields": [
+        "manifest"
+      ],
+      "openssl_exit": 1,
+      "stdout": "Signature Verification Failure\n",
+      "stderr": "806176F501000000:error:030000EA:digital envelope routines:EVP_DigestVerify:provider signature failure:crypto/evp/m_sigver.c:785:ED25519 digest_verify:\n",
+      "input_sha256": {
+        "payload": "e18fb226e1753d37676523760a698df3a0f2c18c0065dc18c3d227a53f6373d5",
+        "signature": "44c4455ef83100fe0ec37b37875dcf596aff41478bb874d240957ac2b9af275d",
+        "key.der": "7f820dbe26f834978565e7c7c16203a63e9c6a213b3b9697f0723b9ae9df09f3"
+      },
+      "public_key_file": "trusted-public-key.pub"
+    },
+    {
+      "case": "changed-signature",
+      "changed_envelope_fields": [
+        "signature"
+      ],
+      "openssl_exit": 1,
+      "stdout": "Signature Verification Failure\n",
+      "stderr": "806176F501000000:error:030000EA:digital envelope routines:EVP_DigestVerify:provider signature failure:crypto/evp/m_sigver.c:785:ED25519 digest_verify:\n",
+      "input_sha256": {
+        "payload": "b59a790dda310398ca9c0fda27500134f1556dfed7eba0901f253c9a8355f52f",
+        "signature": "2b443f97afd3f305d125ec9de1383a731d24be4ebef408ce1a44bd764347a4fc",
+        "key.der": "7f820dbe26f834978565e7c7c16203a63e9c6a213b3b9697f0723b9ae9df09f3"
+      },
+      "public_key_file": "trusted-public-key.pub"
+    }
+  ],
+  "public_provenance_rechecked": {
+    "public_environment_key_matches": true,
+    "key_updated_at": "2026-10-26T02:27:41Z",
+    "stable_asset_id": 676827279,
+    "immutable_asset_id": 676730315,
+    "both_api_size_digest_updated_at_match": true
+  },
+  "compiler_binding": {
+    "original_actual_and_preserved_hash_match": true,
+    "prior_public_receipt_matches": true,
+    "sha256": "799a71ccd12590795d2b340662c6027fee26a69ac70888844c0ca34d980aff3b"
+  },
+  "original_packet_commit": "2a3d8076a11e611ec7137406f9b6fa8dcd5a4dfc",
+  "command_template": [
+    "openssl",
+    "pkeyutl",
+    "-verify",
+    "-pubin",
+    "-keyform",
+    "DER",
+    "-inkey",
+    "CASE/key.der",
+    "-rawin",
+    "-in",
+    "CASE/payload",
+    "-sigfile",
+    "CASE/signature"
+  ],
+  "public_der_prefix_hex": "302a300506032b6570032100"
+}

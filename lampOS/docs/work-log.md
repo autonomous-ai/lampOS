@@ -1,3 +1,15 @@
+Ready for lamp-voice: #1812 host proof audited; startup repair in current gate; #3510 activation HOLD.
+
+## Current checkpoint: 2026-10-26 15:45 +07, separate signature implementation agrees
+
+[OpenSSL audit](verification/stable6963-openssl-audit-20261026/README.md) independently verifies the original trusted 6963 signature and rejects all four negative cases: **5 checks passed / 0 failed**, separate from the five original updater commands. All public packet bytes, hashes, case transformations, current public-key provenance and asset API bindings agree. Compiled source verifies the signature before its installed-sequence shortcut. This is manifest authentication, not payload, installation or attended acceptance.
+
+The #3530 first direct reference repair is in `second/reference-first-handshake` on current `1cad670df`: only initial in-order speaker-side CapturePrepared gains the existing startup allowance; authority/privacy/prime and later-message rules remain. The disabled-allowance control reproduces the reported sequence 1, 143402 us age, 100000 us refusal; restored transport passes **34/0/1** on the original 1ec candidate. That earlier full gate was stopped during compilation when Main advanced, before runtime tests. All five authored files carry unchanged. Fresh current fmt, strict twelve-crate Clippy and compilation pass; full affected runtime is running. No completed full gate or device result is claimed yet.
+
+Own-keys is privately carried to `c93d98df0`/1cad, seven equal patches and 38 unchanged authored blobs. This base changes Voice runtime, so fresh qualification is pending before push; the public e953 native result stays on its actual 1ec base. Activation HOLD remains. The log rebase preserves all 14,347 earlier proof entries. No device, key mutation, provider, signing or release action ran.
+
+---
+
 Ready for lamp-voice: #1812 host signature verification complete; attended acceptance pending. #3510 activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 15:00 +07, trusted release-key blocker resolved
