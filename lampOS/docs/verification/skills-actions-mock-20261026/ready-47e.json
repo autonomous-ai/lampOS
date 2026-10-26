@@ -1,0 +1,89 @@
+{
+  "pr": 3604,
+  "head": "47e3bcb9769fcf79daa9da5bab42c721af8ce7e9",
+  "base": "0961e12d9d02c2327d9601c2ec125f4f2599a631",
+  "ready": true,
+  "host": [
+    525,
+    0,
+    9
+  ],
+  "native": [
+    7537,
+    0,
+    53
+  ],
+  "original_runs": [
+    40382974078,
+    40382973383
+  ],
+  "peer_reads": [
+    6424839900,
+    6425375337
+  ],
+  "author_closure": 6425503929,
+  "next_train_queue": 6425505947,
+  "before_ready": {
+    "baseRefOid": "0961e12d9d02c2327d9601c2ec125f4f2599a631",
+    "headRefOid": "47e3bcb9769fcf79daa9da5bab42c721af8ce7e9",
+    "isDraft": true,
+    "mergeStateStatus": "CLEAN",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-26T19:04:45Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/40382973383/job/121783779909",
+        "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+        "startedAt": "2026-10-26T19:01:30Z",
+        "status": "COMPLETED",
+        "workflowName": "lampOS clippy"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-26T19:14:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/40382974078/job/121783781995",
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "startedAt": "2026-10-26T19:01:33Z",
+        "status": "COMPLETED",
+        "workflowName": "lampOS on ARM64"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-26T19:01:27Z",
+        "conclusion": "SKIPPED",
+        "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/40382974078/job/121783785060",
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "startedAt": "2026-10-26T19:01:28Z",
+        "status": "COMPLETED",
+        "workflowName": "lampOS on ARM64"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-26T19:14:57Z",
+        "conclusion": "SKIPPED",
+        "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/40382974078/job/121790897464",
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "startedAt": "2026-10-26T19:14:58Z",
+        "status": "COMPLETED",
+        "workflowName": "lampOS on ARM64"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-26T19:14:57Z",
+        "conclusion": "SKIPPED",
+        "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/40382974078/job/121790897787",
+        "name": "report-full-run-failure",
+        "startedAt": "2026-10-26T19:14:58Z",
+        "status": "COMPLETED",
+        "workflowName": "lampOS on ARM64"
+      }
+    ]
+  },
+  "limits": [
+    "Readiness is not delivery or device acceptance.",
+    "Author closure is not a third peer read.",
+    "Previous failures and unverified runtime input boundaries remain attributed."
+  ]
+}
