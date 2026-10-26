@@ -1,0 +1,80 @@
+{
+  "head": "2d9194565d93a6560be97445755eae9abc6b9020",
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "actual_preview": "40b9d55d8c03703565d176dab506907f4b729032",
+  "preview_and_authored_tree": "c1076ee9d47c7a025e1d391f9419d3d59dbdc419",
+  "run_id": 40253271430,
+  "attempt": 1,
+  "status": "success",
+  "run_log_sha256": "b06df394b5c6d68953b48a054aedf343cc123be7b79b7403c4c6322d43191e8e",
+  "nextest_unique_pass": 11340,
+  "nextest_selected": 11340,
+  "nextest_skipped": 106,
+  "nextest_binaries": 179,
+  "nextest_skipped_binaries": 2,
+  "nextest_duration_seconds": 211.741,
+  "nextest_fail_leak_timeout": 0,
+  "duplicate_terminal_lines_in_success_output": 35,
+  "promotion_lib_pass": 2,
+  "promotion_integration_pass": 22,
+  "promotion_additional_pass": 1,
+  "promotion_total": 25,
+  "promotion_fail": 0,
+  "custom_process_cases_passed": 12,
+  "custom_process_fail": 0,
+  "product_carrier_cases": [
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+      "duration": "0.007s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+      "duration": "0.007s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+      "duration": "0.026s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+      "duration": "0.022s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+      "duration": "0.020s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+      "duration": "0.023s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+      "duration": "0.011s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+      "duration": "0.057s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::the_lamps_specific_unit_wins_over_the_product_unit",
+      "duration": "0.017s"
+    },
+    {
+      "status": "PASS",
+      "name": "lamp-update::round product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+      "duration": "0.029s"
+    }
+  ],
+  "source_tree_equality_verified": true,
+  "raw_log_publication": "not inspected for publication; private only",
+  "device_or_rehearsal_claim": false
+}

@@ -1,5 +1,28 @@
 # Tests work log
 
+## 2026-10-26 08:37 — Current carrier native green; reader PR published
+
+Ready for lamp-voice: no (#3466 rehearsal; #3527 native checks and read)
+
+[Current carrier native proof](verification/product-carrier-current-20261026/)
+records 11,340 passes, zero failures/leaks/timeouts and 106 skips on 2d919/c5.
+All 25 promotion tests and ten carrier cases pass; tested and authored trees
+match. Linux Clippy passes. The native updater is checksummed and prepared
+locally. No device action ran. First and Seventh were asked to match an owner
+and installed lamp to the pending real GOOD/BAD round.
+
+[Current reader carry](verification/tests-reader-current-c5-20261026/) is
+committed and pushed as a26fdc9d3 in PR #3527. Mac formatting, strict checks
+for twelve crates and workspace build pass. The disk-reserve interruption
+and successful workspace-only continuation remain separate. The old full
+7,454/3/53 and unchanged-base 4/3 remain failed. Current native checks and
+reader requests are active. The #3524 source/proof read found no P1/P2;
+no independent runtime or native results were claimed.
+
+Skills journal completion carried equally to 0c6fc02c7 on c5, with no
+duplicate PR. Its full twelve-package gate is now running once with one
+compiler; failures will be retained. Old controllers remain retired.
+
 ## 2026-10-26 08:16 — Promotion repair pushed; reader failures reproduced unchanged
 
 Ready for lamp-voice: no (#3466; reader fixture)

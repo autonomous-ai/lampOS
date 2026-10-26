@@ -1,0 +1,19 @@
+{
+  "head": "a26fdc9d317821a85febf46f7a25f64da92d4f06",
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "pr": 3527,
+  "fmt": "PASS",
+  "strict_clippy_packages": 12,
+  "strict_clippy": "PASS",
+  "workspace_build": "PASS after interrupted first attempt",
+  "runtime_tests_on_current_mac": 0,
+  "source_guards_unchanged": true,
+  "original_build": "interrupted below5GiB+64MiB reserve; cleanup signal observedEPERM after exit; no own compiler remained",
+  "resume": "workspace build only; same frozen source; no runtime retry",
+  "original_linux_focused": "3d plus same Rust bytes14/0/1",
+  "original_linux_full": "FAILED7454/3/53; same3 reproduced on unchangedbase",
+  "arm64_run": 40254820731,
+  "linux_clippy_run": 40254820689,
+  "native_status_at_publication": "pending",
+  "cleanup": "completed owned Linux generatedtarget contents only; saved99 executables and baseline witness rehashed; localVMunusedblocks trimmed; no source/container/volume deletion"
+}

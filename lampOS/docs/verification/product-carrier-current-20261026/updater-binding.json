@@ -1,0 +1,12 @@
+{
+  "run": 40253271430,
+  "artifact_id": 12621069815,
+  "head": "2d9194565d93a6560be97445755eae9abc6b9020",
+  "zip_sha256": "1b04530ec5b9586c1079cdf6f94cdf411e5666a6a1876324007a56b449bb691d",
+  "updater_sha256": "623b6432223466e82dec6e8e4e9004c8e0fb0adb778cfa33f23ef83c69d44825",
+  "updater_bytes": 4807600,
+  "format": "ELF64 little-endian AArch64",
+  "artifact_checksum_verified": true,
+  "local_execution": false,
+  "installed": false
+}
