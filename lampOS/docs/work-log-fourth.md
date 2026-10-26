@@ -1,3 +1,13 @@
+## 2026-10-26 07:46 — Common producer findings under repair
+
+Ready for lamp-voice: no
+
+Common #3064 remains HOLD at 8af180bb6 for reviewer-two's two producer findings: a successful short empty look leaves the previous identity active until the recognition cadence, and camera-permission expiry/regrant can admit an in-flight pre-loss frame. The first correction withdraws identity at the raw-empty boundary and forces identity-free Checking and recognition on a same-ID return. Its single old-order fault control is running; the second hold-generation correction is being prepared separately. Neither changed source has a passing runtime gate yet. Both will be folded into the one commit, carried onto current Main, and qualified before push. The switch table's stale steady-rate description is also being corrected.
+
+The original native audit is complete: ARM64 40247988735 passes 11,465 unique cases with zero failures, leaks or timeouts and 106 skipped; separate doctests pass 4/0 and process checks 12/0, with relay success. Linux 40247988677 passes formatting and strict workspace Clippy. The actual checkout is preview a84a48836, tree 2ab916341, combining the published checkpoint with d21. These results do not clear either later source finding. Local d21 integration passed formatting, strict Clippy and workspace build; its discovery was deliberately cancelled before runtime for the correction. Native exit 241 and zero executed tests are retained separately, with source stability and owned process closure verified.
+
+Disposable incremental compiler cache was removed only after that release, recovering sufficient build space. Actual cleanup exit zero, source stability and all eight independent predecessor witnesses were verified; compiled binaries and dependencies were retained. No lamp, installation, private-person data or activation was involved. The primary own branch is current to train 150, 756be347e. Onboarding still waits on First's physical acceptance, with its source follow-up prepared; Peek follows the Common correction in the compiler queue.
+
 ## 2026-10-26 07:12 — Common checkpoint pushed; train-148 integration active
 
 Ready for lamp-voice: no
