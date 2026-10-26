@@ -1999,9 +1999,14 @@ then use that person's scope:
   false`): a face kept, or old face records the eyes could not search, whose
   note is passed on as `face_note`. The tool tells the model to say what is
   gone and what is kept. The eyes are asked only while the line is still that
-  person's (`known_faces::run_for_fenced`, read right before the send): a
-  line revoked, or narrowed to the room by later speaking evidence, sends
-  nothing (Fourth's P2 on #3564). With a name typed at setup, the answer says
+  person's (`known_faces::run_for_fenced`): the guarded transport reads it
+  before the connect, after it and before each write, and never blocks in the
+  connect, so a line revoked, or narrowed to the room by later speaking
+  evidence, sends nothing (Fourth's P2 on #3564), and one revoked or narrowed
+  before this step says the face is kept (reviewer-three's P2). The room's
+  lines they were seen saying (#2849) are apart from this: a `forget_said`
+  that fails is journalled, and the answer is as without it. With a name
+  typed at setup, the answer says
   it stays (`setup_name`). A room's line asks the eyes nothing. On lamp-52e6 on 26 Oct
   (build 6963) the memory was forgotten, `people.json` kept the face and its
   name, and the lamp greeted the person by it when asked (the lead on #1711).
