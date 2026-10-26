@@ -13,6 +13,20 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 14:07 — Reminder carried onto delivered factory base
+
+Ready for lamp-voice: no (#3525)
+
+Pushed **fe488d108** on **88335bfbe** after fresh formatting, strict
+Skills Clippy, workspace build and full Skills **542/0/9**, all 21 controls
+once. Source and actual drivers/child sealed. All 32 authored blobs match
+ce75aa0a9 and range-diff is one equal commit.
+[Gate](verification/reminder-pending-present-20261026/current-883.json),
+[carry](verification/reminder-pending-present-20261026/carry-883.json).
+Factory steps.sh is embedded by Update tests, so no full-workspace input
+equivalence is claimed. Current native gates and carry reads are pending;
+the prior ce75 native green remains on its actual 9e5 base. No device test.
+
 ## 2026-10-26 14:03 — Factory refusal follow-up delivered
 
 Ready for lamp-voice: delivered (#3546, train 162)
