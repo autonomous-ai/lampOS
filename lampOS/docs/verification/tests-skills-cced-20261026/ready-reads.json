@@ -1,0 +1,20 @@
+{
+  "pr": 3545,
+  "head": "942123c90d360bfb23a2c2739c229509691f3788",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "ready": true,
+  "reads": [
+    {
+      "builder": "Reviewer-three",
+      "url": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6409168679",
+      "correction": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6409170919",
+      "scope": "Independent Mac add-on tests 9/0; both fifth-say phases belong to the changed case."
+    },
+    {
+      "builder": "Third",
+      "url": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6409418076",
+      "scope": "Independent Mac fmt, strict Skills Clippy, workspace build and full Skills 522/0/9; changed case once with both phases."
+    }
+  ],
+  "limits": "Native affected selection and independent Mac package scopes remain separate; no historical failure cause or device acceptance established."
+}

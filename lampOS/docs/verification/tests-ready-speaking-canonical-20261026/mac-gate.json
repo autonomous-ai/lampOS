@@ -1,0 +1,81 @@
+{
+  "head": "cced429433211e06790f23ed8f51e07be613972d",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "source_identity": "precommit cced plus exactly runtime.rs and expression.md authored bytes; no relabelling to future commit",
+  "terminal": {
+    "status": "PASS",
+    "head": "cced429433211e06790f23ed8f51e07be613972d",
+    "base": "cced429433211e06790f23ed8f51e07be613972d",
+    "scope": "Canonical fmt, strict Expression actual reverse closure, full Expression package once and workspace build; diagnostic outcomes never count as canonical test passes.",
+    "diagnostics_are_canonical_results": false,
+    "full_reverse_runtime_complete": false,
+    "fmt": true,
+    "strict_reverse_clippy": true,
+    "workspace_build": true,
+    "full_expression_package": true,
+    "expression_counts": {
+      "passed": 340,
+      "failed": 0,
+      "ignored": 0
+    },
+    "affected_case_outcomes": [
+      "ok"
+    ],
+    "executable_hashes_unchanged": true,
+    "source_unchanged": true,
+    "protected_frozen_unchanged": true,
+    "old_frozen_99_unchanged": true,
+    "runtime_observations": 1
+  },
+  "completed_stages": {
+    "fmt": {
+      "exit": 0,
+      "elapsed_s": 12.040852
+    },
+    "metadata": {
+      "exit": 0,
+      "elapsed_s": 0.546534
+    },
+    "invalidate-diagnostic-and-reverse-packages": {
+      "exit": 0,
+      "elapsed_s": 0.307062
+    },
+    "strict-clippy": {
+      "exit": 0,
+      "elapsed_s": 194.216969
+    },
+    "workspace-build": {
+      "exit": 0,
+      "elapsed_s": 126.422597
+    },
+    "expression-compile": {
+      "exit": 0,
+      "elapsed_s": 20.393596
+    },
+    "expression-tests": {
+      "exit": 0,
+      "elapsed_s": 25.453158
+    }
+  },
+  "selected_test_artifacts": 4,
+  "all_frozen_executables": 8,
+  "protected_prior_witnesses": 118,
+  "raw_hashes": {
+    "terminal.json": "b1928570e48dd64be67779aacca3ded8c4fd3af678e79edee36b9fe62bc34d08",
+    "source-after.json": "2c5738e4cc7c93dcd58e6f2390181eae36109e4d0721766dc4664630400113a0",
+    "metadata.stdout.txt": "1f86b0f907bbc5f869407dfcf267a7877e409cb462c41e572b2980554c970b04",
+    "all-compiled-executables.json": "4fa28f19af1834d47e9cf59710e74cffff6b5843908e5a2e72d0ddbca4fc92ef",
+    "frozen-executables.json": "03100f9039d8426dae2df4383ec67f8710a37f486ce723d24d791e1c05b1dec8",
+    "protected-frozen-after.json": "c9164c2aeb8b62ae252a5273ae6c1f5a16daf74824722188a003c7d87b423c96",
+    "run.py": "f8a83b24b1c15b69cc9a26de97841e100431bbec5199719a9258c91168c6bfbc",
+    "plan.json": "85bf016c75f88efad015b56457805fae5dd81e59a19cdccc54d486abf7d9e9dc",
+    "expression-outcome.json": "ea86eaf4a9ad5413219b9a71de0d4f5a579cf8c849b42a99186b0e1a4ea6c9da"
+  },
+  "limitations": [
+    "Mac x86 qualification, not native Linux or device evidence",
+    "Full Expression package once; reverse twelve-package Clippy/build, not full reverse-dependent runtime",
+    "Diagnostic original exit 101/candidate exit 0 remains separately scoped"
+  ],
+  "original_audit_sha256": "a631c4f0e17cfac87c91bc439978f9325fece31daa723d70f19c2b375b645d1f",
+  "publication": "Minimal reviewed metadata; raw source, logs and executable witnesses remain private."
+}

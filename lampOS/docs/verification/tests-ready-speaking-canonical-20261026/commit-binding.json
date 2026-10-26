@@ -1,0 +1,12 @@
+{
+  "committed_head": "5713bece435526832373cc9de38db99a39fc706f",
+  "parent": "cced429433211e06790f23ed8f51e07be613972d",
+  "tested_source_receipt_sha256": "2c5738e4cc7c93dcd58e6f2390181eae36109e4d0721766dc4664630400113a0",
+  "all_tracked_source_bytes_and_modes_equal": true,
+  "tracked_files": 10652,
+  "exact_authored_files": [
+    "lampOS/crates/expression/src/runtime.rs",
+    "lampOS/docs/expression.md"
+  ],
+  "scope": "Commit binds the already tested dirty working-tree source; original precommit receipts retain their own head/index/status."
+}

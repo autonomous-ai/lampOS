@@ -1,0 +1,74 @@
+{
+  "run": 40275870512,
+  "head": "942123c90d360bfb23a2c2739c229509691f3788",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "preview_short": "a488693",
+  "selected": 7492,
+  "counts": {
+    "PASS": 7492,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0
+  },
+  "skipped": 53,
+  "executed_binaries": 70,
+  "skipped_binaries": 114,
+  "elapsed_s": 154.453,
+  "summary": "7492 passed, 53 skipped",
+  "identical_repeat_records": 34,
+  "skills_counts": {
+    "PASS": 525,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0
+  },
+  "skills_cases": 525,
+  "changed_case": {
+    "status": "PASS",
+    "duration": "3.148s",
+    "index": 2022,
+    "total": 7492,
+    "name": "lamp-skills::it addon::says_the_judge_dropped_do_not_spend_the_hour"
+  },
+  "raw_sha256": "5d471e17bca51d8481c7f786f8ec6663c4873add103b8aaadfa59cd29d823f8c",
+  "raw_bytes": 1869242,
+  "limits": "Actual affected nextest selection, not automatically full workspace; raw private; separate process/docs not included.",
+  "status": "success",
+  "attempt": 1,
+  "preview": "a48869330a02577aa6a4a5b3c7759db51e49fed9",
+  "preview_parents": [
+    "cced429433211e06790f23ed8f51e07be613972d",
+    "942123c90d360bfb23a2c2739c229509691f3788"
+  ],
+  "equal_tree": "1596dd8e2565911e020427a1cdb198f363364389",
+  "affected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "linux_clippy_run": 40275870473,
+  "linux_clippy_status": "success",
+  "workspace_docs": {
+    "harnesses": 46,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "turn_wire_process": {
+    "passed": 13,
+    "failed": 0
+  },
+  "relay": "success",
+  "publication": "Raw log private; minimal source/test metadata only; no historical failure waived",
+  "scope": "PR affected twelve-package nextest subset excluding configured realtime tests; not whole workspace or full nightly",
+  "skills_limits": "525 unique native nextest passes; per-package skipped count not inferred from aggregate 53"
+}

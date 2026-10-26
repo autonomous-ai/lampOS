@@ -1,5 +1,28 @@
 # Tests work log
 
+## 2026-10-26 13:11 — Skills ready; Ready-speaking canonical qualification complete
+
+Ready for lamp-voice: yes (#3545)
+
+[Skills proof](verification/tests-skills-cced-20261026/) now includes native
+7,492 unique passes, zero failures/leaks/timeouts and 53 skips on 942123c90/cced.
+The changed case passed once; Skills contributes 525 native passes. Linux
+Clippy and exact-tree checks pass. Reviewer-three and Third posted current
+READ-OK, including Third's independent full Mac Skills 522/0/9. Earlier failed
+observations and the distinction between package and affected-selection
+coverage remain explicit.
+
+Ready for lamp-voice: no (#3548 native/review; #3466 installed rehearsal)
+
+[Ready-speaking canonical proof](verification/tests-ready-speaking-canonical-20261026/)
+records one full Expression run, 340/0/0, plus strict twelve-package Clippy and
+workspace build. Its original precommit source identity is retained; a separate
+all-tracked-byte-and-mode comparison binds it to 5713bece4 on cced42943,
+pushed as draft [#3548](https://github.com/autonomous-ai/lampOS/pull/3548). The
+matched diagnostic original-fail/candidate-pass is separate from canonical
+coverage. Full Mac reverse-dependent runtime and physical-lamp acceptance
+remain unrun; no device action occurred.
+
 ## 2026-10-26 12:51 — Sentinel ready; Skills pushed; Ready control started
 
 Ready for lamp-voice: yes (#3543)
