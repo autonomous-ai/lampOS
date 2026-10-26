@@ -1,3 +1,11 @@
+## 2026-10-26 13:34 — Current-base qualification after Main advanced
+
+Ready for lamp-voice: no
+
+Main advanced to d5dc2e87f with actual Voice attention/worker changes. #3544 returned to draft before publishing its current carry. Local head a08abe33e has an equal range-diff from 55eb90cf4 and identical three authored files; fresh workspace/full Voice gates are active. The earlier native qualification and READ-OK keep their original head and tree, rather than being relabelled current.
+
+The diagnostic fixture completed combined Voice 4,086/0/21 with no leaks/timeouts; its changed case passed once in 0.690 s, docs had zero cases, and source/witness/process closure verified. The earlier capacity stop and exact incremental recovery remain recorded. Its two-file task was committed independently, then carried equally as 9b758a4a7 on a08abe33e. It is not yet published or current-source qualified. Common composition against the newly landed name handling is under source review while the compiler remains with the parent carry. No lamp or activation occurred.
+
 ## 2026-10-26 13:04 — Hand-pump repair ready with native gates
 
 Ready for lamp-voice: yes (#3544)
