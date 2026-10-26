@@ -1,0 +1,70 @@
+{
+  "head": "cbc89589b1c76e6f2050e4a1ec54b11fe69071fc",
+  "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+  "runtime": [
+    185,
+    0,
+    1
+  ],
+  "controls": {
+    "a_reset_stops_the_writers_outside_the_target_after_what_starts_them": 1,
+    "the_updaters_way_back_restarts_nothing_after_the_barrier": 1,
+    "a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile": 1,
+    "a_part_not_stopped_or_one_that_joined_leaves_the_wipe_to_setup": 1
+  },
+  "gates": {
+    "clean": {
+      "exit": 0,
+      "command": "python3 ./.claude/worktrees/third-reset-onboarding-evidence/first-cbc-gate/clean-workspace.py",
+      "started": "2026-10-26T12:31:55Z",
+      "finished": "2026-10-26T12:31:57Z",
+      "log_sha256": "83f05bb1a82fbfeda64b6bf833cd97656ce9c38f6cbcd5eee3966d86c41904a6"
+    },
+    "fmt": {
+      "exit": 0,
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T12:31:57Z",
+      "finished": "2026-10-26T12:32:09Z",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "exit": 0,
+      "command": "cargo +1.96.0 clippy --offline --locked -p lamp-setup --all-targets --message-format=json -- -D warnings",
+      "started": "2026-10-26T12:32:09Z",
+      "finished": "2026-10-26T12:32:22Z",
+      "log_sha256": "6a4e98c81a0b22149ba2cd89bd2231ff129933e20582f979c322b716a1ad1b5e"
+    },
+    "build": {
+      "exit": 0,
+      "command": "cargo +1.96.0 build --offline --locked --workspace --message-format=json",
+      "started": "2026-10-26T12:32:22Z",
+      "finished": "2026-10-26T12:35:24Z",
+      "log_sha256": "d60749a3b819c9dd0f33198c3b505e7775b87540c371af8ec1e6eb6372eb7136"
+    },
+    "test-compile": {
+      "exit": 0,
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-setup --no-run --message-format=json",
+      "started": "2026-10-26T12:35:24Z",
+      "finished": "2026-10-26T12:35:46Z",
+      "log_sha256": "47e97f0842b2d9b3c8b7461b7f75fb99e89477b1969736cc9af7aa1673e0ac0e"
+    },
+    "runtime": {
+      "exit": 0,
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-setup -- --test-threads=1",
+      "started": "2026-10-26T12:36:16Z",
+      "finished": "2026-10-26T12:36:37Z",
+      "log_sha256": "5596d3a8e1a6c8ba3c284614a7ffe8925769332f17012543473f7b436353810a"
+    }
+  },
+  "fresh_local_packages": 48,
+  "source_unchanged": true,
+  "all_five_executables_unchanged": true,
+  "executable_sha256": {
+    "lamp_setup-9356f7332a4be1c4": "1f8d363aba62d5d9c05ca3314e42d966022beeef2fe3d0703d0e1a063d89b7ed",
+    "wake-7052689683923e21": "908ba346f96d423d2d09ef7aa3d228712ce358e56fcefc98c6d81573e2d59363",
+    "it-b01e1c3e1d834a04": "c5d495fa579c539ad49815830c0418095eff8e525104ff0e5a4898224ad9932f",
+    "lamp_setup-9b828e7b46c07778": "e876f1d7446efabc3ead186f6f3f3fbf943bcf53b2459dc4b030684b8c71b598",
+    "lamp-setup": "dd628e3c7668ac74c06c3af1d727386a841181c5bdbe4e781adc3b0ec958118f"
+  },
+  "limits": "Independent host review of First PR3579. No device changes or installed acceptance; command bound and custom journal follow-ups remain separately scoped. No retries."
+}

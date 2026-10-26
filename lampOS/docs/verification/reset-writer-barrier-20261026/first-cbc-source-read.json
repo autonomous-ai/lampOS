@@ -1,0 +1,24 @@
+{
+  "head": "cbc89589b1c76e6f2050e4a1ec54b11fe69071fc",
+  "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+  "source_read": "No P1/P2; Third source HOLD closed on PR3579 comment6416070746",
+  "checked": [
+    "Explicit target/member jobs complete before wipe",
+    "Accepting sockets stopped before loaded accepted-helper discovery",
+    "Lingering Setup and independent skills manager writers named",
+    "Updater back worker/timer finish before updater writer stop",
+    "Pending-self-switch regression detects same-stop misordering",
+    "Fixed boot Wi-Fi restore named in writer barrier",
+    "Main stock journal gate precedes reading rollback bytes",
+    "Shared reset/resume finish erases exact Wi-Fi backup/staging before journal removal",
+    "Journal retention and reboot on uncertain stop",
+    "No new switch, message, dependency or storage format",
+    "Protected calibration/software/trust paths unchanged"
+  ],
+  "limits": [
+    "No installed product acceptance",
+    "No exact affected29e7 writer timeline; hostname not resolvable from this host",
+    "Custom journal and command timeout issues remain separately scoped P3 follow-ups",
+    "Independent full host runtime pending; no prior outcomes relabeled"
+  ]
+}
