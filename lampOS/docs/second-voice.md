@@ -3063,9 +3063,10 @@ after a take-over, but now for every turn:
   after it began, so one from a line's last words can come after that line
   is judged, among the next line's signs.
   - With the switch, `Heeding::heed_signs` leaves out of a line's signs every
-    hearing that began inside the sound of the line judged last, before this
-    line began: it is not this line's name heard, its name's note, nor its
-    name said to a face. `Attention::began_at` keeps the same rule for a
+    hearing that began inside the sound of a line judged lately (the last
+    four, `SAID_KEPT`: one may come only after the line between was judged,
+    reviewer-two's P2 on `2110d04a9`), before this line began: it is not
+    this line's name heard, its name's note, nor its name said to a face. `Attention::began_at` keeps the same rule for a
     hearing that came in time and counted for its own line.
   - Kept as before: a line going on from the one before (`continues_from`),
     the line after one whose words called the lamp by name ("Lamp.", "Hey
@@ -3079,7 +3080,8 @@ after a take-over, but now for every turn:
     P2 on `da9a597de`: a third line had it back).
   - Tests: `attention::tests::a_name_heard_inside_a_line_stays_with_it`,
     `worker::tests::a_name_heard_in_the_line_before_does_not_play_the_next`
-    and `worker::tests::a_call_at_a_lines_start_goes_on_and_a_kept_hearing_is_used_up`,
+    `worker::tests::a_call_at_a_lines_start_goes_on_and_a_kept_hearing_is_used_up`
+    and `worker::tests::a_hearing_come_two_lines_late_stays_with_its_line`,
     with 4ace's times, the hearing late or in time, the switch off as a
     control.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
