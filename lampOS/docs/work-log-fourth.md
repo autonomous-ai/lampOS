@@ -1,3 +1,13 @@
+## 2026-10-26 18:04 — Current composed tree passes native gates
+
+Ready for lamp-voice: no
+
+The published 6dc PR's ARM64 40309109196 and Linux Clippy 40309109081 pass. Actual preview 209f8d248 has parents ba950 plus 6dc, tree b5fe21b132: exactly the local c97 carry's tree. [Native composition receipt](verification/hand-pump-receipts-20261026/native-6dc-preview.json). ARM64 ran 7,503 unique passes, zero failures/leaks/timeouts, all 64 hand-controls cases including the four required controls, five Linux speaker-lapse cases and four new transport controls. Thirty-four repeated display lines were excluded. The summary reports 53 skips; per-skip ignored/filter identities are unavailable. Separately: four doctests across 46 targets, 13 process cases and relay success. This is CI submitted at 6dc, not at c97.
+
+Current Mac compiler stages pass. The census controller's 125 is retained: it initially demanded nonempty Linux-only speaker tests on macOS. The only-unrun continuation correctly records zero Mac speaker-lapse coverage and has passed hand-controls 61/0/1 plus transport 28/0/0; Update continues. No compiler or passed runtime was replayed. The earlier full-Voice failures and privacy review HOLD stay separate.
+
+Diagnostic now carries equally as 2cc71e720 on c97. The isolated Common expiry source carries equally as c5be13f1b on that diagnostic, with all 16 repairs preserved; composed tree e8bf3c5a2. Callback's exact three-path delta is prepared on it as tree c63ac21b3, retaining mandatory typed authority fields. These composed-source gates remain UNRUN. Old canonical worktrees stay intact; no source cleanup, device operation, activation or score increase is claimed.
+
 ## 2026-10-26 17:42 — Qualified hand-control increment pushed; current carry starts
 
 Ready for lamp-voice: no

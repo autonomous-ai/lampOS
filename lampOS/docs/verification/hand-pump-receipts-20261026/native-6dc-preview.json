@@ -1,0 +1,198 @@
+{
+  "submitted_head": "6dc3d2b3329756bc20e58a43f13a1e4a2182b65f",
+  "submitted_tree": "cf9fcd83e7badaa46ab244ccad8a16ab644e123a",
+  "actual_checkout": "209f8d24818e595f2bf7d6a60bc2d3fc61c7dde5",
+  "checkout_parents": [
+    "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+    "6dc3d2b3329756bc20e58a43f13a1e4a2182b65f"
+  ],
+  "checkout_tree": "b5fe21b13217b1690ae24576574e0a9a82da979a",
+  "local_head": "c97dae33396a45657641c719794d162ca2d9c581",
+  "local_tree": "b5fe21b13217b1690ae24576574e0a9a82da979a",
+  "local_parent": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+  "tree_equivalent": true,
+  "runs": {
+    "40309109196": {
+      "headSha": "6dc3d2b3329756bc20e58a43f13a1e4a2182b65f",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40309109196"
+    },
+    "40309109081": {
+      "headSha": "6dc3d2b3329756bc20e58a43f13a1e4a2182b65f",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40309109081"
+    }
+  },
+  "nextest": {
+    "raw_terminal_lines": 7537,
+    "unique_executed": 7503,
+    "PASS": 7503,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "repeated_success_display_lines": 34,
+    "sequence_coverage": "all1..7503 exactly one identity per ordinal",
+    "skipped_summary": 53,
+    "skipped_binaries_summary": 114,
+    "ignored_vs_filtered_case_identity": "not independently distinguishable: raw log has no per-skip events;53 is not53 proven ignored cases",
+    "unrun_selected": 0
+  },
+  "hand_module_unique_pass": 64,
+  "hand_four_affected_cases": [
+    {
+      "status": "PASS",
+      "duration": "0.027s",
+      "sequence": 3902,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain"
+    },
+    {
+      "status": "PASS",
+      "duration": "2.031s",
+      "sequence": 1274,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.046s",
+      "sequence": 3938,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "sequence": 3928,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "hand_controls::tests::the_head_touch_fixture_joins_its_worker_before_a_failed_check_returns"
+    }
+  ],
+  "transport_four_controls": [
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "sequence": 6477,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "sequence": 6476,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "sequence": 6480,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "sequence": 6478,
+      "total": 7503,
+      "binary": "lamp-voice",
+      "name": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance"
+    }
+  ],
+  "speaker_lapse_linux_only": [
+    {
+      "status": "PASS",
+      "duration": "0.728s",
+      "sequence": 6844,
+      "total": 7503,
+      "binary": "lamp-voice::it",
+      "name": "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.566s",
+      "sequence": 6845,
+      "total": 7503,
+      "binary": "lamp-voice::it",
+      "name": "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "sequence": 6846,
+      "total": 7503,
+      "binary": "lamp-voice::it",
+      "name": "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.160s",
+      "sequence": 6847,
+      "total": 7503,
+      "binary": "lamp-voice::it",
+      "name": "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.020s",
+      "sequence": 6848,
+      "total": 7503,
+      "binary": "lamp-voice::it",
+      "name": "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation"
+    }
+  ],
+  "speaker_lapse_mac_limit": "Five Linux-only native cases verified; Mac zero was expected and provides no replacement coverage. No Mac run audited here.",
+  "separate_workspace_doctests": {
+    "targets": 46,
+    "pass": 4,
+    "fail": 0,
+    "ignored": 0,
+    "cases": [
+      "test crates/bus/src/lib.rs - (line 14) - compile ... ok",
+      "test crates/bus/src/lib.rs - (line 34) - compile ... ok",
+      "test crates/ipc/src/lib.rs - (line 12) ... ok",
+      "test crates/msgs/src/lib.rs - (line 24) - compile ... ok"
+    ],
+    "zero_case_targets": 43
+  },
+  "separate_process": {
+    "pass": 13,
+    "fail": 0,
+    "cases": [
+      "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2010 ms)",
+      "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+      "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+      "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+      "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+      "test missing_executable_fails_at_once ... ok (2 ms)",
+      "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+      "test startup_failures_are_final ... ok (409 ms)",
+      "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+      "test protocol_violations_are_replaced ... ok (177 ms)",
+      "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+      "test close_during_inference_never_waits ... ok (233 ms)",
+      "test sustained_requests_stay_bounded ... ok (691 ms)"
+    ]
+  },
+  "separate_relay": {
+    "terminal": "relay_signals: ok",
+    "occurrences": 1,
+    "custom_harness_not_libtest_count": true
+  },
+  "limits": [
+    "No CI rerun, compiler or target access.",
+    "No physical lamp or source privacy acceptance implied.",
+    "7503 excludes separately counted workspace docs/process/relay; nested fixture/libtest summaries and promotion-tool bootstrap tests are not added.",
+    "Tree equivalence is proven; CI submitted head and checkout commit remain distinct from local c97."
+  ],
+  "audit_sha256": "8239fb62aa85313bd608940ce339d7b5d5db3ca3068689cd4810829564f4caf7"
+}
