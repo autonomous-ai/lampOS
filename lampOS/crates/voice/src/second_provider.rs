@@ -1363,7 +1363,57 @@ struct Carried {
     /// the earlier request and the later: a line cut short before it was
     /// asked ([`Engine::chain_heard`]), or one cut while its join waited.
     unchecked: Vec<(u64, u64)>,
+    /// The request that first tried a memory write for these words
+    /// ([`WriteOwner`]), shared with a held line answering them again.
+    memory_write_owner: WriteOwner,
 }
+
+/// Which request first tried `remember`, `forget` or `forget_everything`
+/// for one spoken line's words. A held line with no words of its own that
+/// answers those words again shares it, so it cannot write again what the
+/// first one wrote, or may have (lamp-06c1, 26 Oct, build 6963: one
+/// "remember my favourite planet is Saturn" was kept three times, two
+/// empty held lines answering its words again). New words get their own.
+type WriteOwner = Arc<Mutex<Option<u64>>>;
+
+/// Whether `name` writes memory, for [`WriteOwner`]: `remember`, `forget`
+/// and `forget_everything`.
+fn writes_memory(name: &str) -> bool {
+    matches!(
+        name,
+        crate::remember::REMEMBER | crate::remember::FORGET | crate::remember::FORGET_EVERYTHING
+    )
+}
+
+/// Whether `request` may write memory for its words ([`WriteOwner`]):
+/// with no owner, always; else it claims the owner if no request has, and
+/// may if it is the one that did. A poisoned owner refuses. Called only
+/// for a call [`run_tool`] would send ([`reaches_memory`]): one refused
+/// before it is sent claims nothing, so a later answer to the same words
+/// may still try (Reviewer-two and reviewer-three on #3614).
+fn claims_write(owner: Option<&WriteOwner>, request: u64) -> bool {
+    owner.is_none_or(|owner| {
+        owner
+            .lock()
+            .is_ok_and(|mut owner| *owner.get_or_insert(request) == request)
+    })
+}
+
+/// Whether [`run_tool`] would send `name` on: not a memory call on a line
+/// held only by a gap, nor a call with the route's scoped tools and no
+/// scope (`unavailable`).
+fn reaches_memory(
+    shared: &Shared,
+    name: &str,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> bool {
+    let held = held_by_gap(scope) && MEMORY_CALLS.contains(&name);
+    let unavailable = shared.scoped_tools.is_some() && scope.is_none();
+    !held && !unavailable
+}
+
+/// What the model is told of a memory write refused by [`WriteOwner`].
+const CARRIED_MEMORY_WRITE: &str = "Not done: a memory change was already tried for these words. Do not call it again; if you are not sure it was kept, say so.";
 
 /// One line's words in a chain cut short ([`Carried::parts`]): its request,
 /// its words, when its line began by the engine's clock, and how many lines
@@ -1390,6 +1440,7 @@ impl Carried {
             at: Instant::now(),
             said_by,
             unchecked: Vec::new(),
+            memory_write_owner: WriteOwner::default(),
         }
     }
 
@@ -3580,6 +3631,7 @@ impl Engine {
                         Vec::new(),
                         Times::new(begun),
                         None,
+                        None,
                     )
                     .await
                 });
@@ -3640,6 +3692,7 @@ impl Engine {
                         None,
                         Vec::new(),
                         Times::new(Instant::now()),
+                        None,
                         None,
                     )
                     .await
@@ -5042,9 +5095,16 @@ async fn spoken(
             // is answered in its place, and the model is told words came, never
             // which (`worker::NAME_THEN_HELD`).
             let refused = !empty && name_refused(&shared, request, &carried);
-            let (words, said_by, parts) = if empty || refused {
+            // Only the carried words again keep their write's owner; joined
+            // with new words, the line may ask for a write of its own.
+            let (words, said_by, parts, owner) = if empty || refused {
                 unsay_carried(&shared, request, &carried);
-                (carried.text(), carried.said_by, carried.parts.clone())
+                (
+                    carried.text(),
+                    carried.said_by,
+                    carried.parts.clone(),
+                    carried.memory_write_owner.clone(),
+                )
             } else {
                 // While the join waits for a print, the carried words are
                 // where a newer line's cut finds them (the Reviewer on
@@ -5068,10 +5128,15 @@ async fn spoken(
                     return;
                 }
                 match joined {
-                    (joined, None, parts) => (joined, request, parts),
+                    (joined, None, parts) => (joined, request, parts, WriteOwner::default()),
                     (_, Some(carried), _) => {
                         unsay_carried(&shared, request, &carried);
-                        (carried.text(), carried.said_by, carried.parts)
+                        (
+                            carried.text(),
+                            carried.said_by,
+                            carried.parts,
+                            carried.memory_write_owner,
+                        )
                     }
                 }
             };
@@ -5087,6 +5152,7 @@ async fn spoken(
                     at: carried.at,
                     said_by,
                     unchecked: Vec::new(),
+                    memory_write_owner: owner.clone(),
                 },
             );
             let lease = scope.clone();
@@ -5107,6 +5173,7 @@ async fn spoken(
                     notes,
                     times,
                     None,
+                    Some(owner),
                 )
             );
             return;
@@ -5329,6 +5396,7 @@ async fn spoken(
             carried.request
         );
     }
+    let memory_write_owner = WriteOwner::default();
     put_in_flight(
         &shared,
         Carried {
@@ -5337,6 +5405,7 @@ async fn spoken(
             at: Instant::now(),
             said_by: request,
             unchecked: Vec::new(),
+            memory_write_owner: memory_write_owner.clone(),
         },
     );
     if let Some(heard) = &shared.words_heard {
@@ -5352,6 +5421,7 @@ async fn spoken(
         notes,
         times,
         prepared,
+        Some(memory_write_owner),
     )
     .await;
 }
@@ -5508,6 +5578,8 @@ fn waiting_chain(request: u64, marks: &Marks, carried: &Carried, own: Part) -> C
         request,
         at: Instant::now(),
         said_by: request,
+        // New words, so a write of their own ([`WriteOwner`]).
+        memory_write_owner: WriteOwner::default(),
         ..chain
     }
 }
@@ -7195,6 +7267,7 @@ async fn answer(
     notes: Vec<String>,
     times: Arc<Mutex<Times>>,
     prepared: Option<Prepared>,
+    memory_write_owner: Option<WriteOwner>,
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
@@ -7389,6 +7462,15 @@ async fn answer(
                 if policed == Policed::Held {
                     return Err(Stop::Held);
                 }
+            } else if writes_memory(&call.name)
+                && reaches_memory(shared, &call.name, scope.as_ref())
+                && !claims_write(memory_write_owner.as_ref(), request)
+            {
+                // Their yes is these words' memory write too ([`WriteOwner`]).
+                eprintln!(
+                    "lamp-voice second: request {request}: dropped a held forget ({}): a memory write was already tried for these words",
+                    call.name
+                );
             } else {
                 ran_tool.store(true, Ordering::Relaxed);
                 dispatched.store(true, Ordering::Relaxed);
@@ -7906,6 +7988,37 @@ async fn answer(
                         "lamp-voice second: request {request} chat round {round}: {} runs: their turn just before asked to forget",
                         call.name
                     );
+                }
+                // A memory call on a line held only by a gap runs for no one,
+                // by either runner: refused here, before the requested-audio
+                // runner too, which never reaches `run_tool`'s own refusal
+                // (Reviewer-two, 03:38 on #3614).
+                if held_by_gap(scope.as_ref()) && MEMORY_CALLS.contains(&call.name.as_str()) {
+                    eprintln!(
+                        "lamp-voice second: request {request}: a memory call on a line held only by a face's gap runs for no one"
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({ "error": HELD_MEMORY_CALL }).to_string(),
+                    ));
+                    continue;
+                }
+                // A memory write for words another request already tried one
+                // for ([`WriteOwner`]): claimed by the first to send one, the
+                // rest refused ([`claims_write`]).
+                if writes_memory(&call.name)
+                    && reaches_memory(shared, &call.name, scope.as_ref())
+                    && !claims_write(memory_write_owner.as_ref(), request)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: a memory write was already tried for these words",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": CARRIED_MEMORY_WRITE}).to_string(),
+                    ));
+                    continue;
                 }
                 ran_tool.store(true, Ordering::Relaxed);
                 let mut answer = match (&shared.requested_audio, spoken) {
