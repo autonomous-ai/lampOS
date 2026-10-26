@@ -184,8 +184,17 @@ lamp-setup reset-now`). That unit, in this order:
    lamp-29e7 on 26 Oct Voice's onboarding, written as it stopped, outlived
    the wipe, so the customer got no first five minutes. Then every part must
    read `inactive` (or `failed`), and the parts read again must be the same.
-   Parts that cannot be read, a part not stopped, or one that joined during
-   the stop are as a stop that fails;
+   A stop of `lampos.target` also stops the product's writers of wiped
+   paths outside it (`reset::WRITERS`): `lamp-setup.service`, which serves
+   for 600 s after setup, its recovery, the loaded `lamp-setup-change@`,
+   `-keys@` and `-wifi@` instances, `lamp-skills-manage@` instances,
+   `lamp-records` and the updater with its apply. What starts them
+   (`reset::STARTERS`: the helpers' and the skills' sockets, the records'
+   timer) is stopped first, so none starts after they are listed, and they
+   are read stopped too (reviewer-three, the reviewer-lead and Second on
+   #3579). Only loaded units are named: systemd refuses to stop a unit it
+   does not have. Parts that cannot be read, a part not stopped, or one that
+   joined during the stop are as a stop that fails;
 4. it wipes each path in the plan: a file is removed, a directory keeps itself
    (systemd units name some of them and would not start without them) and
    loses everything in it. It walks by handle, one component at a time from
