@@ -43,3 +43,13 @@ the builder whose lamp it is, on the Queue issue.
 
   The owner is testing it before merge.
 
+
+## 26 Oct, 15:41: devin-0-P3 taken, the lamp side of openharness#1717
+
+Ready for lamp-voice: no (draft #3563, ARM64 run pending, not run on a lamp)
+
+- Taken on #3504 at 15:41, after 15:13's proposal stood 15 minutes with no "no". The owner pulled it into the release (Dee on Slack, 26 Oct).
+- Kind: off unless set (`LAMP_MACHINE_ADDONS=on`). The judge's one change, `runtime::writer_may`, takes `machine_addons` only under `own-` names, and refuses `own-`/`remote-` names from `skills`.
+- Built on `devin-0/machine-addon` from lamp-voice `1cad670df`, commit `6a28a5482`. Gate on the Mac: fmt ok, clippy `-D warnings` ok, `cargo test -p lamp-addons` 47 + 12 + 4 passed, 0 failed, workspace build ok, switch census tests pass.
+- Not shown: a run on a lamp. lamp-a0ae (devin-local-tester's lamp, lent by the owner in this session, taken under `lamp-lock.sh`) has no Harness, and its `sudo` asks for a password, so the owner runs the setup by hand.
+- Found while doing it: the owner's Slack add-on (`daniel-auto/lamp-devin-add-on`) proposes `why` `messages`/`news`, which the lamp's bus check refuses. Adding them is a `crates/msgs` change, not mine; asked on #3504.
