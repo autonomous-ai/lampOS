@@ -1,0 +1,180 @@
+{
+  "scope": "Experimental helper/Wi-Fi support evidence for First PR3579; NOT complete factory-reset coverage",
+  "out_of_scope": [
+    "lamp-setup.service linger writer",
+    "lamp-skills-manage.socket and accepted instances"
+  ],
+  "five_artifact_hashes": [
+    {
+      "name": "lamp_setup-9356f7332a4be1c4",
+      "expected": "1f8d363aba62d5d9c05ca3314e42d966022beeef2fe3d0703d0e1a063d89b7ed",
+      "actual": "1f8d363aba62d5d9c05ca3314e42d966022beeef2fe3d0703d0e1a063d89b7ed",
+      "preserved": "1f8d363aba62d5d9c05ca3314e42d966022beeef2fe3d0703d0e1a063d89b7ed"
+    },
+    {
+      "name": "it-b01e1c3e1d834a04",
+      "expected": "3922f577fbff68afee7f4c7f99a99a05e05da61dfccd0de9d60843bdcd12701f",
+      "actual": "3922f577fbff68afee7f4c7f99a99a05e05da61dfccd0de9d60843bdcd12701f",
+      "preserved": "3922f577fbff68afee7f4c7f99a99a05e05da61dfccd0de9d60843bdcd12701f"
+    },
+    {
+      "name": "wake-7052689683923e21",
+      "expected": "505a8ef0c72f6e486b1dc6eaeb376325451b35265b0990a66822562bfa9b827a",
+      "actual": "505a8ef0c72f6e486b1dc6eaeb376325451b35265b0990a66822562bfa9b827a",
+      "preserved": "505a8ef0c72f6e486b1dc6eaeb376325451b35265b0990a66822562bfa9b827a"
+    },
+    {
+      "name": "lamp_setup-9b828e7b46c07778",
+      "expected": "60dd6df8ac2026c665d047460751ea77df76a9970badcdd932e7f06f06dbfb87",
+      "actual": "60dd6df8ac2026c665d047460751ea77df76a9970badcdd932e7f06f06dbfb87",
+      "preserved": "60dd6df8ac2026c665d047460751ea77df76a9970badcdd932e7f06f06dbfb87"
+    },
+    {
+      "name": "lamp-setup",
+      "expected": "27180bb488179d58d54bdbb71e05a0897a23f19f6ef8dea8843fe37d7edae0e4",
+      "actual": "27180bb488179d58d54bdbb71e05a0897a23f19f6ef8dea8843fe37d7edae0e4",
+      "preserved": "27180bb488179d58d54bdbb71e05a0897a23f19f6ef8dea8843fe37d7edae0e4"
+    }
+  ],
+  "all_artifacts_unchanged": true,
+  "source_changed_paths": [],
+  "sources_unchanged": true,
+  "control_outcomes": [
+    {
+      "test": "accepted_connections_before_listener_stop_are_discovered_after_it",
+      "result": "ok"
+    },
+    {
+      "test": "accepted_helper_count_output_and_restore_state_are_bounded",
+      "result": "ok"
+    },
+    {
+      "test": "accepted_helper_stop_refusal_or_timeout_keeps_data_and_reset_journal",
+      "result": "ok"
+    },
+    {
+      "test": "an_additional_trigger_after_helper_stop_refuses_success",
+      "result": "ok"
+    },
+    {
+      "test": "changed_membership_or_active_member_refuses_the_wipe",
+      "result": "ok"
+    },
+    {
+      "test": "existing_stock_systemctl_and_keeper_plans_use_the_barrier",
+      "result": "ok"
+    },
+    {
+      "test": "fixed_restore_is_stopped_or_truthfully_absent",
+      "result": "ok"
+    },
+    {
+      "test": "held_accepted_helper_finishes_exec_stop_post_before_any_wipe",
+      "result": "ok"
+    },
+    {
+      "test": "late_shutdown_write_is_wiped_before_reset_reboots",
+      "result": "ok"
+    },
+    {
+      "test": "listeners_must_be_inactive_and_trigger_names_must_match_their_socket",
+      "result": "ok"
+    },
+    {
+      "test": "malformed_missing_unknown_and_oversized_properties_fail_closed",
+      "result": "ok"
+    },
+    {
+      "test": "membership_count_and_original_deadline_are_bounded",
+      "result": "ok"
+    },
+    {
+      "test": "named_helper_garbage_collection_is_safe_but_static_absence_is_not",
+      "result": "ok"
+    },
+    {
+      "test": "query_and_stop_failures_are_not_successful_stops",
+      "result": "ok"
+    },
+    {
+      "test": "recursive_members_are_deduplicated_and_cycles_terminate",
+      "result": "ok"
+    },
+    {
+      "test": "subprocess_output_and_original_deadline_are_bounded",
+      "result": "ok"
+    }
+  ],
+  "sixteen_exact_unique_controls_pass": true,
+  "suite_summaries": [
+    {
+      "result": "ok",
+      "passed": 34,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "seconds": 4.17
+    },
+    {
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "seconds": 0.0
+    },
+    {
+      "result": "ok",
+      "passed": 157,
+      "failed": 0,
+      "ignored": 1,
+      "filtered": 0,
+      "seconds": 15.17
+    },
+    {
+      "result": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "seconds": 1.82
+    },
+    {
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "seconds": 0.0
+    }
+  ],
+  "totals": {
+    "passed": 197,
+    "failed": 0,
+    "ignored": 1
+  },
+  "compiler_gates": {
+    "fmt": {
+      "exit": 0,
+      "command": "cargo +1.96.0 fmt --all --check ",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "exit": 0,
+      "command": "cargo +1.96.0 clippy --offline --locked -p lamp-setup --all-targets --message-format=json -- -D warnings ",
+      "log_sha256": "54c13815936c1bc3c15aa8c311d1d9272dbc223dbbd5a3d0241b668957d733d8"
+    },
+    "build": {
+      "exit": 0,
+      "command": "cargo +1.96.0 build --offline --locked --workspace --message-format=json ",
+      "log_sha256": "93333cee817715f3ca69533564ec8aee5a307206471502ceb493b0626ffa6f76"
+    },
+    "test-compile": {
+      "exit": 0,
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-setup --no-run --message-format=json ",
+      "log_sha256": "da844b081e6f185d88706de446c294960cb352f824b36cbf3f78b4dcbf3cf787"
+    }
+  },
+  "offered_scope": "Supporting implementation for First PR3579; duplicate PR3583 closed. Not complete reset coverage: lingering lamp-setup.service and skills-manage activator/instances remain outside this branch. No device acceptance.",
+  "source_commit": "258b2a9f10"
+}

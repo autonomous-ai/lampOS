@@ -1,0 +1,148 @@
+{
+  "five_artifact_hashes": [
+    {
+      "name": "lamp_setup-9356f7332a4be1c4",
+      "expected": "1f8d363aba62d5d9c05ca3314e42d966022beeef2fe3d0703d0e1a063d89b7ed",
+      "actual": "1f8d363aba62d5d9c05ca3314e42d966022beeef2fe3d0703d0e1a063d89b7ed",
+      "preserved": "1f8d363aba62d5d9c05ca3314e42d966022beeef2fe3d0703d0e1a063d89b7ed"
+    },
+    {
+      "name": "it-b01e1c3e1d834a04",
+      "expected": "2fdc2548a79f4fa343701384ff9449a007a27214cb567b17dc38fd19e91f5031",
+      "actual": "2fdc2548a79f4fa343701384ff9449a007a27214cb567b17dc38fd19e91f5031",
+      "preserved": "2fdc2548a79f4fa343701384ff9449a007a27214cb567b17dc38fd19e91f5031"
+    },
+    {
+      "name": "wake-7052689683923e21",
+      "expected": "1cefc12af9201ea516883799e07ccddebcf8acfb9efaff6d41cfe79e1e121094",
+      "actual": "1cefc12af9201ea516883799e07ccddebcf8acfb9efaff6d41cfe79e1e121094",
+      "preserved": "1cefc12af9201ea516883799e07ccddebcf8acfb9efaff6d41cfe79e1e121094"
+    },
+    {
+      "name": "lamp_setup-9b828e7b46c07778",
+      "expected": "36474d92837821d744c3d0f2d83665981043a8d740ffc152c46fa762316f2c99",
+      "actual": "36474d92837821d744c3d0f2d83665981043a8d740ffc152c46fa762316f2c99",
+      "preserved": "36474d92837821d744c3d0f2d83665981043a8d740ffc152c46fa762316f2c99"
+    },
+    {
+      "name": "lamp-setup",
+      "expected": "813a09c5e6e1e3b8d36e07a932fbcb39a0f7dacb9220ac5a47a77875f7591bad",
+      "actual": "813a09c5e6e1e3b8d36e07a932fbcb39a0f7dacb9220ac5a47a77875f7591bad",
+      "preserved": "813a09c5e6e1e3b8d36e07a932fbcb39a0f7dacb9220ac5a47a77875f7591bad"
+    }
+  ],
+  "all_artifacts_unchanged": true,
+  "source_changed_paths": [],
+  "sources_unchanged": true,
+  "control_outcomes": [
+    {
+      "test": "changed_membership_or_active_member_refuses_the_wipe",
+      "result": "ok"
+    },
+    {
+      "test": "existing_stock_systemctl_and_keeper_plans_use_the_barrier",
+      "result": "ok"
+    },
+    {
+      "test": "late_shutdown_write_is_wiped_before_reset_reboots",
+      "result": "ok"
+    },
+    {
+      "test": "malformed_missing_unknown_and_oversized_properties_fail_closed",
+      "result": "ok"
+    },
+    {
+      "test": "membership_count_and_original_deadline_are_bounded",
+      "result": "ok"
+    },
+    {
+      "test": "query_and_stop_failures_are_not_successful_stops",
+      "result": "ok"
+    },
+    {
+      "test": "recursive_members_are_deduplicated_and_cycles_terminate",
+      "result": "ok"
+    },
+    {
+      "test": "subprocess_output_and_original_deadline_are_bounded",
+      "result": "ok"
+    }
+  ],
+  "eight_exact_unique_controls_pass": true,
+  "suite_summaries": [
+    {
+      "result": "ok",
+      "passed": 24,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "seconds": 3.94
+    },
+    {
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "seconds": 0.0
+    },
+    {
+      "result": "ok",
+      "passed": 156,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0,
+      "seconds": 15.11
+    },
+    {
+      "result": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "seconds": 1.83
+    },
+    {
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0,
+      "seconds": 0.0
+    }
+  ],
+  "totals": {
+    "passed": 186,
+    "failed": 0,
+    "ignored": 1
+  },
+  "compiler_gates": {
+    "fmt": {
+      "exit": 0,
+      "command": "cargo +1.96.0 fmt --all --check ",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "exit": 0,
+      "command": "cargo +1.96.0 clippy --offline --locked -p lamp-setup --all-targets --message-format=json -- -D warnings ",
+      "log_sha256": "92b6893cf3f5477b795286a843802822e1419a13764079a3d5fb8aed26480231"
+    },
+    "build": {
+      "exit": 0,
+      "command": "cargo +1.96.0 build --offline --locked --workspace --message-format=json ",
+      "log_sha256": "489173755b1ea756704291b46b9f6e04d5af54fac555e65274271ae91f32389a"
+    },
+    "test-compile": {
+      "exit": 0,
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-setup --no-run --message-format=json ",
+      "log_sha256": "8d0e8b50823b1685443ad9ed1a9d5f3b9560ec3d2d13f78e6ca62f4e80b8d2b4"
+    }
+  },
+  "offered_scope": "Supporting implementation for First PR3579; duplicate PR3583 closed. Not complete reset coverage: lingering lamp-setup.service and skills-manage activator/instances remain outside this branch. No device acceptance.",
+  "source_commit": "e5df1e4d1a"
+}
