@@ -1,4 +1,12 @@
-## 2026-10-27 03:07 — Face fixture recovery and remaining harnesses
+## 2026-10-27 03:10 — HTTP counter fault discriminates old behavior
+
+Ready for lamp-voice: no
+
+[Selected old-behavior receipt](verification/common-http-fault-counter-20261027/receipt.json) binds one final permission-check omission to the retained fault source and executable. The build completed; initial execution admission failed because the private copy had mode0600, so zero test children launched. That original controller125 remains recorded. An independent mode0700 copy of the same built executable then ran the exact counter control once: expected exit101, zero passes/one failure, one concrete HTTP send polled versus required zero. This is the requested discriminating negative control, not a fixed-code pass. No compiler or passed-test replay occurred in the continuation.
+
+The checked9bd source was restored exactly. All151 actual fault debug backing inputs were independently COW-cloned; the prior23 witnesses,7492+151 inputs and four passed driver clones remain intact. Actual preservation/control continuations exited0 and fresh owned sessions were empty before cache release. The original probe's native tool exit was unobserved and is not invented. Common repairs are now folded on currentMain2bf, source897/tree6a026; current composition runtime is UNRUN. Next is its delta gate, then own-branch push and new native gates. The camera witness remains a separate unwired prerequisite. Explicit-close, independent privacy, pin and physical holds remain; no device action.
+
+## 2026-10-27 — Face fixture recovery and remaining harnesses
 
 Ready for lamp-voice: no
 

@@ -1,0 +1,51 @@
+{
+  "qualified_source_head": "2a2b413fbcf238b95ab2c45bc44ed16c5561c3e3",
+  "qualified_source_tree": "9bd44e220356a95c82310f02d14e9ab5a5805ab3",
+  "test": "second_provider::services::tests::declaration_barrier_rechecks_permission_before_each_http_attempt",
+  "single_fault": "Remove final post_guarded permission check immediately before concrete HTTP send",
+  "fault_source_sha256": "75d42bfae75ce9256e9841a97ac424ca302696dcda841bd3b9ce518f6b60db14",
+  "fixed_source_sha256": "75adbd21c56fcb09ada6fb4c95dbfd4fc2f3005a26cc36c0d9fef1816ccab48e",
+  "fault_patch_sha256": "43bf6fca148ffe6af52982f5265a52bf746a492253cc499c2de01b6e343c339e",
+  "fault_driver_sha256": "7bb6cac4d35244ce6fbf85df739ffded53b460524a4c7453d31d2b189c52c9d2",
+  "initial_probe": {
+    "controller_exit": 125,
+    "build_exit": 0,
+    "control_exit": 125,
+    "control_child_launched": false,
+    "reason": "Executable copy had mode0600; PermissionError before child launch",
+    "source_restored": true,
+    "original_native_tool_exit_unobserved": true
+  },
+  "control_only": {
+    "actual_native_exit": 0,
+    "compiler_invocations": 0,
+    "executions": 1,
+    "actual_test_exit": 101,
+    "passed": 0,
+    "failed": 1,
+    "expected_assertion": "revoked declaration must never poll its concrete HTTP send",
+    "observed_send_polls": 1,
+    "required_send_polls": 0,
+    "qualified_source_stable": true,
+    "fixed_tests_replayed": 0,
+    "all_owned_sessions_groups_closed": true
+  },
+  "retention": {
+    "actual_native_exit": 0,
+    "fault_debug_backing_inputs_cloned": 151,
+    "old_witnesses_preserved": 23,
+    "prior_debug_backing_inputs_preserved": [
+      7492,
+      151
+    ],
+    "passed_driver_clones_preserved": 4,
+    "hardlinks": false,
+    "physical_copy_fallback": false,
+    "release_sha256": "21fc14764b77ee63dc8299084da8e24798621e6ca974aac6cc12acca9f5aa0e3",
+    "source_stable": true,
+    "fresh_owned_process_census_empty": true
+  },
+  "no_current_fixed_binary_claim": true,
+  "original_full_failure_remains_failed": true,
+  "no_device_or_latency_acceptance": true
+}
