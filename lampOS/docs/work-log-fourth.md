@@ -1,3 +1,13 @@
+## 2026-10-26 07:12 — Common checkpoint pushed; train-148 integration active
+
+Ready for lamp-voice: no
+
+Common #3064 is published as one commit 8af180bb6 on train147 3d9722f38. The PR body now states the concrete privacy behavior, current evidence and remaining holds. Its frozen train146 full run passed 8,372 with zero failures/leaks/timeouts and 58 skips. The train147 gate passed workspace fmt, strict workspace/all-target Clippy and build; full Controls 516/0/3, installation 92/0 and workflow readers 2/0. Controls docs completed with zero cases. Two procedure125 outcomes remain explicit: sandbox process-inspection denial before an observed fmt result, and filtered-result parser rejection after the actual installation command succeeded. Independent retained-output reconciliation and an unrun-only continuation finished the gate without repeating any runtime test. Final source, eight failure witnesses and owned groups verified. Only the proof note changed after the tested tree.
+
+Train148 landed while installation ran. The published commit rebases with an equal range-diff to f175c81bc on d21a854b6, clean tree2ab916341. Its new Voice two-face policy and Voice/Expression fixture changes compose without conflict. A separate current integration gate is active: workspace fmt/strict Clippy/build, full Voice/Expression/VoiceEval once, the two workflow readers, and three-package docs. Older counts are not assigned to this integration. The original8af ARM6440247988735 and LinuxClippy40247988677 are being watched separately, alongside the two additional candidate-reader workflows. Full independent privacy review, matching pins and First's known-person/other-person/look-away/privacy lamp acceptance remain holds.
+
+Onboarding's paired-success/unsupported-peer test and exact physical checklist are prepared; its twelve-package gate follows the Common integration. Peek's sessions-only source also passes an independent source read with no demonstrated P1/P2, while its eight new runtime controls remain unrun. The preceding binary's off-mode compatibility observation remains1/0. Both preparations are being carried onto actualtrain148 without another full checkout. Callback and Name child-only source patches are now independently preserved on the prior Common checkpoint; their actual publication must preserve the final parent's newer proof and source. No child activation, physical test or device access occurred.
+
 ## 2026-10-26 06:52 — Common full host gate complete; current carry qualifying
 
 Ready for lamp-voice: no
