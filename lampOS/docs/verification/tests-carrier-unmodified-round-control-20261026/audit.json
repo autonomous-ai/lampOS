@@ -1,0 +1,141 @@
+{
+  "baseline_commit": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "candidate_commit": "f281a5575b3cb6487517745a021bc61cad52747a",
+  "baseline_scope": "Unmodified Main Round integration binary only; actual checkout is 7d despite the private scratch directory name",
+  "baseline_command": "round --test-threads=16",
+  "baseline_runtime_attempts": 1,
+  "candidate_runtime_attempts_in_this_control": 0,
+  "baseline_counts": {
+    "passed": 183,
+    "failed": 0,
+    "ignored": 0
+  },
+  "candidate_retained_full_Update_counts": {
+    "passed": 439,
+    "failed": 3,
+    "ignored": 6
+  },
+  "candidate_retained_Round_counts": {
+    "passed": 192,
+    "failed": 3,
+    "ignored": 0
+  },
+  "test_threads": 16,
+  "inventory_comparison": {
+    "baseline_Round_total": 183,
+    "candidate_Round_total": 195,
+    "common_cases": 183,
+    "baseline_only": [],
+    "candidate_only": [
+      "product_carrier::a_comment_only_product_unit_is_an_intended_noop",
+      "product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+      "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+      "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+      "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+      "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+      "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation",
+      "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+      "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+      "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+      "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+      "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit"
+    ],
+    "all_candidate_only_cases_previously_passed": true,
+    "candidate_common_case_counts": {
+      "passed": 180,
+      "failed": 3,
+      "ignored": 0
+    },
+    "ordinary_filter_count": 0
+  },
+  "historically_failed_cases": [
+    {
+      "case": "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "candidate_original": "FAILED",
+      "baseline_control": "ok"
+    },
+    {
+      "case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "candidate_original": "FAILED",
+      "baseline_control": "ok"
+    },
+    {
+      "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "candidate_original": "FAILED",
+      "baseline_control": "ok"
+    }
+  ],
+  "artifact_comparison": {
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "target_name": "round",
+    "target_kind": [
+      "test"
+    ],
+    "profile_features_target_equal": true,
+    "baseline_binary_sha256": "985df18fdb71fbc5d106c0a7094591eee1bc6c9cf070733fb970ccbe7b5db187",
+    "baseline_binary_bytes": 16902700,
+    "candidate_binary_sha256": "a29ebb7d9f576433d1550cf0f908ab50f4f5c80143f80017bc84e98055ea682e",
+    "candidate_binary_bytes": 16984804,
+    "binary_equal": false,
+    "helper_literal_sources_equal": {
+      "lampOS/crates/update/tests/round/self_cuts.rs": {
+        "candidate_sha256": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06",
+        "baseline_sha256": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06"
+      },
+      "lampOS/crates/update/tests/round/runnable_events.rs": {
+        "candidate_sha256": "c9c7efcb0e758eae4d8f6c6f6ab36b80de57419dd0bc5719b2f9faf46d3a1fee",
+        "baseline_sha256": "c9c7efcb0e758eae4d8f6c6f6ab36b80de57419dd0bc5719b2f9faf46d3a1fee"
+      }
+    }
+  },
+  "guards": {
+    "baseline_source_unchanged": true,
+    "protected_197_unchanged": true,
+    "candidate_restored": true,
+    "restored_candidate_source_bytes_modes_index_status_equal": true,
+    "source_mtimes_changed_by_checkout": true,
+    "candidate_source_files_with_mtime_changes": 16,
+    "owned_group_closed": true,
+    "runtime_exit": 0,
+    "stop_reason": null
+  },
+  "interpretation": {
+    "product_cause_established": false,
+    "historical_failures_preserved": true,
+    "baseline_pass_waives_original_candidate_failures": false,
+    "byte_equivalent_execution_claim": false,
+    "ready_or_push_clearance": false,
+    "timing_comparison_claimed": false,
+    "scope_limit": "183 baseline Round cases are not a full-package baseline for the retained 439/3/6 candidate command."
+  },
+  "prior_failure_proof": "https://github.com/autonomous-ai/lampOS/tree/839863049/lampOS/docs/verification/tests-carrier-2d-parallel-failure-20261026",
+  "receipt_sha256": {
+    "terminal.json": "b9ce59ba2882ff23bee345197feba802e32dc862c840f1a434e4bf8af1378db3",
+    "census.json": "0192b4137c7238d661077c026bce4f6301a88902a7d1329e1aa37cbb421c3da2",
+    "inventory-comparison.json": "d4d0569252b4f8e206c6f5a1d4abd19b71d9a572a6dba3705d1a39055e684760",
+    "artifact-comparison.json": "3f47021155fc91605c4b905f0d2ca302d47204b66189c089de1f4ca3de3c6eca",
+    "helper-literal-source-equality.json": "9c89b19f0c997adb83fe3c8d142ee5ef091a76a470171d7effb542c58bf1387f",
+    "baseline-source-before.json": "dcc3458d618eeb24593e385c806d2bf711be209135551d0a69a98a752981d4b1",
+    "baseline-source-after.json": "dcc3458d618eeb24593e385c806d2bf711be209135551d0a69a98a752981d4b1",
+    "candidate-source.json": "fe5fa5293288000ed3fb9e6a62c3ca48fa6c28c60e9b5998c6ad4c9c6b043370",
+    "restored-candidate-source.json": "36f560b6a7c9696d54ed8841935b5e476e77c56fdfa014f573d5a16ac4e623b2",
+    "round-control-result.json": "5734a65558ad5485e024768375776ce320365aeac84caef1e5e0b70aaf182e35",
+    "round-control.stdout": "d61bd857378e56c282d5512a3879063677b7b15c4ce0738e986559658d481394",
+    "round-control.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "protected-before.json": "5047bebc11c061d158117690dedae1bf495e7f39f9846397821574ab2336e2b0",
+    "protected-after.json": "5047bebc11c061d158117690dedae1bf495e7f39f9846397821574ab2336e2b0",
+    "new-frozen.json": "72fce4743dec781c721642dc53447bcd7e594ae8859038f31f0e886449a03232",
+    "new-frozen-after.json": "72fce4743dec781c721642dc53447bcd7e594ae8859038f31f0e886449a03232"
+  },
+  "candidate_failure_receipt_sha256": {
+    "terminal.json": "9a26bbbbf8903b03ebc434b07a02fcf2fffed0bd46f0fe1b28989f115ae28c1c",
+    "update-census.json": "0154f2c0ceaf4dcdf07a2f508b0f396fd35e351024d920afddf742cb4affbe51"
+  }
+}
