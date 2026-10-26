@@ -1,9 +1,20 @@
-# Product carrier acceptance — pending owner execution
+# Product carrier acceptance
 
-Required by PR #3466 comment 6397116959. No device round is claimed here.
-Tests owns no lamp. A product-lamp owner or authorized borrower must claim
-an attended slot, obtain the lamp's required access approval and hold its
-lease. Lamp-4ace is excluded.
+Required by PR #3466 comment 6397116959. The owner-approved installed round
+on lamp-52e6 passed: meaningful GOOD 900011, actual BAD 900012 rejection,
+automatic exact-GOOD fallback and refusal, then verified restoration of
+original build 6963, real key and `lampos-stable`. The
+[installed evidence](https://github.com/autonomous-ai/lampOS/tree/976c891a9/lampOS/docs/verification/product-carrier-lamp-52e6-20261026/)
+records the artifact identities, operational events, observation limits and
+cleanup. One GOOD and one BAD ran without retries or a manual Voice restart
+for acceptance. Normal quiet/watch and recovery bounds were unchanged.
+
+Tests owns no lamp. This round used the owner's explicit password exception,
+the verified host key and a held lease; no SSH key or sudoers entry was added.
+The lamp was handed back, lease released and SSH closed. A later round still
+requires its own attended slot, access approval and lease. Lamp-4ace is
+excluded. The procedure below remains the acceptance contract; the earlier
+comment-only round stays a separate historical HOLD.
 
 ## Inputs and scope
 
@@ -68,8 +79,28 @@ Never modify signed bytes or overwrite an immutable GOOD/BAD prefix.
 
 ## GOOD and BAD acceptance
 
-GOOD appends only a harmless comment to the verified current Voice base
-unit. Capture a journal cursor, then start the controlled updater. Require
+GOOD inserts exactly `Environment=LAMP_CARRIER_TEST=1` inside the existing
+`[Service]` section of the verified current Voice base unit. First verify
+that this test variable is unused by the deployed program and absent from
+the original unit and its effective environment. Preserve the complete
+`ExecStart` line byte-for-byte, every existing argument and Environment line,
+and all other unit bytes. Do not append the assignment after an unrelated
+section. The owner reports 17 additional Environment lines compared with the old
+provisional unit, not a total of 17. Preserve every actual installed line and
+its exact private value, without reconstructing them from this sheet.
+
+Before signing, assert `unit::same(before, GOOD) == false` using the updater's
+actual comparator, require exactly the one intended Environment-line delta,
+and compare the unchanged Voice binary, current target and sidecars by full
+SHA-256. Stop before publication if any assertion fails. A comment-only unit
+is a separate intended no-op control: `unit::same(before, comment_only)` must
+be true; its normal applying round may record the sequence as up to date
+without replacing unit bytes, restarting or watching Voice. It is not GOOD.
+
+Capture the original installed sequence and a journal cursor, then start the
+controlled updater. Keep the installed sequence unchanged through climb and
+dry confirmation; require it to advance to GOOD only after real application.
+Require
 journal evidence of 5→6 climb and confirmation, unit installation, automatic
 Voice restart and successful normal health watch. Require the exact new
 unit bytes, unchanged Voice current target, and active/listening Voice.
@@ -78,9 +109,43 @@ Do not manually restart Voice to make the check pass.
 BAD starts from GOOD and appends `--product-carrier-test-invalid` to its
 single `ExecStart`. Require an actual unknown-option startup failure, then
 automatic health fallback restoring the exact GOOD unit and Voice link,
-with Voice active/listening again. Capture the failed sequence refusal.
+with Voice active/listening again. Require installed.sequence to remain GOOD,
+and capture the BAD sequence refusal.
 Manual restoration is recovery, not acceptance. Failed automatic rollback
 means HOLD; preserve the first evidence and stop rather than retry to green.
+
+## Prior installed round and quiet-state HOLD
+
+The owner-reported 6963 r2 round remains HOLD, not a successful carrier trial.
+The restored installed record was 6963 / `41233c1b6`; updater level 5 was
+`6d22838a…`, Voice was `7e17711d…`, and the original unit was `f646f086…`.
+That round used the b635671c2 candidate updater `49286ba0…bc31` from ARM64
+run 40273208241. Comment-only GOOD 900001 was `920fb514…`; BAD 900002 was
+`0ac27055…`. These are the owner's abbreviated trial hashes, not sufficient
+preflight checksums: obtain and verify the actual full SHA-256 values from
+private source artifacts before any new trial. Do not reuse deleted trial
+assets or relabel that old round as the corrected GOOD experiment.
+
+The old round climbed and confirmed, then recorded comment-only GOOD as
+up to date without replacing the unit or restarting Voice. That matches the
+semantic no-op path and does not establish premature sequence recording in
+climb. BAD did not reach application: missing `voice/state` prevented quiet
+from being judged, so automatic fallback was not exercised. Restoration was
+reported with the real key fingerprint `54213f8d3aa2f241`, the original
+`lampos-stable` feed and `lamp-voice` channel, original service/timer states,
+no test sudoers drop-in, and deleted trial prereleases and disposable key.
+Private preimages and journals have not been independently verified here.
+
+Keep quiet fail-closed. Before the next trial, capture same-cycle startup,
+active/privacy/software-mute state, BusOut initialization errors, topic
+declaration/publication timestamps and the updater's fresh receipt through
+the complete quiet interval. Topic presence later, or one spoken turn, is
+not proof of fresh receipt and does not explain the old absence. A missing
+state or unresolved publisher failure means HOLD; do not bypass the gate or
+change production behavior to force the trial. A fresh second-only service
+on an isolated real bus, without an utterance, still needs to demonstrate
+fresh Resting through that interval. The file-backed regression does not
+establish that service or device result.
 
 ## Teardown and evidence
 
