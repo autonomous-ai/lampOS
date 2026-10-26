@@ -1,0 +1,119 @@
+{
+  "base": "f3c8983418872d8ec8491e36ef465398f9e153f5",
+  "patch_sha256": "3a395fcba9593c698918a20aa325fff1d9b63753d5a7d08e04d93fbd65b1a99b",
+  "source_count": 7173,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "1f319e91f2ddeb871a6697ff5fb61fbf65e6cc444121d65121d70c397fce1084",
+  "changed_source_sha256": {
+    "lampOS/crates/voice/src/coordinator.rs": "d718f8b20d0f821ad478d4ff5787379a2b7fd295bad82869b301e6fd84e98e25",
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs": "92df7fed35ffc5ecf5590bc4097ab1a856b719b4d81375885aaf99b7b841e352",
+    "lampOS/crates/voice/src/reminders.rs": "9d0e1062876f69e1669dcfc6333d732aedc8e75ebaf625c2ae9ef96d97e18657",
+    "lampOS/crates/voice/src/reminders/tests.rs": "12e2766bc529da2d3a37c5da3e600ab119d4ccf6e8940989830ccf776a50a1f8",
+    "lampOS/docs/reuse-decisions.md": "203c7d18885972e2046208f23d02784a3f9081a687d8e37bfea9c0e9c8a97df4",
+    "lampOS/docs/schedule.md": "101afaf08fca10a78150b6617ea63d27a3eb525d0cbfc5e540ae9a217b80dcfb",
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/README.md": "e4fbf9a699cf9bbee83096e4692e832886347314b633d40e05f4209606494df4"
+  },
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T01:54:10Z",
+      "finished": "2026-10-26T01:54:22Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-26T01:54:22Z",
+      "finished": "2026-10-26T01:56:15Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-focused": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice --lib reminders -- --test-threads=1",
+      "started": "2026-10-26T01:56:15Z",
+      "finished": "2026-10-26T01:58:32Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 110,
+      "failed": 0,
+      "ignored": 2,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T01:58:32Z",
+      "finished": "2026-10-26T02:00:13Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-voice": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice -- --test-threads=1",
+      "started": "2026-10-26T02:00:13Z",
+      "finished": "2026-10-26T02:11:41Z",
+      "exit": 0,
+      "harnesses": 7,
+      "passed": 4080,
+      "failed": 0,
+      "ignored": 21,
+      "disk_error_lines": []
+    },
+    "test-schedule": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-schedule -- --test-threads=1",
+      "started": "2026-10-26T02:11:41Z",
+      "finished": "2026-10-26T02:12:17Z",
+      "exit": 0,
+      "harnesses": 8,
+      "passed": 214,
+      "failed": 0,
+      "ignored": 7,
+      "disk_error_lines": []
+    }
+  },
+  "own_control_pass_counts": {
+    "an_interruption_after_reminder_retirement_stays_held_without_ack_or_retry": 1,
+    "interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio": 1,
+    "a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission": 1,
+    "offline_user_interruption_retries_only_after_successful_authority_publication": 1,
+    "user_interruption_cannot_retry_a_failed_provider_with_unretired_audio": 1,
+    "interrupted_receipt_retires_before_or_after_audio_without_claiming_completion": 1,
+    "interrupted_receipt_preserves_completed_and_invalidated_outcomes": 1,
+    "interrupted_receipt_waits_for_drop_and_exact_consumer_settlement": 1,
+    "interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack": 1
+  },
+  "executable_sha256": {
+    "lamp_voice-6d619bbdd1df3a0d": "3fd20f8c0bc220dbc8af643164795c9ff344b24fcc5df9f1a25a462b8a86e074",
+    "lamp_voice-507b8ab98a2c94b0": "38fc627da91487a2bb9171ba2148d57030b3d8e665bdd1b2a4476f2865b8ca6b",
+    "it-ac9b9993d410d428": "adf4fe3b96b27a21d64e1a7beb077e72e78a683e6d1c76724bb1838faa81b988",
+    "release_pair-92e5f959ae720155": "7bb4fa30fb1c46cbf8c338da48a6c2d9d644bbb559cb652fd847b8597a702e6e",
+    "render_line_second-d52e8b12a523439f": "8028a06ec6b5e61b5ffcaf130707a31a9b597c565c015e16bf9c462dbf95b3df",
+    "stop_words_stt_replay-5a8c99799d0dadff": "4aebe9464ccda020f699d41c07264189e7b1bdae8a6e75d327891f757fa8be8c",
+    "lamp_schedule-de848ec9df735658": "a418d26fa7cea830d03b8d6a9cb096766908716ddfb74f14e9a420bd078dc2a0",
+    "lamp_schedule-de56f58e62853fa2": "5bea95cacb33abddabeac0c91832ba9fadea5bcea7d45a6c104dd07738f5d340",
+    "forward-3fb0f4d2ce430d98": "509c99e7254a3957cb171c095c3a97df981936c84ff0cbb52de7afbdca837e86",
+    "it-57ebe05dee816449": "da09701c321ac7c0b973610c82ebb9a96fac6b8f7d26eecb87bbbe3f15ef4549",
+    "release_pair-182e76929e283e55": "fe58d168bd4e54217e02fcfaa34d62cd475cc84f4a8fe7161347d8bffbc101e5",
+    "storage_children-65a83eb548aedca4": "7ce09eae73e367cc7cda6be9f0efb2244e17e535750b04b729f7e4ac83ac493f",
+    "schedule_check-eef6cffb53a641b7": "65274f038c94c8e586eaefc8d04dcddf7205d6decfcb21acc31ed7b0ec855574"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-focused": "579b5db10922ed9365de572c896383b22352b4b31181f35e6a01a0f3db48b578",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-voice": "3a50379da22afe1afeb0843dc6b98372a98784b838ce569279011786d1476f4d",
+    "test-schedule": "d25fce13ff9a14639e07977f9ed43eaae50db58d53683e179477c65f93e0b004"
+  },
+  "limits": "Native x86_64 Mac. Full Voice and Schedule on the frozen current-base overlay with separate fixture dependency; no ARM64 link, physical latency, played-word or device acceptance."
+}

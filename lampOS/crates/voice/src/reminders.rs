@@ -154,6 +154,27 @@ struct Progress {
     settlement: Option<ToWorker>,
 }
 impl Progress {
+    /// The caller has established that this exact owner cannot produce
+    /// more sound. This does not assert that none of it was heard.
+    fn retire_owner_fenced(&mut self) {
+        if self.settlement.is_some() {
+            return;
+        }
+        let proof = QualifiedRetirement {
+            correlation: self.token.correlation.clone(),
+            retired_by_session: self.token.correlation.consumer_session.clone(),
+            basis: lamp_schedule::delivery::RetirementBasis::OwnerFenced {
+                owner_boot: self.owner.boot().bytes(),
+                turn: self.owner.turn(),
+                microphone_generation: self.privacy,
+            },
+        };
+        self.settlement = Some(ToWorker::Retire {
+            token: self.token.clone(),
+            proof,
+        });
+    }
+
     fn eligible_completion_cursor(&self) -> Option<(u64, u64, u64)> {
         if self.qualified && self.had_audio && self.retired > 0 && self.settlement.is_none() {
             self.final_cursor
@@ -220,22 +241,28 @@ impl Receipt {
     /// retried later. Partially spoken/otherwise uncertain attempts stay pending.
     pub fn deferred_before_audio(&mut self) {
         let mut state = self.0.borrow_mut();
-        if state.had_audio || state.settlement.is_some() {
+        if state.had_audio {
             return;
         }
-        let proof = QualifiedRetirement {
-            correlation: state.token.correlation.clone(),
-            retired_by_session: state.token.correlation.consumer_session.clone(),
-            basis: lamp_schedule::delivery::RetirementBasis::OwnerFenced {
-                owner_boot: state.owner.boot().bytes(),
-                turn: state.owner.turn(),
-                microphone_generation: state.privacy,
-            },
-        };
-        state.settlement = Some(ToWorker::Retire {
-            token: state.token.clone(),
-            proof,
-        });
+        state.retire_owner_fenced();
+    }
+
+    /// A positively admitted user interruption may be retried even after
+    /// partial audio before any own retirement. Call only after cancelling
+    /// this exact owner, clearing
+    /// its queued output and successfully publishing its revoked/replacement
+    /// authority. A reason string or a failed publication proves no fence.
+    /// The coordinator retains this receipt across that operation; on any
+    /// failure its ordinary Drop leaves the uncertain attempt held instead.
+    /// An invalidated receipt or any qualified own retirement stays held.
+    /// A generation retirement is not a whole-provider completion, but may
+    /// already be the final words; conservatively do not repeat that attempt.
+    pub fn interrupted_after_owner_fenced(&mut self) {
+        let mut state = self.0.borrow_mut();
+        if !state.live || !state.qualified || state.eligible_completion_cursor().is_some() {
+            return;
+        }
+        state.retire_owner_fenced();
     }
 }
 impl Drop for Receipt {

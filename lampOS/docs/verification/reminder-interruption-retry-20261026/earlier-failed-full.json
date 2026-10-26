@@ -1,0 +1,22 @@
+{
+  "base": "d21a854b6a46209c8a76a70d8a8b3f3e286f0ff3",
+  "source_count": 7159,
+  "source_hashes_unchanged": true,
+  "patch_sha256": "2e5756c6d791d5ecfc9132ca3a5ae62d0051ed5b85527edf3848ad3cc8a51659",
+  "stages": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-voice": 101
+  },
+  "passed": 3787,
+  "failed": [
+    "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+    "coordinator::tests::second_route::a_push_once_the_looks_picture_went_cuts_its_answer"
+  ],
+  "ignored": 15,
+  "filtered": 0,
+  "binary_sha256": "30dffd89120869b1b722dad868a1daf83a701a8d7df203b2d678bc29b9a3f559",
+  "log_sha256": "ad8884eca09728e73ee1275f1a69bd851300bf1e4267ae1a40f56a85c955f2c3",
+  "schedule": "not run: stopped after failing stage"
+}

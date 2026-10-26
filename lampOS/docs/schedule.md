@@ -863,7 +863,7 @@ changes, and never one per tick. At start it says `started`, then
 line, so a reminder deferred while people talk is said once per retry),
 `said, waiting to be acknowledged` (a completion kept from before),
 `withdrawn: <why>` or `not offered: <why>`, `said; its completion is kept, to
-be acknowledged`, `not said: given back before any of it played, to be
+be acknowledged`, `not completed: this attempt can no longer speak, to be
 offered again`, `held: an attempt may have been heard and was never proven
 said, so it is not offered again`, and `resolved (<resolution>), not
 offered`. When the due notice itself cannot be read or trusted it says
@@ -1021,7 +1021,20 @@ proven resolved entries can be compacted, preserving a revision high-water mark.
 
 An offer withdrawn before admission or a provider deferral before any PCM may
 retry after explicit owner qualification, with at least five seconds between
-attempts. Partially spoken, failed, interrupted or crash-uncertain attempts stay
+attempts. A positively admitted user interruption also permits retry before
+any qualified own audio generation has retired, including partly played audio
+whose generation is still unretired, but only after the coordinator revokes its exact
+owner, clears queued output and successfully publishes the replacement or
+revoked authority. The receipt is retained until that boundary; any failure
+still leaves the attempt held. An already failed provider or invalidated
+playback clock does not qualify. An existing own-retirement cursor keeps the
+attempt held even if no whole-provider completion arrived: those may already
+be its final words. Conservatively this also holds a later unfinished generation
+after an earlier one retired. It does not fabricate completion or Ack.
+The same occurrence is offered after the conversation when ordinary fresh
+capture, silence, readiness and the five-second attempt pace permit it. Words
+already heard may repeat; no time limit alone authorizes replay. Failed,
+privacy-cancelled, otherwise unqualified or crash-uncertain attempts stay
 pending without re-speech while the voice that made them runs. Such an oldest
 entry does not starve other due work: a bounded page scan may select another
 pending item.
@@ -1263,9 +1276,13 @@ the Schedule switches/path settings above, raw logs and actual timing boundaries
    Separately try someone speaking, mute and a pending short utterance: no
    reminder may take that person's turn or bypass privacy. Confirm later
    delivery when current input and readiness permit it.
-4. Interrupt a multi-generation reminder after its first audio has retired,
-   and mute during the last generation. It must remain pending without Ack
-   or automatic re-speech. Explicitly list and snooze/cancel to resolve it.
+4. Interrupt before any audio generation has retired. It remains pending
+   without Ack, then may be offered after the conversation once ordinary
+   admission and attempt pacing permit it; partial words can repeat. Separately
+   interrupt after the final retirement, or interrupt a multi-generation
+   reminder after its first generation retired: both stay held without Ack or
+   automatic re-speech. Privacy cancellation also remains held. Explicitly
+   list and snooze/cancel to resolve those uncertain attempts.
 5. Restart Voice with an unknown prepared attempt; the new exclusive voice
    claim permits another attempt under the existing restart policy, so it may
    be heard again. Restart after a recorded completion but before Ack; it

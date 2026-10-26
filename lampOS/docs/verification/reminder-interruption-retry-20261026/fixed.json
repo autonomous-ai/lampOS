@@ -1,0 +1,106 @@
+{
+  "base": "2a353bfdb05f42548a82ec5374485f463d88ebac",
+  "patch_sha256": "0468043f3877eb1bbf8164dabafd18dbb0fee2b6f607fa9d7b2345aacb649a38",
+  "source_count": 7164,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "028857583f77b59c23483ed4f415cb676c5aa6cc42507de2c4c174124655ddaf",
+  "changed_source_sha256": {
+    "lampOS/crates/voice/src/coordinator.rs": "d6ac56c63e6a2e5895ad7790a29aaf67654b07d7d91a649fc2ac15676ca3b71b",
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs": "9861c665e328b93db0157b6dddb03444bba6de9f36257177edef882cc1426936",
+    "lampOS/crates/voice/src/reminders.rs": "fd1d586746075b1db7ca29a05914bd3e08f8d608d86dc90f34143c9adbeae967",
+    "lampOS/crates/voice/src/reminders/consumer.rs": "0f4274cb87d742d5110e0a483f0b3d2f70bd213c11dfc831b94986a90db0fbc4",
+    "lampOS/crates/voice/src/reminders/consumer/tests.rs": "b4f8d89800a83447dee920b52d6e00887d023bce0b556cc784f6e0a9603f5f22",
+    "lampOS/crates/voice/src/reminders/tests.rs": "a34c12c3c9f978d02b8ca4a8c1515e93cc97dd5fe9fb7d80b27f2e4bb4629168",
+    "lampOS/docs/reuse-decisions.md": "461c2d7446ccd77a55e13a1e95e936bd93677694216e1ff19fac9cb697199197",
+    "lampOS/docs/schedule.md": "1fd49192c577c97215afd619e2af55bdd92de9ea6f461c4a2c1214dadeb8c174"
+  },
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T00:59:52Z",
+      "finished": "2026-10-26T01:00:04Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-26T01:00:04Z",
+      "finished": "2026-10-26T01:01:57Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T01:01:57Z",
+      "finished": "2026-10-26T01:03:45Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-voice": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice -- --test-threads=1",
+      "started": "2026-10-26T01:03:45Z",
+      "finished": "2026-10-26T01:17:28Z",
+      "exit": 0,
+      "harnesses": 7,
+      "passed": 4078,
+      "failed": 0,
+      "ignored": 21,
+      "disk_error_lines": []
+    },
+    "test-schedule": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-schedule -- --test-threads=1",
+      "started": "2026-10-26T01:17:28Z",
+      "finished": "2026-10-26T01:18:42Z",
+      "exit": 0,
+      "harnesses": 8,
+      "passed": 214,
+      "failed": 0,
+      "ignored": 7,
+      "disk_error_lines": []
+    }
+  },
+  "own_control_pass_counts": {
+    "a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission": 1,
+    "offline_user_interruption_retries_only_after_successful_authority_publication": 1,
+    "user_interruption_cannot_retry_a_failed_provider_with_unretired_audio": 1,
+    "interrupted_receipt_retires_before_or_after_audio_without_claiming_completion": 1,
+    "interrupted_receipt_preserves_completed_and_invalidated_outcomes": 1,
+    "interrupted_receipt_waits_for_drop_and_exact_consumer_settlement": 1,
+    "interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack": 1
+  },
+  "executable_sha256": {
+    "lamp_voice-6d619bbdd1df3a0d": "7c2812f74b3a86d139c6c8971b1a9bd84bef5dca6ff1c123b3a4fa71bd0d4fdc",
+    "lamp_voice-507b8ab98a2c94b0": "dc981e376389b24097abb9eb1fbcf283919ddba546c91185d4147edb80def741",
+    "it-ac9b9993d410d428": "c213f1da789d4fe9ff194005083f283bfec4bda9e2027de7c38bef05a4b0b26d",
+    "release_pair-92e5f959ae720155": "35879a0733146c9ce2a3d04e156434ac14452a53264ba971a14027a601325afe",
+    "render_line_second-d52e8b12a523439f": "cddaadec62574020235476539bb07d61d7d6d5ea0c63bead2d4108ed7fbc5fe5",
+    "stop_words_stt_replay-5a8c99799d0dadff": "3b3e6e0851bafffabf3773d33dbc0c4241161a3f7547285f60bd0250765550e5",
+    "lamp_schedule-de848ec9df735658": "a418d26fa7cea830d03b8d6a9cb096766908716ddfb74f14e9a420bd078dc2a0",
+    "lamp_schedule-de56f58e62853fa2": "5bea95cacb33abddabeac0c91832ba9fadea5bcea7d45a6c104dd07738f5d340",
+    "forward-3fb0f4d2ce430d98": "509c99e7254a3957cb171c095c3a97df981936c84ff0cbb52de7afbdca837e86",
+    "it-57ebe05dee816449": "da09701c321ac7c0b973610c82ebb9a96fac6b8f7d26eecb87bbbe3f15ef4549",
+    "release_pair-182e76929e283e55": "fe58d168bd4e54217e02fcfaa34d62cd475cc84f4a8fe7161347d8bffbc101e5",
+    "storage_children-65a83eb548aedca4": "7ce09eae73e367cc7cda6be9f0efb2244e17e535750b04b729f7e4ac83ac493f",
+    "schedule_check-eef6cffb53a641b7": "65274f038c94c8e586eaefc8d04dcddf7205d6decfcb21acc31ed7b0ec855574"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-voice": "1c8a041b5d63868f5f42bb611a829a82602a591a3b156ebad76718c9ea8d3133",
+    "test-schedule": "a0ad5e5dbcc8aa6428c1e309c6f54d7a384f6cffb516b69c2eb03c70b8eafe59"
+  },
+  "limits": "Native x86_64 Mac. Full Voice and Schedule on the frozen current-base overlay with separate fixture dependency; no ARM64 link, physical latency, played-word or device acceptance."
+}

@@ -1,0 +1,30 @@
+diff --git a/lampOS/crates/voice/src/coordinator/tests/reminders.rs b/lampOS/crates/voice/src/coordinator/tests/reminders.rs
+index e1c48adb3..3fcb4b127 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/reminders.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/reminders.rs
+@@ -692,6 +692,25 @@ fn a_settled_reminder_finishes_before_the_live_loop_admits_its_successor() {
+     assert!(ended < began);
+ }
+ 
++#[test]
++fn an_interruption_after_reminder_retirement_stays_held_without_ack_or_retry() {
++    use super::provider_terminal::{ReminderBoundary, reminder_admission};
++    // The sole generation's final retirement and onset arrive in the same
++    // pump, but no provider terminal join authorizes a completed receipt.
++    let run = reminder_admission(ReminderBoundary::NoTerminal);
++    assert_eq!(run.starts.len(), 1, "real successor admitted");
++    assert_eq!(run.starts[0].0, 2);
++    assert_eq!(run.audio[0], (1, 1), "successor's first words kept");
++    assert_eq!(run.retirement_sent_at_us, run.onset_at_us);
++    assert!(
++        matches!(run.settlement, ToWorker::Abandon { .. }),
++        "a reminder with its own retired audio must stay held, not retry or Ack"
++    );
++    assert!(matches!(run.answers.as_slice(),
++        [Answer::Begun(_), Answer::Done(Outcome::Dropped(reason))]
++            if reason == "user_interrupted"));
++}
++
+ #[test]
+ fn a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission() {
+     use super::provider_terminal::{ReminderBoundary, reminder_admission};

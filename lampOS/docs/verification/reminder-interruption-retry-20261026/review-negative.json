@@ -1,0 +1,13 @@
+{
+  "head": "61a4e1774bef27e8748ba6e0c8c2e0cfd0affdad",
+  "source_count": 7170,
+  "all_source_hashes_unchanged": true,
+  "production_unchanged": true,
+  "patch_sha256": "a0575609a85895e7e7f3b235cb239340e0a988229f2a74e66588eca7c63958b0",
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "failure": "a reminder with its own retired audio must stay held, not retry or Ack",
+  "executable_sha256": "1bc44b27103c17c72bfa238e263a414376dbd57e3b95e51b85591047fd9f08a1",
+  "log_sha256": "757dbf41beed7cb4e4ac3ec1f9def279e2b0c2ccd8676e27fdba852f619d33c8"
+}

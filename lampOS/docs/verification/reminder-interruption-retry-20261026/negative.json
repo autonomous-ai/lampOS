@@ -1,0 +1,12 @@
+{
+  "base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "source_count": 7132,
+  "source_unchanged": true,
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "failure": "NoTerminal: known user interruption must retry after fencing",
+  "executable_sha256": "78da4da0191561d857dfe43619d5b902a68890f2273f06d9025fc780922e7349",
+  "log_sha256": "c399aa480db0ab58138e022d56388530e0a146d4a3ebc295c76e736300ce5b15",
+  "patch_sha256": "8084e0ebaa83c5309b4185a0c96f0ef57130096f73ea0265f37a9a20660d1b62"
+}

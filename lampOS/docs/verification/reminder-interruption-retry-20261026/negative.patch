@@ -1,0 +1,40 @@
+diff --git a/lampOS/crates/voice/src/coordinator/tests/reminders.rs b/lampOS/crates/voice/src/coordinator/tests/reminders.rs
+index d65acbbd4..d777bf69a 100644
+--- a/lampOS/crates/voice/src/coordinator/tests/reminders.rs
++++ b/lampOS/crates/voice/src/coordinator/tests/reminders.rs
+@@ -692,6 +692,35 @@ fn a_settled_reminder_finishes_before_the_live_loop_admits_its_successor() {
+     assert!(ended < began);
+ }
+ 
++#[test]
++fn a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission() {
++    use super::provider_terminal::{ReminderBoundary, reminder_admission};
++    for boundary in [ReminderBoundary::NoTerminal, ReminderBoundary::Unretired] {
++        let run = reminder_admission(boundary);
++        assert_eq!(run.starts.len(), 1, "{boundary:?}: real successor admitted");
++        assert_eq!(run.starts[0].0, 2);
++        assert_eq!(run.audio[0], (1, 1), "{boundary:?}: first words kept");
++        let ToWorker::Retire { token, proof } = run.settlement else {
++            panic!("{boundary:?}: known user interruption must retry after fencing");
++        };
++        assert_eq!(proof.correlation, token.correlation);
++        assert!(matches!(
++            proof.basis,
++            lamp_schedule::delivery::RetirementBasis::OwnerFenced { turn: 1, .. }
++        ));
++        assert!(matches!(run.answers.as_slice(),
++            [Answer::Begun(_), Answer::Done(Outcome::Dropped(reason))]
++                if reason == "user_interrupted"));
++        assert!(
++            !run.trace
++                .iter()
++                .any(|event| event["kind"] == "turn_finished"
++                    && event["turn"] == 1
++                    && event["outcome"] == "completed")
++        );
++    }
++}
++
+ #[test]
+ fn the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery_unacknowledged() {
+     use super::provider_terminal::{ReminderBoundary, reminder_admission};
