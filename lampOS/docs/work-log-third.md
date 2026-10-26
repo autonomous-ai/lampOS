@@ -13,6 +13,20 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 16:03 — Reminder carried to factory repair
+
+Ready for lamp-voice: no (current native gates and reads pending)
+
+**783184fc6** on **1aa409fcb** preserves one equal patch and all 32
+authored blobs. Fresh formatting, strict Skills Clippy, workspace build
+and all Skills test compilation pass. Five test drivers and actual child
+are byte-identical to sealed **a54ba36c3/1cad670df**, whose fresh **542/0/9**
+and all 21 controls once remain their actual execution.
+[Current binding](verification/reminder-pending-present-20261026/carry-1aa.json).
+The whole-head delta is factory scripts and install documentation; Update
+embeds steps.sh, so whole-workspace equivalence is not claimed. New native
+qualification and exact carry reads are required; no physical acceptance.
+
 ## 2026-10-26 15:59 — Current carries and alias correction
 
 Ready for lamp-voice: no (qualification in progress)
