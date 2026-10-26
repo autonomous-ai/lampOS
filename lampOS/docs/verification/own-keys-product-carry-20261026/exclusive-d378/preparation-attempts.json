@@ -1,0 +1,36 @@
+{
+  "empty_target_guard": {
+    "compilation_executed": false,
+    "error": "exclusive target is no longer empty",
+    "exit_code": 1,
+    "metadata_executed": false,
+    "stage": "preflight target empty assertion",
+    "target_entries": [
+      {
+        "directory": false,
+        "path": ".rustc_info.json",
+        "sha256": "f43794c98b40d048321d524c4c81ed4892e1d563bc866ab164b529957c54b895",
+        "size": 1685
+      }
+    ]
+  },
+  "full_workspace_offline_metadata": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "metadata",
+      "--locked",
+      "--offline",
+      "--format-version",
+      "1"
+    ],
+    "disk_free_before": 99680100352,
+    "elapsed_seconds": 0.905,
+    "error": null,
+    "exit_code": 101,
+    "log_sha256": "3e9b139e7160c5621b769e6ae19f9bcb427ee435a8b5471063aee6e4444388c8",
+    "source_entries": 7258,
+    "source_unchanged": true
+  },
+  "scope": "Both preparation attempts stopped before compilation or tests; preserved, not overwritten."
+}

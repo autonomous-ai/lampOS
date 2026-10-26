@@ -1,0 +1,18 @@
+{
+  "exclusive_target_empty_before_first_command": true,
+  "paths": {
+    "/.cargo/config": null,
+    "/.cargo/config.toml": null,
+    "<ancestor-cargo>/config": null,
+    "<ancestor-cargo>/config.toml": null,
+    "<home>/.cargo/config": null,
+    "<home>/.cargo/config.toml": null,
+    "<scratch>/.cargo/config": null,
+    "<scratch>/.cargo/config.toml": null,
+    "<source>/.cargo/config": null,
+    "<source>/.cargo/config.toml": null,
+    "<source>/lampOS/.cargo/config": null,
+    "<source>/lampOS/.cargo/config.toml": "# Resolve the camera UAPI bundle from this standalone workspace, not host media headers.\n[env]\nV4L2R_VIDEODEV2_H_PATH = { value = \"vendor/linux-uapi-v6.12-adc218676eef/include\", relative = true, force = true }\n"
+  },
+  "relevant_inherited_variables": []
+}

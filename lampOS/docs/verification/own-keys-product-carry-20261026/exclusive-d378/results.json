@@ -1,0 +1,140 @@
+{
+  "complete": {
+    "actual_and_preserved_artifacts": 14,
+    "artifacts_unchanged": true,
+    "base": "6663ca655b8e31eb9b73926d17b292df576b10aa",
+    "complete": true,
+    "head": "d378a185031dd839e0e559aacc520391760e440e",
+    "ignored": 21,
+    "passed": 4093,
+    "source_entries": 7258,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "6663ca655b8e31eb9b73926d17b292df576b10aa",
+    "controller_sha256": "66bdf6cb14b1c2895c51fffee8bceeaeda84d64c4234699d5a7b725ce27bbc3f",
+    "head": "d378a185031dd839e0e559aacc520391760e440e",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "metadata_sha256": "46d2532c2db329c321dcf343bdf40c7d88d711603bc7c687d71bbae75a126b66",
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 99690344448,
+      "elapsed_seconds": 187.042,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "a19ec66a38563000e9f8722b103e761b7a49465df73fa81caec4ed427961a030",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 99251212288,
+      "elapsed_seconds": 253.367,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "0e0dc115b8913f9461b6c7083b6202c9ac6010c1beebad4b27ec585b39bd26ac",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 99690246144,
+      "elapsed_seconds": 6.418,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 99692449792,
+      "elapsed_seconds": 0.986,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "46d2532c2db329c321dcf343bdf40c7d88d711603bc7c687d71bbae75a126b66",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "disk_free_before": 95411752960,
+      "elapsed_seconds": 575.212,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "bd6ca2f080ecb683e77a9d54f3e6641d092c1d690eee291f20ed525104958a9b",
+      "source_entries": 7258,
+      "source_unchanged": true
+    }
+  },
+  "scope": "Full Voice runtime only; strict nine-crate Clippy. Prior reused-target outcome and preparation failures retained separately.",
+  "source_inventory_sha256": "bd579e4ef505c66f03daa0ecdbaf8955791c6df2ad32516a1df1936dd42b4c25"
+}

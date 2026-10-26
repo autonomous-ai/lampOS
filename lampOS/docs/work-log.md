@@ -1,3 +1,13 @@
+Ready for lamp-voice: startup delivered; own-keys software carry active, activation HOLD unchanged.
+
+## Current checkpoint: 2026-10-26 18:08 +07, exclusive-target Voice qualification passed
+
+[Fresh d378/6663 evidence](verification/own-keys-product-carry-20261026/exclusive-d378/README.md): formatting, strict nine-crate all-target Clippy and full Voice pass. Literal runtime **4,093 passed / 0 failed / 21 ignored**, four new transport controls once, 575.212 seconds. Six test executable summaries and zero doctests are retained. All 7,258 source entries, 14 executable pairs, 65 reached local compiler outputs and 675 depfiles passed final actual/preserved guards; 48 local package trees are inventoried. The compilation target was created from verified absence after separate metadata/fmt preparation.
+
+This fresh qualification addresses the historical target-sharing limitation for this scoped execution. It does not relabel the prior six-crate 6,175/0/48, discard the reused-target observations, or erase either preparation stop. Native Linux worker/ARM64 evidence remains separate. The next carry onto ba950f289 changes inherited installer fixtures and documentation only; its composed full Update library/install gate follows before push. #3510 remains draft for #2094 and current-lamp acceptance. No device, provider or release action ran.
+
+---
+
 Ready for lamp-voice: startup delivered; own-keys activation HOLD; local cache qualification narrowed.
 
 ## Current checkpoint: 2026-10-26 17:51 +07, historical cache provenance audit

@@ -1,0 +1,11 @@
+[
+  {
+    "cfgs": [],
+    "env": [],
+    "linked_libs": [],
+    "linked_paths": [],
+    "out_dir": "<target>/debug/build/lamp-camera-958a935b8b9a0668/out",
+    "package_id": "path+file://<source>/lampOS/crates/camera#lamp-camera@0.1.0",
+    "reason": "build-script-executed"
+  }
+]
