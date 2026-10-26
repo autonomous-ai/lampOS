@@ -563,6 +563,77 @@ pub(crate) fn face_and_memory(mut face: Value, memory: &Value) -> Value {
 /// couldn't be emptied ([`face_and_memory`]).
 pub const FACE_MEMORY_KEPT: &str = "Their face is forgotten, but what they told you could not be forgotten just now. Tell them so; they can ask you to forget everything.";
 
+/// "Forget everything about me", and their face with it: once the memory of
+/// the known person whose line it is was emptied (`told`, as the model hears
+/// it: `forgotten`, or nothing kept), the eyes forget that person's face and
+/// the name it keeps, as "forget my face" asks (`known_faces::FORGET`), in
+/// their scope alone, never the room's. On lamp-52e6 on 2026-10-26 (build
+/// 6963) the memory was forgotten, `people.json` kept the face and its name,
+/// and the lamp greeted the person by it when asked. A face that could not be
+/// forgotten, one the eyes do not see at the lamp then included, is said
+/// ([`MEMORY_FACE_KEPT`]).
+/// Off (`LAMP_MEMORY_FORGET_ALL`), on a line of the room's, or with the
+/// memory not emptied, `told` is as it was.
+pub fn forget_everything_face(
+    told: (Value, bool),
+    who: &std::path::Path,
+    switches: crate::known_faces::FaceSwitches,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    forget_everything_face_if(forget_all_on(), told, who, switches, lease)
+}
+
+/// [`forget_everything_face`] with `LAMP_MEMORY_FORGET_ALL` as `on`.
+fn forget_everything_face_if(
+    on: bool,
+    told: (Value, bool),
+    who: &std::path::Path,
+    switches: crate::known_faces::FaceSwitches,
+    lease: &crate::memory_scope::ScopeLease,
+) -> (Value, bool) {
+    let Some(person) = lease
+        .scope()
+        .and_then(|scope| scope.person().map(str::to_owned))
+    else {
+        return told;
+    };
+    let emptied =
+        told.0["forgotten"] == true || told.0["note"] == json!("I was keeping nothing of them.");
+    if !on || !emptied {
+        return told;
+    }
+    // Nothing heard or saved before it follows anyone, as "forget my face".
+    crate::follows_face::forgot();
+    let call = ToolCall {
+        id: String::new(),
+        name: crate::known_faces::FORGET.into(),
+        args: json!({}),
+    };
+    let (face, _) = crate::known_faces::run_for(who, &call, switches, Some(&person), None);
+    (memory_and_face(told.0, &face), told.1)
+}
+
+/// What the model hears for a person's memory emptied (`memory`) and the
+/// eyes' answer to forgetting their face (`face`)
+/// ([`forget_everything_face`]): their face forgotten too, or kept and said
+/// so. The eyes find the face of the person whose line it is only while
+/// they see it at the lamp, so one not in view is kept, and said.
+pub(crate) fn memory_and_face(mut memory: Value, face: &Value) -> Value {
+    if face["ok"] == true {
+        memory["face"] = json!("forgotten too");
+    } else {
+        eprintln!(
+            "lamp-voice: a person's memory was emptied, but their face could not be forgotten now"
+        );
+        memory["face"] = json!(MEMORY_FACE_KEPT);
+    }
+    memory
+}
+
+/// What the model is told when the memory went but the person's face
+/// couldn't be forgotten ([`memory_and_face`]).
+pub const MEMORY_FACE_KEPT: &str = "What they told you is forgotten, but their face could not be forgotten just now, so you may still know them by it. Tell them so; they can look at you and ask you to forget their face.";
+
 /// Set it once for this process, as [`start`] does from the environment;
 /// the first setting stands. For a caller that runs the Days client itself.
 pub fn switch_forget_all(on: bool) -> bool {
@@ -8931,6 +9002,60 @@ mod tests {
             vec![26, 27],
             "an ambiguous correction must never pick an old id"
         );
+    }
+
+    /// The lead on #1711 (lamp-52e6, 2026-10-26, build 6963): "forget
+    /// everything about me" emptied the memory and kept the face and its
+    /// name. With the memory of the known person whose line it is emptied,
+    /// the eyes are asked to forget that face: their yes is said as
+    /// "forgotten too", no answer as kept. A room's line, a memory not
+    /// emptied and the switch off ask the eyes nothing.
+    #[test]
+    fn forgetting_everything_forgets_the_persons_face_too() {
+        let dir = std::env::temp_dir().join(format!("forget-all-face-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let who = dir.join("eyes.sock");
+        std::fs::write(crate::known_faces::known_file_of(&who), "Ann\n").unwrap();
+        let emptied = (json!({"forgotten": true, "everything": true}), true);
+        let switches = crate::known_faces::FaceSwitches::default();
+        let listener = UnixListener::bind(&who).unwrap();
+        let eyes = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            (&stream).write_all(b"{\"forgot\":true}\n").unwrap();
+            line
+        });
+        let ann = scoped_request(Some("Ann"), 3_558_001);
+        let (told, answered) =
+            forget_everything_face_if(true, emptied.clone(), &who, switches, &ann.lease());
+        let asked = eyes.join().unwrap();
+        assert!(asked.contains("\"forget\":\"Ann\""), "{asked}");
+        assert_eq!(told["face"], "forgotten too");
+        assert_eq!(told["forgotten"], true);
+        assert!(answered);
+        // The eyes not answering: the face is said to be kept.
+        std::fs::remove_file(&who).unwrap();
+        let (told, _) =
+            forget_everything_face_if(true, emptied.clone(), &who, switches, &ann.lease());
+        assert_eq!(told["face"], MEMORY_FACE_KEPT);
+        // A room's line, a memory not emptied, the switch off: as it was.
+        let room = scoped_request(None, 3_558_002);
+        assert_eq!(
+            forget_everything_face_if(true, emptied.clone(), &who, switches, &room.lease()),
+            emptied
+        );
+        let kept = (json!({"forgotten": false, "note": "not now"}), true);
+        assert_eq!(
+            forget_everything_face_if(true, kept.clone(), &who, switches, &ann.lease()),
+            kept
+        );
+        assert_eq!(
+            forget_everything_face_if(false, emptied.clone(), &who, switches, &ann.lease()),
+            emptied
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     /// #2850: "forget my face" with its person's memory emptied says so;

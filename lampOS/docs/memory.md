@@ -1988,6 +1988,18 @@ then use that person's scope:
   now goes on, when the lamp has a memory: what they ask to keep and say is
   theirs, and what recall marks "theirs" they told it themselves, so with
   them it may say "you told me" about that and never about the rest.
+- **"Forget everything about me"** forgets their face too, with
+  `LAMP_MEMORY_FORGET_ALL=on`: on a line said at the lamp whose admitted scope
+  is the known person's, once their memory answers that it is emptied, the
+  voice asks the eyes to forget that person's face and the name it keeps, as
+  "forget my face" asks (`remember::forget_everything_face`). The model hears
+  `face: "forgotten too"`, or that it could not be forgotten now: the eyes
+  find the face only while they see it at the lamp, so one not in view is
+  kept, and said. A room's line asks the eyes nothing. On lamp-52e6 on 26 Oct
+  (build 6963) the memory was forgotten, `people.json` kept the face and its
+  name, and the lamp greeted the person by it when asked (the lead on #1711).
+  The name typed at setup (`/etc/lampOS/person/name`) is the setup's, not the
+  face's, and only the 5 s reset clears it.
 - **"Forget my face"** forgets the face only: what they said stays theirs,
   unless `LAMP_MEMORY_FORGET_ALL=on` (#2850). Then, on a line whose admitted
   scope is the known person's, once the eyes answer that their face is
