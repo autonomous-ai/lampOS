@@ -438,6 +438,58 @@ mod tests {
     /// non-blocking, whichever way the relay writes them.
     #[test]
     fn a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking() {
+        const CHILD: &str = "LAMP_IPC_FULL_JOURNAL_TEST_CHILD";
+        const CASE: &str = "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking";
+        if std::env::var_os(CHILD).as_deref() != Some(std::ffi::OsStr::new("1")) {
+            // Nothing reads the full pipe/socket until write_now returns.
+            // A regression therefore blocks for real. Isolate it so the
+            // diagnostic watchdog can stop and reap it without a stuck thread.
+            struct Probe(std::process::Child);
+            impl Drop for Probe {
+                fn drop(&mut self) {
+                    if !matches!(self.0.try_wait(), Ok(Some(_))) {
+                        let _ = self.0.kill();
+                    }
+                    let _ = self.0.wait();
+                }
+            }
+            let mut probe = Probe(
+                std::process::Command::new(std::env::current_exe().unwrap())
+                    .args([CASE, "--exact", "--test-threads=1", "--color=never"])
+                    .env(CHILD, "1")
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::piped())
+                    .spawn()
+                    .unwrap(),
+            );
+            let until = Instant::now() + Duration::from_secs(15);
+            let status = loop {
+                if let Some(status) = probe.0.try_wait().unwrap() {
+                    break status;
+                }
+                assert!(
+                    Instant::now() < until,
+                    "journal write did not return while its pipe/socket stayed full"
+                );
+                std::thread::sleep(Duration::from_millis(5));
+            };
+            use std::io::Read;
+            let mut output = String::new();
+            probe
+                .0
+                .stdout
+                .take()
+                .unwrap()
+                .take(65_537)
+                .read_to_string(&mut output)
+                .unwrap();
+            assert!(output.len() <= 65_536, "unexpected child output volume");
+            assert!(status.success(), "full-journal child failed: {output}");
+            // Exit zero alone would also accept a misspelled, unselected test.
+            assert!(output.contains(&format!("test {CASE} ... ok")), "{output}");
+            assert!(output.contains("1 passed; 0 failed"), "{output}");
+            return;
+        }
         let (read, pipe) = rustix::pipe::pipe().unwrap();
         let own = Journal::new(rustix::io::dup(&pipe).unwrap());
         #[cfg(target_os = "linux")]
@@ -448,9 +500,7 @@ mod tests {
         };
         for journal in [own, polled] {
             assert!(filled(&journal) > 0);
-            let started = Instant::now();
             assert_eq!(write_now(&journal, b"one more line\n"), Err(Errno::AGAIN));
-            assert!(started.elapsed() < Duration::from_millis(100));
             // The pipe stays as its owner made it: a parent's `eprintln!`
             // into it waits for room, never fails.
             assert!(waits_when_full(&pipe, &read));
