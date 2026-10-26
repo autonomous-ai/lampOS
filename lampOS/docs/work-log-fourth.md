@@ -1,3 +1,9 @@
+## 2026-10-26 09:30 — Taken: diagnostic sequence acknowledgement fixture
+
+Ready for lamp-voice: no
+
+Taken on Queue #3504 after checking open and merged work: strengthen only the DSP-reset sequence fixture so a timeout cannot satisfy its negative controls. The related recorder-peer fix #1597 is already delivered; no open repair for this case was found. The fixture will require queued submissions, acknowledged Complete for the consecutive sequence and Invalid for repeated/gapped sequences, with matching summary/marker state. It uses the existing maximum acknowledgement wait only for this file-format test; production's default/maximum and dedicated timeout tests remain unchanged. The observed c5 timeout stays failed with its cause unproved. Source preparation is separate from Common's frozen current gate; new runtime checks are UNRUN.
+
 ## 2026-10-26 09:27 — Common failed gate retained; current composition qualifying
 
 Ready for lamp-voice: no
