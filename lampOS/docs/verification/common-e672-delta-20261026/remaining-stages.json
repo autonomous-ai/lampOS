@@ -1,0 +1,247 @@
+[
+  {
+    "label": "own-self-process-cuts",
+    "raw_exit": 0,
+    "counts": {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1
+    },
+    "named_results": [
+      {
+        "name": "persisted_self_switches_survive_sigkill",
+        "status": "ignored",
+        "cargo_target": "tests/self_process_cuts.rs"
+      }
+    ],
+    "parsed": {
+      "raw_summaries": [
+        {
+          "status": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "measured": 0,
+          "filtered": 0,
+          "cargo_target": "tests/self_process_cuts.rs"
+        }
+      ],
+      "cargo_target_sections": [
+        {
+          "cargo_target": "tests/self_process_cuts.rs",
+          "summaries": [
+            {
+              "status": "ok",
+              "passed": 0,
+              "failed": 0,
+              "ignored": 1,
+              "measured": 0,
+              "filtered": 0,
+              "cargo_target": "tests/self_process_cuts.rs"
+            }
+          ],
+          "header": "Running tests/self_process_cuts.rs (target/debug/deps/self_process_cuts-fad4d2e16b859c79)"
+        }
+      ],
+      "selected_final_target_summaries": [
+        {
+          "status": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "measured": 0,
+          "filtered": 0,
+          "cargo_target": "tests/self_process_cuts.rs"
+        }
+      ],
+      "named_results": [
+        {
+          "name": "persisted_self_switches_survive_sigkill",
+          "status": "ignored",
+          "cargo_target": "tests/self_process_cuts.rs"
+        }
+      ],
+      "raw_aggregate": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1
+      },
+      "final_target_aggregate": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1
+      },
+      "count_boundary": "Raw sums may include nested isolated-child output. Final-target sums select the last summary per observed Cargo Running/Doc-tests section; inspect raw sections for any nested Cargo headers."
+    },
+    "Mac_ignored_not_pass": true
+  },
+  {
+    "label": "own-self-cli-exec",
+    "raw_exit": 0,
+    "counts": {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1
+    },
+    "named_results": [
+      {
+        "name": "actual_cli_exec_confirms_before_the_next_round",
+        "status": "ignored",
+        "cargo_target": "tests/self_cli_exec.rs"
+      }
+    ],
+    "parsed": {
+      "raw_summaries": [
+        {
+          "status": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "measured": 0,
+          "filtered": 0,
+          "cargo_target": "tests/self_cli_exec.rs"
+        }
+      ],
+      "cargo_target_sections": [
+        {
+          "cargo_target": "tests/self_cli_exec.rs",
+          "summaries": [
+            {
+              "status": "ok",
+              "passed": 0,
+              "failed": 0,
+              "ignored": 1,
+              "measured": 0,
+              "filtered": 0,
+              "cargo_target": "tests/self_cli_exec.rs"
+            }
+          ],
+          "header": "Running tests/self_cli_exec.rs (target/debug/deps/self_cli_exec-20e040872a7466d4)"
+        }
+      ],
+      "selected_final_target_summaries": [
+        {
+          "status": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "measured": 0,
+          "filtered": 0,
+          "cargo_target": "tests/self_cli_exec.rs"
+        }
+      ],
+      "named_results": [
+        {
+          "name": "actual_cli_exec_confirms_before_the_next_round",
+          "status": "ignored",
+          "cargo_target": "tests/self_cli_exec.rs"
+        }
+      ],
+      "raw_aggregate": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1
+      },
+      "final_target_aggregate": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1
+      },
+      "count_boundary": "Raw sums may include nested isolated-child output. Final-target sums select the last summary per observed Cargo Running/Doc-tests section; inspect raw sections for any nested Cargo headers."
+    },
+    "Mac_ignored_not_pass": true
+  },
+  {
+    "label": "all-package-doctests",
+    "requested_packages": [
+      "lamp-body",
+      "lamp-voice-eval",
+      "lamp-setup",
+      "lamp-cloud",
+      "lamp-update",
+      "lamp-eyes",
+      "lamp-voice"
+    ],
+    "eligible_targets": [
+      "lamp_body",
+      "lamp_cloud",
+      "lamp_eyes",
+      "lamp_setup",
+      "lamp_update",
+      "lamp_voice",
+      "lamp_voice_eval"
+    ],
+    "targets": [
+      "lamp_body",
+      "lamp_cloud",
+      "lamp_eyes",
+      "lamp_setup",
+      "lamp_update",
+      "lamp_voice",
+      "lamp_voice_eval"
+    ],
+    "summaries": [
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ok",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ]
+    ],
+    "raw_exit": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "zero_case_targets_not_tests": true
+  }
+]

@@ -1,3 +1,13 @@
+## 2026-10-26 23:59 — Common native failures and current carry
+
+Ready for lamp-voice: no
+
+Pushed #3064 checkpoint db11fa2e6 with the producer fixes folded into one Common commit on the tested 2a827 base. The [e672 delta](verification/common-e672-delta-20261026/accounting.json) completed 2,083 clean passes, zero failures, all 33 required boundaries once; 29 natural ignored identities and 4,250 filter exclusions are discovery categories, not new runtime credit. Its runtime nextest exited 0; the original controller's undefined accounting name exited 125 after runtime and remains recorded. Offline accounting corrected the report without compiler/test replay. Only unrun custom/docs stages followed: both Mac-unsupported custom cases ignored and seven zero-case doctest targets completed. [Release](verification/common-e672-delta-20261026/release.json) verifies unchanged source/evidence, owned-process closure and actual continuation exit 0.
+
+The [original native checkpoint runs](verification/common-db11-native-20261026/receipt.json) failed: Linux Clippy 40360500025 reports three question-mark diagnostics; ARM64 40360500416 has 9,927 unique passes, one callback assertion failure, 1,632 selected cases without completion, and 106 summary-only skips. The failing fixture signals request arrival before recording it across separate mutex guards, permitting a receipt observer to count zero. The repair holds one guard across both actions and releases before hooks/socket I/O. It preserves zero-based hold selection and the actual denial assertions. No exact failed binary was uploaded; raw logs are retained.
+
+Both fixes are carried with all 16 producer-repair files onto current Main 008e7a974; source and affected checks precede the next folded push. The privacy lease-clock fixture is staged separately and remains ungated. Explicit-close, independent privacy, parent and physical acceptance HOLDs remain. No device action, activation or quality score change.
+
 ## 2026-10-26 22:05 — Common full correction gate completed
 
 Ready for lamp-voice: no

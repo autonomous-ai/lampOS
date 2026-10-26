@@ -1,0 +1,166 @@
+{
+  "state": "ORIGINAL_NATIVE_RUNS_FAILED_NO_RERUN",
+  "PR": 3064,
+  "published_head": "db11fa2e622150996b69efe28bbe1b4abf409cd1",
+  "published_head_ordered_parents": [
+    "85bc50886b2cd4794fc00e3e1f40da2bac44d7aa"
+  ],
+  "published_head_tree": "f3b0f5b51639d15be3396eb21a85ca21af9f03b4",
+  "actual_checkout": {
+    "sha": "ddfc67479e7a4c9d4591425f6a835a828c2222e7",
+    "ordered_parents": [
+      "521dcb006848a5bc99b11513828233ef65a4883c",
+      "db11fa2e622150996b69efe28bbe1b4abf409cd1"
+    ],
+    "tree": "1543281474f5dd29c26fcc0f91742a5ef81918a5",
+    "proof": "Both raw checkout git log -1 full SHA plus GitHub Git-commit API"
+  },
+  "LinuxClippy": {
+    "run": 40360500025,
+    "job": 121704315906,
+    "conclusion": "failure",
+    "exit": 101,
+    "diagnostics": [
+      {
+        "lint": "clippy::question_mark",
+        "path": "lampOS/crates/eyes/src/main.rs",
+        "line": 2667
+      },
+      {
+        "lint": "clippy::question_mark",
+        "path": "lampOS/crates/eyes/src/main.rs",
+        "line": 2814
+      },
+      {
+        "lint": "clippy::question_mark",
+        "path": "lampOS/crates/eyes/src/main.rs",
+        "line": 2888
+      }
+    ],
+    "formatting": "success",
+    "stable_promotion_clippy": "success",
+    "workspace_all_targets_clippy": "failure",
+    "targets": [
+      "lamp-eyes bin",
+      "lamp-eyes bin test"
+    ]
+  },
+  "ARM": {
+    "run": 40360500416,
+    "job": 121704317414,
+    "conclusion": "failure",
+    "nextest_exit": 100,
+    "unique_terminals": {
+      "PASS": 9927,
+      "FAIL": 1
+    },
+    "raw_PASS_display_lines": 9950,
+    "raw_FAIL_display_lines": 2,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "ABORT": 0,
+    "summary": "9928/11560 tests run: 9927 passed, 1 failed, 106 skipped",
+    "selected_not_completed_after_fail_fast": 1632,
+    "summary_only_skips": 106,
+    "declared_ignored_count": "NOT_ESTABLISHED_FROM_SUMMARY_ONLY",
+    "failed_case": {
+      "binary": "lamp-voice",
+      "test": "second_provider::worker::kept_name_callback::new_request_already_waiting_retries_after_the_old_reader_actually_denies",
+      "source": "crates/voice/src/second_provider/worker/kept_name_callback_tests.rs:1685:9",
+      "assertion": "old Room response is still held",
+      "left": 0,
+      "right": 1
+    },
+    "required_33": {
+      "PASS": 17,
+      "NO_TERMINAL_OBSERVED": 16,
+      "all33_qualified": false
+    },
+    "four_hand_cases": {
+      "PASS_once_each": 4,
+      "included_in_nextest_passes": true,
+      "extra_count_added": 0
+    },
+    "own_Update_custom_harnesses": {
+      "passed_once_each": 2,
+      "included_in_nextest_passes": true,
+      "extra_count_added": 0,
+      "cases": [
+        {
+          "binary": "lamp-update::self-cli-exec",
+          "test": "actual_cli_exec_confirms_before_the_next_round",
+          "displays": [
+            {
+              "status": "PASS",
+              "duration": "0.149s",
+              "ordinal": 6664,
+              "total": 11560
+            }
+          ]
+        },
+        {
+          "binary": "lamp-update::self-process-cuts",
+          "test": "persisted_self_switches_survive_sigkill",
+          "displays": [
+            {
+              "status": "PASS",
+              "duration": "4.106s",
+              "ordinal": 7083,
+              "total": 11560
+            }
+          ]
+        }
+      ]
+    },
+    "workspace_doctests": "STEP_SKIPPED_NOT_RUN",
+    "IPC_relay_signals": "STEP_SKIPPED_NOT_RUN",
+    "turn_end_process_13": "STEP_SKIPPED_NOT_RUN",
+    "prelude_publication_or_promotion_tests": "NOT_INCLUDED_IN_NEXTTEST_COUNTS",
+    "expected_panic_fixture_diagnostics": "NOT_COUNTED_AS_FAILURE_WITHOUT_A_FAILED_TERMINAL"
+  },
+  "source_blob_parity": {
+    "qualified_tree": "d9f10adf38fb5be2b34c9d61485f17044e52a92c",
+    "qualified_base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+    "authored_paths": 42,
+    "authored_Rust_or_test": 26,
+    "authored_units": 2,
+    "authored_manifests": 2,
+    "all_these_blob_identities_match_actual_merge": true,
+    "whole_tree_identity_claimed": false,
+    "doc_differences": [
+      "lampOS/docs/memory.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/verification/common-checking-20261023/README.md"
+    ]
+  },
+  "limits": [
+    "Both native failures remain failures at their original checkout",
+    "No historical failure waiver or cause established by this census",
+    "No physical/device acceptance",
+    "No reruns, posts, commits or source/index/target writes"
+  ],
+  "raw_and_derived_sha256": {
+    "arm-job-121704317414.log": "1fadede16069dd289b96131ab138e5b124f8449434edd6ac3c212c93210a6c4e",
+    "arm-run-api-initial.json": "839f4c5355fa8c90d85cc4c6bd222ce3a628356561cbda50db48aa5f2f80d772",
+    "arm-run-api-final.json": "7c9c54733e3576aec55d35c5e8f63c3bb4d858429149f3a52e78030f32b93399",
+    "merge-tree-api.json": "f76f1223d6eb61ef01a9d47425f9c67552544c6e29f0f86b0879d106543ef076",
+    "unique-nextest-terminals.json": "0d4552bc21abc6a367c1b24cc3f34611e9df3b8c8fa4f3759a8cfa5135cf9889",
+    "merge-git-commit-api.json": "abea8802f280de6140ddb99cca80cc5e66f97374cbb1549e6040ce1a8e268078",
+    "clippy-run-api-initial.json": "df7fcadba94fdc98896f53351eeefbef83e3934d8db31e5969bab016e40ac918",
+    "four-hand-census.json": "d000f3ddb7a1d238a014b8f09838e9591cd7552e1bd814576f89d07a5fda2c2e",
+    "required-boundary-census.json": "2372177edb7e7deda410e56c10f0796aa54caecc1cc8a3bad5f3a5c178efef8f",
+    "pr-api-initial.json": "fd4acc29c364b020ac2bcf423d6e1e7d7d45746f929b8626764b76cc69453cde",
+    "arm-jobs-latest.json": "d9947ac33f9cbd1c5d6b33c562e20e748da1c5c5033fbc60792c4f6abd8e9028",
+    "clippy-exact-diagnostics.txt": "5d5ae5c52fd7ff5a54e7b128576b9b32334a3fcd4485fb6b3f4d00c42aca5ebf",
+    "clippy-run-api-final.json": "3c0ea160334f6f7426440d25ccccb2078f0c8ba417b4484c9329408c10c96796",
+    "arm-jobs-final.json": "23b07dba77586a333dda71bfaaafb08538cddffa07c7be6a52273d5dab538963",
+    "arm-jobs-initial.json": "d9947ac33f9cbd1c5d6b33c562e20e748da1c5c5033fbc60792c4f6abd8e9028",
+    "clippy-jobs-initial.json": "8681e955d4ebafadf2ac4fc39df08a9954adab20c736a894b029b2f555b6875d",
+    "clippy-job-121704315906.log": "ed709da2bf7547bd870fa6696abdb4d60930f3742e5e92bd7d7687b789eb2675",
+    "authored-blob-comparison.json": "08844fdbe7c75941ae25908d55f6c5adf2486105d6c27bdbbf4fa850a1ebd8f6",
+    "clippy-jobs-final.json": "e8ec75c2d54a08580ab0122c56a21051cad3e4c84a060abc7ebfb8419ef3fbef",
+    "arm-exact-diagnostic.txt": "3bbcf2c3197c1d564fc978906e03c293d7c4afe0dc90c95e2436dcbf0abb62fc",
+    "git-commit-api.json": "2d2634fd9ff7761f18590562036c48d0d9ddd7fe19347662a1432efa27f3c429"
+  }
+}

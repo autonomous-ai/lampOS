@@ -1,0 +1,60 @@
+{
+  "head": "53d83e269284b3026416cdb0af3d206d954b4634",
+  "tree": "b7195bfce0aed8d07a839680a5e9315b691fbe27",
+  "actual_native_session_id": 89939,
+  "actual_native_exit": 0,
+  "actual_native_chunk": "cd05a2",
+  "source_stable": true,
+  "all_owned_sessions_groups_closed": true,
+  "target_release_permitted": true,
+  "protected_witnesses": 22,
+  "debug_inputs": 7492,
+  "passed_driver_clones": 4,
+  "fresh_process_census": [
+    {
+      "stage": "own-self-process-cuts",
+      "sid": 49333,
+      "members": [],
+      "inspection_errors": []
+    },
+    {
+      "stage": "own-self-cli-exec",
+      "sid": 56594,
+      "members": [],
+      "inspection_errors": []
+    },
+    {
+      "stage": "all-package-doctests",
+      "sid": 56804,
+      "members": [],
+      "inspection_errors": []
+    }
+  ],
+  "runtime": {
+    "current_delta_passed": 2083,
+    "failed": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "required_controls_passed": 33,
+    "direct_hand_cases": 4,
+    "remainder_passed": 2079,
+    "natural_ignored_in_listed_discovery": 29,
+    "filter_exclusions": 4250,
+    "custom_mac_ignored_separate": 2,
+    "doc_targets": 7,
+    "doc_cases": 0
+  },
+  "original_controller_exit": 125,
+  "original_nextest_exit": 0,
+  "corrected_accounting_sha256": "2a018a205d2251dcc4078e5cdddd32001a86bcff92c9ca6e92e68c902d6e0edd",
+  "only_unrun_continuation_exit": 0,
+  "no_test_replay": true,
+  "receipts": {
+    "run.py": "bfc59c658d9ba6680aedc9238ba6bc4c50c4261bb351148807002caa66a390a3",
+    "binding.json": "1757f0ba091470b6deb1c72bdce96c80b11ed9c582060bd2d1df7b85e1345f4e",
+    "terminal.json": "1fe3fa6983de08cfda5641df7638bd4c9c01976d5f29e4769e09e34af8a84c1a",
+    "operations.json": "c057b0cec80904d4c1da63cb36c6ca6704a35d949e73a996eb3dbd9422e78650",
+    "results.json": "8f7615dd2b7d73338262cc9277031a071015070082b93d14fb147a79c9847043",
+    "continuation.json": "bf70bbc343536f866d96a1ca89cb3a7548b2aa19b006cba27300edc55277092a"
+  }
+}

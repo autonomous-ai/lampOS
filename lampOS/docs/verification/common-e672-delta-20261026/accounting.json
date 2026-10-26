@@ -1,0 +1,121 @@
+{
+  "state": "OFFLINE_ACCOUNTING_ONLY_NO_RUNTIME_REPLAY",
+  "script_sha256": "a2709efdc0f23d9c44a3761c8e855e0960bcd0751fd342c29b06e195bcdeda28",
+  "packet": "/private/tmp/fourth-common-e672-delta-20261026",
+  "original_controller_exit": 125,
+  "original_controller_error": {
+    "type": "NameError",
+    "message": "name 'projected_human' is not defined",
+    "no_runtime_replay_for_parser_recovery": true
+  },
+  "raw_nextest_exit": 0,
+  "counts": {
+    "accounting_valid": true,
+    "all_selected_terminal": true,
+    "selected_cases": 2079,
+    "passed_including_LEAK": 2079,
+    "clean_passed": 2079,
+    "passed_but_LEAK": 0,
+    "failed": 0,
+    "ignored_discovery_and_human_SKIP": 4279,
+    "ignored_JSON_terminals": 25,
+    "raw_nextest_exit": 0,
+    "failed_keys": [],
+    "leaky_keys": [],
+    "timeout_case_count": 0,
+    "suite_terminal_rows_retained": 58,
+    "suite_rows_not_independent_test_counts": true,
+    "direct_hand_passed": 4,
+    "combined_passed": 2083,
+    "current_full14": false,
+    "natural_ignored": 29,
+    "filter_exclusions": 4250
+  },
+  "direct_hand": [
+    {
+      "label": "direct-hand-0",
+      "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+      "passed": 1,
+      "raw_exit": 0
+    },
+    {
+      "label": "direct-hand-1",
+      "test": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain",
+      "passed": 1,
+      "raw_exit": 0
+    },
+    {
+      "label": "direct-hand-2",
+      "test": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+      "passed": 1,
+      "raw_exit": 0
+    },
+    {
+      "label": "direct-hand-3",
+      "test": "hand_controls::tests::the_head_touch_fixture_joins_its_worker_before_a_failed_check_returns",
+      "passed": 1,
+      "raw_exit": 0
+    }
+  ],
+  "required_boundary_count": 33,
+  "ordinary_assertion_failure": false,
+  "LEAK_not_clean_pass": 0,
+  "source_or_target_read_or_mutation": false,
+  "compiler_or_test_invocation": false,
+  "original_input_sha256_before": {
+    "binding.json": "36ac27aa6712f2a1a9dc74396f82a32437fa92c316d1ba7e0d5e571c6cf5c61e",
+    "integration-discovery.json": "be49be8c3d25a43cb5898e50af20fd33634447122b5a02d553c3dc0f32b52b82",
+    "integration-run-process.json": "a4b754fca0f0dbfa1974d63d0c14e98fcd22e2733049c68f9a5160c194929e01",
+    "integration-run.stdout": "eb8d59359a8d41c04ebc19a7c1375ea4e70e861f1c48caacdda56c2e4eeefbc2",
+    "integration-run.stderr": "e785fe0f109424041c4c3cd00ebd45981a6f7f2a1ed2766157bf686a9198a729",
+    "required-boundary-identities.json": "41b42b8088ec98dfc40c957840e23173f1075f3e8aa85448c2e8f856af2d5bac",
+    "binary-before.json": "330c5ca14a615f5144d91f99b4abdd2cc5895513bfa8b4b6cf2a68d55f4c825a",
+    "binary-after.json": "330c5ca14a615f5144d91f99b4abdd2cc5895513bfa8b4b6cf2a68d55f4c825a",
+    "terminal.json": "e0bf7663466028cc7525dc284cef1fd142198d12bb2d65007d6a1d7f9113f01f",
+    "error.json": "193b762e5ce8e3e0c85335b86aabe32fee70d10503817d5a6b0b112a607973ae",
+    "run.py": "688cca8773ae7316ac18c5f949283535ad57f043acb77d39b803d1970f67f906",
+    "direct-hand-0-process.json": "8880d83ed95d1151abea0e9948b452e71421d54ff7feb32a7d97e606c125a17c",
+    "direct-hand-0.stdout": "259bcfd8f58ae1b5ace49d6dc3c7defed3d1dd891bb2fd227e9c6acc1638e201",
+    "direct-hand-0.stderr": "34b7234cf4396bc298e4c3af883c314264a77357db88b603d5492034ac21e781",
+    "direct-hand-1-process.json": "3c0e3ba1d2d2ef6562ca6fc67120d87d3440bf0c31672ee03817c8240d68adb4",
+    "direct-hand-1.stdout": "8e41501ca4aea5f48087e82d172eb84bba1683dcb4aefcd7d6d772e6f53e41ef",
+    "direct-hand-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "direct-hand-2-process.json": "630f1b28c79200562d560287776f608bdfe40fa2c93b43cde8885a642f5d406d",
+    "direct-hand-2.stdout": "d1fca899322b616422baf6dd45194683e1d4025c1dfc6aa6797a944f8fc5ae56",
+    "direct-hand-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "direct-hand-3-process.json": "dd517b92deb088c10bdcbe2fcb7fc93af0b46f0999d15ee4b97a04e1964e26e5",
+    "direct-hand-3.stdout": "e2c5a42b8a25b27440a12514d380c79ad84b7747cabbee728931eeded00960a2",
+    "direct-hand-3.stderr": "98cd2f1b304704e94393f1c5facdf74c45c7913f30bd10eace6690f4ccb6b71b"
+  },
+  "original_input_sha256_after": {
+    "binding.json": "36ac27aa6712f2a1a9dc74396f82a32437fa92c316d1ba7e0d5e571c6cf5c61e",
+    "integration-discovery.json": "be49be8c3d25a43cb5898e50af20fd33634447122b5a02d553c3dc0f32b52b82",
+    "integration-run-process.json": "a4b754fca0f0dbfa1974d63d0c14e98fcd22e2733049c68f9a5160c194929e01",
+    "integration-run.stdout": "eb8d59359a8d41c04ebc19a7c1375ea4e70e861f1c48caacdda56c2e4eeefbc2",
+    "integration-run.stderr": "e785fe0f109424041c4c3cd00ebd45981a6f7f2a1ed2766157bf686a9198a729",
+    "required-boundary-identities.json": "41b42b8088ec98dfc40c957840e23173f1075f3e8aa85448c2e8f856af2d5bac",
+    "binary-before.json": "330c5ca14a615f5144d91f99b4abdd2cc5895513bfa8b4b6cf2a68d55f4c825a",
+    "binary-after.json": "330c5ca14a615f5144d91f99b4abdd2cc5895513bfa8b4b6cf2a68d55f4c825a",
+    "terminal.json": "e0bf7663466028cc7525dc284cef1fd142198d12bb2d65007d6a1d7f9113f01f",
+    "error.json": "193b762e5ce8e3e0c85335b86aabe32fee70d10503817d5a6b0b112a607973ae",
+    "run.py": "688cca8773ae7316ac18c5f949283535ad57f043acb77d39b803d1970f67f906",
+    "direct-hand-0-process.json": "8880d83ed95d1151abea0e9948b452e71421d54ff7feb32a7d97e606c125a17c",
+    "direct-hand-0.stdout": "259bcfd8f58ae1b5ace49d6dc3c7defed3d1dd891bb2fd227e9c6acc1638e201",
+    "direct-hand-0.stderr": "34b7234cf4396bc298e4c3af883c314264a77357db88b603d5492034ac21e781",
+    "direct-hand-1-process.json": "3c0e3ba1d2d2ef6562ca6fc67120d87d3440bf0c31672ee03817c8240d68adb4",
+    "direct-hand-1.stdout": "8e41501ca4aea5f48087e82d172eb84bba1683dcb4aefcd7d6d772e6f53e41ef",
+    "direct-hand-1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "direct-hand-2-process.json": "630f1b28c79200562d560287776f608bdfe40fa2c93b43cde8885a642f5d406d",
+    "direct-hand-2.stdout": "d1fca899322b616422baf6dd45194683e1d4025c1dfc6aa6797a944f8fc5ae56",
+    "direct-hand-2.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "direct-hand-3-process.json": "dd517b92deb088c10bdcbe2fcb7fc93af0b46f0999d15ee4b97a04e1964e26e5",
+    "direct-hand-3.stdout": "e2c5a42b8a25b27440a12514d380c79ad84b7747cabbee728931eeded00960a2",
+    "direct-hand-3.stderr": "98cd2f1b304704e94393f1c5facdf74c45c7913f30bd10eace6690f4ccb6b71b"
+  },
+  "original_reports_unchanged": true,
+  "only_unrun_independent_stages_may_resume": true,
+  "remaining_stages_not_executed_or_qualified_here": [
+    "Update custom2",
+    "requested package docs"
+  ]
+}
