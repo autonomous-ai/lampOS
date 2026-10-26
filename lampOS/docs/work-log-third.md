@@ -1,3 +1,9 @@
+## 2026-10-27 01:50 — worker be8 original native pass
+
+Ready for lamp-voice: no (#3604 newer-base qualification pending)
+
+Offered be8e4c9bc/bdc2 original ARM40378911764 and Linux40378911899 pass 7,537/0/53, all three worker controls once; exact ordered preview/tree, complete ordinals, duplicate deduplication and separate harnesses verified. [Native receipt](verification/skills-actions-mock-20261026/native-be8.json). This belongs to be8, whose successful socket-capable host525/0/9 remains separate from its restricted bind failure. Main advanced to 0961e12d9 with only the Voice doc-comment move; local equal-patch 47e3bcb97 is undergoing current compiler/hash qualification before push. Reminder094/bdc2 full twelve-consumer runtime remains frozen and active; no latest-base or runtime success claim for it.
+
 ## 2026-10-27 01:46 — current reminder consumer command started
 
 Ready for lamp-voice: no (#3525 current runtime/native/reads pending)
