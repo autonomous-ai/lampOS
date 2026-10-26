@@ -1,16 +1,16 @@
 # Tests work log
 
-## 2026-10-27 01:02 — Current-base warm qualification and retained failures
+## 2026-10-27 01:14 — Current-base warm qualification and retained failures
 
 Ready for lamp-voice: no (current qualification, native checks and reads remain)
 
 Ready #3548 `f8f1e7a5f`/`008e7a974` is pushed with Mac 340/0/0, fmt, strict twelve-package Clippy and workspace pass; [proof](https://github.com/autonomous-ai/lampOS/tree/a8065bf06/lampOS/docs/verification/tests-ready-speaking-008-20261027). Its original ARM64 40367811863, Linux Clippy 40367811830 and general CI 40367803546 evidence/audit is still being collected. The local `32890d3d1`/`978cb0e98` carry preserves the patch; its warm-target gate is RUNNING (70144), and this head is not pushed.
 
-Sentinel `7cafe341a`/008 is pushed: Mac 4/0/0, strict twelve-package Clippy, workspace and 208 sealed guards passed. The changed Linux case is unrun on the Mac; original ARM64 40371123630 is running, while Linux Clippy 40371123472 and general CI 40371114033 reported success pending source/log audit. [Mac proof](verification/tests-sentinel-008-20261027/) is prepared; fresh native evidence remains separate. Its current `8edc8aa02`/978 carry is source-only, with no new current-base gate run.
+Sentinel `7cafe341a`/008 is pushed: Mac 4/0/0, strict twelve-package Clippy, workspace and 208 sealed guards passed. The changed Linux case is unrun on the Mac; original ARM64 40371123630 is running, while Linux Clippy 40371123472 and general CI 40371114033 reported success pending source/log audit. [Mac proof](verification/tests-sentinel-008-20261027/) is prepared; fresh native evidence remains separate. Its latest `e7d22e1e7`/e588 carry is source-only, with no new current-base gate run.
 
-Carrier `09b75f05a`/008 remains in its live serial full gate, unchanged. Its precompiled Round matches the earlier `a29ebb7d9`; no completed current-gate result is claimed. The original 439/3/6 remains FAIL, with the [original artifact binding published](https://github.com/autonomous-ai/lampOS/tree/4a2ad39fc/lampOS/docs/verification/tests-carrier-2d-parallel-failure-20261026).
+Carrier `09b75f05a`/008 is PASS and PUSHED: full Update 442/0/6 once serial (2,475.635 s), promoter 25/0/0 (0.409 s), fmt/strict fourteen-package/workspace and 215 sealed guards. Round 195/0/0 uses the same `a29ebb7d9` binary as the old parallel failure; the original 439/3/6 remains FAIL. [Serial proof](verification/tests-carrier-008-serial-20261027/) is prepared. Latest Main `e5889ebb5` local carry `d645d5698` is source-only; its gates, native qualification and disposition remain pending; Ready `32890d3d1`/978 gate 70144 is still live.
 
-Restart `4b167b0a6`/978 is source-only: no new gate has been prepared or executed. Skills `a5a9b502f`/978 is also source-only; its original 521/1/9 remains failed. These carries preserve their authored patches.
+Restart `c3943ebe5`/e588 is source-only: no new gate has been prepared or executed. Skills `08bb8f27d`/e588 is also source-only; its original 521/1/9 remains failed. These carries preserve their authored patches.
 
 The #3604 review is taken. Source read has no finding so far; the independent three-case runtime queues after the new current Ready gate. No new device action: the [installed GOOD/BAD round](verification/product-carrier-lamp-52e6-20261026/) passed and the original lamp was restored.
 
