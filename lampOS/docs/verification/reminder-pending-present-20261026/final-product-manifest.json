@@ -1,0 +1,36 @@
+{
+  "qualified_baseline": "fac0279ca3c78fa1fb82e7a209e3b8a19596f868",
+  "integration_base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "qualified_patch_sha256": "fddc8ce164ef3ebd9de20753304851bebd79906e37c5e71fc97c8bdbbda7276c",
+  "qualified_product_files_sha256": {
+    "lampOS/crates/skills/src/lib.rs": "beda2e9fea2e84f88cc85bfb54aa3b1312a9d9bf91d411c4cca46822f2a7d5c1",
+    "lampOS/crates/skills/tests/it/skills.rs": "1f5460d9eb5e6106280819b5b87011637d7edc02cae7777fbe4d6c142d4b78e1",
+    "lampOS/docs/reuse-decisions.md": "3cd3c0845fc1888add659939cb96ed01878255e5b8495c5c451390d96e90cd54",
+    "lampOS/docs/schedule.md": "2c94d6a64dd440a7ef83f778c32243e7e2fcd26820e647addbaefdb90bd03154",
+    "lampOS/docs/skills.md": "b25a7788ad9d0f39dd7d4d844f2feefc0f8915018ab0cd8059926da1ced3862c",
+    "lampOS/skills/reminders/SKILL.md": "c8a525dac9074cedc30018d5f69cc8650991f799c59069ced61bad733f219dc9",
+    "lampOS/skills/reminders/skill.toml": "9d0e6b27bba6f74c321bea97fd44a5fe49a4b6441e21d681808ecdda035b7b45",
+    "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml": "0df2ac9258fbc25f0c83156cd8bd264ae12ca0f3f1c79fb96c64eb3f27ea01f6",
+    "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml": "e4bacd213d0cd2ad6e2828079fbe0e4fc89e8b9d736cfdf5ed66c366bfec726d",
+    "lampOS/skills/reminders/tests/each-reminder-once/expect.toml": "6880f969ba059ab357aa29c4cb9a9d9ab187c3bb0600bf096391c6dd32400146",
+    "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml": "53d657afa4c5fa4735b44c10a342f1753dae815f42ef89e7cd9461e6af737d94"
+  },
+  "post_gate_change": "Only this verification packet was updated after final product gate and exact test-overlay restoration. No binary or nonportable test overlay is committed.",
+  "receipts_sha256": {
+    "review-fixture.json": "41f6bae6c570c6440b113255de9ffa191ef52dcf59bd9f96b7bf22f44c0f6b53",
+    "held-negative.json": "0622be5c3aa42fbf2225e4eb7cffc0fdf3ab80d8aedf2e968499acfe0140064b",
+    "changes-initial.json": "371b016cb0a315c2f4c02efe3f06f77ecd9b35b3d5319a7b02d6a80d0b3b5735",
+    "selected-negative-initial.json": "0ac761c874fee3589e79823ef87445c6114f4e5f688b9489a9c01dea65d7a1e7",
+    "selected-negative.json": "ffe124337f0ce7b176224d8222e6bfa6c790f7f056b79c7a819975fed8b85f0d",
+    "changes-final-0c1.json": "c15ca6f772a888e8c45a47219c4ff97968eee3e60a550f3454f55ff690494b55",
+    "current-1c884-intermediate.json": "84c9d5e1c92176992f30e2cac2292fc8cfe19aa6c2fa3a2233f77fc3c478a410",
+    "while-negative.json": "7f980f9f11dbe05da3764f76665c0eb3c54090fcb4f896dffcedec8e1a0943f1",
+    "scalar-negative.json": "978810eadb07856ffadf8e0c228da00ba2dd699998de07b97bf8e92180b9b3f1",
+    "final-1c884.json": "c5b1d12976f23e097d594d3d3e5c7d14b1cea98ee94da03517a048d540fe91a7",
+    "update-crossings.json": "d5126a21884403dbcf4a9d4407d4ceb5344865888048089578c87073ccda4067",
+    "compatibility-cli.json": "00a35115f0b1837a31a9c268ef3c09a85b9ad7eba6651d6f81b60b21c2789123",
+    "old-parser.json": "2f9ebba8b0c31fe891e4aaac1c7313cb97121b55b855575f9029f0361669e09e",
+    "carry-1c884.json": "0ec5af65eecca6ee2c4eebb0a5bdbdaf84ea4789262b51e7887706986caadc73"
+  },
+  "limits": "Full source and actual executables retained privately. Source-baseline hashes name local frozen compositions; older gates and negatives are not relabelled as final-head executions."
+}

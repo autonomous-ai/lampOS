@@ -1,7 +1,8 @@
-# One reminder due at 30 s and acknowledged at 40 s; another due at 50 s,
-# and a third due at 55 s while the second still is: the lamp asks at 30 s
-# and at 50 s. The third is one trigger with the second: the voice says it
-# after the second, by itself.
+# One reminder is due at 30 s and acknowledged at 40 s; another is due at
+# 50 s. A third at 55 s changes pending while the same oldest remains.
+# Each change plans one look/source-say chance. Unchanged positive counts
+# do not repeat it. These are planned chances, not delivery receipts:
+# Voice's ledger owns delivery and the runner waits for Voice's begun.
 
 [[expect]]
 at = "30s"
@@ -20,5 +21,15 @@ args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
 
 [[expect]]
 at = "50s"
+call = "say"
+args = { from = "schedule" }
+
+[[expect]]
+at = "55s"
+call = "body.gaze"
+args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+
+[[expect]]
+at = "55s"
 call = "say"
 args = { from = "schedule" }

@@ -1147,6 +1147,9 @@ enum After {
     /// The skill's folder removed once the first call to the actions part
     /// is answered, and the reload waited for.
     Removed,
+    /// Release the voice's answer only after this many busy refusals have
+    /// been observed, so a waiting run does not depend on reply timing.
+    VoiceAfterBusyRefusals(usize),
 }
 
 /// A hello that greets at once, with the light and the say of Welcome back.
@@ -1297,17 +1300,37 @@ fn the_program_timed(
     let voice = UnixListener::bind(root.join("say.sock")).unwrap();
     let (heard, asked) = mpsc::channel();
     let (wrote, written) = mpsc::channel();
+    let release_after = match &then {
+        After::VoiceAfterBusyRefusals(count) => Some(*count),
+        _ => None,
+    };
+    let (mut release_voice, mut voice_release) = if release_after.is_some() {
+        let (release, wait) = mpsc::channel::<()>();
+        (Some(release), Some(wait))
+    } else {
+        (None, None)
+    };
     std::thread::spawn(move || {
         for stream in voice.incoming().flatten() {
             let mut line = String::new();
             BufReader::new(&stream).read_line(&mut line).unwrap();
             let _ = heard.send(line);
+            if let Some(wait) = voice_release.take()
+                && wait.recv_timeout(Duration::from_secs(10)).is_err()
+            {
+                return;
+            }
             for answer in answers {
-                std::thread::sleep(Duration::from_millis(200));
+                if release_after.is_none() {
+                    std::thread::sleep(Duration::from_millis(200));
+                }
                 (&stream)
                     .write_all(format!("{answer}\n").as_bytes())
                     .unwrap();
                 let _ = wrote.send(Instant::now());
+            }
+            if release_after.is_some() {
+                return;
             }
         }
     });
@@ -1414,11 +1437,27 @@ fn the_program_timed(
         clock.skip(Duration::from_secs(1));
     }
     let mut seen = Vec::new();
+    let mut busy_refusals = 0;
     while seen.len() < wanted && Instant::now() < deadline {
         if let Some(message) = events.recv(Duration::from_millis(100)).unwrap() {
-            seen.push(message.parse::<SkillEvent>().unwrap());
+            let event = message.parse::<SkillEvent>().unwrap();
+            if event.why == "not made: its last run is still under way" {
+                busy_refusals += 1;
+            }
+            seen.push(event);
+            if release_after == Some(busy_refusals)
+                && let Some(release) = release_voice.take()
+            {
+                release
+                    .send(())
+                    .expect("voice reply watchdog expired before both refusals");
+            }
         }
     }
+    assert!(
+        release_voice.is_none(),
+        "voice reply not released before the fixture deadline: {busy_refusals} busy refusals; {seen:?}"
+    );
     let looked = gaze
         .recv(&mut buffer)
         .ok()
@@ -12370,4 +12409,705 @@ fn resting_a_budget_queue_and_a_while_without_a_wait_say_why_not_run() {
         engine.take_dropped(),
         ["hush not run: its while did not hold: voice/state state resting"]
     );
+}
+
+// The core skill offers a chance to Voice; a Schedule count is not a delivery
+// receipt. These tests keep that trigger boundary separate from the runner's
+// existing requirement that Voice begin the say before the body moves.
+mod reminder_pending {
+    use super::*;
+    use lamp_msgs::{ClockStamp, ScheduleDue, ScheduleNotice};
+
+    fn report(pending: u32, ready: bool, enabled: bool) -> ScheduleDue {
+        ScheduleDue {
+            stamp: ClockStamp {
+                clock_id: "schedule".into(),
+                at_us: 0,
+                sequence: 1,
+            },
+            store_id: "0123456789abcdef0123456789abcdef".into(),
+            revision: 3,
+            enabled,
+            ready,
+            pending,
+            waiting_for_clock: 0,
+            oldest: (pending > 0 && ready && enabled).then_some(ScheduleNotice {
+                id: 188,
+                delivery: 1,
+                due_unix_ms: 1_792_130_400_000,
+                late_by_ms: None,
+                late: false,
+            }),
+        }
+    }
+
+    fn send_due(
+        engine: &mut Engine,
+        at_us: u64,
+        mut due: ScheduleDue,
+        expires_ms: u64,
+    ) -> Vec<lamp_skills::Run> {
+        due.stamp.at_us = at_us;
+        due.stamp.sequence = at_us + 1;
+        due.check().unwrap();
+        engine.observe(
+            ScheduleDue::TOPIC,
+            at_us,
+            &serde_json::to_vec(&due).unwrap(),
+            Some(expires_ms),
+        )
+    }
+
+    fn heartbeat_due(
+        engine: &mut Engine,
+        second: u64,
+        due: ScheduleDue,
+        voice: &str,
+    ) -> Vec<lamp_skills::Run> {
+        let at_us = second * 1_000_000;
+        assert!(
+            engine
+                .observe(Faces::TOPIC, at_us, FACE.as_bytes(), Some(3_000))
+                .is_empty()
+        );
+        assert!(
+            engine
+                .observe(
+                    "voice/state",
+                    at_us,
+                    &serde_json::to_vec(&serde_json::json!({ "state": voice })).unwrap(),
+                    Some(3_000),
+                )
+                .is_empty()
+        );
+        send_due(engine, at_us, due, 3_000)
+    }
+
+    fn heartbeat(
+        engine: &mut Engine,
+        second: u64,
+        pending: u32,
+        ready: bool,
+        enabled: bool,
+        voice: &str,
+    ) -> Vec<lamp_skills::Run> {
+        heartbeat_due(engine, second, report(pending, ready, enabled), voice)
+    }
+
+    fn one_chance(runs: Vec<lamp_skills::Run>) {
+        assert_eq!(runs.len(), 1, "{runs:?}");
+        assert!(!runs[0].queue, "ordinary triggers do not queue more runs");
+        assert_eq!(
+            runs[0].calls.iter().map(Call::named).collect::<Vec<_>>(),
+            [
+                (
+                    "body.gaze",
+                    serde_json::json!({"look_at":"face","x":0.0,"y":-0.25,"size":0.25}),
+                ),
+                ("say", serde_json::json!({"from":"schedule"})),
+            ]
+        );
+    }
+
+    #[test]
+    fn unchanged_held_reminder_has_one_chance_across_sixty_heartbeats() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        let mut chances = Vec::new();
+        // This bus metadata can remain positive for a held occurrence. Its
+        // unchanged heartbeats are not sixty new delivery opportunities.
+        for second in 0..60 {
+            chances.extend(heartbeat(&mut engine, second, 1, true, true, "resting"));
+        }
+        one_chance(chances);
+    }
+
+    #[test]
+    fn core_reminders_can_request_again_after_talk_with_pending_still_positive() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        assert!(heartbeat(&mut engine, 0, 0, true, true, "resting").is_empty());
+        one_chance(heartbeat(&mut engine, 1, 1, true, true, "resting"));
+
+        // The original chance has already been taken. Heartbeats stay one
+        // second apart throughout a talk longer than a source ask's 20 s
+        // lifetime, so neither an absent count nor stale source rearms it.
+        for second in 2..=30 {
+            let voice = match second {
+                2..=10 => "listening",
+                11..=20 => "thinking",
+                _ => "speaking",
+            };
+            assert!(heartbeat(&mut engine, second, 1, true, true, voice).is_empty());
+        }
+
+        // An older held occurrence can keep this same oldest/count positive
+        // when a later one becomes due. Held state and actual offers are not
+        // on this bus: only Voice's durable consumer may choose a delivery.
+        // The skill must offer another chance without requiring pending=0.
+        one_chance(heartbeat(&mut engine, 31, 1, true, true, "resting"));
+        assert!(heartbeat(&mut engine, 32, 1, true, true, "resting").is_empty());
+        one_chance(heartbeat(&mut engine, 33, 2, true, true, "resting"));
+        assert!(heartbeat(&mut engine, 34, 2, true, true, "resting").is_empty());
+        assert!(heartbeat(&mut engine, 35, 0, true, true, "resting").is_empty());
+    }
+
+    #[test]
+    fn core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        assert!(heartbeat(&mut engine, 0, 0, true, true, "resting").is_empty());
+        assert!(heartbeat(&mut engine, 1, 1, false, true, "resting").is_empty());
+        one_chance(heartbeat(&mut engine, 2, 1, true, true, "resting"));
+        assert!(heartbeat(&mut engine, 3, 1, true, false, "resting").is_empty());
+        one_chance(heartbeat(&mut engine, 4, 1, true, true, "resting"));
+        assert!(heartbeat(&mut engine, 5, 0, true, true, "resting").is_empty());
+        assert!(heartbeat(&mut engine, 6, 1, true, true, "listening").is_empty());
+        one_chance(heartbeat(&mut engine, 7, 1, true, true, "resting"));
+    }
+
+    #[test]
+    fn core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        let mut due = report(1, true, true);
+        one_chance(heartbeat_due(&mut engine, 0, due.clone(), "resting"));
+        due.oldest.as_mut().unwrap().id = 9_007_199_254_740_992;
+        one_chance(heartbeat_due(&mut engine, 1, due.clone(), "resting"));
+        // Adjacent integer identities must not collapse through f64.
+        due.oldest.as_mut().unwrap().id += 1;
+        one_chance(heartbeat_due(&mut engine, 2, due.clone(), "resting"));
+        due.oldest.as_mut().unwrap().delivery = 2;
+        one_chance(heartbeat_due(&mut engine, 3, due.clone(), "resting"));
+        due.store_id = "fedcba9876543210fedcba9876543210".into();
+        one_chance(heartbeat_due(&mut engine, 4, due.clone(), "resting"));
+        due.pending = 2;
+        one_chance(heartbeat_due(&mut engine, 5, due.clone(), "resting"));
+        // Several selected fields change in the same publication: one chance.
+        due.pending = 3;
+        due.store_id = "00112233445566778899aabbccddeeff".into();
+        due.oldest.as_mut().unwrap().id = 189;
+        due.oldest.as_mut().unwrap().delivery = 3;
+        one_chance(heartbeat_due(&mut engine, 6, due.clone(), "resting"));
+        due.pending = 1;
+        one_chance(heartbeat_due(&mut engine, 7, due.clone(), "resting"));
+        for second in 8..68 {
+            due.revision += 1;
+            let oldest = due.oldest.as_mut().unwrap();
+            oldest.late = true;
+            oldest.late_by_ms = Some(second * 1_000);
+            // The helper also renews the stamp and sequence each time.
+            assert!(heartbeat_due(&mut engine, second, due.clone(), "resting").is_empty());
+        }
+    }
+
+    #[test]
+    fn core_reminders_notice_a_brief_talk_between_schedule_heartbeats() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        one_chance(heartbeat(&mut engine, 0, 1, true, true, "resting"));
+        for (at_us, state) in [(100_000, "listening"), (200_000, "resting")] {
+            assert!(
+                engine
+                    .observe(
+                        "voice/state",
+                        at_us,
+                        &serde_json::to_vec(&serde_json::json!({"state":state})).unwrap(),
+                        Some(3_000),
+                    )
+                    .is_empty()
+            );
+        }
+        one_chance(heartbeat(&mut engine, 1, 1, true, true, "resting"));
+        assert!(heartbeat(&mut engine, 2, 1, true, true, "resting").is_empty());
+    }
+
+    #[test]
+    fn core_reminders_rearm_after_source_or_condition_expiry() {
+        for tick in [false, true] {
+            let mut engine =
+                Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+            one_chance(heartbeat(&mut engine, 0, 1, true, true, "resting"));
+            // Keep Schedule fresh while the resting observation expires.
+            for second in 1..3 {
+                assert!(
+                    send_due(
+                        &mut engine,
+                        second * 1_000_000,
+                        report(1, true, true),
+                        3_000
+                    )
+                    .is_empty()
+                );
+            }
+            if tick {
+                assert!(engine.tick(3_000_000).is_empty());
+                assert!(send_due(&mut engine, 3_000_000, report(1, true, true), 3_000).is_empty());
+            }
+            // With no tick, renewal itself must notice the old condition's
+            // exact expiry before replacing it with a fresh resting value.
+            one_chance(heartbeat(&mut engine, 3, 1, true, true, "resting"));
+            assert!(heartbeat(&mut engine, 4, 1, true, true, "resting").is_empty());
+            if tick {
+                assert!(engine.tick(7_000_000).is_empty());
+            }
+            one_chance(heartbeat(&mut engine, 7, 1, true, true, "resting"));
+            // A zero-lifetime publication cannot create a chance.
+            assert!(send_due(&mut engine, 8_000_000, report(2, true, true), 0).is_empty());
+            one_chance(heartbeat(&mut engine, 9, 2, true, true, "resting"));
+            assert!(heartbeat(&mut engine, 10, 2, true, true, "resting").is_empty());
+        }
+    }
+
+    #[test]
+    fn core_reminders_keep_the_change_snapshot_across_unchanged_reload() {
+        let skill = || load(&skills_root().join("reminders")).unwrap();
+        let mut engine = Engine::new(vec![skill()], true);
+        one_chance(heartbeat(&mut engine, 0, 1, true, true, "resting"));
+        for second in 1..60 {
+            assert!(engine.replace(vec![skill()]).is_empty());
+            assert!(heartbeat(&mut engine, second, 1, true, true, "resting").is_empty());
+        }
+        let mut changed = skill();
+        changed.triggers[0].changes.push("revision".into());
+        assert!(engine.replace(vec![changed]).is_empty());
+        one_chance(heartbeat(&mut engine, 60, 1, true, true, "resting"));
+        assert!(heartbeat(&mut engine, 61, 1, true, true, "resting").is_empty());
+    }
+
+    #[test]
+    fn invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        one_chance(heartbeat(&mut engine, 0, 1, true, true, "resting"));
+        let original = serde_json::to_value(report(1, true, true)).unwrap();
+        let mut absent = original.clone();
+        absent.as_object_mut().unwrap().remove("store_id");
+        let mut object = original.clone();
+        object["store_id"] = serde_json::json!({"id":"unavailable"});
+        let mut array = original.clone();
+        array["store_id"] = serde_json::json!(["unavailable"]);
+        let mut oversized = original.clone();
+        oversized["store_id"] = serde_json::json!("s".repeat(257));
+        for (index, value) in [absent, object, array, oversized].into_iter().enumerate() {
+            let at_us = (index as u64 + 1) * 200_000;
+            assert!(
+                engine
+                    .observe(
+                        ScheduleDue::TOPIC,
+                        at_us,
+                        &serde_json::to_vec(&value).unwrap(),
+                        Some(3_000)
+                    )
+                    .is_empty()
+            );
+            assert!(
+                send_due(&mut engine, at_us + 100_000, report(1, true, true), 3_000).is_empty()
+            );
+        }
+        assert!(heartbeat(&mut engine, 1, 1, true, true, "resting").is_empty());
+    }
+
+    #[test]
+    fn invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot() {
+        for (label, replacement) in [
+            ("missing", None),
+            ("object", Some(serde_json::json!({"invalid": true}))),
+            ("array", Some(serde_json::json!([1]))),
+            ("oversized", Some(serde_json::json!("p".repeat(257)))),
+        ] {
+            let mut engine =
+                Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+            one_chance(heartbeat(&mut engine, 0, 1, true, true, "resting"));
+            let mut malformed = serde_json::to_value(report(1, true, true)).unwrap();
+            if let Some(value) = replacement {
+                malformed["pending"] = value;
+            } else {
+                malformed.as_object_mut().unwrap().remove("pending");
+            }
+            assert!(
+                engine
+                    .observe(
+                        ScheduleDue::TOPIC,
+                        100_000,
+                        &serde_json::to_vec(&malformed).unwrap(),
+                        Some(3_000),
+                    )
+                    .is_empty(),
+                "{label} selected predicate produced a chance"
+            );
+            assert!(
+                send_due(&mut engine, 200_000, report(1, true, true), 3_000).is_empty(),
+                "{label} selected predicate rearmed unchanged valid pending work"
+            );
+        }
+    }
+
+    #[test]
+    fn a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        one_chance(heartbeat(&mut engine, 0, 1, true, true, "resting"));
+        let mut malformed = serde_json::to_value(report(1, true, true)).unwrap();
+        malformed.as_object_mut().unwrap().remove("pending");
+        assert!(
+            engine
+                .observe(
+                    ScheduleDue::TOPIC,
+                    100_000,
+                    &serde_json::to_vec(&malformed).unwrap(),
+                    Some(3_000),
+                )
+                .is_empty()
+        );
+        let empty = report(0, true, true);
+        assert!(empty.oldest.is_none());
+        // A real zero is a false trigger, even though no oldest paths exist.
+        assert!(send_due(&mut engine, 200_000, empty, 3_000).is_empty());
+        one_chance(send_due(&mut engine, 300_000, report(1, true, true), 3_000));
+        assert!(send_due(&mut engine, 400_000, report(1, true, true), 3_000).is_empty());
+    }
+
+    #[test]
+    fn a_talk_rearms_even_while_a_selected_trigger_value_is_invalid() {
+        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
+        one_chance(heartbeat(&mut engine, 0, 1, true, true, "resting"));
+        let mut malformed = serde_json::to_value(report(1, true, true)).unwrap();
+        malformed["pending"] = serde_json::json!({"invalid": true});
+        assert!(
+            engine
+                .observe(
+                    ScheduleDue::TOPIC,
+                    100_000,
+                    &serde_json::to_vec(&malformed).unwrap(),
+                    Some(3_000),
+                )
+                .is_empty()
+        );
+        for (at_us, state) in [(200_000, "listening"), (300_000, "resting")] {
+            assert!(
+                engine
+                    .observe(
+                        "voice/state",
+                        at_us,
+                        &serde_json::to_vec(&serde_json::json!({"state": state})).unwrap(),
+                        Some(3_000),
+                    )
+                    .is_empty()
+            );
+        }
+        // The invalid trigger cannot erase the independently observed talk.
+        assert!(
+            engine
+                .observe(
+                    ScheduleDue::TOPIC,
+                    400_000,
+                    &serde_json::to_vec(&malformed).unwrap(),
+                    Some(3_000),
+                )
+                .is_empty()
+        );
+        one_chance(send_due(&mut engine, 500_000, report(1, true, true), 3_000));
+        assert!(send_due(&mut engine, 600_000, report(1, true, true), 3_000).is_empty());
+    }
+
+    #[test]
+    fn invalid_selected_choice_values_do_not_rearm_a_changes_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = skill_with(
+            dir.path(),
+            "changing-choice",
+            r#"
+[trigger]
+topic = "air/indoor"
+field = "reading"
+above = 0.5
+when = "changes"
+changes = ["reading", "choice"]
+[choice]
+name = "choice"
+about = "The observed choice."
+one_of = ["left", "right"]
+field = "choice"
+[ask]
+policy = "moment"
+[[do]]
+light = { colour = "warm" }
+"#,
+        );
+        let observe = |engine: &mut Engine, at_us: u64, value: &serde_json::Value| {
+            engine.observe(
+                "air/indoor",
+                at_us,
+                &serde_json::to_vec(value).unwrap(),
+                Some(3_000),
+            )
+        };
+        for (label, replacement) in [
+            ("missing", None),
+            ("object", Some(serde_json::json!({"invalid": true}))),
+            ("array", Some(serde_json::json!(["left"]))),
+            ("oversized", Some(serde_json::json!("l".repeat(257)))),
+        ] {
+            let mut engine = Engine::new(vec![load(&path).unwrap()], true);
+            let valid = serde_json::json!({"reading": 1, "choice": "left"});
+            assert_eq!(observe(&mut engine, 0, &valid).len(), 1);
+            let mut malformed = valid.clone();
+            if let Some(value) = replacement {
+                malformed["choice"] = value;
+            } else {
+                malformed.as_object_mut().unwrap().remove("choice");
+            }
+            assert!(observe(&mut engine, 100_000, &malformed).is_empty());
+            assert!(
+                observe(&mut engine, 200_000, &valid).is_empty(),
+                "{label} selected choice rearmed an unchanged valid snapshot"
+            );
+            // A valid false predicate still rearms, even without a choice.
+            assert!(observe(&mut engine, 300_000, &serde_json::json!({"reading": 0})).is_empty());
+            assert_eq!(observe(&mut engine, 400_000, &valid).len(), 1);
+            assert!(observe(&mut engine, 500_000, &valid).is_empty());
+            // A valid scalar outside the allowed choices really ends eligibility.
+            assert!(
+                observe(
+                    &mut engine,
+                    600_000,
+                    &serde_json::json!({"reading": 1, "choice": "elsewhere"}),
+                )
+                .is_empty()
+            );
+            assert_eq!(observe(&mut engine, 700_000, &valid).len(), 1);
+        }
+    }
+
+    fn changes_with_while_path(
+        dir: &Path,
+        selected: &str,
+        condition_topic: &str,
+        condition_field: &str,
+        mode: &str,
+    ) -> Result<lamp_skills::Skill, String> {
+        let selection = if mode == "changes" {
+            format!("changes = [\"{selected}\"]\n")
+        } else {
+            String::new()
+        };
+        let path = skill_with(
+            dir,
+            "changes-while-path",
+            &format!(
+                r#"
+[trigger]
+topic = "air/indoor"
+field = "reading"
+above = 0.5
+when = "{mode}"
+{selection}
+[[while]]
+topic = "{condition_topic}"
+field = "{condition_field}"
+above = 0.5
+for = "1s"
+[ask]
+policy = "moment"
+[[do]]
+light = {{ colour = "warm" }}
+"#,
+            ),
+        );
+        load(&path)
+    }
+
+    #[test]
+    fn a_changes_trigger_refuses_selected_while_path_overlap() {
+        let dir = tempfile::tempdir().unwrap();
+        for (selected, condition) in [
+            ("count", "count"),
+            ("counts", "counts.pending"),
+            ("counts.pending", "counts"),
+        ] {
+            let result =
+                changes_with_while_path(dir.path(), selected, "air/indoor", condition, "changes");
+            let error = result.expect_err("a selected/while path overlap must not load");
+            assert!(error.contains("overlaps a while field"), "{error}");
+        }
+    }
+
+    #[test]
+    fn a_changes_trigger_keeps_independent_while_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        for (selected, topic, condition) in [
+            ("count", "air/state", "count"),
+            ("counts.pending", "air/indoor", "counts.ready"),
+            ("count", "air/indoor", "counter"),
+            ("counter", "air/indoor", "count"),
+        ] {
+            changes_with_while_path(dir.path(), selected, topic, condition, "changes").unwrap();
+        }
+        // This restriction belongs only to the new Changes mode.
+        for mode in ["present", "appears"] {
+            changes_with_while_path(dir.path(), "count", "air/indoor", "count", mode).unwrap();
+        }
+        // The product's ready/enabled guards share its trigger topic but
+        // are independent of the selected pending/identity fields.
+        load(&skills_root().join("reminders")).unwrap();
+    }
+
+    #[test]
+    fn existing_trigger_modes_keep_their_heartbeat_behavior() {
+        for (mode, expected) in [
+            (lamp_skills::When::Appears, 1),
+            (lamp_skills::When::Present, 3),
+        ] {
+            let mut skill = load(&skills_root().join("reminders")).unwrap();
+            skill.triggers[0].when = mode;
+            skill.triggers[0].changes.clear();
+            let mut engine = Engine::new(vec![skill], true);
+            let mut chances = Vec::new();
+            for second in 0..3 {
+                chances.extend(heartbeat(&mut engine, second, 1, true, true, "resting"));
+            }
+            assert_eq!(chances.len(), expected, "{mode:?}");
+        }
+    }
+
+    #[test]
+    fn a_changes_trigger_reads_a_bounded_tuple_on_another_topic() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = skill_with(
+            dir.path(),
+            "changing",
+            r#"
+[trigger]
+topic = "air/indoor"
+field = "reading"
+above = 0.5
+when = "changes"
+changes = ["source", "reading"]
+[[while]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+[ask]
+policy = "moment"
+[[do]]
+light = { colour = "warm" }
+"#,
+        );
+        let mut engine = Engine::new(vec![load(&path).unwrap()], true);
+        assert!(
+            engine
+                .observe("voice/state", 0, br#"{"state":"resting"}"#, Some(1_000))
+                .is_empty()
+        );
+        let observed = |engine: &mut Engine, at_us: u64, reading: u64, source: &str| {
+            engine.observe(
+                "air/indoor",
+                at_us,
+                &serde_json::to_vec(&serde_json::json!({"reading":reading,"source":source}))
+                    .unwrap(),
+                Some(1_000),
+            )
+        };
+        let source = "s".repeat(256);
+        let first = observed(&mut engine, 1, 1, &source);
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].calls[0].named().0, "light");
+        assert!(observed(&mut engine, 2, 1, &source).is_empty());
+        assert!(observed(&mut engine, 3, 1, &"s".repeat(257)).is_empty());
+        assert!(observed(&mut engine, 4, 1, &source).is_empty());
+        assert_eq!(observed(&mut engine, 5, 2, &source).len(), 1);
+        assert_eq!(observed(&mut engine, 6, 2, "other").len(), 1);
+        assert!(observed(&mut engine, 7, 0, "other").is_empty());
+        assert_eq!(observed(&mut engine, 8, 2, "other").len(), 1);
+    }
+
+    #[test]
+    fn a_schedule_ask_only_moves_when_voice_begins_it() {
+        // The executable fixture triggers on faces so it can isolate the
+        // runner's source-say handshake from Schedule and delivery policy.
+        let skill = FROM_SCHEDULE.replace(
+            "light = { colour = \"warm\" }",
+            "body = { look_at = \"face\" }\nlight = { colour = \"warm\" }",
+        );
+        let expired = the_program_with(&skill, true, &[r#"{"outcome":"expired"}"#], 3, 1, 4);
+        assert_eq!(expired.events.len(), 4);
+        assert_eq!(expired.events[3].why, "say: expired");
+        assert_eq!((expired.looked, expired.lights.len()), (None, 0));
+        let ask: serde_json::Value =
+            serde_json::from_str(expired.asked.as_deref().unwrap()).unwrap();
+        assert_eq!(ask["from"], "schedule");
+        assert_eq!(ask["priority"], 8);
+        assert!(ask.get("note").is_none());
+
+        let begun = the_program_with(
+            &skill,
+            true,
+            &[r#"{"event":"begun","at_us":5}"#, r#"{"outcome":"spoken"}"#],
+            3,
+            1,
+            4,
+        );
+        assert_eq!(begun.events.len(), 4);
+        assert_eq!(
+            begun.looked.as_deref(),
+            Some(r#"{"face":{"size":0.25,"turned":0.0,"x":0.0,"y":-0.25}}"#)
+        );
+        assert_eq!(begun.lights.len(), 2, "one light change and its return");
+        assert!(begun.events[3].why.contains("say: spoken"));
+    }
+
+    #[test]
+    fn repeated_schedule_chances_keep_one_waiting_runner_and_no_look() {
+        // A held-only Schedule can leave a wildcard ask waiting until Voice
+        // expires it. Repeated trigger chances while that run waits must not
+        // queue more executions or move the body without a begun response.
+        let skill = FROM_SCHEDULE
+            .replace("when = \"appears\"", "when = \"present\"")
+            .replace(
+                "light = { colour = \"warm\" }",
+                "body = { look_at = \"face\" }\nlight = { colour = \"warm\" }",
+            );
+        // Voice cannot answer until the fixture has observed both busy
+        // refusals. Scheduling delays cannot turn the last chance into a
+        // second execution. Voice's own test separately pins the 20 s cap.
+        let seen = the_program_timed(
+            &skill,
+            true,
+            &[r#"{"outcome":"expired"}"#],
+            3,
+            3,
+            12,
+            (Ring::Off, After::VoiceAfterBusyRefusals(2)),
+            false,
+        );
+        assert_eq!(seen.events.len(), 12, "{:?}", seen.events);
+        assert_eq!(
+            seen.events
+                .iter()
+                .filter(|event| event.why == "say: expired")
+                .count(),
+            1,
+            "{:?}",
+            seen.events
+        );
+        assert_eq!(
+            seen.events
+                .iter()
+                .filter(|event| event.why == "not made: its last run is still under way")
+                .count(),
+            2,
+            "{:?}",
+            seen.events
+        );
+        assert!(seen.asked.is_some());
+        let expired = seen
+            .events
+            .iter()
+            .position(|event| event.why == "say: expired")
+            .unwrap();
+        assert!(
+            seen.events
+                .iter()
+                .enumerate()
+                .filter(|(_, event)| event.why == "not made: its last run is still under way")
+                .all(|(index, _)| index < expired),
+            "expiry preceded a busy refusal: {:?}",
+            seen.events
+        );
+        assert_eq!((seen.looked, seen.lights.len()), (None, 0));
+    }
 }

@@ -553,6 +553,8 @@ struct TriggerFile {
     /// The field of an item that names it, with `each`.
     key: Option<String>,
     when: Option<String>,
+    /// Scalar field paths compared together by `when = "changes"`.
+    changes: Option<Vec<String>>,
     field: Option<String>,
     equals: Option<toml::Value>,
     above: Option<f64>,
@@ -2021,7 +2023,14 @@ pub enum When {
     Appears,
     /// Holds, and has for `for`.
     Present,
+    /// First eligible observation, changed selected values, or eligibility
+    /// restored after the trigger or one of its while conditions stopped.
+    Changes,
 }
+
+const MOST_CHANGE_FIELDS: usize = 8;
+const MOST_CHANGE_PATH_BYTES: usize = 128;
+const MOST_CHANGE_STRING_BYTES: usize = 256;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Trigger {
@@ -2033,6 +2042,8 @@ pub struct Trigger {
     pub each: Option<(String, String)>,
     test: Test,
     pub when: When,
+    /// Selected scalar fields; empty for the existing trigger modes.
+    pub changes: Vec<String>,
     pub absent_for_us: u64,
     pub for_us: u64,
     pub gap_us: u64,
@@ -2529,12 +2540,59 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
     let when = match file.when.as_deref() {
         Some("appears") => When::Appears,
         None | Some("present") => When::Present,
+        Some("changes") => When::Changes,
         Some(other) => {
             return Err(format!(
-                "when = {other:?}: only \"appears\" and \"present\" are known"
+                "when = {other:?}: only \"appears\", \"present\" and \"changes\" are known"
             ));
         }
     };
+    let changes = match (when, file.changes) {
+        (When::Changes, Some(fields)) if (1..=MOST_CHANGE_FIELDS).contains(&fields.len()) => {
+            for (index, field) in fields.iter().enumerate() {
+                path(field)?;
+                if field.len() > MOST_CHANGE_PATH_BYTES
+                    || field.chars().any(char::is_control)
+                    || fields[..index].contains(field)
+                {
+                    return Err(format!(
+                        "changes: distinct field paths of at most {MOST_CHANGE_PATH_BYTES} bytes, without control characters"
+                    ));
+                }
+            }
+            fields
+        }
+        (When::Changes, _) => {
+            return Err(format!(
+                "when = \"changes\" requires changes with 1 to {MOST_CHANGE_FIELDS} field paths"
+            ));
+        }
+        (_, Some(_)) => return Err("changes goes only with when = \"changes\"".into()),
+        (_, None) => Vec::new(),
+    };
+    if when == When::Changes
+        && (file.field.is_none()
+            || file.each.is_some()
+            || file.key.is_some()
+            || file.near.is_some()
+            || file.present.is_some()
+            || file.absent_for.is_some()
+            || file.lasting.is_some()
+            || file.gap.is_some()
+            || file.rearm.is_some()
+            || file.cooldown.is_some()
+            || file.wait.is_some()
+            || file.rise.is_some()
+            || file.during.is_some()
+            || file.once_per_day
+            || file.unless_heard
+            || file.yields_to.is_some())
+    {
+        return Err(
+            "when = \"changes\" needs a field test, without each, key, near, present, absent_for, for, gap, rearm, cooldown, wait, rise, during, once_per_day, unless_heard or yields_to"
+                .into(),
+        );
+    }
     let rearm_given = file.rearm.is_some();
     let (rearm, rearm_line) = match file.rearm {
         None => (false, None),
@@ -2710,12 +2768,19 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             ));
         }
     }
+    // A compound comparison can turn false because a selected child is
+    // malformed, incorrectly rearming its unchanged valid scalar tuple.
+    if when == When::Changes && matches!(&test, Test::Equals(_, Value::Array(_) | Value::Object(_)))
+    {
+        return Err("when = \"changes\" needs a scalar comparison, not an array or object".into());
+    }
     Ok(Trigger {
         test,
         topic: file.topic,
         name: file.name,
         each,
         when,
+        changes,
         absent_for_us: optional(&file.absent_for)?,
         for_us: optional(&file.lasting)?,
         gap_us: optional(&file.gap)?,
@@ -3168,6 +3233,36 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 topics
             }
         };
+        // An invalid selected value must not reset a while's clock and
+        // rearm the unchanged tuple. Keep those inputs independent instead
+        // of introducing a second set of condition clocks for Changes.
+        for trigger in triggers
+            .iter()
+            .filter(|trigger| trigger.when == When::Changes && trigger.topic == condition.topic)
+        {
+            let field = match &test {
+                Test::Equals(field, _)
+                | Test::NotEquals(field, _)
+                | Test::Above(field, _)
+                | Test::Below(field, _)
+                | Test::Number(field) => field,
+                Test::Faces(_) | Test::NoFaces => continue,
+            };
+            if let Some(selected) = trigger.changes.iter().find(|selected| {
+                selected.as_str() == field.as_str()
+                    || selected
+                        .strip_prefix(field.as_str())
+                        .is_some_and(|rest| rest.starts_with('.'))
+                    || field
+                        .strip_prefix(selected.as_str())
+                        .is_some_and(|rest| rest.starts_with('.'))
+            }) {
+                return Err(format!(
+                    "when = \"changes\": selected field {selected:?} overlaps a while field {field:?} on {}",
+                    condition.topic
+                ));
+            }
+        }
         conditions.push(Condition {
             topic: condition.topic,
             test,
@@ -4418,6 +4513,72 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
     loaded
 }
 
+/// One bounded snapshot, never a history of publications. Invalid selected
+/// values do not replace it or create another chance when valid data returns.
+#[derive(Default)]
+struct Changes {
+    values: Option<Vec<Value>>,
+    eligible: bool,
+}
+
+impl Changes {
+    fn bounded_scalar(value: &Value) -> bool {
+        match value {
+            Value::Null | Value::Bool(_) | Value::Number(_) => true,
+            Value::String(text) => text.len() <= MOST_CHANGE_STRING_BYTES,
+            _ => false,
+        }
+    }
+
+    fn scalar_at<'a>(value: &'a Value, field: &str) -> Option<&'a Value> {
+        let value = field
+            .split('.')
+            .try_fold(value, |value, name| value.get(name))?;
+        Self::bounded_scalar(value).then_some(value)
+    }
+
+    /// Invalid selected predicate/choice inputs are not eligibility changes.
+    /// A valid false predicate needs no choice or other selected fields:
+    /// pending=0 legitimately has no oldest.id or oldest.delivery.
+    fn selected_inputs_valid(skill: &Skill, trigger: &Trigger, value: &Value) -> bool {
+        let predicate_valid = match &trigger.test {
+            Test::Equals(field, _)
+            | Test::NotEquals(field, _)
+            | Test::Above(field, _)
+            | Test::Below(field, _)
+            | Test::Number(field) => {
+                !trigger.changes.contains(field) || Self::scalar_at(value, field).is_some()
+            }
+            Test::Faces(_) | Test::NoFaces => true,
+        };
+        predicate_valid
+            && (!trigger.test.holds(value)
+                || skill
+                    .choice
+                    .as_ref()
+                    .and_then(|choice| choice.field.as_ref())
+                    .is_none_or(|field| {
+                        !trigger.changes.contains(field)
+                            // Match chooses: a choice names a top-level field.
+                            || value.get(field).is_some_and(Self::bounded_scalar)
+                    }))
+    }
+
+    fn observe(&mut self, fields: &[String], value: &Value) -> bool {
+        let values: Option<Vec<Value>> = fields
+            .iter()
+            .map(|field| Self::scalar_at(value, field).cloned())
+            .collect();
+        let Some(values) = values else {
+            return false;
+        };
+        let changed = !self.eligible || self.values.as_ref() != Some(&values);
+        self.values = Some(values);
+        self.eligible = true;
+        changed
+    }
+}
+
 #[derive(Default)]
 struct Watch {
     started_us: Option<u64>,
@@ -4449,6 +4610,9 @@ struct Watch {
     /// With `rise`: the readings it compares with, since the start or the
     /// last reload.
     readings: Readings,
+    /// `when = "changes"`: the last eligible selected values and whether
+    /// the trigger and its while conditions have remained eligible.
+    changes: Changes,
     /// With `yields_to`: when this time it holds first waited, and said so.
     yielded_us: Option<u64>,
     /// Each gate a due chance was said dropped by ([`dropped`], #2602): the
@@ -5222,6 +5386,7 @@ impl Engine {
     /// for [`SILENT_ENDS_US`]. Its spell is over with it.
     pub fn tick(&mut self, now_us: u64) -> Vec<Run> {
         self.judge_nudges(now_us);
+        self.invalidate_changes(now_us);
         let mut runs = Vec::new();
         let moment = self.local_moment(now_us);
         for skill in &self.skills {
@@ -5387,9 +5552,20 @@ impl Engine {
         // what is there, as at the start.
         // A rise begins again too (#1684): an edit may have changed its
         // field or its while, and readings kept for another are not its.
-        for watch in self.watches.values_mut() {
+        for ((name, index), watch) in &mut self.watches {
             watch.items = None;
             watch.readings = Readings::default();
+            let unchanged = old
+                .iter()
+                .find(|skill| &skill.name == name)
+                .zip(self.skills.iter().find(|skill| &skill.name == name))
+                .is_some_and(|(before, after)| {
+                    before.triggers.get(*index) == after.triggers.get(*index)
+                        && before.conditions == after.conditions
+                });
+            if !unchanged {
+                watch.changes = Changes::default();
+            }
         }
         for skill in &self.skills {
             for (index, trigger) in skill.triggers.iter().enumerate() {
@@ -5733,6 +5909,34 @@ impl Engine {
             .then(|| calls(&self.latest, skill, trigger, now_us, &Value::Null, run_item))
     }
 
+    /// Remember lost eligibility even between trigger-topic publications:
+    /// a brief talk, or an expired while value renewed before the next due
+    /// message, must not disappear into an unchanged selected tuple.
+    fn invalidate_changes(&mut self, now_us: u64) {
+        for skill in &self.skills {
+            if !skill
+                .triggers
+                .iter()
+                .any(|trigger| trigger.when == When::Changes)
+            {
+                continue;
+            }
+            let conditions = Self::conditions_hold(&self.latest, &self.holding, skill, now_us);
+            for (index, trigger) in skill.triggers.iter().enumerate() {
+                if trigger.when == When::Changes
+                    && (!conditions
+                        || Self::fresh(&self.latest, &trigger.topic, now_us).is_none_or(|value| {
+                            Changes::selected_inputs_valid(skill, trigger, value)
+                                && !(trigger.test.holds(value) && chooses(skill, value))
+                        }))
+                    && let Some(watch) = self.watches.get_mut(&(skill.name.clone(), index))
+                {
+                    watch.changes.eligible = false;
+                }
+            }
+        }
+    }
+
     /// A message on `topic`, at `now_us`. A payload that is not JSON is
     /// passed over.
     pub fn observe(
@@ -5745,6 +5949,8 @@ impl Engine {
         let Ok(value) = serde_json::from_slice::<Value>(payload) else {
             return Vec::new();
         };
+        // Check expiry before replacing the previous value with a fresh one.
+        self.invalidate_changes(now_us);
         // Whether a run of a resting skill was noticed (#1685), then each
         // whose while is over judged.
         self.notice(topic, &value, now_us);
@@ -5841,6 +6047,7 @@ impl Engine {
                 }
             }
         }
+        self.invalidate_changes(now_us);
         let mut runs = Vec::new();
         let minute = self.local_minute(now_us);
         let moment = self.local_moment(now_us);
@@ -5866,6 +6073,11 @@ impl Engine {
             let mut item_runs: Vec<(String, Run)> = Vec::new();
             for (index, trigger) in skill.triggers.iter().enumerate() {
                 if trigger.topic != topic {
+                    continue;
+                }
+                if trigger.when == When::Changes
+                    && !Changes::selected_inputs_valid(skill, trigger, &value)
+                {
                     continue;
                 }
                 let yielding = trigger
@@ -6400,6 +6612,12 @@ impl Engine {
                     continue;
                 }
                 watch.waiting_us = None;
+                if trigger.when == When::Changes
+                    && (Self::fresh(&self.latest, topic, now_us).is_none()
+                        || !watch.changes.observe(&trigger.changes, &value))
+                {
+                    continue;
+                }
                 let acts = self.skip_ask
                     || self.ask_policy
                     || skill.kind == SkillKind::Addon
@@ -6566,6 +6784,7 @@ impl Engine {
                         watch.away_us / 1_000_000
                     ),
                     When::Present => format!("{topic} has held for {} s", held_us / 1_000_000),
+                    When::Changes => format!("{topic} selected values changed or became eligible"),
                 };
                 let mut question = question(skill);
                 if question["act"] == "hello" {
@@ -7683,6 +7902,115 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_change_trigger_requires_bounded_paths_and_compatible_options() {
+        let read = |options: &str| {
+            toml::from_str::<TriggerFile>(&format!(
+                "topic = \"schedule/due\"\nfield = \"pending\"\nabove = 0.5\n{options}"
+            ))
+            .map_err(|error| error.to_string())
+            .and_then(trigger)
+        };
+        let selected = "when = \"changes\"\nchanges = [\"pending\", \"oldest.id\"]\n";
+        let valid = read(selected).unwrap();
+        assert_eq!(valid.when, When::Changes);
+        assert_eq!(valid.changes, ["pending", "oldest.id"]);
+        let most = serde_json::to_string(
+            &(0..MOST_CHANGE_FIELDS)
+                .map(|i| format!("p{i}"))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        assert!(read(&format!("when = \"changes\"\nchanges = {most}\n")).is_ok());
+        for fields in [
+            "[]".to_owned(),
+            "[\"\"]".to_owned(),
+            "[\"oldest..id\"]".to_owned(),
+            "[\"line\\nfeed\"]".to_owned(),
+            "[\"pending\", \"pending\"]".to_owned(),
+            format!("[\"{}\"]", "p".repeat(MOST_CHANGE_PATH_BYTES + 1)),
+            serde_json::to_string(
+                &(0..=MOST_CHANGE_FIELDS)
+                    .map(|i| format!("p{i}"))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap(),
+        ] {
+            assert!(
+                read(&format!("when = \"changes\"\nchanges = {fields}\n")).is_err(),
+                "{fields}"
+            );
+        }
+        assert!(read("when = \"changes\"\n").is_err());
+        for mode in ["appears", "present"] {
+            assert!(read(&format!("when = \"{mode}\"\nchanges = [\"pending\"]\n")).is_err());
+            let unchanged = read(&format!("when = \"{mode}\"\n")).unwrap();
+            assert!(unchanged.changes.is_empty());
+        }
+        for extra in [
+            "each = \"items\"\nkey = \"id\"",
+            "key = \"id\"",
+            "near = 0.14",
+            "present = true",
+            "absent_for = \"0s\"",
+            "for = \"0s\"",
+            "gap = \"0s\"",
+            "rearm = \"ends\"",
+            "cooldown = \"0s\"",
+            "wait = \"0s\"",
+            "rise = { by = 1, within = \"1s\" }",
+            "during = { from = \"08:00\", to = \"09:00\" }",
+            "once_per_day = true",
+            "unless_heard = true",
+            "yields_to = { skill = \"hello\", trigger = \"morning\" }",
+        ] {
+            assert!(read(&format!("{selected}{extra}\n")).is_err(), "{extra}");
+        }
+        // A face trigger without a field must not silently become a change
+        // trigger whose test differs from the scalar selection it names.
+        let faces: TriggerFile =
+            toml::from_str(&format!("topic = \"humans/faces/tracked\"\n{selected}")).unwrap();
+        assert!(trigger(faces).is_err());
+    }
+
+    #[test]
+    fn a_change_trigger_requires_a_scalar_comparison() {
+        let read = |field: &str, wanted: &str, selected: &str, mode: &str| {
+            let selection = if mode == "changes" {
+                format!("changes = [\"{selected}\"]\n")
+            } else {
+                String::new()
+            };
+            let file: TriggerFile = toml::from_str(&format!(
+                "topic = \"air/indoor\"\nfield = {field:?}\nequals = {wanted}\nwhen = {mode:?}\n{selection}"
+            ))
+            .unwrap();
+            trigger(file)
+        };
+        // Scalar predicates retain exact selections and independent fields.
+        for (field, wanted, selected) in [
+            ("count", "1", "count"),
+            ("ready", "true", "count"),
+            ("state", "\"ready\"", "count"),
+            ("object.ready", "true", "object.count"),
+        ] {
+            read(field, wanted, selected, "changes").unwrap();
+        }
+        // Existing modes retain compound comparisons.
+        for mode in ["present", "appears"] {
+            read("object", "{ count = 1 }", "object.count", mode).unwrap();
+            read("values", "[1]", "count", mode).unwrap();
+        }
+        for (field, wanted, selected) in [
+            ("object", "{ count = 1 }", "object.count"),
+            ("values", "[1]", "count"),
+        ] {
+            let error = read(field, wanted, selected, "changes")
+                .expect_err("Changes must not accept a compound comparison");
+            assert!(error.contains("needs a scalar comparison"), "{error}");
+        }
+    }
 
     /// #1669: a trigger's field may step into an object with a dot, as
     /// `ears/classes` keeps its scores (`scores.music`); a plain name is

@@ -1,19 +1,15 @@
-# Someone at the desk throughout, talking with the lamp from 20 s to 60.5 s
-# (voice/state listening, thinking, speaking). A reminder falls due at 30 s,
-# in the talk: nothing then. The talk ends at 60.5 s, and at Schedule's next
-# second, 61 s, the lamp looks at them and asks the voice to say it, which
-# the voice says then too, once, with the look (the reviewer's P2 on #1667:
-# asked for at 30 s, the ask would be gone at 50 s, and the voice would say
-# it at 71 s with no look). Acknowledged at 70 s.
+# Someone is at the desk, talking from 20 s through 60.5 s. A reminder
+# becomes due at 30 s, but no chance is made during the talk. The first
+# eligible Schedule heartbeat at 61 s plans one look/source-say chance;
+# unchanged heartbeats through acknowledgement at 70 s add none. These
+# plans do not prove spoken delivery; Voice owns that and the begun gate.
 
 [[expect]]
 at = "61s"
-within = "500ms"
 call = "body.gaze"
 args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
 
 [[expect]]
 at = "61s"
-within = "500ms"
 call = "say"
 args = { from = "schedule" }

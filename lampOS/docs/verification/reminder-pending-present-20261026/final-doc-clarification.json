@@ -1,0 +1,6 @@
+{
+  "path": "lampOS/skills/reminders/SKILL.md",
+  "qualified_sha256": "f094dfdfceb6853d44d9f356b74f6f8000df68424eb9741c33d6a72b135cc897",
+  "final_sha256": "a95bfa200d00db23d4248cccc695f70ccd74fb7bdd4042c6e4a5089b4105d2ec",
+  "change": "English prose explicitly describes the existing Voice-begun look gate; no frontmatter, TOML, Rust, fixture or recorded expectation changed after qualification."
+}

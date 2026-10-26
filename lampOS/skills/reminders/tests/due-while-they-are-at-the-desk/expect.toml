@@ -1,7 +1,7 @@
-# Schedule says every second. Nothing due for a minute, someone at the desk
-# throughout. At 60 s a reminder is due: the lamp looks at them and asks the
-# voice to say it, once, though it stays due until it is acknowledged at
-# 70 s.
+# Nothing is due before 60 s. The first eligible due heartbeat plans one
+# look/source-say chance; unchanged positive heartbeats through 69 s add
+# none. Acknowledgement at 70 s ends the pending spell. These are plans:
+# Voice owns delivery, and the runner moves only after Voice says begun.
 
 [[expect]]
 at = "60s"

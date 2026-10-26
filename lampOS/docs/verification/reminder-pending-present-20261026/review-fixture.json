@@ -1,0 +1,89 @@
+{
+  "base": "f5339bb75a9f2ed7d41d766cdfb13583c678eee6",
+  "patch_sha256": "466bff5f060b8749bd74afa666bb90560ce5b00dba41046f5699d560cbbb4ec0",
+  "source_count": 7165,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "a680c38c6f4bcc9031242d6c2da892effb50a2a4a0545893a1a0d613ec7e0fb9",
+  "changed_source_sha256": {
+    "lampOS/crates/skills/tests/it/skills.rs": "a07cde48aad17b9eb835b1c98c39e37397716b0d3be4c3f003a0c61035698553"
+  },
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T01:45:13Z",
+      "finished": "2026-10-26T01:45:24Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-skills --all-targets -- -D warnings",
+      "started": "2026-10-26T01:45:24Z",
+      "finished": "2026-10-26T01:45:41Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-focused": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --test it skills::reminder_pending:: -- --test-threads=1",
+      "started": "2026-10-26T01:45:41Z",
+      "finished": "2026-10-26T01:46:51Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T01:46:51Z",
+      "finished": "2026-10-26T01:48:13Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-skills": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills -- --test-threads=1",
+      "started": "2026-10-26T01:48:13Z",
+      "finished": "2026-10-26T01:52:23Z",
+      "exit": 0,
+      "harnesses": 6,
+      "passed": 526,
+      "failed": 0,
+      "ignored": 9,
+      "disk_error_lines": []
+    }
+  },
+  "full_suite_control_pass_counts": {
+    "core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "executable_sha256": {
+    "lamp_skills-c6f44302f3b2c78f": "e1033f9892a1d5ef5d01e52ddeaccbaa2605c194928d00e2374ffe5a3e75fcdb",
+    "lamp_skills-a718b2a0214b6903": "bce6b85356c661fabf082acf7813c702e1132ddea93a77d56d641750d285bc92",
+    "it-46363ab9699809b5": "0b8de2688e652a37254a50e00f2b3bd2b3106a59452853ba86c65b5c56698904",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "requested_audio-019db324b83a9807": "a18b4a22464769f6dbe96f9705b6e613e18ef15ebad21a8bb10cfe4c6136c5be"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-focused": "c91500f61a7e04bc21e668199886956cd5a4dd5ca5995811ad4f0fb6f3619fce",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-skills": "1ac57ad99bafe0c2156b4741a23095de0b3de9ebbabfecab5ae8e99d185332af"
+  },
+  "limits": "Native x86_64 Mac. Focused counts overlap full suite and are not added. Replays count planned calls, not actual delivery. No physical gaze, acoustic timing or Linux ARM64 claim."
+}

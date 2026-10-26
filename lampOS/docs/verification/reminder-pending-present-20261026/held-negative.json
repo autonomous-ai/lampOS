@@ -1,0 +1,13 @@
+{
+  "base": "ed8e4819477f626dc4fbde4a23c5d43ef6fdfa17",
+  "source_count": 7197,
+  "all_source_hashes_unchanged": true,
+  "production_unchanged": true,
+  "patch_sha256": "215d514ff887a6442fe5032b126d4131d1c5253f5b6f55568a13074edc1a24cb",
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "failure": "stationary held reminder: 60 chances across 60 heartbeats instead of 1",
+  "executable_sha256": "953810882611c2f74050308dd2e8764d1a718fef0e8fefe0cd912e5ff290376f",
+  "log_sha256": "5786e7abed326df4061d369fd93b7733328022d4fe64ff18a21673cc39927ba7"
+}

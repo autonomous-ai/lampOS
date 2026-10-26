@@ -1,7 +1,8 @@
-# A reminder is counted due at 20 s while Schedule is not ready to serve it:
-# nothing. Ready at 40 s with it still due: the chance kept since 20 s
-# (wait, the reviewer's P2 on #1667) is taken then, as the voice is offered
-# it, so the lamp looks at them as it is said.
+# A reminder is counted due at 20 s while Schedule cannot serve it: no
+# planned calls. Ready at 40 s with pending still positive, the first
+# eligible heartbeat plans one look/source-say chance. Unchanged ready
+# heartbeats through 59 s add none. These are plans only; Voice owns
+# delivery and the runner moves only after Voice says begun.
 
 [[expect]]
 at = "40s"

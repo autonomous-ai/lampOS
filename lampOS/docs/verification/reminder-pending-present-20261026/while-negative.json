@@ -1,0 +1,13 @@
+{
+  "base": "fac0279ca3c78fa1fb82e7a209e3b8a19596f868",
+  "patch_sha256": "5c96745c89480c73b7fc03a88641ba9a03183abe706cb149f96fd350f3fd2745",
+  "all_source_hashes_unchanged": true,
+  "source_count": 7204,
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "qualified_failure": "selected/while path overlap accepted at load; expected refusal",
+  "limit": "Observed parser acceptance, not an executed malformed-input rearm round; the latter was a source finding.",
+  "executable_sha256": "90dbf96fbb756fd19382ef8e29646f224699c5cb11e91828adc70fa417de4a0b",
+  "log_sha256": "c6c0f26d23ab3290a6df7bd87c211d8c02cc849700c63970ace557d6f73970ca"
+}

@@ -855,6 +855,28 @@ and slow storage cannot renew an old observation. Cancellation, snooze, changed 
 stalled consumer withdraws queued/current reminder audio through Voice's normal
 owner revocation. These are host targets and bounds, not measured acoustic stops.
 
+The core Reminders skill uses a bounded change trigger while Voice rests and
+Schedule is ready and enabled. It asks once on first eligibility, after a
+change to `(store_id, pending, oldest.id, oldest.delivery)`, or when eligibility
+returns after talk, disabled/not-ready state or source expiry. A held occurrence
+can keep the count positive across later work; no zero-to-positive edge is
+required. Ordinary one-second heartbeats, revision, timestamps and lateness do
+not repeat an unchanged held request. Several changes in one observation make
+one opportunity. Voice's fallback, admission and five-second delivery-attempt
+pacing remain unchanged; this is not an end-to-end timing guarantee.
+
+An opportunity is not a delivery or permission to look. Voice's durable consumer
+chooses the actual occurrence. Skills permits one executing reminder run,
+rejects additional runs as busy, and moves only after Voice returns `begun`.
+An unchanged held tuple produces one opportunity across sixty heartbeats, with
+no look or speech without that response. Voice caps source-ask
+eligibility at 20 seconds and expires before selecting. Socket reads use
+the existing 180-second per-read timeout; connect has no explicit
+deadline. Neither is an absolute execution-duration bound. Busy serialization
+still permits only one executing reminder run. The policy is the existing
+local reminder rule, with no model request. Pure skill replays count planned calls, not actual speech or
+motion; physical time-to-first-audio still requires the lamp replay.
+
 The child journals (stderr, so the voice's journal) one line,
 `lamp-voice schedule-consumer: ...`, each time what it does with a due item
 changes, and never one per tick. At start it says `started`, then

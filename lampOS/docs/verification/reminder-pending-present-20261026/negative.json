@@ -1,0 +1,13 @@
+{
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "source_count": 7160,
+  "all_source_hashes_unchanged": true,
+  "production_unchanged": true,
+  "patch_sha256": "b11117be47cc4b7d5fb1dbe9eeb5e17d535b38de74e88a6b496aaf8fd2f8165c",
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "failure": "pending remains positive after talk: no new skill chance",
+  "executable_sha256": "23959e514108cb752afc79153eaa8c350e5bbeb26a29f883b0a178737247f0b3",
+  "log_sha256": "1ba60a5180137e74558bd22d535075ef6f03c833d5238b6259c65ec09c7f95d8"
+}
