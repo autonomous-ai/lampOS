@@ -3068,7 +3068,9 @@ after a take-over, but now for every turn:
     reviewer-two's P2 on `2110d04a9`), before this line began: it is not
     this line's name heard, its name's note, nor its name said to a face. `Attention::began_at` keeps the same rule for a
     hearing that came in time and counted for its own line.
-  - Kept as before: a line going on from the one before (`continues_from`),
+  - Kept as before: a line going on from another (`continues_from`) keeps
+    that line's hearings, though not an older line's (the reviewer-lead's P3
+    on `db3bc2d59`),
     the line after one whose words called the lamp by name ("Lamp.", "Hey
     Lamp, …"; `Attention::called_in_its_words`) or after a bare call, a
     hearing at the line before's start (`attention::NAME_AT_THE_START_US`,
