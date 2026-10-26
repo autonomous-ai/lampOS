@@ -1,0 +1,85 @@
+{
+  "head": "b9de89470a288d5e078bde8043478e10d9c5b2ad",
+  "base": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "lampOS_tree": "6d5d14296c5d3124074631068e79e42168f857b7",
+  "equal_previous_lampOS_tree": true,
+  "changed_outside": "scripts/imager/build-orangepi-v2.sh",
+  "gates": {
+    "fmt": {
+      "exit": 0,
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T09:57:19Z",
+      "finished": "2026-10-26T09:57:32Z",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "exit": 0,
+      "command": "cargo +1.96.0 clippy -q --offline --locked -p lamp-skills --all-targets -- -D warnings",
+      "started": "2026-10-26T09:57:32Z",
+      "finished": "2026-10-26T09:58:58Z",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "build": {
+      "exit": 0,
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T09:58:58Z",
+      "finished": "2026-10-26T10:02:48Z",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "test-compile": {
+      "exit": 0,
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --no-run",
+      "started": "2026-10-26T10:02:48Z",
+      "finished": "2026-10-26T10:05:14Z",
+      "log_sha256": "59b57d6ebc7e8d0a71817a7a624d797e64cf257c02b14140d26009287bbe501b"
+    },
+    "test-skills": {
+      "exit": 0,
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills -- --test-threads=1",
+      "started": "2026-10-26T10:06:05Z",
+      "finished": "2026-10-26T10:10:14Z",
+      "log_sha256": "cdb5ab4bc666da33f5cb4d815e8e4558eae09d9ccd598f4f0dc3f3657b0809d4"
+    }
+  },
+  "executable_sha256": {
+    "lamp_skills-c6f44302f3b2c78f": "9ff7f8f17e3aad533683a1b2322d97d01610811ca3e398ff3d9ac3ca400aa7d1",
+    "lamp_skills-a718b2a0214b6903": "7a53c6ecccbcf6c74275603f8cb5cdc7b5cd1274b3d7d29ff58bde61a01b00ab",
+    "it-46363ab9699809b5": "963c6f82b9c268a0a94adff03768d5548350f51fa0e9aa2d33a91829d2a77cb8",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "requested_audio-019db324b83a9807": "b2fc466c123edf62632ec0a89665b7e0e7e24758a51880770c449e62c6607095",
+    "lamp-skills": "55cd3701555992dbe1919fa8fd76b4f0ad4650b5cc75cb0408dd8cc65fcfd932"
+  },
+  "unchanged_before_after_and_copies": true,
+  "source_unchanged": true,
+  "source_count": 7257,
+  "runtime": {
+    "passed": 542,
+    "failed": 0,
+    "ignored": 9
+  },
+  "controls": {
+    "skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": 1,
+    "skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": 1,
+    "skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": 1,
+    "skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": 1,
+    "skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": 1,
+    "skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": 1,
+    "skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "tests::a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "tests::a_change_trigger_requires_a_scalar_comparison": 1,
+    "skills::every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "parser_note": "Initial same-line control parser did not recognize two child-output-interleaved serial ok lines; corrected to serial case segments after inspecting original log. No test rerun.",
+  "limits": "Fresh current b9de/aa7 runtime; earlier failed equality check remains recorded, five of six binaries differed after recompilation in other target. Cause not established, no earlier runtime reused. No device or acoustic qualification. Current native gates required."
+}

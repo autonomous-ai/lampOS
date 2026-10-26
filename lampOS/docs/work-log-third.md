@@ -13,6 +13,22 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 17:12 — Reminder current runtime rerun and push
+
+Ready for lamp-voice: no (#3525, current native gates and carry reads pending)
+
+Pushed **b9de89470/aa7cf9029** after fresh full Skills **542/0/9**, all
+21 controls once, plus formatting, strict Skills Clippy and workspace
+build. All sources and six actual/preserved executable pairs stayed fixed.
+[Current receipt](verification/reminder-pending-present-20261026/current-aa7.json).
+Five binaries differed from the earlier target's artifacts, so this run
+replaces reuse for the current head; the original equality failure remains
+recorded. Its cause is not established. The initial control-count parser
+missed two serial cases whose child output interrupted the status line;
+inspection and serial segment parsing recovered their terminal ok lines.
+No runtime retry was used. Earlier failures and native results retain
+original identities. Current native audit is active, without device claims.
+
 ## 2026-10-26 17:10 — Parallel preflight fixture repair pushed
 
 Ready for lamp-voice: no (#3574, native gates and reads pending)
