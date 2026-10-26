@@ -1,0 +1,85 @@
+{
+  "head": "28510e559c942718d9f1b7942df4ba03acc25c65",
+  "base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+  "prior_head": "783184fc6b6ca4b4ffc475abf7090467d73a1424",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started": "2026-10-26T09:27:30Z",
+      "finished": "2026-10-26T09:27:43Z"
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --offline --locked -p lamp-skills --all-targets -- -D warnings",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started": "2026-10-26T09:27:43Z",
+      "finished": "2026-10-26T09:28:09Z"
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started": "2026-10-26T09:28:09Z",
+      "finished": "2026-10-26T09:31:31Z"
+    },
+    "test-compile": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --no-run",
+      "exit": 0,
+      "log_sha256": "1cd48c1af490bf897525d42d72c5275899214fda9375f3d6b1aa2a9ce384e974",
+      "started": "2026-10-26T09:31:31Z",
+      "finished": "2026-10-26T09:33:17Z"
+    }
+  },
+  "executable_sha256": {
+    "lamp_skills-c6f44302f3b2c78f": "e48506dd4fdda69df15af9e416b5215e4df69465bb8e8ffea6776792b52203e2",
+    "lamp_skills-a718b2a0214b6903": "819287baf2f0d6ca8afd584476c552e735f8ff4eded5c25a3f4627a37d64d0b7",
+    "it-46363ab9699809b5": "2d90c1f7ecf7e9aa3be499f492dd71d655fa56dfce9ba9db4e84735bc49d057e",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "requested_audio-019db324b83a9807": "8308248b2da952dc4d6168b2c4caac32a39ea885031719d191f6086c0043abfa",
+    "lamp-skills": "649eb1cb800177013cfa94cdd6d66e2ed17b0c148a2d3644a245c7532cff9e7c"
+  },
+  "all_source_unchanged": true,
+  "source_manifest_sha256": "4cdafa5fe28d760cfcd616894bfb2dc5e5c141edf2165abab8eab081d3a7b5fe",
+  "authored_blobs_equal": [
+    "lampOS/crates/skills/src/lib.rs",
+    "lampOS/crates/skills/tests/it/skills.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/schedule.md",
+    "lampOS/docs/skills.md",
+    "lampOS/docs/verification/reminder-pending-present-20261026/README.md",
+    "lampOS/docs/verification/reminder-pending-present-20261026/carry-1c884.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/changes-final-0c1.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/changes-initial.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/compatibility-cli.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/current-1c884-intermediate.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/final-1c884.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/final-doc-clarification.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/final-product-manifest.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/fixed.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/held-negative.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/negative.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/negative.patch",
+    "lampOS/docs/verification/reminder-pending-present-20261026/old-daemon-reload.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/old-parser.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/review-fixture.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/scalar-negative.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/selected-negative-initial.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/selected-negative.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/update-crossings.json",
+    "lampOS/docs/verification/reminder-pending-present-20261026/while-negative.json",
+    "lampOS/skills/reminders/SKILL.md",
+    "lampOS/skills/reminders/skill.toml",
+    "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml",
+    "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml",
+    "lampOS/skills/reminders/tests/each-reminder-once/expect.toml",
+    "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml"
+  ],
+  "range_diff": "1:  783184fc6b = 1:  28510e559c lampOS: rearm reminder chances on changed work\n",
+  "head_delta": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "runtime_scope": "542/0/9 and21 controls remain actual a54/1cad execution; all current five test drivers+child equal a54 and783. No fresh285 runtime or rustdoc execution claimed. Current native required.",
+  "limits": "No device or ARM local link; only inherited build-rows.md changed versus783."
+}

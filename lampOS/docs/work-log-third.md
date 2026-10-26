@@ -13,6 +13,36 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 16:38 — Qualified reminder member and latest docs carry
+
+Ready for lamp-voice: no (new current native/read qualification)
+
+**783184fc6/1aa409fcb** passed original ARM64 **40296644703** and Linux
+**40296644676**: **11,381/0/106**, zero leaks/timeouts, all 21 controls once.
+Exact preview **4a6287107**, ordered parents and complete tree **4995ab3b2**
+verified. Separate docs 4/0, Turn-wire 13/0 and relay passed.
+[Sanitized receipt](verification/reminder-pending-present-20261026/native-40296644703.json).
+Both exact member READ-OKs are posted. The initial doctest auditor pairing
+was corrected; its original parser/result and raw log remain private,
+with no product/CI failure or rerun.
+
+Docs train 167 advanced the base before readiness. **28510e559** now
+contains latest **690dff041**, one equal patch and all 32 authored blobs.
+Only build-rows.md differs from 783. Fresh fmt, strict Skills Clippy,
+workspace build and test compilation pass; all five drivers and actual
+child equal the sealed a54/1cad runtime and 783 compiler artifacts.
+[Current binding](verification/reminder-pending-present-20261026/carry-690.json).
+The **542/0/9** runtime remains a54/1cad; new native/read qualification
+starts for 285. No physical acceptance.
+
+Separately, corrected Setup passed full **425/0/6** on 1aa, including
+18 controls once; latest docs carry is being bound. First's assigned
+install-fixture investigation reproduced **96/5/0** on unchanged 1aa
+at 16 threads: the five success fixtures hit the post-ready deadline.
+A diagnostic-only phase trace is next; no deadline/assertion relaxation.
+The reproduction overlapped Setup's four-thread round gate; no isolated
+load or cause inference is claimed.
+
 ## 2026-10-26 16:03 — Reminder carried to factory repair
 
 Ready for lamp-voice: no (current native gates and reads pending)
