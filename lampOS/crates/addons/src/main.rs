@@ -6,8 +6,9 @@ use std::{
     time::Duration,
 };
 
-const HELP: &str = "usage: lamp-addons machine [--enable] [--bus-root ABS] [--yes-file PATH] [--harness-dir PATH] [--port N] [--run-for-ms N]
+const HELP: &str = "usage: lamp-addons machine [--enable] [--stream] [--bus-root ABS] [--yes-file PATH] [--harness-dir PATH] [--port N] [--run-for-ms N]
 LAMP_MACHINE_ADDONS=on is --enable: proposals from the person's own computers, through this lamp's Harness.
+LAMP_MACHINE_ADDONS_STREAM=on is --stream: the bus's changes to those computers too, with the person's yes for it.
 usage: lamp-addons serve [--enable] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] [--say-quiet-ms N] [--move-quiet-ms N] [--body-socket PATH] [--mute-grace-ms N]
 LAMP_ADDONS=on is --enable.
 --say-quiet-ms N  Tests only: wait 0..15000 ms of quiet before a say (default 15000 ms).
@@ -132,6 +133,7 @@ fn machine(mut args: impl Iterator<Item = String>) -> Result<(), Box<dyn std::er
                 return Ok(());
             }
             "--enable" => enabled = true,
+            "--stream" => config.stream = true,
             "--bus-root" => config.bus_root = Some(PathBuf::from(value("an absolute path")?)),
             "--yes-file" => config.yes_file = PathBuf::from(value("a path")?),
             "--harness-dir" => config.data_dir = PathBuf::from(value("Harness's data folder")?),
@@ -164,8 +166,8 @@ fn machine(mut args: impl Iterator<Item = String>) -> Result<(), Box<dyn std::er
     signal_hook::flag::register(signal_hook::consts::SIGINT, stop.clone())?;
     let report = machine::serve(config, stop, harness)?;
     println!(
-        "{{\"proposed\":{},\"refused\":{},\"decided\":{},\"published\":{}}}",
-        report.proposed, report.refused, report.decided, report.published
+        "{{\"proposed\":{},\"refused\":{},\"decided\":{},\"published\":{},\"lines\":{}}}",
+        report.proposed, report.refused, report.decided, report.published, report.lines
     );
     Ok(())
 }

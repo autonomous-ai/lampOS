@@ -3,7 +3,7 @@
 //! (`machine-addon/hello|publish|decision|proposals`), with its hook
 //! credential checked.
 use lamp_bus::Bus;
-use lamp_msgs::{AddonDecision, AddonProposal, Voice, VoiceState};
+use lamp_msgs::{AddonDecision, AddonProposal, Room, RoomState, Speech, Voice, VoiceState};
 use serde_json::{Value, json};
 use std::{
     io::{BufRead, BufReader, Read, Write},
@@ -173,6 +173,10 @@ fn harness_dir(root: &Path) -> std::path::PathBuf {
 }
 
 fn service(root: &Path, port: u16, enabled: bool) -> Running {
+    service_with(root, port, enabled, &[])
+}
+
+fn service_with(root: &Path, port: u16, enabled: bool, more: &[&str]) -> Running {
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-addons"));
     command
         .args(["machine", "--bus-root"])
@@ -183,6 +187,8 @@ fn service(root: &Path, port: u16, enabled: bool) -> Running {
         .arg(root.join("harness"))
         .args(["--port", &port.to_string()])
         .env_remove("LAMP_MACHINE_ADDONS")
+        .env_remove("LAMP_MACHINE_ADDONS_STREAM")
+        .args(more)
         .stdout(Stdio::null())
         .stderr(std::fs::File::create(root.join("machine.log")).unwrap());
     if enabled {
@@ -411,4 +417,120 @@ fn without_the_yes_nothing_is_published_and_withdrawing_it_clears_harness() {
         published,
         "published after the yes was withdrawn"
     );
+}
+
+/// The lines Harness was given in the stream's slots, in order: (topic, value).
+fn streamed(state: &Mutex<Daemon>) -> Vec<(String, Value)> {
+    let mut lines: Vec<(u64, String, Value)> = asked(state, "publish")
+        .iter()
+        .flat_map(|batch| batch["values"].as_array().cloned().unwrap_or_default())
+        .filter(|value| {
+            value["topic"]
+                .as_str()
+                .is_some_and(|t| t.starts_with("lamp/log/s"))
+        })
+        .flat_map(|slot| {
+            slot["value"]["lines"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+        })
+        .map(|line| {
+            (
+                line[0].as_u64().unwrap(),
+                line[2].as_str().unwrap().to_owned(),
+                line[3].clone(),
+            )
+        })
+        .collect();
+    lines.sort_by_key(|line| line.0);
+    lines
+        .into_iter()
+        .map(|(_, topic, value)| (topic, value))
+        .collect()
+}
+
+#[test]
+fn with_the_switch_and_the_yes_for_it_the_bus_reaches_the_computer_as_lines() {
+    let root = tempfile::tempdir().unwrap();
+    harness_dir(root.path());
+    std::fs::write(
+        root.path().join("yes.json"),
+        format!(r#"{{"machines":["{OWNER}"],"stream":true}}"#),
+    )
+    .unwrap();
+    let bus = Bus::new(root.path().join("b")).unwrap();
+    let mut room = bus
+        .publisher_declared(RoomState::TOPIC, &RoomState::declaration(), "voice")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared("voice/heard", &Speech::declaration(), "voice")
+        .unwrap();
+    let (port, state) = daemon();
+    let _service = service_with(root.path(), port, true, &["--stream"]);
+    until(root.path(), "said hello", || {
+        !asked(&state, "hello").is_empty()
+    });
+    // The service looks for topics at start; say the room until a line comes.
+    until(root.path(), "streamed room/state", || {
+        room.publish_json(lamp_ipc::monotonic_us(), &RoomState { state: Room::Quiet })
+            .unwrap();
+        heard
+            .publish_json(
+                lamp_ipc::monotonic_us(),
+                &serde_json::json!({"text": "words", "finished": true}),
+            )
+            .ok();
+        streamed(&state)
+            .iter()
+            .any(|(topic, _)| topic == "room/state")
+    });
+    room.publish_json(lamp_ipc::monotonic_us(), &RoomState { state: Room::Busy })
+        .unwrap();
+    until(root.path(), "streamed the change", || {
+        streamed(&state)
+            .iter()
+            .any(|(topic, value)| topic == "room/state" && value["state"] == "busy")
+    });
+    let lines = streamed(&state);
+    // Said once each: the same meaning again is no new line.
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|(topic, _)| topic == "room/state")
+            .count(),
+        2,
+        "{lines:?}"
+    );
+    // What was heard goes only with the yes for words.
+    assert!(
+        lines.iter().all(|(topic, _)| topic != "voice/heard"),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn without_the_switch_the_yes_for_the_stream_sends_nothing_of_it() {
+    let root = tempfile::tempdir().unwrap();
+    harness_dir(root.path());
+    std::fs::write(
+        root.path().join("yes.json"),
+        format!(r#"{{"machines":["{OWNER}"],"stream":true,"words":true}}"#),
+    )
+    .unwrap();
+    let bus = Bus::new(root.path().join("b")).unwrap();
+    let mut room = bus
+        .publisher_declared(RoomState::TOPIC, &RoomState::declaration(), "voice")
+        .unwrap();
+    let (port, state) = daemon();
+    let _service = service(root.path(), port, true);
+    until(root.path(), "said hello", || {
+        !asked(&state, "hello").is_empty()
+    });
+    for _ in 0..15 {
+        room.publish_json(lamp_ipc::monotonic_us(), &RoomState { state: Room::Quiet })
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(streamed(&state).is_empty());
 }

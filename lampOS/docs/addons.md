@@ -666,6 +666,48 @@ and 6.
 - **Not yet:** the reasons `messages` and `news` (a schema change in
   `crates/msgs`), a deploy unit, and a `say` on a lamp.
 
+### The stream (devin-0-P4, the owner, 26 Oct)
+
+The owner asked to see everything the lamp does on their own computer
+through the add-on protocol, not over ssh. Harness has no event stream
+yet (#1654 question 5): `addon.publish` keeps the newest value of a topic,
+at most 32 topics, 4,096 bytes a value. So `crates/addons/src/stream.rs`
+carries events over it as follows, off unless
+`LAMP_MACHINE_ADDONS_STREAM=on` (`--stream`) **and** the yes file says
+`"stream": true`:
+
+- **What is followed:** every topic the bus lists, looked at again every
+  30 s, but raw audio, joint angles, the 10 ms privacy lease and the
+  slots themselves. The continuous state streams (controls, touch, the
+  body's pose, sound level, faces tracked, voice timing and playout,
+  health) only with `"busy": true`. What was said or typed and what is
+  kept about a person (`voice/heard`, `voice/said`, `chat/*`, `memory/*`,
+  `humans/*`, `skills/ask`, `messages/*`) only with `"words": true`.
+- **A line a change of meaning:** a topic's message is a new line only
+  when it means something else than the last: times, counters, leases
+  and stamps are left out of the comparison, and a part's diagnostics
+  count by their level and message. A value over 1,024 bytes is said by
+  its size alone (`too_big`).
+- **Rotating slots:** once a second, the waiting lines are packed in
+  order into at most eight slots, `lamp/log/s0` to `lamp/log/s7`, each
+  `{from, to, dropped, lines: [[seq, at, topic, value], …]}` within
+  4,096 bytes, and published with the summaries (at most 13 values a
+  batch). A line leaves the lamp's queue only once Harness took its slot.
+  A computer that reads every few seconds misses nothing; one that reads
+  less often sees the gap by the numbers. More than 4,096 lines waiting
+  drops the oldest, and the next slot says how many.
+- **The yes:** withdrawing it, or narrowing it, clears what Harness holds
+  (a `hello`) at once.
+- **Not the trusted tier as designed below:** no person-scoped yes for a
+  housemate's words yet (`"words"` is the computer owner's, for every
+  line), no camera pictures, no message over 1,024 bytes. It is the
+  owner's debugging view until Harness carries events.
+- **On lamp-a0ae,** 26 Oct 17:03, the owner's Mac read a whole turn
+  through Harness: the name heard, what was heard, the verdict, the
+  Policy's attention decision, what was said and the body's gesture,
+  lines #33 to #52 with none missed, each about 2 s after the lamp said
+  it (a publish a second and the computer's own read).
+
 ### Two tiers of remote add-on
 
 | | Partner (above) | The person's own computer (this) |

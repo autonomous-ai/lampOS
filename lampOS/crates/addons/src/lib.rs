@@ -12,6 +12,7 @@ pub mod machine;
 pub mod rules;
 pub mod runtime;
 pub mod situation;
+pub mod stream;
 
 pub use rules::{Drop, Judge, Reading, Situation, Verdict};
 pub use situation::Watcher;

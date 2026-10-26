@@ -13,6 +13,7 @@
 //!
 //! Nothing here reaches a speaker, a light or a motor: a proposal is only
 //! ever put to the judge, which decides as it does for an add-on on the lamp.
+use crate::stream::{Allowed, Stream};
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
     ADDON_HOLDS_MS, ADDON_NOTE_BYTES, ADDON_TOPICS, ADDON_WHYS, AddonDecision, AddonLight,
@@ -58,6 +59,13 @@ pub const HARNESS_PORT: u16 = 18_473;
 /// The acts a computer may propose.
 pub const ACTS: [&str; 2] = ["light", "say"];
 
+/// The stream's own switch (`crate::stream`), off unless set: without it,
+/// only the summaries are published, whatever the yes says.
+pub const STREAM_ENVIRONMENT: &str = "LAMP_MACHINE_ADDONS_STREAM";
+
+/// How often the bus is looked at again for topics to follow.
+const LOOK_EVERY: Duration = Duration::from_secs(30);
+
 /// The longest one take waits for the next proposal (Harness's own bound
 /// is 20 s); a stop is seen within it.
 const TAKE_WAIT_MS: u64 = 10_000;
@@ -89,6 +97,8 @@ pub struct Config {
     pub data_dir: PathBuf,
     pub port: u16,
     pub run_for: Option<Duration>,
+    /// The stream to the computer (`crate::stream`), with the yes for it.
+    pub stream: bool,
 }
 
 impl Config {
@@ -118,6 +128,7 @@ impl Config {
             data_dir,
             port,
             run_for: None,
+            stream: std::env::var(STREAM_ENVIRONMENT).as_deref() == Ok("on"),
         }
     }
 }
@@ -129,6 +140,8 @@ pub struct Report {
     pub refused: u64,
     pub decided: u64,
     pub published: u64,
+    /// Lines made for the stream.
+    pub lines: u64,
 }
 
 /// The stamp of a computer: `own-` and the first 12 hex digits of the
@@ -143,13 +156,7 @@ pub fn stamp(machine_id: &str) -> String {
 /// A file missing, unreadable or not as written is no yes.
 pub fn yes(path: &Path) -> BTreeSet<String> {
     let read = || -> Option<BTreeSet<String>> {
-        let file = std::fs::File::open(path).ok()?;
-        let mut text = String::new();
-        file.take(YES_BYTES + 1).read_to_string(&mut text).ok()?;
-        if text.len() as u64 > YES_BYTES {
-            return None;
-        }
-        let value: Value = serde_json::from_str(&text).ok()?;
+        let value = yes_file(path)?;
         let machines = value.as_object()?.get("machines")?.as_array()?;
         machines
             .iter()
@@ -157,6 +164,31 @@ pub fn yes(path: &Path) -> BTreeSet<String> {
             .collect()
     };
     read().unwrap_or_default()
+}
+
+/// The person's yes for the stream: `"stream": true` beside their
+/// computers, and what else it covers (`"words"`, `"busy"`). None, unless
+/// all of it is as written and some computer has the yes.
+pub fn yes_to_stream(path: &Path) -> Option<Allowed> {
+    if yes(path).is_empty() {
+        return None;
+    }
+    let value = yes_file(path)?;
+    let flag = |name: &str| value.get(name).and_then(Value::as_bool);
+    (flag("stream") == Some(true)).then(|| Allowed {
+        words: flag("words") == Some(true),
+        busy: flag("busy") == Some(true),
+    })
+}
+
+fn yes_file(path: &Path) -> Option<Value> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut text = String::new();
+    file.take(YES_BYTES + 1).read_to_string(&mut text).ok()?;
+    if text.len() as u64 > YES_BYTES {
+        return None;
+    }
+    serde_json::from_str(&text).ok()
 }
 
 /// A machine id as Harness names one.
@@ -587,7 +619,14 @@ impl Published {
     }
 
     /// Harness brought in step with the yes, at most one request a second.
-    fn sync(&mut self, harness: &dyn Harness, yes: bool, report: &mut Report) {
+    /// The stream's slots, when it is on, go in the same batch.
+    fn sync(
+        &mut self,
+        harness: &dyn Harness,
+        yes: bool,
+        stream: Option<&mut Stream>,
+        report: &mut Report,
+    ) {
         let now = Instant::now();
         if self.last_try.is_some_and(|at| now < at + PUBLISH_EVERY) {
             return;
@@ -607,27 +646,38 @@ impl Published {
             }
             return;
         }
-        if !yes
-            || self.dirty.is_empty()
-            || self.last_batch.is_some_and(|at| now < at + PUBLISH_EVERY)
-        {
+        if !yes || self.last_batch.is_some_and(|at| now < at + PUBLISH_EVERY) {
             return;
         }
-        let values: Vec<Value> = self
-            .dirty
-            .iter()
-            .filter_map(|topic| {
-                let (value, at) = self.latest.get(topic)?;
-                Some(json!({ "topic": topic, "value": value, "at": at }))
-            })
-            .take(16)
-            .collect();
+        let packed = stream.as_ref().and_then(|stream| stream.pack());
+        if self.dirty.is_empty() && packed.is_none() {
+            return;
+        }
+        let at = unix_ms();
+        // At most five summaries and eight slots: within Harness's 16 a batch.
+        let values: Vec<Value> =
+            self.dirty
+                .iter()
+                .filter_map(|topic| {
+                    let (value, at) = self.latest.get(topic)?;
+                    Some(json!({ "topic": topic, "value": value, "at": at }))
+                })
+                .chain(packed.iter().flat_map(|packed| {
+                    packed.values.iter().map(
+                        move |(topic, value)| json!({ "topic": topic, "value": value, "at": at }),
+                    )
+                }))
+                .take(16)
+                .collect();
         self.last_try = Some(now);
         match harness.publish(values) {
             Ok(_) => {
                 report.published += 1;
                 self.last_batch = Some(now);
                 self.dirty.clear();
+                if let (Some(stream), Some(packed)) = (stream, &packed) {
+                    stream.sent(packed);
+                }
             }
             Err(error) => {
                 eprintln!("lamp-addons machine: summaries not published: {error}");
@@ -685,6 +735,11 @@ pub fn serve(
     let mut waiting: HashMap<u64, Waiting> = HashMap::new();
     let mut report = Report::default();
     let mut had_yes = false;
+    // The stream: the bus's topics followed, and what the yes allowed last.
+    let mut stream = Stream::default();
+    let mut followed: BTreeMap<String, Subscriber> = BTreeMap::new();
+    let mut streaming: Option<Allowed> = None;
+    let mut looked: Option<Instant> = None;
     eprintln!("lamp-addons machine: taking proposals from the person's own computers");
     let began = Instant::now();
     while !stop.load(Ordering::Relaxed)
@@ -700,6 +755,62 @@ pub fn serve(
             published.last_try = None;
         }
         had_yes = !yes.is_empty();
+        let allowed = if config.stream {
+            yes_to_stream(&config.yes_file)
+        } else {
+            None
+        };
+        if allowed != streaming {
+            if streaming.is_some() {
+                // Narrowed or withdrawn: what the computer holds goes too.
+                eprintln!(
+                    "lamp-addons machine: the stream's yes changed; clearing what was published"
+                );
+                published.hello_owed = true;
+                published.last_try = None;
+                stream = Stream::default();
+            }
+            followed.retain(|topic, _| {
+                allowed.is_some_and(|allowed| crate::stream::followed(topic, allowed))
+            });
+            streaming = allowed;
+            looked = None;
+            if let Some(allowed) = allowed {
+                eprintln!(
+                    "lamp-addons machine: streaming the bus to the computer (words {}, busy {})",
+                    if allowed.words { "on" } else { "off" },
+                    if allowed.busy { "on" } else { "off" }
+                );
+            }
+        }
+        if let Some(allowed) = streaming
+            && looked.is_none_or(|at| at.elapsed() >= LOOK_EVERY)
+        {
+            looked = Some(Instant::now());
+            for topic in bus.topics()? {
+                if crate::stream::followed(&topic.name, allowed)
+                    && !followed.contains_key(&topic.name)
+                {
+                    match bus.subscribe(&topic.name, "ms") {
+                        Ok(subscriber) => {
+                            followed.insert(topic.name, subscriber);
+                        }
+                        Err(error) => {
+                            eprintln!("lamp-addons machine: {} not followed: {error}", topic.name)
+                        }
+                    }
+                }
+            }
+        }
+        for (topic, subscriber) in &mut followed {
+            while let Some(message) = subscriber.recv(Duration::ZERO)? {
+                if let Ok(value) = message.json()
+                    && stream.take(topic, value, message.header.at_unix_ms)
+                {
+                    report.lines += 1;
+                }
+            }
+        }
         for (topic, subscriber) in &mut summaries {
             while let Some(message) = subscriber.recv(Duration::ZERO)? {
                 if let Ok(value) = message.json() {
@@ -707,7 +818,12 @@ pub fn serve(
                 }
             }
         }
-        published.sync(harness.as_ref(), had_yes, &mut report);
+        published.sync(
+            harness.as_ref(),
+            had_yes,
+            streaming.is_some().then_some(&mut stream),
+            &mut report,
+        );
         while let Ok(news) = took.try_recv() {
             match news {
                 Took::Reset => {

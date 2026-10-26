@@ -36,3 +36,13 @@ Also shown in the journal: Harness restarting under the service after the sign-i
 - Times measured by the lamp's clock against the Mac's: each row's times are each machine's own.
 
 Nothing of what was said in the room is kept here.
+
+## The stream (devin-0-P4), 17:03
+
+The same lamp, `lamp-addons` built from this branch's head in Docker (`rust:1.96.0-bookworm`, arm64), SHA-256
+`36ed8876d74b16775a551443c7882a0bac387c91f4e6592cf168906f8a64626c`, with `machine --stream` and the yes
+`{"stream": true, "words": true}`. The owner's Mac ran `watch` through Harness and asked the lamp, by its own
+speaker, "Hey Lamp, what is the capital of Japan?". `mac-stream.jsonl` is the Mac's log of lines #33 to #52:
+`voice/state`, `name/rising`, `name/heard`, `voice/heard`, `voice/turn`, `policy/decisions`, `voice/said`,
+`body/gesture` and diagnostics, none missed, each read on the Mac about 2 s after its time on the lamp. The
+words in it are the Mac's synthesized question and the lamp's answer.
