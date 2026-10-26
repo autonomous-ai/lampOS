@@ -628,8 +628,8 @@ identify the cause of older failures that retained no expiry evidence.
 
 The Skills repeat-call fixture for a tool containing only made steps keeps
 its two original calls, refusal assertions and three-second light duration.
-Its Actions mock now handles one initial `light_colour` request in a scoped
-thread. After both call assertions, the fixture joins that worker and checks
+Its Actions mock starts before the child, as originally, and handles one
+initial `light_colour` request in a scoped thread. After both call assertions, the fixture joins that worker and checks
 the exact white-light request and complete ACK before dropping the child.
 This observes the initial exchange, not completion of the three-second run;
 no synchronization was added before or between the calls.
@@ -639,7 +639,8 @@ absolute two-second request/ACK budget, with an 8,192-byte request cap.
 Cancellation is checked in 20 ms I/O slices. Ordinary I/O, parse and deadline
 errors fail the test; only explicit teardown returns cancellation. The scope
 joins during unwind while the child still exists. Controls close the peer
-after a witnessed complete request before releasing the ACK, and unwind
+after a witnessed complete request before releasing the ACK, require a
+typed failure witness emitted by the actual write, and unwind
 both before connect and while a partial request's peer stays open. They
 require a joined error or explicit cancellation, rather than a detached
 panic or an EOF standing in for cancellation. Host overruns fail those
