@@ -2713,6 +2713,32 @@ after a take-over, but now for every turn:
   on the same build, as the lines fell inside or outside the 15 s window
   behind answers of different lengths. A follow-up ("And what about
   tomorrow?") shows none of the signs and plays.
+- **A reply never says it kept something with no `remember` call**
+  (finding K on #3504: lamp-06c1, 27 Oct, "Kept: the meeting room is
+  called Orange." with `calls=none`, 2 of 4 remembers, the model copying
+  its own earlier acknowledgement). On by default, on every turn of this
+  route offered functions (not a quoted add-on's or a reminder's). Each
+  round's reply opening is held only while its words could still begin a
+  claim (`remember::claims_a_keep`: after up to three of "okay", "sure",
+  "got it", "done"…, a keep that takes what was kept: "Kept:", "Kept.",
+  "kept that/it", "I've kept that", "I'll remember that/this/it", "I've
+  saved it", "saved that", and "đã ghi nhớ", "mình sẽ nhớ", "đã lưu"
+  with anything after them); at the
+  first word that cannot, it goes on as before. "I'll keep it short",
+  "I'll keep the light on", "I'll remember to remind you at five", "Saved
+  your playlist", "Remembered! …", "Got it" and "Noted" claim nothing
+  (the reviewer-lead's P2 on #3628). A claim is held to the round's end: beside a `remember`
+  call it is said. With none, its words are not said: beside other calls,
+  those run and the next round is told nothing was kept
+  (`KEEP_CLAIMED_UNKEPT`); alone, the model is told once and asked again,
+  and a second such reply, or one in the last round, is said as
+  `NOT_KEPT_LINE` ("I didn't keep that. Tell me again and I'll remember
+  it."). Not held after any call of the same request but a `recall` ran
+  unrefused, so a reminder set in round 1 may be confirmed in round 2,
+  "Got it, I've saved that for five." (reviewer-three's and the
+  reviewer-lead's P2 on #3628). Tests: `a reply never says it kept something with no remember
+  call`, `a turn offered no function is never held for a claim` and
+  `remember::tests::a_reply_that_says_it_kept_something_is_known_by_its_opening`.
 - **"Not for me" written as words, with `LAMP_NOT_FOR_ME_WORDS=on`** (off
   unless set): on a line told `worker::CONVERSATION_ALONE`, a reply that
   is "not for me" (`not_speech::opens_not_for_me`) ends as the

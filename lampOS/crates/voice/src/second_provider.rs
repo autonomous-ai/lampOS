@@ -8138,8 +8138,19 @@ async fn answer(
         // whether the request held more (the Reviewer-lead's P2 on #2930):
         // said only if that round adds no words and no calls.
         let mut short_line: Option<String> = None;
+        // Whether a `remember` of this request kept something, and whether
+        // a reply that said it kept something with none was asked again
+        // once ([`crate::remember::claims_a_keep`], finding K on #3504).
+        let mut kept_now = false;
+        let mut keep_claim_asked = false;
+        // Told before the round after one whose claim went unsaid beside
+        // other calls, once those calls are answered.
+        let mut keep_claim_note = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
+            if std::mem::take(&mut keep_claim_note) {
+                messages.push(Message::system(crate::remember::KEEP_CLAIMED_UNKEPT));
+            }
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                 return Err(Stop::Gone);
             }
@@ -8164,6 +8175,13 @@ async fn answer(
             let mut calls = Vec::new();
             let mut reasoning = None;
             let mut called_us = 0;
+            // A reply's opening, held until it is known whether it says
+            // something was kept; one that does is held to the round's end,
+            // when its calls say whether it was. Not while something of
+            // this request was kept already, nor on a turn offered no
+            // function (a quoted add-on's or a reminder's).
+            let mut claim_held =
+                (!kept_now && !quoted && asked != Asker::Reminder).then(String::new);
             loop {
                 let next = if first && round == 1 {
                     let at = |after: Duration| from + after;
@@ -8318,6 +8336,17 @@ async fn answer(
                                 }
                             }
                         };
+                        let piece = match claim_held.as_mut() {
+                            None => piece,
+                            Some(held) => {
+                                held.push_str(&piece);
+                                match crate::remember::claims_a_keep(held, false) {
+                                    Some(false) => claim_held.take().unwrap_or_default(),
+                                    // Undecided, or a claim: held.
+                                    _ => continue,
+                                }
+                            }
+                        };
                         // The model has chosen to speak: the announcement
                         // need not wait for its first sentence.
                         // A call written as words opens nothing: no
@@ -8364,6 +8393,48 @@ async fn answer(
                 }
                 for sentence in split.push(&held) {
                     queue.push(sentence).await?;
+                }
+            }
+            // A reply that says it kept something (finding K on #3504:
+            // lamp-06c1, 27 Oct, "Kept: the meeting room is called Orange."
+            // with no call, 2 of 4): said only beside a `remember` call. With
+            // none, its words are not said. Beside other calls, those run
+            // and the next round is told nothing was kept (the reviewer-
+            // lead's P2 on #3628). Alone, the model is told once and asked
+            // again; a second such reply, or one in the last round, is said
+            // as the plain line that it was not kept.
+            if let Some(held) = claim_held.take().filter(|held| !held.is_empty()) {
+                let remembers = calls
+                    .iter()
+                    .any(|call| call.name == crate::remember::REMEMBER);
+                if crate::remember::claims_a_keep(&held, true) == Some(true) && !remembers {
+                    if !calls.is_empty() {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no remember call: not said, its other calls run"
+                        );
+                        keep_claim_asked = true;
+                        keep_claim_note = true;
+                        text.clear();
+                    } else if round < MAX_ROUNDS && !std::mem::replace(&mut keep_claim_asked, true)
+                    {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says it kept something, with no remember call: not said, asked again"
+                        );
+                        messages.push(Message::system(crate::remember::KEEP_CLAIMED_UNKEPT));
+                        continue;
+                    } else {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round}: its reply says again it kept something, with no remember call: said it was not kept"
+                        );
+                        queue
+                            .push(crate::remember::NOT_KEPT_LINE.to_owned())
+                            .await?;
+                        return Ok(());
+                    }
+                } else {
+                    for sentence in split.push(&held) {
+                        queue.push(sentence).await?;
+                    }
                 }
             }
             // Asked on `messages` as they still are: what the round's chat
@@ -8844,6 +8915,17 @@ async fn answer(
                 }
                 if may_answer_short {
                     short_told.push(answer.told.clone());
+                }
+                // Any call of this request that ran and was not refused (a
+                // remember, a reminder set, a skill's add): its confirmation
+                // in a later round, "I've saved that for five", is no false
+                // keep (reviewer-three and the reviewer-lead on #3628). A
+                // recall reads, and keeps nothing.
+                if call.name != crate::remember::RECALL
+                    && answer.told["remembered"] != false
+                    && answer.told.get("error").is_none()
+                {
+                    kept_now = true;
                 }
                 messages.push(Message::tool(call.id.clone(), answer.told.to_string()));
                 if let Some(offer) = answer.requested_audio {
