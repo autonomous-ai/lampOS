@@ -1,0 +1,75 @@
+{
+  "pr": 3523,
+  "offered_head": "61a4e1774bef27e8748ba6e0c8c2e0cfd0affdad",
+  "offered_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "fixture_parent": "1fa9ae1b9288b9d4080fbef79723aa4ad6970486",
+  "arm64_run": 40253749638,
+  "linux_clippy_run": 40253749678,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "a24d9f94b245f8b011f5e2b3b98b2168b3404598",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "61a4e1774bef27e8748ba6e0c8c2e0cfd0affdad"
+      ],
+      "preview_tree": "9f87af079a6c31ec286d7f8032ed5070f3f822ae",
+      "offered_tree": "9f87af079a6c31ec286d7f8032ed5070f3f822ae",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "a24d9f94b245f8b011f5e2b3b98b2168b3404598",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "61a4e1774bef27e8748ba6e0c8c2e0cfd0affdad"
+      ],
+      "preview_tree": "9f87af079a6c31ec286d7f8032ed5070f3f822ae",
+      "offered_tree": "9f87af079a6c31ec286d7f8032ed5070f3f822ae",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11332,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11332,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11332
+  ],
+  "own_control_pass_counts": {
+    "lamp-voice coordinator::tests::reminders::a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission": 1,
+    "lamp-voice coordinator::tests::reminders::offline_user_interruption_retries_only_after_successful_authority_publication": 1,
+    "lamp-voice coordinator::tests::reminders::user_interruption_cannot_retry_a_failed_provider_with_unretired_audio": 1,
+    "lamp-voice reminders::tests::interrupted_receipt_retires_before_or_after_audio_without_claiming_completion": 1,
+    "lamp-voice reminders::tests::interrupted_receipt_preserves_completed_and_invalidated_outcomes": 1,
+    "lamp-voice reminders::tests::interrupted_receipt_waits_for_drop_and_exact_consumer_settlement": 1,
+    "lamp-voice reminders::consumer::tests::interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T01:34:13.1959445Z      Summary [ 223.710s] 11332 tests run: 11332 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "linux-clippy-40253749678.log",
+      "bytes": 90843,
+      "sha256": "c5c20a244fa9a5f8372eeef071c0921b33fb22a468c6dc7147de2d8d723019ca"
+    },
+    "arm64": {
+      "path": "arm64-40253749638.log",
+      "bytes": 2718935,
+      "sha256": "dfebb05930bb2ea113020ef4cd0a66b0a50fe231e4cdd1235a5d70c48a6dc63f"
+    }
+  },
+  "controls_source": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-evidence/fixed-stack-2a/sealed.json",
+    "sha256": "4025bd21dc460c957d297d1dad35b0628813391fedad21ccf6966c9f4bb279c3"
+  },
+  "qualified": true,
+  "limits": "Original 61a4e1774 reminder-retry run only, including unchanged fixture dependency #3520. Separate from the pending-trigger fix and earlier 756/c5 carries. No local tests, workflow retries, device, provider or physical-latency claims."
+}

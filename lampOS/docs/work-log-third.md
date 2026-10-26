@@ -7,6 +7,27 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:37 — Current reads complete; interruption repair native green
+
+Ready for lamp-voice: yes (#3512, #3513, #3520).
+
+The three current-c5 carries are non-draft with original ARM64 and Linux
+Clippy green and current READ-OK from reviewer-two and reviewer-three.
+Reviewer-two comments 6406261463, 6406261714 and 6406261087 respectively
+bind those exact heads. Physical/default-path disposition remains First's;
+no merge is claimed. The independent fixture full Voice **4,071/0/21**
+remains reviewer-two's frozen 2a execution with identical compiled/test
+inputs, not a new author run or a whole-1fa execution.
+
+#3523 **61a4e1774** now passes original ARM64 **40253749638**:
+**11,332 unique PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped. All seven
+new retirement controls pass once. Linux Clippy **40253749678** passes;
+both executed previews have exact c5/head parents and the offered tree.
+[Native receipt](verification/reminder-interruption-retry-20261026/native-40253749638.json).
+The PR can now leave draft for readers; the separate #3520 fixture is its
+first dependency commit. #3525's native run continues; no local ARM64 or
+device action was taken.
+
 ## 2026-10-26 08:33 — Independent Turn-end-wire fixture read
 
 READ-OK **ecaed2484** (#3524): no P1/P2 in the test-only change.
